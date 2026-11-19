@@ -12,5 +12,6 @@
     "types": ["vitest/globals"]
   },
   "include": ["src"],
-  "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx"]
+  "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx"],
+  "files": ["src/webStyle.test.ts"]
 }

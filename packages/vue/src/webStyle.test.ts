@@ -1,0 +1,83 @@
+// The type tests of the web style through the Vue binding: `pnpm typecheck` compiles this file.
+import {
+  createCache,
+  createMemorySheet,
+  type StyleObject,
+  type WebStyleObject,
+} from '@umber-style/core'
+import { expectTypeOf } from 'vitest'
+import { createStyle } from './createStyle'
+
+function setup() {
+  const sheet = createMemorySheet()
+  const style = createStyle(
+    { palette: { primary: '#0000ff' }, space: [0, 4, 8] },
+    { prefix: 'v', cache: createCache({ prefix: 'v', sheet }) }
+  )
+  return { ...style, sheet }
+}
+
+describe('what a web style accepts through the Vue binding', () => {
+  it('accepts properties, fallbacks, nested selectors, at-rules, custom properties and label', () => {
+    const { styled, sheet, apply, cache } = setup()
+    const Box = styled('div')({
+      label: 'box',
+      display: 'grid',
+      padding: 8,
+      margin: ['1px', '2px'],
+      '--accent': '#ff0000',
+      '&:hover': { opacity: 0.8 },
+      ':first-child': { margin: 0 },
+      '@media (min-width: 40em)': { padding: 16 },
+    })
+    expectTypeOf(Box).toBeFunction()
+    expect(sheet.rules).toEqual([])
+    expect(apply(cache.css({ '--accent': 'red' }))).toHaveProperty('class')
+    expect(sheet.rules.join('')).toContain('--accent:red;')
+  })
+
+  it('accepts a style function with the theme, returning a style, null or false', () => {
+    const { styled } = setup()
+    styled('div')(({ theme }) => {
+      expectTypeOf(theme.palette.primary).toEqualTypeOf<string>()
+      return Math.random() > 2 ? null : { color: theme.palette.primary, '&:hover': { opacity: 1 } }
+    })
+  })
+
+  it('rejects a misspelt property and a wrong value', () => {
+    const { styled } = setup()
+    // @ts-expect-error `backgroudColor` is not a property
+    styled('div')({ backgroudColor: 'red' })
+    // @ts-expect-error `gird` is not a display value
+    styled('div')({ display: 'gird' })
+    styled('div')({
+      '&:hover': {
+        // @ts-expect-error a misspelt property in a nested style
+        paddng: 1,
+      },
+    })
+    // @ts-expect-error a selector needs `&`
+    styled('div')({ '> li': { color: 'red' } })
+  })
+
+  it('does not catch a typo in a widened object or in an untyped return, and takes the loose type through a cast', () => {
+    const { styled } = setup()
+    const widened = { color: 'red', backgroudColor: 'red' }
+    styled('div')(widened)
+    styled('div')(() => ({ backgroudColor: 'red' }))
+    const loose: StyleObject = { anything: 'goes' }
+    // @ts-expect-error the loose type is not accepted as it is
+    styled('div')(loose)
+    styled('div')(loose as WebStyleObject)
+  })
+
+  it('checks a sheet, an object and a function of the theme', () => {
+    const { StyleSheet } = setup()
+    StyleSheet.create({ box: { padding: 8, '&:hover': { opacity: 0.8 } } })
+    StyleSheet.create((theme) => ({ box: { color: theme.palette.primary } }))
+    // @ts-expect-error a misspelt property in a sheet
+    StyleSheet.create({ box: { backgroudColor: 'red' } })
+    // @ts-expect-error a wrong value in a sheet
+    StyleSheet.create({ box: { display: 'gird' } })
+  })
+})

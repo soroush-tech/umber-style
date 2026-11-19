@@ -1,5 +1,5 @@
 import { createElement, type ElementType } from 'react'
-import type { StyleInput } from '@umber-style/core'
+import type { NativeStyleInput } from './nativeStyle'
 import { platformStyleSheet } from './platform'
 import { toNativeStyle } from './toNativeStyle'
 import type { Styled, StyledOptions } from './types'
@@ -20,7 +20,7 @@ export function createStyled<T>(useTheme: () => T): Styled<T> {
     }
     const { shouldForwardProp: shouldForward } = options
 
-    return (...styles: StyleInput[]) => {
+    return (...styles: NativeStyleInput[]) => {
       const isDynamic = styles.some((style) => typeof style === 'function')
       const fixed = Object.fromEntries(
         styles.flatMap((style, index) =>

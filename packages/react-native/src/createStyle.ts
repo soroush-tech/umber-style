@@ -1,7 +1,7 @@
 import { createElement, type ReactElement } from 'react'
 import { createThemeValue } from './ThemeValue'
 import type { NativeStyle, SheetDefinition, StyleOptions, ThemeProviderProps } from './types'
-import type { SheetStyles, StyleObject } from '@umber-style/core'
+import type { NativeSheetInput, NativeSheetStyles, NativeStyleObject } from './nativeStyle'
 import { createStyled } from './styled'
 import { platformStyleSheet } from './platform'
 import { toNativeStyle } from './toNativeStyle'
@@ -9,14 +9,19 @@ import { toNativeStyle } from './toNativeStyle'
 export type { StyleOptions } from './types'
 
 /** A sheet on React Native: its styles are registered with the platform once for each theme (once in all, for objects). */
-interface NativeSheet<S extends SheetStyles, T> extends SheetDefinition<S, StyleObject> {
-  resolve(theme: T): { [K in keyof S]: StyleObject }
+interface NativeSheet<S extends NativeSheetStyles, T> extends SheetDefinition<
+  S,
+  NativeStyleObject
+> {
+  resolve(theme: T): { [K in keyof S]: NativeStyleObject }
 }
 
 /** Registers `source` with the platform StyleSheet, without the keys that only the web has. */
-function register<S extends SheetStyles>(source: S): { [K in keyof S]: StyleObject } {
+function register<S extends NativeSheetStyles>(source: S): { [K in keyof S]: NativeStyleObject } {
   const pairs = Object.entries(source).map(([key, style]) => [key, toNativeStyle(style)])
-  return platformStyleSheet.create(Object.fromEntries(pairs)) as { [K in keyof S]: StyleObject }
+  return platformStyleSheet.create(Object.fromEntries(pairs)) as {
+    [K in keyof S]: NativeStyleObject
+  }
 }
 
 /** Where the base theme lives: set by the outermost provider, or by the app. */
@@ -34,9 +39,12 @@ export function bindHolder<T extends object>(holder: NativeHolder<T>): NativeSty
     return createElement(ThemeValueProvider, { theme: partial }, children)
   }
 
-  function create<S extends SheetStyles>(styles: S | ((theme: T) => S)): NativeSheet<S, T> {
-    const byTheme = new WeakMap<object, { [K in keyof S]: StyleObject }>()
-    let fixed: { [K in keyof S]: StyleObject } | undefined
+  function create<K extends string>(
+    styles: NativeSheetInput<K, T>
+  ): NativeSheet<Record<K, NativeStyleObject>, T> {
+    type S = Record<K, NativeStyleObject>
+    const byTheme = new WeakMap<object, { [K in keyof S]: NativeStyleObject }>()
+    let fixed: { [K in keyof S]: NativeStyleObject } | undefined
     return {
       resolve(current) {
         if (typeof styles !== 'function') {
@@ -53,7 +61,7 @@ export function bindHolder<T extends object>(holder: NativeHolder<T>): NativeSty
     }
   }
 
-  function useStyle<S extends SheetStyles>(sheet: SheetDefinition<S, StyleObject>) {
+  function useStyle<S extends NativeSheetStyles>(sheet: SheetDefinition<S, NativeStyleObject>) {
     return (sheet as NativeSheet<S, T>).resolve(useTheme())
   }
 
@@ -61,7 +69,7 @@ export function bindHolder<T extends object>(holder: NativeHolder<T>): NativeSty
     styled: createStyled(useTheme),
     StyleSheet: { ...platformStyleSheet, create },
     useStyle,
-    apply: (...entries) => ({ style: entries.filter((entry) => !!entry) as StyleObject[] }),
+    apply: (...entries) => ({ style: entries.filter((entry) => !!entry) as NativeStyleObject[] }),
     ThemeProvider,
     useTheme,
     themeClass: () => '',

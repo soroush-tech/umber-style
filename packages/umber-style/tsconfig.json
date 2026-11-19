@@ -24,5 +24,6 @@
     "../react-native/src/**/*.test.tsx",
     "../vue/src/**/*.test.ts",
     "../vue/src/**/*.test.tsx"
-  ]
+  ],
+  "files": ["src/sharedTypes.test.tsx"]
 }

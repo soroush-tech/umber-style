@@ -99,11 +99,21 @@ function resolveSelector(parent: string, key: string): string {
     .join(',')
 }
 
+/**
+ * `style` for the web: a style written for both platforms has a `web` part, which is merged over the
+ * rest, and a `native` part, which is dropped.
+ */
+function resolveWebParts(style: StyleObject): StyleObject {
+  if (!('web' in style) && !('native' in style)) return style
+  const { web, native: _native, ...rest } = style
+  return isStyleObject(web) ? mergeStyles([rest, web]) : rest
+}
+
 /** Merges style objects left to right; a later key wins and moves to the end; nested objects merge the same way. */
 export function mergeStyles(styles: readonly StyleObject[]): StyleObject {
   const merged: StyleObject = {}
   for (const style of styles) {
-    for (const [key, value] of Object.entries(style)) {
+    for (const [key, value] of Object.entries(resolveWebParts(style))) {
       const earlier = merged[key]
       delete merged[key]
       merged[key] =

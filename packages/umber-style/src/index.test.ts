@@ -54,11 +54,13 @@ describe('the entries of umber-style', () => {
     const targets = Object.values(manifest.exports).flatMap((target) =>
       typeof target === 'string' ? [target] : Object.values(target)
     )
-    expect(targets).toHaveLength(6)
+    expect(targets).toHaveLength(7)
     for (const target of targets) {
       expect(existsSync(fileURLToPath(new URL(`../${target}`, import.meta.url)))).toBe(true)
     }
+    // The `types` condition is first: the compiler reads the shared types, a bundler skips it.
     expect(manifest.exports['./react']).toEqual({
+      types: './src/shared.ts',
       'react-native': './src/react-native.ts',
       'react-server': './src/react.server.ts',
       default: './src/react.ts',

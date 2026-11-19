@@ -3,8 +3,18 @@ import { defineConfig } from 'vitest/config'
 
 export default defineConfig({
   resolve: {
-    // The platform is not installed here: its one import resolves to a stand-in.
-    alias: { 'react-native': fileURLToPath(new URL('./vitest.react-native.ts', import.meta.url)) },
+    alias: [
+      // The platform is not installed here: its one import resolves to a stand-in.
+      {
+        find: 'react-native',
+        replacement: fileURLToPath(new URL('./vitest.react-native.ts', import.meta.url)),
+      },
+      // The entry that the type tests import by its package name: at run time it is the web binding.
+      {
+        find: /^umber-style\/react$/,
+        replacement: fileURLToPath(new URL('./src/react.ts', import.meta.url)),
+      },
+    ],
   },
   test: {
     globals: true,

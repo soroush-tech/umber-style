@@ -14,5 +14,5 @@
   },
   "include": ["src"],
   "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx"],
-  "files": ["src/augmentation.test.tsx"]
+  "files": ["src/augmentation.test.tsx", "src/nativeStyle.test.tsx"]
 }

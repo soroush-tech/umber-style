@@ -1,4 +1,5 @@
 import type { StyleObject } from './serialize'
+import type { WebStyleObject } from './webStyle'
 
 const BRAND = Symbol.for('umber-style.sheet-entry')
 const ENTRY_KEY_PREFIX = '--umber-entry-'
@@ -33,8 +34,8 @@ export function isSheetEntry(value: unknown): value is SheetEntry {
  * framework merged entries and plain keys (Vue does) is split back into its entries, then the rest. A
  * string is an error: a text style cannot be merged into a class.
  */
-export function flattenStyle(style: unknown): (SheetEntry | StyleObject)[] {
-  const flat: (SheetEntry | StyleObject)[] = []
+export function flattenStyle(style: unknown): (SheetEntry | WebStyleObject)[] {
+  const flat: (SheetEntry | WebStyleObject)[] = []
   const visit = (value: unknown): void => {
     if (Array.isArray(value)) {
       value.forEach(visit)
@@ -48,7 +49,7 @@ export function flattenStyle(style: unknown): (SheetEntry | StyleObject)[] {
         if (key.startsWith(ENTRY_KEY_PREFIX)) flat.push(createSheetEntry(item as string))
         else rest[key] = item
       }
-      if (Object.keys(rest).length > 0) flat.push(rest)
+      if (Object.keys(rest).length > 0) flat.push(rest as WebStyleObject)
     }
   }
   visit(style)

@@ -1,11 +1,12 @@
 import { createCache, type Cache, type ClassValue } from './cache'
 import { createSheetEntry, type SheetEntry } from './sheetEntry'
-import type { StyleObject } from './serialize'
 import { createThemeClass } from './theme'
 import { createTokens, type DeepPartial, type Tokens } from './tokens'
+import type { WebStyleObject } from './webStyle'
 import type {
   ColorScheme,
   EngineOptions,
+  SheetInput,
   SheetStyles,
   StyleFunction,
   StyleInput,
@@ -55,13 +56,13 @@ export interface Engine<T> {
   /** The class of a wrapper that a provider renders: it only has display: contents. Inserted once. It is not part of a theme class, which is also put on <html>. */
   scopeClass(): string
   /** The class name of each key of a sheet, made on first use. */
-  createSheet<S extends SheetStyles>(
-    styles: S | ((theme: T) => S)
+  createSheet<K extends string>(
+    styles: SheetInput<K, T>
   ): {
     /** Whether the styles are a function of the theme. */
     isDynamic: boolean
     /** The entries; for a function, against `theme` (a theme view) when given, else against the base theme. */
-    resolve(theme?: T): { [K in keyof S]: SheetEntry }
+    resolve(theme?: T): { [P in K]: SheetEntry }
   }
   /** The logic that every web `styled` shares: the label, the style list, function styles and the class memo. */
   createStyler(
@@ -200,8 +201,8 @@ export function createLazyEngine<T extends object = Theme>(options: EngineOption
         if (hasFunction) {
           return cache.css(...list.map((style) => resolveStyle(style, props, theme)), ...extras)
         }
-        if (extras.some(Boolean)) return cache.css(...(list as StyleObject[]), ...extras)
-        staticClass ??= cache.css(...(list as StyleObject[]))
+        if (extras.some(Boolean)) return cache.css(...(list as WebStyleObject[]), ...extras)
+        staticClass ??= cache.css(...(list as WebStyleObject[]))
         return staticClass
       },
     }

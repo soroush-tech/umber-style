@@ -18,3 +18,21 @@ describe('toNativeStyle', () => {
     expect(toNativeStyle(style)).toEqual(style)
   })
 })
+
+describe('the platform parts of a style written for both platforms', () => {
+  it('merges the native part over the rest and drops the web part', () => {
+    expect(
+      toNativeStyle({
+        padding: 8,
+        elevation: 1,
+        web: { '&:hover': { opacity: 0.8 } },
+        native: { elevation: 2, margin: 4 },
+      })
+    ).toEqual({ padding: 8, elevation: 2, margin: 4 })
+  })
+
+  it('drops a part that is not an object', () => {
+    expect(toNativeStyle({ padding: 8, native: undefined, web: false })).toEqual({ padding: 8 })
+    expect(toNativeStyle({ padding: 8, native: {} })).toEqual({ padding: 8 })
+  })
+})

@@ -14,5 +14,10 @@
   },
   "include": ["src"],
   "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx", "src/**/vitest.*.ts"],
-  "files": ["src/augmentation.test.tsx"]
+  "files": [
+    "src/augmentation.test.tsx",
+    "src/webStyle.test.tsx",
+    "src/webStyle.server.test.tsx",
+    "src/styledSystem.types.test.tsx"
+  ]
 }

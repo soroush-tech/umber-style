@@ -1,4 +1,5 @@
-import type { SheetStyles, StyleObject, Theme } from '@umber-style/core'
+import type { Theme } from '@umber-style/core'
+import type { NativeSheetStyles, NativeStyleObject } from './nativeStyle'
 import { bindHolder, type NativeHolder } from './createStyle'
 import { platformStyleSheet } from './platform'
 import type {
@@ -37,7 +38,7 @@ export function createDefaultStyle() {
     create: (styles) => getStyle().StyleSheet.create(styles),
   }
 
-  function useStyle<S extends SheetStyles>(sheet: SheetDefinition<S, StyleObject>) {
+  function useStyle<S extends NativeSheetStyles>(sheet: SheetDefinition<S, NativeStyleObject>) {
     return getStyle().useStyle(sheet)
   }
 

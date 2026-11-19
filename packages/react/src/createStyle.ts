@@ -4,7 +4,9 @@ import {
   type DeepPartial,
   type Engine,
   type SheetEntry,
+  type SheetInput,
   type SheetStyles,
+  type WebStyleObject,
 } from '@umber-style/core'
 import { createStyled } from './styled'
 import { createThemeProvider } from './ThemeProvider'
@@ -35,8 +37,9 @@ export function bindEngine<T extends object>(engine: Engine<T>): WebStyle<T> {
     return resolve(isDynamic && real !== undefined ? engine.createThemeView(real) : undefined)
   }
 
-  const create = <S extends SheetStyles>(styles: S | ((theme: T) => S)): WebSheet<S> =>
-    engine.createSheet(styles)
+  const create = <K extends string>(
+    styles: SheetInput<K, T>
+  ): WebSheet<Record<K, WebStyleObject>> => engine.createSheet(styles)
 
   return {
     engine,

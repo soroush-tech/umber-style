@@ -5,9 +5,11 @@ import type {
   DeepPartial,
   Engine,
   SheetEntry,
+  SheetInput,
   SheetStyles,
   StyleInput,
   StylerOptions,
+  WebStyleObject,
 } from '@umber-style/core'
 
 export type StyleOptions<T = never> = BindingOptions<T>
@@ -54,7 +56,7 @@ export interface Style<T> {
   cache: Engine<T>['cache']
   styled: Styled<T>
   StyleSheet: {
-    create<S extends SheetStyles>(styles: S | ((theme: T) => S)): Sheet<S>
+    create<K extends string>(styles: SheetInput<K, T>): Sheet<Record<K, WebStyleObject>>
   }
   useStyle<S extends SheetStyles>(sheet: Sheet<S>): { [K in keyof S]: SheetEntry }
   /** The attributes that apply entries of a sheet: a class. */

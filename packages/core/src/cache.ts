@@ -1,6 +1,7 @@
 import { hashString } from './hash'
 import { isSheetEntry, type SheetEntry } from './sheetEntry'
 import { compileRules, mergeStyles, readLabel, type StyleObject } from './serialize'
+import type { WebStyleObject } from './webStyle'
 
 export interface CacheOptions {
   /** First part of every class name. Default 'css'. Must match /^[a-z][a-z0-9-]*$/ or createCache throws. */
@@ -19,7 +20,7 @@ export interface Sheet {
   readonly rules: readonly string[]
 }
 
-export type ClassValue = StyleObject | SheetEntry | string | null | undefined | false
+export type ClassValue = WebStyleObject | SheetEntry | string | null | undefined | false
 
 export interface Cache {
   readonly prefix: string

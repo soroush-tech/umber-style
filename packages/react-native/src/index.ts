@@ -16,4 +16,5 @@ export const {
 export * from './alpha'
 export * from './createStyle'
 export * from './defaultStyle'
+export * from './nativeStyle'
 export * from './types'

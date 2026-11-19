@@ -1,5 +1,11 @@
 import { computed, inject, type ComputedRef, type InjectionKey } from 'vue'
-import { createEngine, type Engine, NO_THEME_MESSAGE, type SheetStyles } from '@umber-style/core'
+import {
+  createEngine,
+  type Engine,
+  NO_THEME_MESSAGE,
+  type SheetInput,
+  type WebStyleObject,
+} from '@umber-style/core'
 import { createStyled } from './styled'
 import { createThemeProvider } from './ThemeProvider'
 import type { Sheet, Style, StyleOptions } from './types'
@@ -21,7 +27,7 @@ export function bindEngine<T extends object>(engine: Engine<T>): Style<T> {
   // The real theme of the nearest provider, as references for tokens and real raw values.
   const useThemeView = () => engine.createThemeView(useTheme().value)
 
-  const create = <S extends SheetStyles>(styles: S | ((theme: T) => S)): Sheet<S> =>
+  const create = <K extends string>(styles: SheetInput<K, T>): Sheet<Record<K, WebStyleObject>> =>
     engine.createSheet(styles)
 
   return {

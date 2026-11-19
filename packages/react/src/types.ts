@@ -1,11 +1,4 @@
-import type {
-  ComponentProps,
-  CSSProperties,
-  ElementType,
-  FunctionComponent,
-  ReactElement,
-  ReactNode,
-} from 'react'
+import type { ComponentProps, ElementType, FunctionComponent, ReactElement, ReactNode } from 'react'
 import type {
   BindingOptions,
   Cache,
@@ -13,10 +6,12 @@ import type {
   DeepPartial,
   Engine,
   SheetEntry,
+  SheetInput,
   SheetStyles,
   StyleInput,
   StylerOptions,
   Theme,
+  WebStyleObject,
 } from '@umber-style/core'
 
 export type StyleOptions<T = never> = BindingOptions<T>
@@ -48,7 +43,13 @@ export interface StyledStatics {
  * each value, so give such a value to a class as a CSS custom property, or drive it another way. A
  * string is an error.
  */
-export type StyleProp = SheetEntry | CSSProperties | false | null | undefined | readonly StyleProp[]
+export type StyleProp =
+  | SheetEntry
+  | WebStyleObject
+  | false
+  | null
+  | undefined
+  | readonly StyleProp[]
 
 export type StyledComponent<C extends ElementType, P extends object> = FunctionComponent<
   Omit<ComponentProps<C>, keyof P | 'as' | 'style'> & P & { as?: ElementType; style?: StyleProp }
@@ -86,7 +87,9 @@ export interface WebThemeProviderProps<T> extends ThemeProviderProps<T> {
 export interface Style<T, E> {
   styled: Styled<T>
   StyleSheet: {
-    create<S extends SheetStyles>(styles: S | ((theme: T) => S)): SheetDefinition<S, E>
+    create<K extends string>(
+      styles: SheetInput<K, T>
+    ): SheetDefinition<Record<K, WebStyleObject>, E>
   }
   useStyle<S extends SheetStyles>(sheet: SheetDefinition<S, E>): { [K in keyof S]: E }
   ThemeProvider(props: ThemeProviderProps<T>): ReactElement

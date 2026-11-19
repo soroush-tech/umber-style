@@ -1,12 +1,10 @@
+import type { BindingOptions, ColorScheme, DeepPartial, StylerOptions } from '@umber-style/core'
 import type {
-  BindingOptions,
-  ColorScheme,
-  DeepPartial,
-  SheetStyles,
-  StyleInput,
-  StyleObject,
-  StylerOptions,
-} from '@umber-style/core'
+  NativeSheetInput,
+  NativeSheetStyles,
+  NativeStyleInput,
+  NativeStyleObject,
+} from './nativeStyle'
 import type { platformStyleSheet } from './platform'
 import type { ComponentProps, ElementType, FunctionComponent, ReactElement, ReactNode } from 'react'
 
@@ -19,7 +17,7 @@ export interface StyledOptions extends StylerOptions {
 }
 
 /** What the `style` prop of a styled component takes: style objects (sheet entries are such objects), in arrays, with falsy values dropped. */
-export type StyleProp = StyleObject | false | null | undefined | readonly StyleProp[]
+export type StyleProp = NativeStyleObject | false | null | undefined | readonly StyleProp[]
 
 export type StyledComponent<C extends ElementType, P extends object> = FunctionComponent<
   Omit<ComponentProps<C>, keyof P | 'as' | 'style'> & P & { as?: ElementType; style?: StyleProp }
@@ -28,10 +26,10 @@ export type StyledComponent<C extends ElementType, P extends object> = FunctionC
 export type Styled<T> = <C extends ElementType>(
   tag: C,
   options?: StyledOptions
-) => <P extends object = object>(...styles: StyleInput<T, P>[]) => StyledComponent<C, P>
+) => <P extends object = object>(...styles: NativeStyleInput<T, P>[]) => StyledComponent<C, P>
 
 /** A set of named styles; `E` is what one of them becomes. */
-export interface SheetDefinition<S extends SheetStyles, E> {
+export interface SheetDefinition<S extends NativeSheetStyles, E> {
   /** Never set at run time: it only carries the types. */
   readonly entries?: { [K in keyof S]: E }
 }
@@ -52,15 +50,19 @@ export interface NativeStyle<T> {
   styled: Styled<T>
   /** The platform StyleSheet, with a `create` that resolves the styles with the theme and registers them. */
   StyleSheet: Omit<typeof platformStyleSheet, 'create'> & {
-    create<S extends SheetStyles>(styles: S | ((theme: T) => S)): SheetDefinition<S, StyleObject>
+    create<K extends string>(
+      styles: NativeSheetInput<K, T>
+    ): SheetDefinition<Record<K, NativeStyleObject>, NativeStyleObject>
   }
-  useStyle<S extends SheetStyles>(
-    sheet: SheetDefinition<S, StyleObject>
+  useStyle<S extends NativeSheetStyles>(
+    sheet: SheetDefinition<S, NativeStyleObject>
   ): {
-    [K in keyof S]: StyleObject
+    [K in keyof S]: NativeStyleObject
   }
   /** The props that apply entries of a sheet: a style array. */
-  apply(...entries: (StyleObject | null | undefined | false)[]): { style: StyleObject[] }
+  apply(...entries: (NativeStyleObject | null | undefined | false)[]): {
+    style: NativeStyleObject[]
+  }
   ThemeProvider(props: ThemeProviderProps<T>): ReactElement
   /** The real theme values, for JavaScript that needs a number or a name. */
   useTheme(): T

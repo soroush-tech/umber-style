@@ -1,5 +1,5 @@
 import type { Cache } from './cache'
-import type { StyleObject } from './serialize'
+import type { WebStyleObject } from './webStyle'
 import type { TokenOptions } from './tokens'
 
 export interface EngineOptions extends TokenOptions {
@@ -16,13 +16,13 @@ export interface EngineOptions extends TokenOptions {
 export type ColorScheme = 'light' | 'dark' | 'light dark'
 
 /** What a style function may return. */
-export type StyleResult = StyleObject | null | undefined | false
+export type StyleResult = WebStyleObject | null | undefined | false
 
 /** A style that is computed from the props and the theme. */
 export type StyleFunction<T, P> = (props: P & { theme: T }) => StyleResult
 
 /** A style object, or a function of the props and the theme; the defaults accept any function. */
-export type StyleInput<T = never, P = never> = StyleObject | StyleFunction<T, P>
+export type StyleInput<T = never, P = never> = WebStyleObject | StyleFunction<T, P>
 
 /** The label of a styled component, and what it takes from the styles of the one it wraps. */
 export interface StylerOptions {
@@ -32,7 +32,15 @@ export interface StylerOptions {
   slot?: string
 }
 
-export type SheetStyles = Record<string, StyleObject>
+export type SheetStyles = Record<string, WebStyleObject>
+
+/**
+ * What a sheet is made from: one style for each name, or a function of the theme that returns them. The
+ * names are the type parameter, so that an object literal given here is checked key by key.
+ */
+export type SheetInput<K extends string, T> =
+  | Record<K, WebStyleObject>
+  | ((theme: T) => Record<K, WebStyleObject>)
 
 /**
  * The shape of the theme of an app. It has no members of its own (the optional one below only keeps it

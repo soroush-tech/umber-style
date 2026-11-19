@@ -5,6 +5,10 @@ import { fileURLToPath } from 'node:url'
 import * as core from './index'
 
 const SOURCE = dirname(fileURLToPath(import.meta.url))
+const manifest = JSON.parse(readFileSync(join(SOURCE, '../package.json'), 'utf8')) as {
+  dependencies: Record<string, string>
+  peerDependencies?: Record<string, string>
+}
 const IMPORT_PATTERN = /(?:from|import)\s+'([^']+)'/g
 const FRAMEWORK_PATTERN = /^(react|react-dom|react-native|vue)(\/|$)/
 const BINDING_PATTERN = /(^|\/)(react|react-native|vue)(\/|$)/
@@ -41,6 +45,26 @@ describe('the core', () => {
       expect(specifier).not.toMatch(FRAMEWORK_PATTERN)
       expect(specifier).not.toMatch(BINDING_PATTERN)
     }
+  })
+
+  it('imports csstype for types only, so the core has no runtime dependency', () => {
+    const { files, specifiers } = walkImports(join(SOURCE, 'index.ts'))
+    expect(specifiers).toContain('csstype')
+    for (const file of files) {
+      const source = readFileSync(file, 'utf8')
+      for (const { index } of source.matchAll(/from\s+'csstype'/g)) {
+        // The start of the statement that this import ends: with `verbatimModuleSyntax`, only an
+        // `import type` is erased from the build.
+        const start =
+          Math.max(source.lastIndexOf('\nimport ', index), source.lastIndexOf('\nexport ', index)) +
+          1
+        expect(source.slice(start, index)).toMatch(/^import type /)
+      }
+      expect(source).not.toMatch(/import\(\s*'csstype'/)
+    }
+    // It is listed as a dependency, so that the types in the declarations resolve for a consumer.
+    expect(manifest.dependencies).toHaveProperty('csstype')
+    expect(manifest.peerDependencies).toBeUndefined()
   })
 
   it('exports the engine and its parts', () => {
