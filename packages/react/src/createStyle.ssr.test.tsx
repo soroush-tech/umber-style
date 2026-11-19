@@ -19,7 +19,7 @@ describe('createStyle on the server', () => {
         </ThemeProvider>
       </ThemeProvider>
     )
-    expect(html).toMatch(/<div class="srv-theme-\w+ srv-scope">/)
+    expect(html).toMatch(/<div class="srv-theme-\w+ srv-boundary srv-scope">/)
     expect(html).not.toContain('style=')
     const { css } = cache.extract()
     expect(css.match(/\.srv-theme-\w+\{/g)).toHaveLength(2)

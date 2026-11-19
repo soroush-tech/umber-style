@@ -10,6 +10,8 @@ describe('the entry of @umber-style/react-native', () => {
       'useStyle',
       'apply',
       'themeClass',
+      'when',
+      'whenScheme',
       'configure',
       'createStyle',
       'alpha',

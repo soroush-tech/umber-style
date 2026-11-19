@@ -66,7 +66,7 @@ describe('the server build of styled', () => {
       </ThemeProvider>
     )
     const [section] = findAll(tree, 'section')
-    expect(classOf(section)).toMatch(/^f-theme-\w+ f-scope mine$/)
+    expect(classOf(section)).toMatch(/^f-theme-\w+ f-boundary f-scope mine$/)
     expect(section.props.style).toBeUndefined()
     expect(section.children).toEqual(['text'])
     const [style] = findAll(tree, 'style')

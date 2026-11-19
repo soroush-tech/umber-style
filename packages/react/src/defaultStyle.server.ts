@@ -55,6 +55,9 @@ export function createDefaultStyle() {
     readTheme,
     ThemeProvider,
     apply: ((...entries) => getStyle().apply(...entries)) as ServerStyle<Theme>['apply'],
+    when: ((theme, colorScheme) =>
+      getStyle().when(theme, colorScheme)) as ServerStyle<Theme>['when'],
+    whenScheme: ((scheme) => getStyle().whenScheme(scheme)) as ServerStyle<Theme>['whenScheme'],
     themeClass: ((theme, colorScheme) =>
       getStyle().themeClass(theme, colorScheme)) as ServerStyle<Theme>['themeClass'],
   }

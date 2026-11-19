@@ -10,6 +10,8 @@ describe('the entry of @umber-style/vue', () => {
       'useStyle',
       'apply',
       'themeClass',
+      'when',
+      'whenScheme',
       'getEngine',
       'configure',
       'createStyle',

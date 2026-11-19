@@ -66,6 +66,8 @@ export function createDefaultStyle() {
     useTheme,
     ThemeProvider,
     apply: ((...entries) => getStyle().apply(...entries)) as Style<Theme>['apply'],
+    when: ((theme, colorScheme) => getStyle().when(theme, colorScheme)) as Style<Theme>['when'],
+    whenScheme: ((scheme) => getStyle().whenScheme(scheme)) as Style<Theme>['whenScheme'],
     themeClass: ((theme, colorScheme) =>
       getStyle().themeClass(theme, colorScheme)) as Style<Theme>['themeClass'],
   }

@@ -6,8 +6,11 @@ import type { ComponentProps, ElementType, FunctionComponent, ReactElement } fro
 import type {
   ColorScheme,
   DeepPartial,
+  SchemeKey,
+  SchemeName,
   SheetEntry,
   Theme,
+  ThemeKey,
   WebProperties,
   WebStyleObject,
 } from '@umber-style/core'
@@ -112,6 +115,10 @@ export interface SharedStyle<T> {
   ThemeProvider(props: ThemeProviderProps<T>): ReactElement
   useTheme(): T
   themeClass(theme: DeepPartial<T>, colorScheme?: ColorScheme): string
+  /** A style key for "the nearest theme is this theme", at the top of a style or inside `web` or `native`. On the web it needs `@scope`; on React Native it matches the theme object of the nearest provider. */
+  when(theme: DeepPartial<T>, colorScheme?: ColorScheme): ThemeKey
+  /** A style key for "the nearest color scheme is this one": the nearest theme given that `colorScheme`, else the system preference. */
+  whenScheme(scheme: SchemeName): SchemeKey
 }
 
 export type { DefaultStyleOptions, StyledOptions, StyleOptions, ThemeProviderProps }
@@ -125,6 +132,8 @@ export declare const useTheme: SharedStyle<Theme>['useTheme']
 export declare const ThemeProvider: SharedStyle<Theme>['ThemeProvider']
 export declare const apply: SharedApply
 export declare const themeClass: SharedStyle<Theme>['themeClass']
+export declare const when: SharedStyle<Theme>['when']
+export declare const whenScheme: SharedStyle<Theme>['whenScheme']
 /** `color` at `opacity` (0 to 1): a CSS mix on the web, rgba() on React Native. */
 export declare const alpha: (color: string, opacity: number) => string
 /** A percentage: `'50%'`. */

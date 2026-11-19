@@ -90,7 +90,8 @@ describe('the default style on React Native', () => {
   })
 
   it('has a sheet, useStyle, apply and an empty themeClass', () => {
-    const { StyleSheet, useStyle, apply, themeClass, configure } = createDefaultStyle()
+    const { StyleSheet, useStyle, apply, themeClass, configure, when, whenScheme } =
+      createDefaultStyle()
     configure({ theme: light })
     const sheet = StyleSheet.create((theme) => ({ box: { padding: theme.space.small } }))
     const seen: unknown[] = []
@@ -102,6 +103,8 @@ describe('the default style on React Native', () => {
     expect(seen[0]).toEqual({ padding: 4 })
     expect(apply({ margin: 1 }, null)).toEqual({ style: [{ margin: 1 }] })
     expect(themeClass(light, 'dark')).toBe('')
+    expect(when(light)).toMatch(/^@theme n/)
+    expect(whenScheme('dark')).toBe('@scheme dark')
   })
 })
 

@@ -16,7 +16,7 @@ describe('a ThemeProvider with isRoot', () => {
     const {
       ThemeProvider,
       useTheme: readTheme,
-      themeClass,
+      engine,
     } = createStyle(theme, {
       prefix: 'r',
       cache: createCache({ hasLayers: false, hasPruning: false, prefix: 'r', sheet }),
@@ -42,7 +42,7 @@ describe('a ThemeProvider with isRoot', () => {
     expect(root.children[1].className).toMatch(/^r-theme-/)
     expect(seen).toEqual(theme)
     expect(sheet.rules).toContain(
-      `.${themeClass(theme)}{--r-palette-primary:#0000ff;--r-space-0:0;--r-space-1:4px;}`
+      `.${engine.themeId(theme)}{--r-palette-primary:#0000ff;--r-space-0:0;--r-space-1:4px;}`
     )
   })
 })

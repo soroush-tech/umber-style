@@ -25,6 +25,13 @@ export interface CacheOptions {
    * color-mix(). Default true. Without it only the color-mix() value is written.
    */
   hasColorFallbacks?: boolean
+  /**
+   * Whether a style written with `when()` or `whenScheme()` is scoped with `@scope`, so that it follows the
+   * nearest theme. Default true. Without it the rule is the plain descendant form `:where(.theme) .class`,
+   * which also matches below a nested theme, and so is wrong for nested themes. A browser without `@scope`
+   * drops the scoped rules and keeps the rest.
+   */
+  hasScope?: boolean
   /** Where rules go. Default: a DOM sheet when `document` exists, otherwise an in-memory one. */
   sheet?: Sheet
 }
@@ -71,6 +78,8 @@ export interface Cache {
   insertOnce(id: string, rules: readonly string[], layer?: RuleLayer): boolean
   /** The rules this cache inserted under `id` (a class name), or none: for a style element that a server component renders. */
   getRules(id: string): readonly string[]
+  /** Whether conditional rules are written with `@scope`. */
+  readonly hasScope: boolean
   /** Whether theme classes declare only the variables in use. */
   readonly hasPruning: boolean
   /** The names of the variables that rules refer to, or that were marked: the only ones a pruned theme class declares. It only grows. */
@@ -206,6 +215,7 @@ export function createCache(options: CacheOptions = {}): Cache {
     hasLayers = true,
     hasPruning = true,
     hasColorFallbacks = true,
+    hasScope = true,
   } = options
   if (!PREFIX_PATTERN.test(prefix)) {
     throw new Error(`Invalid cache prefix "${prefix}": use lowercase letters, digits and hyphens.`)
@@ -219,6 +229,7 @@ export function createCache(options: CacheOptions = {}): Cache {
     options.sheet ??
     (typeof document === 'undefined' ? createMemorySheet() : createDomSheet(prefix))
   const registered = new Map<string, StyleObject>()
+  const scoping = { prefix, hasScope }
 
   const insertedRules = new Map<string, readonly string[]>()
   // The `@property` rule of each registered variable, and the variables of each theme class.
@@ -375,14 +386,14 @@ export function createCache(options: CacheOptions = {}): Cache {
     if (styles.length === 0) return rawClasses.join(' ')
 
     const merged = mergeStyles(styles)
-    const rules = compileRules('&', merged, hasColorFallbacks)
+    const rules = compileRules('&', merged, hasColorFallbacks, scoping)
     if (rules.length === 0) return rawClasses.join(' ')
     const label = hasLabels ? readLabel(merged) : ''
     // The layer is part of the hash, so that the same styles in two layers are two classes.
     const hash = hashString((hasLayers && layer === 'overrides' ? layer : '') + rules.join(''))
     const className = [prefix, label, hash].filter(Boolean).join('-') + suffix
     registered.set(className, merged)
-    insertOnce(className, compileRules(`.${className}`, merged, hasColorFallbacks), layer)
+    insertOnce(className, compileRules(`.${className}`, merged, hasColorFallbacks, scoping), layer)
     return [...rawClasses, className].join(' ')
   }
 
@@ -393,6 +404,7 @@ export function createCache(options: CacheOptions = {}): Cache {
     registered,
     css: (...values) => cssIn('components', ...values),
     cssIn,
+    hasScope,
     hasPruning,
     usedVariables: used,
     markUsed,

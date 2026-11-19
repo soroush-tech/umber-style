@@ -55,6 +55,8 @@ export function bindEngine<T extends object>(engine: Engine<T>): WebStyle<T> {
     }),
     useTheme,
     themeClass,
+    when: engine.when,
+    whenScheme: engine.whenScheme,
   }
 }
 

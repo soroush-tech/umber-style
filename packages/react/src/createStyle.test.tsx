@@ -238,7 +238,7 @@ describe('ThemeProvider', () => {
     )
     const element = container.firstElementChild as HTMLElement
     expect(element.tagName).toBe('SECTION')
-    expect(element.className).toMatch(/^t-theme-[a-z0-9]+ t-scope mine$/)
+    expect(element.className).toMatch(/^t-theme-[a-z0-9]+ t-boundary t-scheme-dark t-scope mine$/)
     expect(sheet.rules.find((rule) => rule.includes('color-scheme'))).toMatch(
       /color-scheme:dark;\}$/
     )

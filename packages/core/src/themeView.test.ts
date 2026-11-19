@@ -94,7 +94,7 @@ describe('cache.getRules', () => {
       ruleOf(className),
       `.${className}:hover{color:blue;}`,
     ])
-    const themeClass = engine.themeClass({ palette: { primary: '#fff' } })
+    const themeClass = engine.themeId({ palette: { primary: '#fff' } })
     expect(engine.cache.getRules(themeClass)).toEqual([`.${themeClass}{--v-palette-primary:#fff;}`])
     expect(engine.cache.getRules('external')).toEqual([])
   })

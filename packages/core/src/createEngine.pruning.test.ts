@@ -51,7 +51,7 @@ describe('the generated rules of each token mode', () => {
     const { engine, cache } = setup({
       modes: { zIndex: 'inline', 'palette.accent': 'reference', 'palette.text': 'raw' },
     })
-    const name = engine.themeClass(theme)
+    const name = engine.themeId(theme)
     engine.createStyler({}, [card]).getClassName({})
     expect(cache.getRules(name)).toEqual([
       `.${name}{--e-palette-primary:#0000ff;--e-palette-accent:#ff0000;--e-space-1:4px;}`,
@@ -62,7 +62,7 @@ describe('the generated rules of each token mode', () => {
 
   it('lets a nested theme override a reference token as it overrides a variable', () => {
     const { engine, cache } = setup({ modes: { 'palette.primary': 'reference' } })
-    const name = engine.themeClass(dark)
+    const name = engine.themeId(dark)
     const className = engine.createStyler({}, [card]).getClassName(
       {},
       undefined,
@@ -106,8 +106,8 @@ describe('the generated rules of each token mode', () => {
 describe('only the used variables', () => {
   it('extracts each theme class with exactly the used tokens it has a value for', () => {
     const { engine, cache } = setup()
-    const base = engine.themeClass(theme)
-    const nested = engine.themeClass(dark)
+    const base = engine.themeId(theme)
+    const nested = engine.themeId(dark)
     engine.css({ color: engine.refs.palette.primary, background: engine.refs.palette.accent })
     engine.css({ margin: engine.refs.space[2] })
     const { css } = cache.extract()
@@ -129,7 +129,7 @@ describe('only the used variables', () => {
       prefix: 'e',
       cache: createCache({ prefix: 'e', hasLayers: false, sheet }),
     })
-    const name = engine.themeClass(aliases)
+    const name = engine.themeId(aliases)
     engine.css({ color: engine.refs.palette.primary })
     expect(engine.cache.getRules(name)).toEqual([
       `.${name}{--e-palette-primary:var(--e-palette-blue);--e-palette-blue:#0000ff;}`,
@@ -138,7 +138,7 @@ describe('only the used variables', () => {
 
   it('always declares the paths in alwaysDeclare, nothing else', () => {
     const { engine, cache } = setup({ alwaysDeclare: ['space', 'palette.text', 'zIndex'] })
-    const name = engine.themeClass(theme)
+    const name = engine.themeId(theme)
     expect(cache.getRules(name)).toEqual([
       `.${name}{--e-palette-text:#111111;--e-space-0:0;--e-space-1:4px;--e-space-2:8px;--e-z-index-modal:100;}`,
     ])
@@ -152,7 +152,7 @@ describe('only the used variables', () => {
       alwaysDeclare: ['palette.surface'],
       cache: createCache({ prefix: 'e', hasLayers: false, sheet }),
     })
-    const nested = engine.themeClass(dark)
+    const nested = engine.themeId(dark)
     expect(engine.cache.getRules(nested)).toEqual([`.${nested}{--e-palette-surface:#000000;}`])
   })
 
@@ -166,8 +166,8 @@ describe('only the used variables', () => {
       sheet: createMemorySheet(),
     })
     const oldEngine = createEngine(theme, { prefix: 'e', cache: old })
-    const name = full.engine.themeClass(dark, 'dark')
-    expect(oldEngine.themeClass(dark, 'dark')).toBe(name)
+    const name = full.engine.themeId(dark, 'dark')
+    expect(oldEngine.themeId(dark, 'dark')).toBe(name)
     expect(full.cache.getRules(name)).toEqual([
       `.${name}{--e-palette-primary:#8ab4f8;--e-palette-surface:#000000;color-scheme:dark;}`,
     ])
@@ -181,8 +181,8 @@ describe('only the used variables', () => {
   it('appends the variable that a token adds later, in the browser, once and to the classes that have it', () => {
     const cache = createCache({ prefix: 'e', hasLayers: false, sheet: createDomSheet('e') })
     const engine = createEngine<AppTheme>(theme, { prefix: 'e', cache })
-    engine.themeClass(theme)
-    engine.themeClass(dark)
+    engine.themeId(theme)
+    engine.themeId(dark)
     const rules = () =>
       [...(document.querySelector('style')?.sheet?.cssRules ?? [])].map((rule) => rule.cssText)
     engine.css({ color: engine.refs.palette.primary })
@@ -198,8 +198,8 @@ describe('only the used variables', () => {
 describe('a hydrated page', () => {
   it('neither loses nor repeats a declaration', () => {
     const server = setup()
-    const baseName = server.engine.themeClass(theme)
-    const darkName = server.engine.themeClass(dark, 'dark')
+    const baseName = server.engine.themeId(theme)
+    const darkName = server.engine.themeId(dark, 'dark')
     server.engine.css({ color: server.engine.refs.palette.primary })
     document.head.innerHTML = createStyleTag(server.cache)
 
@@ -207,8 +207,8 @@ describe('a hydrated page', () => {
     const sent = element.textContent
     const cache = createCache({ prefix: 'e', hasLayers: false, sheet: createDomSheet('e') })
     const engine = createEngine<AppTheme>(theme, { prefix: 'e', cache })
-    expect(engine.themeClass(theme)).toBe(baseName)
-    expect(engine.themeClass(dark, 'dark')).toBe(darkName)
+    expect(engine.themeId(theme)).toBe(baseName)
+    expect(engine.themeId(dark, 'dark')).toBe(darkName)
     // One token the server covered, and one it did not.
     engine.css({ color: engine.refs.palette.primary })
     const inserted = engine.css({ background: engine.refs.palette.surface })
@@ -255,8 +255,8 @@ describe('the size of the extracted css', () => {
     const darker = { palette: { blue500: '#101010', gray100: '#202020', red500: '#303030' } }
     const cache = createCache({ prefix: 'e', sheet: createMemorySheet(), hasPruning })
     const engine = createEngine(large, { prefix: 'e', cache, lengthKeys: ['space'] })
-    engine.themeClass(large)
-    engine.themeClass(darker, 'dark')
+    engine.themeId(large)
+    engine.themeId(darker, 'dark')
     const { refs } = engine
     engine.css({ color: refs.palette.blue500, background: refs.palette.gray100 })
     engine.css({ padding: refs.space[2], margin: refs.space[4] })
@@ -309,6 +309,6 @@ describe('edges', () => {
   it('writes a theme class with nothing to declare as no rule, with no pruning', () => {
     const cache = createCache({ prefix: 'e', hasPruning: false, sheet: createMemorySheet() })
     const engine = createEngine({ breakpoints: { md: 1 } }, { prefix: 'e', cache })
-    expect(cache.getRules(engine.themeClass({}))).toEqual([])
+    expect(cache.getRules(engine.themeId({}))).toEqual([])
   })
 })

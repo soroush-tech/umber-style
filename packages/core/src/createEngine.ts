@@ -1,5 +1,13 @@
 import { createCache, type Cache, type ClassValue } from './cache'
 import { createSheetEntry, type SheetEntry } from './sheetEntry'
+import {
+  createSchemeKey,
+  createThemeClassName,
+  createThemeKey,
+  type SchemeKey,
+  type SchemeName,
+  type ThemeKey,
+} from './scope'
 import { createThemeClass } from './theme'
 import { createTokens, type DeepPartial, type Tokens } from './tokens'
 import type { WebStyleObject } from './webStyle'
@@ -56,8 +64,19 @@ export interface Engine<T> {
   /** Gives the engine its base theme. The same object again does nothing; another one replaces the base. */
   setTheme(theme: T): void
   css: Cache['css']
-  /** The scope class of a theme, made once for each theme object and color scheme. With no base theme yet, this theme becomes it. */
+  /**
+   * The classes of a theme, made once for each theme object and color scheme: the theme class (the
+   * variables), the boundary marker `<prefix>-boundary`, and for a `light` or `dark` color scheme the
+   * marker `<prefix>-scheme-light` or `-dark`. Put the whole string where a class goes. With no base
+   * theme yet, this theme becomes it.
+   */
   themeClass(theme: DeepPartial<T>, colorScheme?: ColorScheme): string
+  /** The theme class alone, `<prefix>-theme-<hash>`: the id that rules and style elements are keyed by. Makes the theme class as `themeClass` does. */
+  themeId(theme: DeepPartial<T>, colorScheme?: ColorScheme): string
+  /** A style key for "the nearest theme is this theme": `{ [when(dark)]: { border: ... } }`. Needs `@scope` (see `hasScope`). */
+  when(theme: DeepPartial<T>, colorScheme?: ColorScheme): ThemeKey
+  /** A style key for "the nearest color scheme is this one": the nearest theme given that `colorScheme`, else the system preference. */
+  whenScheme(scheme: SchemeName): SchemeKey
   /** The class of a wrapper that a provider renders: it only has display: contents. Inserted once. It is not part of a theme class, which is also put on <html>. */
   scopeClass(): string
   /** The class name of each key of a sheet, made on first use. */
@@ -90,11 +109,13 @@ function createLabel({ name, slot = 'root' }: StylerOptions): string {
 /** Makes an engine that has no theme yet: it takes one from `setTheme`, or from the first `themeClass`. It needs no framework. */
 export function createLazyEngine<T extends object = Theme>(options: EngineOptions = {}): Engine<T> {
   const { cache: given, suffix, hasLabels, hasLayers, hasPruning, hasColorFallbacks } = options
+  const { hasScope } = options
   const { alwaysDeclare = [] } = options
   const { rawKeys, lengthKeys, modes, registered } = options
   const prefix = options.prefix ?? given?.prefix ?? 'css'
   const cache =
-    given ?? createCache({ prefix, suffix, hasLabels, hasLayers, hasPruning, hasColorFallbacks })
+    given ??
+    createCache({ prefix, suffix, hasLabels, hasLayers, hasPruning, hasColorFallbacks, hasScope })
   const tokenOptions = { prefix, rawKeys, lengthKeys, modes, registered }
   let baseTheme: T | undefined
   let tokens: Tokens<T> | undefined
@@ -131,7 +152,7 @@ export function createLazyEngine<T extends object = Theme>(options: EngineOption
 
   // A theme object is read once per color scheme: a theme object is not changed after it is used.
   const themeClasses = new WeakMap<object, Map<string, string>>()
-  const themeClass = (partial: DeepPartial<T>, colorScheme?: ColorScheme) => {
+  const themeId = (partial: DeepPartial<T>, colorScheme?: ColorScheme) => {
     if (!tokens) setTheme(partial as T)
     const key = colorScheme ?? ''
     const known = themeClasses.get(partial) ?? new Map<string, string>()
@@ -143,6 +164,10 @@ export function createLazyEngine<T extends object = Theme>(options: EngineOption
     }
     return className
   }
+  const themeClass = (partial: DeepPartial<T>, colorScheme?: ColorScheme) =>
+    createThemeClassName(cache.prefix, themeId(partial, colorScheme), colorScheme)
+  const when = (partial: DeepPartial<T>, colorScheme?: ColorScheme) =>
+    createThemeKey(themeId(partial, colorScheme))
 
   const scopeName = `${cache.prefix}-scope`
   const scopeClass = () => {
@@ -247,6 +272,9 @@ export function createLazyEngine<T extends object = Theme>(options: EngineOption
     setTheme,
     createThemeView,
     themeClass,
+    themeId,
+    when,
+    whenScheme: createSchemeKey,
     createSheet,
     createStyler,
   }

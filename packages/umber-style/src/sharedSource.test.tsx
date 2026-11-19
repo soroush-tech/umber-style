@@ -196,3 +196,59 @@ describe('arithmetic on tokens in one component source', () => {
     expect(calls[0].style).toEqual([{ padding: 8, marginLeft: -8 }])
   })
 })
+
+const darkTheme = { palette: { primary: '#8888ff', hover: '#ccccff' }, space: [0, 4, 8] }
+
+/** The one source of a component that differs in a dark theme and in a dark color scheme. */
+function createConditional(
+  binding: ReturnType<typeof createWebStyle<typeof theme>>,
+  Host: string | ((props: Record<string, unknown>) => unknown)
+) {
+  const { styled, when, whenScheme } = binding
+  const Card = styled(Host as never)({
+    padding: 8,
+    [when(darkTheme)]: { padding: 4 },
+    [whenScheme('dark')]: { opacity: 0.5 },
+  })
+  return function Conditional() {
+    return <Card>card</Card>
+  }
+}
+
+describe('theme conditions in one component source', () => {
+  it('compiles to a scoped rule and a scheme rule on the web', () => {
+    const { binding, ruleOf } = setupWeb()
+    const Conditional = createConditional(binding, 'div')
+    render(<Conditional />)
+    const { className } = screen.getByText('card')
+    const id = binding.engine.themeId(darkTheme)
+    expect(ruleOf(className)).toEqual([
+      `@layer u-components{.${className}{padding:8px;}}`,
+      `@layer u-components{@scope (.${id}) to (.u-boundary){.${className}{padding:4px;}}}`,
+      `@layer u-components{@scope (.u-scheme-dark) to (.u-scheme-light,.u-scheme-dark){.${className}{opacity:0.5;}}}`,
+      expect.stringContaining('@media (prefers-color-scheme: dark)'),
+    ])
+  })
+
+  it('matches the nearest provider on React Native', () => {
+    const binding = createNativeStyle(theme)
+    const { View, calls } = createStandIn()
+    const Conditional = createConditional(
+      binding as unknown as ReturnType<typeof createWebStyle<typeof theme>>,
+      View
+    )
+    const { ThemeProvider } = binding
+    render(
+      <>
+        <Conditional />
+        <ThemeProvider theme={darkTheme} colorScheme="dark">
+          <Conditional />
+        </ThemeProvider>
+      </>
+    )
+    expect(calls.map((call) => call.style)).toEqual([
+      [{ padding: 8 }],
+      [{ padding: 4, opacity: 0.5 }],
+    ])
+  })
+})

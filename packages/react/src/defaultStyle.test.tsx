@@ -135,7 +135,7 @@ describe('the default style', () => {
   })
 
   it('has a sheet, useStyle, apply and themeClass', () => {
-    const { StyleSheet, useStyle, apply, themeClass, getEngine, ruleOf } = setup()
+    const { StyleSheet, useStyle, apply, themeClass, when, whenScheme, getEngine, ruleOf } = setup()
     getEngine().setTheme(light)
     const sheet = StyleSheet.create((theme) => ({ box: { color: theme.palette.primary } }))
     const Box = () => <div {...apply(useStyle(sheet).box)}>box</div>
@@ -143,7 +143,9 @@ describe('the default style', () => {
     const { className } = screen.getByText('box')
     expect(ruleOf(className)).toBe(`.${className}{color:var(--d-palette-primary);}`)
     expect(apply()).toEqual({ className: undefined })
-    expect(themeClass(light, 'dark')).toMatch(/^d-theme-/)
+    expect(themeClass(light, 'dark')).toMatch(/^d-theme-[a-z0-9]+ d-boundary d-scheme-dark$/)
+    expect(when(light)).toBe(`@theme ${getEngine().themeId(light)}`)
+    expect(whenScheme('light')).toBe('@scheme light')
   })
 })
 

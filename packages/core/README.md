@@ -311,6 +311,51 @@ What is true about animating a switch of theme class:
 - A nested theme that gives a registered token a value of another type (`10px` for a `<color>`) is a
   declaration the browser ignores, so the value of an outer theme shows through.
 
+## Theme conditions
+
+A style can differ between themes with no token to carry the difference (a border only in dark, a
+shadow only in light). Two keys, `when()` and `whenScheme()`, from the engine, the bindings and the
+top-level exports, say it:
+
+```ts
+const Card = styled('div')({
+  border: 'none',
+  [when(darkTheme)]: { border: '1px solid white' },
+  [whenScheme('dark')]: { boxShadow: 'none' },
+})
+```
+
+- `when(theme, colorScheme?)` applies where the NEAREST theme is `theme` (made with `themeClass`, so
+  pass the same `colorScheme` you give the provider). `whenScheme('light' | 'dark')` applies where the
+  nearest theme that was given a `colorScheme` has that scheme, and, with no such theme above, when the
+  system preference (`prefers-color-scheme`) matches. A theme with no `colorScheme`, or `'light dark'`,
+  is not a scheme boundary. The nested style may hold selectors and at-rules.
+- "Nearest" is what `@scope (theme) to (boundary)` answers: `themeClass(theme)` is now the theme class
+  plus `<prefix>-boundary` (and `<prefix>-scheme-light` or `-dark` for those schemes), so a nested theme
+  cuts the outer one off. In a page with themes A > B > A, a `when(A)` rule applies below the first A, not
+  below B, and again below the second A. `themeId(theme)` is the theme class alone (what rules and style
+  elements are keyed by). The theme class rule itself still declares the variables, and they cascade as
+  before.
+- For `Card` in a page with the dark theme `D` (class `u-theme-1r456yg`), the rules are
+  `@layer u-components{@scope (.u-theme-1r456yg) to (.u-boundary){.u-22td0{border:1px solid white;}}}`,
+  `@layer u-components{@scope (.u-scheme-dark) to (.u-scheme-light,.u-scheme-dark){.u-22td0{box-shadow:none;}}}`
+  and `@layer u-components{@media (prefers-color-scheme: dark){.u-22td0:where(:not(.u-scheme-light,.u-scheme-dark,.u-scheme-light *,.u-scheme-dark *)){box-shadow:none;}}}`.
+  The scoped rule beats the base rule of the class (same specificity, and a scoped rule wins over an
+  unscoped one before source order is looked at); the guard has no specificity.
+- The browser must know `@scope` (Chrome 118, Safari 17.4, Firefox 146). One that does not drops those
+  rules and keeps the rest, so the style is the base style. With `hasScope: false` the rule is the plain
+  form `:where(.theme) .class` instead, which also matches below a nested theme, so it is wrong for nested
+  themes. There is no run-time detection: pick the option.
+- A conditional style applies to descendants of the theme element, not to the element that carries the
+  theme class itself, and a condition inside a `::before` selector cannot take the guard of
+  `whenScheme`. Call `when(theme)` after the base theme is known (`configure({ theme })`), since it
+  makes the theme class like `themeClass` does.
+- On React Native `when(theme)` applies where the nearest provider was given that theme object (the same
+  object, not an equal one; the base theme counts when no provider is above), and `whenScheme(scheme)`
+  where the nearest provider with a `colorScheme` has it, else the platform's `Appearance` color
+  scheme at render. The matching parts are merged over the rest of the style, in order, on each render.
+  The types of `NativeStyleObject` accept the keys but do not check what is inside them.
+
 ## Supported browsers
 
 What the engine writes needs custom properties, and cascade layers (Chrome 99, Firefox 97, Safari

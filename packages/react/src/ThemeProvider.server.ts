@@ -24,7 +24,8 @@ export function createThemeProvider<T extends object>(
   }: WebThemeProviderProps<T>): ReactElement {
     const scope = engine.themeClass(theme, colorScheme)
     const provided = createElement(root.Provider, { value: theme }, children)
-    const styles = createStyleElements(engine.cache, scope)
+    // The rules are keyed by the theme class alone; the markers have none.
+    const styles = createStyleElements(engine.cache, engine.themeId(theme, colorScheme))
     // A root provider renders no element: the app puts the class on an ancestor, and the rule is still sent.
     if (isRoot) return createElement(Fragment, null, ...styles, provided)
     const scoped = engine.scopeClass()

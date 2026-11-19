@@ -43,11 +43,11 @@ describe('createEngine', () => {
   it('makes one class for a theme object and color scheme, once', () => {
     const { engine, sheet } = setup()
     const partial = { palette: { primary: '#ff0000' } }
-    const first = engine.themeClass(partial)
-    expect(engine.themeClass(partial)).toBe(first)
-    const dark = engine.themeClass(partial, 'dark')
+    const first = engine.themeId(partial)
+    expect(engine.themeId(partial)).toBe(first)
+    const dark = engine.themeId(partial, 'dark')
     expect(dark).not.toBe(first)
-    expect(engine.themeClass(partial, 'dark')).toBe(dark)
+    expect(engine.themeId(partial, 'dark')).toBe(dark)
     expect(sheet.rules.filter((rule) => rule.startsWith('.e-theme-'))).toHaveLength(2)
     expect(sheet.rules).toContain(`.${first}{--e-palette-primary:#ff0000;}`)
   })

@@ -40,6 +40,8 @@ export function bindEngine<T extends object>(engine: Engine<T>): Style<T> {
     ThemeProvider: createThemeProvider(engine, key),
     useTheme,
     themeClass: engine.themeClass,
+    when: engine.when,
+    whenScheme: engine.whenScheme,
   }
 }
 

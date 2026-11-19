@@ -65,4 +65,8 @@ export interface Style<T> {
   /** The real theme values, merged over the providers above; reactive. Call it in `setup`. */
   useTheme(): ComputedRef<T>
   themeClass: Engine<T>['themeClass']
+  /** A style key for "the nearest theme is this theme"; it needs `@scope`. */
+  when: Engine<T>['when']
+  /** A style key for "the nearest color scheme is this one": the nearest theme given that `colorScheme`, else the system preference. */
+  whenScheme: Engine<T>['whenScheme']
 }

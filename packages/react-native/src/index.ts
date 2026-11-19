@@ -11,6 +11,8 @@ export const {
   ThemeProvider,
   apply,
   themeClass,
+  when,
+  whenScheme,
 } = defaults
 
 export * from './alpha'

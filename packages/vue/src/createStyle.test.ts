@@ -160,7 +160,7 @@ describe('ThemeProvider and useTheme', () => {
       space: { small: 8 },
     })
     const outer = root.querySelector('[class*="v-theme-"]') as HTMLElement
-    expect(outer.className).toMatch(/^v-theme-[a-z0-9]+ v-scope mine$/)
+    expect(outer.className).toMatch(/^v-theme-[a-z0-9]+ v-boundary v-scope mine$/)
     expect(root.querySelectorAll('[style]')).toHaveLength(0)
     const buttons = [...root.querySelectorAll('button')].map((button) => button.className)
     expect(new Set(buttons).size).toBe(1)

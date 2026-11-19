@@ -118,7 +118,7 @@ describe('a registered token in an engine', () => {
       cache: createCache({ prefix: 'e', sheet }),
       registered: { 'palette.primary': true },
     })
-    engine.themeClass({ palette: { primary: '#123456' } } as AppTheme)
+    engine.themeId({ palette: { primary: '#123456' } } as AppTheme)
     engine.css({ color: engine.refs.palette.primary })
     expect(rulesOf(sheet)).toEqual([
       '@property --e-palette-primary{syntax:"<color>";inherits:true;initial-value:#123456;}',
@@ -132,8 +132,8 @@ describe('a registered token in a theme', () => {
       prefix: 'e',
       registered: { 'palette.primary': '<color>' },
     })
-    const outer = engine.themeClass(theme)
-    const inner = engine.themeClass({ palette: { primary: '#ff0000' } })
+    const outer = engine.themeId(theme)
+    const inner = engine.themeId({ palette: { primary: '#ff0000' } })
     const style = engine.css({ color: engine.refs.palette.primary })
 
     document.body.innerHTML = `<div class="${outer}"><div class="${inner}"><p class="${style}"></p></div><p class="${style}" id="plain"></p></div>`

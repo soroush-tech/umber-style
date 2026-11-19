@@ -12,6 +12,8 @@ export const {
   ThemeProvider,
   apply,
   themeClass,
+  when,
+  whenScheme,
 } = defaults
 
 export { add, alpha, divide, multiply, negate, subtract } from '@umber-style/core'

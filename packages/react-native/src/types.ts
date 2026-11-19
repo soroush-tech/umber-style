@@ -1,4 +1,12 @@
-import type { BindingOptions, ColorScheme, DeepPartial, StylerOptions } from '@umber-style/core'
+import type {
+  BindingOptions,
+  ColorScheme,
+  DeepPartial,
+  SchemeKey,
+  SchemeName,
+  StylerOptions,
+  ThemeKey,
+} from '@umber-style/core'
 import type {
   NativeSheetInput,
   NativeSheetStyles,
@@ -37,7 +45,7 @@ export interface SheetDefinition<S extends NativeSheetStyles, E> {
 export interface ThemeProviderProps<T> {
   /** The theme, or the part of it that this subtree changes. */
   readonly theme: DeepPartial<T>
-  /** Ignored on React Native. */
+  /** The color scheme of this subtree, for `whenScheme`: `light` or `dark`; `light dark` keeps the one above. */
   readonly colorScheme?: ColorScheme
   /** Ignored on React Native. */
   readonly className?: string
@@ -68,4 +76,8 @@ export interface NativeStyle<T> {
   useTheme(): T
   /** Always '': there are no classes on React Native. */
   themeClass(theme: DeepPartial<T>, colorScheme?: ColorScheme): string
+  /** A style key for "the nearest provider has this theme object" (compared by identity; `colorScheme` is not used here). */
+  when(theme: DeepPartial<T>, colorScheme?: ColorScheme): ThemeKey
+  /** A style key for "the nearest provider's `colorScheme` is this one"; with none above, the platform's color scheme. */
+  whenScheme(scheme: SchemeName): SchemeKey
 }

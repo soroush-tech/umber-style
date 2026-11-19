@@ -71,7 +71,7 @@ describe('alpha in an engine', () => {
   it('declares a token that is used only inside alpha(), in both declarations', () => {
     const { engine } = setup()
     const { cache } = engine
-    const scope = engine.themeClass(theme)
+    const scope = engine.themeId(theme)
     expect(cache.getRules(scope)).toEqual([])
     engine.css({ background: alpha(engine.refs.palette.accent, 0.2) })
     expect(cache.usedVariables.has('--e-palette-accent')).toBe(true)
@@ -81,7 +81,7 @@ describe('alpha in an engine', () => {
 
   it('declares it with the mix alone, too', () => {
     const { engine } = setup({ hasColorFallbacks: false })
-    const scope = engine.themeClass(theme)
+    const scope = engine.themeId(theme)
     engine.css({ background: alpha(engine.refs.palette.accent, 0.2) })
     expect(engine.cache.getRules(scope)).toEqual([`.${scope}{--e-palette-accent:#ff0000;}`])
   })

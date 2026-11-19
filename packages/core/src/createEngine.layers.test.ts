@@ -140,7 +140,7 @@ describe('a styler with layers', () => {
   it('puts the scope rule and the theme class in the theme layer', () => {
     const { engine, sheet } = setup()
     const scope = engine.scopeClass()
-    const themeClass = engine.themeClass({ palette: { primary: '#ff0000' } })
+    const themeClass = engine.themeId({ palette: { primary: '#ff0000' } })
     expect(sheet.rules).toEqual([
       '@layer e-theme,e-global,e-components,e-overrides;',
       `@layer e-theme{.${scope}{display:contents;}}`,
@@ -161,7 +161,7 @@ describe('a styler with hasLayers: false', () => {
     expect(sheet.rules.join('')).not.toContain('@layer')
     expect(cache.layerOrder).toBe('')
     engine.scopeClass()
-    engine.themeClass({ palette: { primary: '#ff0000' } })
+    engine.themeId({ palette: { primary: '#ff0000' } })
     expect(sheet.rules.join('')).not.toContain('@layer')
   })
 

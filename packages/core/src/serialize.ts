@@ -1,4 +1,14 @@
 import { isAlphaColor, type AlphaColor } from './alpha'
+import {
+  createNoSchemeGuard,
+  createScopeRule,
+  DEFAULT_SCOPING,
+  getBoundaryClass,
+  getSchemeClass,
+  readCondition,
+  type Condition,
+  type Scoping,
+} from './scope'
 
 export type StyleValue =
   | string
@@ -128,17 +138,79 @@ export function mergeStyles(styles: readonly StyleObject[]): StyleObject {
   return merged
 }
 
-/** The rules of the nested style `value` under `key`: an at-rule wraps them, any other key is a selector inside `selector`. */
+/** What the compiler is given besides the style: how an `alpha()` value is written, and how a condition is scoped. */
+interface CompileContext {
+  hasColorFallbacks: boolean
+  scoping: Scoping
+}
+
+/** `selector`, a list or one, with `text` in front of each of its parts. */
+function prefixSelector(selector: string, text: string): string {
+  return splitSelectors(selector)
+    .map((part) => text + part)
+    .join(',')
+}
+
+/** `selector`, a list or one, with `text` at the end of each of its parts. */
+function suffixSelector(selector: string, text: string): string {
+  return splitSelectors(selector)
+    .map((part) => part + text)
+    .join(',')
+}
+
+/**
+ * The rules of `value` for the elements below `start`, down to the elements that match `limits`: one
+ * `@scope` rule, or, without `hasScope`, the plain descendant selector (which does not stop at a limit).
+ */
+function compileScoped(
+  selector: string,
+  value: StyleObject,
+  context: CompileContext,
+  start: string,
+  limits: string
+): string[] {
+  if (!context.scoping.hasScope) {
+    return compileStyle(prefixSelector(selector, `:where(${start}) `), value, context)
+  }
+  const rules = compileStyle(selector, value, context)
+  return rules.length > 0 ? [createScopeRule(start, limits, rules)] : []
+}
+
+/** The rules of a condition key: the style applies where the nearest theme, or the nearest color scheme, is the one named. */
+function compileCondition(
+  selector: string,
+  condition: Condition,
+  value: StyleObject,
+  context: CompileContext
+): string[] {
+  const { prefix } = context.scoping
+  if (condition.kind === 'theme') {
+    const limit = `.${getBoundaryClass(prefix)}`
+    return compileScoped(selector, value, context, `.${condition.id}`, limit)
+  }
+  const limits = (['light', 'dark'] as const).map((name) => `.${getSchemeClass(prefix, name)}`)
+  const start = `.${getSchemeClass(prefix, condition.scheme)}`
+  const scoped = compileScoped(selector, value, context, start, limits.join(','))
+  // With no scheme marker above, the system preference decides.
+  const guard = createNoSchemeGuard(prefix)
+  const guarded = compileStyle(suffixSelector(selector, guard), value, context)
+  const query = `@media (prefers-color-scheme: ${condition.scheme}){${guarded.join('')}}`
+  return guarded.length > 0 ? [...scoped, query] : scoped
+}
+
+/** The rules of the nested style `value` under `key`: a condition scopes them, an at-rule wraps them, any other key is a selector inside `selector`. */
 function compileNested(
   selector: string,
   key: string,
   value: StyleObject,
-  hasColorFallbacks: boolean
+  context: CompileContext
 ): string[] {
+  const condition = readCondition(key)
+  if (condition) return compileCondition(selector, condition, value, context)
   if (!key.startsWith('@')) {
-    return compileRules(resolveSelector(selector, key), value, hasColorFallbacks)
+    return compileStyle(resolveSelector(selector, key), value, context)
   }
-  return compileRules(selector, value, hasColorFallbacks).map((rule) => `${key}{${rule}}`)
+  return compileStyle(selector, value, context).map((rule) => `${key}{${rule}}`)
 }
 
 /** One item of a property's value: a value, or an `alpha()` result, which is two declarations (the fallback, then the mix) or just the mix. */
@@ -167,22 +239,32 @@ function toDeclarations(
   return items.map((item) => toItemDeclarations(key, name, item, hasColorFallbacks)).join('')
 }
 
-/** The flat CSS rules of `style` for `selector`; without `hasColorFallbacks` an `alpha()` result is written as its mix alone. */
-export function compileRules(
-  selector: string,
-  style: StyleObject,
-  hasColorFallbacks = true
-): string[] {
+/** The rules of `style` for `selector`, with the options of `context`. */
+function compileStyle(selector: string, style: StyleObject, context: CompileContext): string[] {
   let declarations = ''
   const nested: string[] = []
 
   for (const [key, value] of Object.entries(style)) {
     if (key === 'label' || value === null || value === undefined || value === false) continue
-    if (isStyleObject(value)) nested.push(...compileNested(selector, key, value, hasColorFallbacks))
-    else declarations += toDeclarations(key, value, hasColorFallbacks)
+    if (isStyleObject(value)) nested.push(...compileNested(selector, key, value, context))
+    else declarations += toDeclarations(key, value, context.hasColorFallbacks)
   }
 
   return declarations ? [`${selector}{${declarations}}`, ...nested] : nested
+}
+
+/**
+ * The flat CSS rules of `style` for `selector`; without `hasColorFallbacks` an `alpha()` result is
+ * written as its mix alone. A `when()` or `whenScheme()` key becomes a scoped rule, written as
+ * `scoping` says.
+ */
+export function compileRules(
+  selector: string,
+  style: StyleObject,
+  hasColorFallbacks = true,
+  scoping: Scoping = DEFAULT_SCOPING
+): string[] {
+  return compileStyle(selector, style, { hasColorFallbacks, scoping })
 }
 
 /** The label of `style` (its `label` key), or ''. */

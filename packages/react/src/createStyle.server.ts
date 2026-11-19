@@ -73,6 +73,8 @@ export function bindEngine<T extends object>(
     ThemeProvider: createThemeProvider(engine, root),
     readTheme,
     themeClass,
+    when: engine.when,
+    whenScheme: engine.whenScheme,
   }
 }
 

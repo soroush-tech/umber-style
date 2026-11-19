@@ -5,12 +5,15 @@ import type {
   ColorScheme,
   DeepPartial,
   Engine,
+  SchemeKey,
+  SchemeName,
   SheetEntry,
   SheetInput,
   SheetStyles,
   StyleInput,
   StylerOptions,
   Theme,
+  ThemeKey,
   WebStyleObject,
 } from '@umber-style/core'
 
@@ -97,6 +100,10 @@ export interface Style<T, E> {
   useTheme(): T
   /** The class that declares the variables of `theme`; '' on React Native. */
   themeClass(theme: DeepPartial<T>, colorScheme?: ColorScheme): string
+  /** A style key for "the nearest theme is this theme": `{ [when(dark)]: { border: ... } }`. On the web it needs `@scope`; on React Native it matches the theme object of the nearest provider. */
+  when(theme: DeepPartial<T>, colorScheme?: ColorScheme): ThemeKey
+  /** A style key for "the nearest color scheme is this one": the nearest provider given that `colorScheme`, else the system preference. */
+  whenScheme(scheme: SchemeName): SchemeKey
 }
 
 /** The styling for server components: the root theme of the request is read with readTheme, not with a hook. */
