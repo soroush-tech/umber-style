@@ -14,6 +14,11 @@ describe('the server entry of @umber-style/react', () => {
       'configure',
       'createStyle',
       'alpha',
+      'multiply',
+      'divide',
+      'add',
+      'subtract',
+      'negate',
     ]) {
       expect(entry).toHaveProperty(name)
     }

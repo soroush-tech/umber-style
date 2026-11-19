@@ -1,9 +1,14 @@
 // The type tests of the web style: `pnpm typecheck` compiles this file.
 import { expectTypeOf } from 'vitest'
 import {
+  add,
   createCache,
   createLazyEngine,
   createMemorySheet,
+  divide,
+  multiply,
+  negate,
+  subtract,
   type StyleFunction,
   type StyleObject,
   type WebStyleObject,
@@ -101,5 +106,22 @@ describe('WebStyleObject', () => {
     engine.createStyler({}, [{ padding: 8 }, () => ({ color: 'red' })])
     // @ts-expect-error a misspelt property in a style list
     engine.createStyler({}, [{ backgroudColor: 'red' }])
+  })
+})
+
+describe('the arithmetic helpers in a web style', () => {
+  it('are accepted as values, a negative margin included', () => {
+    const space = 'var(--u-space-2)'
+    const style: WebStyleObject = {
+      marginLeft: negate(space),
+      margin: [negate(space), 0],
+      padding: multiply(space, 2),
+      width: add(space, 4),
+      height: subtract(8, 2),
+      gap: divide(space, 2),
+      '&:hover': { top: negate(4) },
+    }
+    expectTypeOf(style.marginLeft).not.toBeAny()
+    expect(style.padding).toBe('calc(var(--u-space-2) * 2)')
   })
 })

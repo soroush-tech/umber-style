@@ -14,6 +14,7 @@ export const {
 } = defaults
 
 export * from './alpha'
+export * from './calc'
 export * from './createStyle'
 export * from './defaultStyle'
 export * from './nativeStyle'

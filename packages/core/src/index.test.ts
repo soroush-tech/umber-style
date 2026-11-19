@@ -68,7 +68,18 @@ describe('the core', () => {
   })
 
   it('exports the engine and its parts', () => {
-    for (const name of ['createEngine', 'createCache', 'createStyleTag', 'mergeStyles', 'alpha']) {
+    for (const name of [
+      'createEngine',
+      'createCache',
+      'createStyleTag',
+      'mergeStyles',
+      'alpha',
+      'multiply',
+      'divide',
+      'add',
+      'subtract',
+      'negate',
+    ]) {
       expect(core).toHaveProperty(name)
     }
     expect(core).not.toHaveProperty('createStyle')

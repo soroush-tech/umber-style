@@ -1,8 +1,17 @@
 import { render, screen } from '@testing-library/react'
 import { createElement } from 'react'
 import { createCache, createMemorySheet } from './index'
-import { createStyle as createWebStyle } from './react'
-import { createStyle as createNativeStyle } from './react-native'
+import {
+  multiply as multiplyWeb,
+  negate as negateWeb,
+  createStyle as createWebStyle,
+} from './react'
+import {
+  multiply as multiplyNative,
+  negate as negateNative,
+  createStyle as createNativeStyle,
+} from './react-native'
+import type * as Shared from './shared'
 
 const theme = {
   palette: { primary: '#0000ff', hover: '#000080' },
@@ -134,5 +143,51 @@ describe('the same component source on React Native', () => {
       { background: '#0000ff', borderRadius: 8, padding: 4 },
       { background: 'rebeccapurple', borderRadius: 0 },
     ])
+  })
+})
+
+type Helpers = Pick<typeof Shared, 'multiply' | 'negate'>
+
+/** The one source of a component that does arithmetic on tokens; the helpers are the ones of the platform. */
+function createSpacing(
+  binding: ReturnType<typeof createWebStyle<typeof theme>>,
+  Host: string | ((props: Record<string, unknown>) => unknown),
+  { multiply, negate }: Helpers
+) {
+  const Spaced = binding.styled(Host as never)(({ theme: refs }: { theme: typeof theme }) => ({
+    padding: multiply(refs.space[1], 2),
+    marginLeft: negate(refs.space[2]),
+  }))
+  return function Spacing() {
+    return <Spaced>spacing</Spaced>
+  }
+}
+
+describe('arithmetic on tokens in one component source', () => {
+  it('computes in the browser on the web', () => {
+    const { binding, ruleOf } = setupWeb()
+    const Spacing = createSpacing(binding, 'div', {
+      multiply: multiplyWeb as unknown as Helpers['multiply'],
+      negate: negateWeb as unknown as Helpers['negate'],
+    })
+    render(<Spacing />)
+    const { className } = screen.getByText('spacing')
+    expect(ruleOf(className)).toEqual([
+      `.${className}{padding:calc(var(--u-space-1) * 2);margin-left:calc(var(--u-space-2) * -1);}`,
+    ])
+  })
+
+  it('gives the real numbers on React Native', () => {
+    const { View, calls } = createStandIn()
+    const Spacing = createSpacing(
+      createNativeStyle(theme) as unknown as ReturnType<typeof createWebStyle<typeof theme>>,
+      View,
+      {
+        multiply: multiplyNative as unknown as Helpers['multiply'],
+        negate: negateNative as unknown as Helpers['negate'],
+      }
+    )
+    render(<Spacing />)
+    expect(calls[0].style).toEqual([{ padding: 8, marginLeft: -8 }])
   })
 })

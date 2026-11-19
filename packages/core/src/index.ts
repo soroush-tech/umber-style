@@ -1,5 +1,6 @@
 export * from './alpha'
 export * from './cache'
+export * from './calc'
 export * from './createEngine'
 export * from './extractStyles'
 export * from './hash'

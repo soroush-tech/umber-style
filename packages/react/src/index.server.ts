@@ -14,7 +14,7 @@ export const {
   themeClass,
 } = defaults
 
-export { alpha } from '@umber-style/core'
+export { add, alpha, divide, multiply, negate, subtract } from '@umber-style/core'
 export * from './createStyle.server'
 export * from './defaultStyle.server'
 export * from './types'

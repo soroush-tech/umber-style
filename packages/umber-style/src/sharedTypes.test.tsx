@@ -6,10 +6,15 @@ import type { NativeStyleObject } from '@umber-style/react-native'
 import type { ReactNode } from 'react'
 import { expectTypeOf } from 'vitest'
 import {
+  add,
   apply,
   createStyle,
+  divide,
+  multiply,
+  negate,
   StyleSheet,
   styled,
+  subtract,
   useStyle,
   type SharedEntry,
   type SharedStyled,
@@ -173,5 +178,32 @@ describe('what a style written for web and mobile accepts', () => {
       return { padding: 4 }
     })
     expectTypeOf<SharedStyleObject['padding']>().not.toBeAny()
+  })
+})
+
+describe('the arithmetic helpers in a shared style', () => {
+  it('are accepted as values, a negative margin included', () => {
+    const own = createStyle({ space: [0, 4, 8] })
+    const Box = own.styled(Host)(({ theme }) => ({
+      marginLeft: negate(theme.space[2]),
+      padding: multiply(theme.space[1], 2),
+      gap: divide(theme.space[2], 2),
+      height: subtract(theme.space[2], 2),
+      width: add('50%', '10%'),
+      top: negate('5%'),
+      web: { margin: negate(theme.space[1]) },
+      native: { margin: negate(theme.space[1]) },
+    }))
+    expectTypeOf(negate(8)).toEqualTypeOf<number>()
+    expectTypeOf(add(1, 2)).toEqualTypeOf<number>()
+    expectTypeOf(multiply('50%', 2)).toEqualTypeOf<number | `${number}%`>()
+    expectTypeOf(Box).toBeFunction()
+  })
+
+  it('do not take a value that only the web computes', () => {
+    // @ts-expect-error a reference string cannot be computed on React Native
+    multiply('var(--space-2)', 2)
+    // @ts-expect-error a length with a unit is not a percentage
+    add('8px', 4)
   })
 })

@@ -46,6 +46,11 @@ describe('the entries of umber-style', () => {
       for (const name of names) expect(binding).toHaveProperty(name)
     }
     for (const binding of [react, vue]) expect(binding).toHaveProperty('getEngine')
+    for (const binding of [react, reactNative]) {
+      for (const name of ['multiply', 'divide', 'add', 'subtract', 'negate']) {
+        expect(binding).toHaveProperty(name)
+      }
+    }
     expect(react.alpha('red', 1)).toBe('color-mix(in srgb, red 100%, transparent)')
     expect(reactNative.alpha('#fff', 1)).toBe('rgba(255, 255, 255, 1)')
   })

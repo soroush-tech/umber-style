@@ -127,6 +127,31 @@ export declare const apply: SharedApply
 export declare const themeClass: SharedStyle<Theme>['themeClass']
 /** `color` at `opacity` (0 to 1): a CSS mix on the web, rgba() on React Native. */
 export declare const alpha: (color: string, opacity: number) => string
+/** A percentage: `'50%'`. */
+export type SharedPercent = `${number}%`
+
+/**
+ * `value` times `factor`. A token is typed as the number it is on React Native; on the web it is a
+ * `var(--x)` reference and the result is a CSS `calc()` that the browser computes. Percentages are the one
+ * string that both platforms compute.
+ */
+export declare function multiply(value: number, factor: number): number
+export declare function multiply(value: SharedPercent, factor: number): number | SharedPercent
+/** `value` divided by `divisor`; a `divisor` of 0 throws a `RangeError`. */
+export declare function divide(value: number, divisor: number): number
+export declare function divide(value: SharedPercent, divisor: number): number | SharedPercent
+/** The sum of `values`: all numbers, or all percentages. */
+export declare function add(...values: number[]): number
+export declare function add(...values: SharedPercent[]): number | SharedPercent
+/** `value` minus each of `values`: all numbers, or all percentages. */
+export declare function subtract(value: number, ...values: number[]): number
+export declare function subtract(
+  value: SharedPercent,
+  ...values: SharedPercent[]
+): number | SharedPercent
+/** `value` times -1: a negative margin from a token. */
+export declare function negate(value: number): number
+export declare function negate(value: SharedPercent): number | SharedPercent
 export declare function createStyle<T extends object>(
   theme: T,
   options?: StyleOptions<T>

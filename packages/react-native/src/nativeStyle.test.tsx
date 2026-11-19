@@ -2,6 +2,7 @@
 import { render } from '@testing-library/react'
 import { createElement } from 'react'
 import { expectTypeOf } from 'vitest'
+import { add, divide, multiply, negate, subtract } from './calc'
 import { createStyle } from './createStyle'
 import type { NativeStyleObject } from './nativeStyle'
 
@@ -126,5 +127,24 @@ describe('what a native style accepts', () => {
     // @ts-expect-error a nested selector in apply
     apply({ '&:hover': { opacity: 1 } })
     expectTypeOf(Panel).toBeFunction()
+  })
+})
+
+describe('the arithmetic helpers in a native style', () => {
+  it('are accepted as values, a negative margin included', () => {
+    const { styled } = createStyle(theme)
+    const { View, calls } = createStandIn()
+    const Box = styled(View)(({ theme: refs }) => ({
+      marginLeft: negate(refs.space[2]),
+      padding: multiply(refs.space[1], 2),
+      width: add('50%', '10%'),
+      height: subtract(8, 2),
+      top: negate('5%'),
+      margin: divide(refs.space[2], 2),
+    }))
+    render(<Box id="calc" />)
+    expect(calls[0].style).toEqual([
+      { marginLeft: -8, padding: 8, width: '60%', height: 6, top: '-5%', margin: 4 },
+    ])
   })
 })
