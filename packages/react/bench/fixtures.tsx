@@ -91,24 +91,29 @@ export function createComponents(style: BenchStyle, hasCondition = false) {
 
 export type Components = ReturnType<typeof createComponents>
 
+/** A key that tells the combination of props apart: the 48 are distinct. */
+const keyOf = ({ gap, direction, align, justify, wrap }: LayoutProps): string =>
+  [gap, direction, align, justify, wrap].join('|')
+
 /** 48 elements of one component, each a distinct combination for `Flex`. */
 export function createFortyEight(
   components: Components,
   kind: 'fixed' | 'themed' | 'flex' | 'override' | 'entry'
 ): ReactNode[] {
   const { Fixed, Themed, Flex, sheet } = components
-  return combinations.map((props, index) => {
+  return combinations.map((props) => {
+    const key = keyOf(props)
     switch (kind) {
       case 'fixed':
-        return <Fixed key={index} />
+        return <Fixed key={key} />
       case 'themed':
-        return <Themed key={index} />
+        return <Themed key={key} />
       case 'flex':
-        return <Flex key={index} {...props} />
+        return <Flex key={key} {...props} />
       case 'override':
-        return <Fixed key={index} style={{ margin: 4, outline: '1px solid blue' }} />
+        return <Fixed key={key} style={{ margin: 4, outline: '1px solid blue' }} />
       case 'entry':
-        return <Fixed key={index} style={sheet.root} />
+        return <Fixed key={key} style={sheet.root} />
     }
   })
 }

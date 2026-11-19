@@ -1,3 +1,5 @@
+import { codeAt } from './codeAt'
+
 /** The class tokens of a finished HTML document. */
 export interface HtmlTokens {
   /** The tokens of every `class` (and `className`) attribute. */
@@ -27,7 +29,7 @@ function isLetter(code: number): boolean {
 /** The index of the first character at or after `index` that is not whitespace. */
 function skipSpaces(html: string, index: number): number {
   let position = index
-  while (position < html.length && isSpace(html.charCodeAt(position))) position++
+  while (position < html.length && isSpace(codeAt(html, position))) position++
   return position
 }
 
@@ -47,7 +49,7 @@ function readValue(html: string, index: number): { value: string; end: number } 
     return { value: html.slice(index + 1, end), end: end + 1 }
   }
   let end = index
-  while (end < html.length && !isSpace(html.charCodeAt(end)) && html[end] !== '>') end++
+  while (end < html.length && !isSpace(codeAt(html, end)) && html[end] !== '>') end++
   return { value: html.slice(index, end), end }
 }
 
@@ -55,14 +57,14 @@ function readValue(html: string, index: number): { value: string; end: number } 
 function readAttributes(html: string, index: number, found: HtmlTokens): number {
   let position = index
   while (position < html.length) {
-    const code = html.charCodeAt(position)
+    const code = codeAt(html, position)
     if (code === 62) return position + 1
     if (isSpace(code) || code === 47) {
       position++
       continue
     }
     const nameStart = position
-    while (position < html.length && !isNameEnd(html.charCodeAt(position))) position++
+    while (position < html.length && !isNameEnd(codeAt(html, position))) position++
     if (position === nameStart) position++
     const name = html.slice(nameStart, position).toLowerCase()
     position = skipSpaces(html, position)
@@ -87,7 +89,7 @@ function findClosingTag(html: string, index: number, name: string): number {
 /** The index of the end of the tag name that starts at `index`. */
 function readTagNameEnd(html: string, index: number): number {
   let end = index
-  while (end < html.length && !isNameEnd(html.charCodeAt(end))) end++
+  while (end < html.length && !isNameEnd(codeAt(html, end))) end++
   return end
 }
 
@@ -105,7 +107,7 @@ export function scanHtml(html: string): HtmlTokens {
     if (html.startsWith('<!--', at)) {
       const close = html.indexOf('-->', at + 4)
       at = close === -1 ? html.length : close + 3
-    } else if (isLetter(html.charCodeAt(at + 1))) {
+    } else if (isLetter(codeAt(html, at + 1))) {
       const nameEnd = readTagNameEnd(html, at + 1)
       const name = html.slice(at + 1, nameEnd).toLowerCase()
       at = readAttributes(html, nameEnd, found)

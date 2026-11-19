@@ -34,6 +34,7 @@ describe('styled-system parsers as style functions, without a cast', () => {
 
   it('still checks an object next to a parser', () => {
     // @ts-expect-error a misspelt property next to a parser
-    styled('div')(space, { backgroudColor: 'red' })
+    const Typo = styled('div')(space, { backgroudColor: 'red' })
+    expectTypeOf(Typo).toBeFunction()
   })
 })

@@ -84,10 +84,10 @@ export function bindHolder<T extends object>(holder: NativeHolder<T>): NativeSty
     if (typeof styles !== 'function') {
       // Registered with the platform when the first key is read, once. There is no theme and no condition.
       let registered: RegisteredSheet<NativeSheetStyles> | undefined
-      return createLazyRecord(
-        Object.keys(styles),
-        (key) => (registered ??= register(styles as NativeSheetStyles)).entries[key]
-      )
+      return createLazyRecord(Object.keys(styles), (key) => {
+        registered ??= register(styles as NativeSheetStyles)
+        return registered.entries[key]
+      })
     }
     const byTheme = new WeakMap<object, RegisteredSheet<Record<string, NativeStyleObject>>>()
     return {

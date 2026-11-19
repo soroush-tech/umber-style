@@ -64,39 +64,46 @@ describe('what a web style accepts through the Vue binding', () => {
 
   it('rejects a misspelt property and a wrong value', () => {
     const { styled } = setup()
-    // @ts-expect-error `backgroudColor` is not a property
-    styled('div')({ backgroudColor: 'red' })
-    // @ts-expect-error `gird` is not a display value
-    styled('div')({ display: 'gird' })
-    styled('div')({
-      '&:hover': {
-        // @ts-expect-error a misspelt property in a nested style
-        paddng: 1,
-      },
-    })
-    // @ts-expect-error a selector needs `&`
-    styled('div')({ '> li': { color: 'red' } })
+    const rejected = [
+      // @ts-expect-error `backgroudColor` is not a property
+      styled('div')({ backgroudColor: 'red' }),
+      // @ts-expect-error `gird` is not a display value
+      styled('div')({ display: 'gird' }),
+      styled('div')({
+        '&:hover': {
+          // @ts-expect-error a misspelt property in a nested style
+          paddng: 1,
+        },
+      }),
+      // @ts-expect-error a selector needs `&`
+      styled('div')({ '> li': { color: 'red' } }),
+    ]
+    expectTypeOf(rejected).items.not.toBeAny()
   })
 
   it('does not catch a typo in a widened object or in an untyped return, and takes the loose type through a cast', () => {
     const { styled } = setup()
     const widened = { color: 'red', backgroudColor: 'red' }
-    styled('div')(widened)
-    styled('div')(() => ({ backgroudColor: 'red' }))
+    const accepted = [styled('div')(widened), styled('div')(() => ({ backgroudColor: 'red' }))]
     const loose: StyleObject = { anything: 'goes' }
-    // @ts-expect-error the loose type is not accepted as it is
-    styled('div')(loose)
-    styled('div')(loose as WebStyleObject)
+    const loosened = [
+      // @ts-expect-error the loose type is not accepted as it is
+      styled('div')(loose),
+      styled('div')(loose as WebStyleObject),
+    ]
+    expectTypeOf(accepted).items.not.toBeAny()
+    expectTypeOf(loosened).items.not.toBeAny()
   })
 
   it('checks a sheet, an object and a function of the theme', () => {
     const { StyleSheet } = setup()
-    StyleSheet.create({ box: { padding: 8, '&:hover': { opacity: 0.8 } } })
+    const accepted = StyleSheet.create({ box: { padding: 8, '&:hover': { opacity: 0.8 } } })
     StyleSheet.create((theme) => ({ box: { color: theme.palette.primary } }))
     // @ts-expect-error a misspelt property in a sheet
     StyleSheet.create({ box: { backgroudColor: 'red' } })
     // @ts-expect-error a wrong value in a sheet
     StyleSheet.create({ box: { display: 'gird' } })
+    expectTypeOf(accepted.box).toHaveProperty('className')
   })
 })
 

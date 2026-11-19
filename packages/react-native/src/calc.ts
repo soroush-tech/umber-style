@@ -16,7 +16,7 @@ interface Reading {
   isPercent: boolean
 }
 
-const NUMBER_PATTERN = /^(-?(?:\d+\.?\d*|\.\d+))(px|%)?$/i
+const NUMBER_PATTERN = /^(-?(?:\d+(?:\.\d*)?|\.\d+))(px|%)?$/i
 
 /** `value` rounded so that float noise (0.1 * 3) does not show; `-0` is `0`. */
 function tidy(value: number): number {
@@ -55,9 +55,9 @@ function read(name: string, operand: unknown): Reading {
   return { value: Number.parseFloat(match[1]), isPercent: match[2] === '%' }
 }
 
-/** `value` as the number or the percentage that a style takes. */
-function toResult(value: number, isPercent: boolean): number | Percent {
-  return isPercent ? `${tidy(value)}%` : tidy(value)
+/** `value` as the percentage that a style takes. */
+function toPercent(value: number): Percent {
+  return `${tidy(value)}%`
 }
 
 /** `operand` multiplied or divided by `factor`; a percentage stays a percentage. */
@@ -72,7 +72,8 @@ function scale(
   if (isDivision && factor === 0) {
     throw new RangeError(`@umber-style/react-native: ${name}(): the divisor must not be 0`)
   }
-  return toResult(isDivision ? value / factor : value * factor, isPercent)
+  const result = isDivision ? value / factor : value * factor
+  return isPercent ? toPercent(result) : tidy(result)
 }
 
 /** The sum of `terms`: all numbers, or all percentages (a number 0 is both). */
@@ -84,7 +85,7 @@ function sum(name: string, terms: readonly Term[]): number | Percent {
     if (isPercentValue !== isPercent && operand !== 0) throw unsupported(name, operand)
     total += sign * value
   }
-  return toResult(total, isPercent)
+  return isPercent ? toPercent(total) : tidy(total)
 }
 
 /** `value` times `factor`: a number for a number, a percentage for a percentage. */

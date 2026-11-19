@@ -3,26 +3,19 @@
 // `shared.server.ts`). This file holds types and declarations only: it is never loaded.
 import type { ComponentProps, ElementType, FunctionComponent, ReactElement } from 'react'
 import type {
-  AlphaColor,
   ColorScheme,
   DeepPartial,
   NestedKey,
   SchemeKey,
   SchemeName,
   SheetEntry,
-  StyleObject,
   Theme,
   ThemeKey,
   WebNested,
   WebProperties,
   WebStyleObject,
 } from '@umber-style/core'
-import type {
-  DefaultStyleOptions,
-  StyledOptions,
-  StyleOptions,
-  ThemeProviderProps,
-} from '@umber-style/react'
+import type { DefaultStyleOptions, StyledOptions, ThemeProviderProps } from '@umber-style/react'
 import type { NativeStyleObject } from '@umber-style/react-native'
 
 /** The keys that the web style and the native style both have. */
@@ -42,9 +35,9 @@ export type SharedProperties = {
  */
 export type SharedStyleObject = SharedProperties & {
   /** Only on the web: nested selectors, at-rules, any CSS property. */
-  web?: WebStyleObject | null | undefined | false
+  web?: WebStyleObject | null | false
   /** Only on React Native: any key of the platform's styles. */
-  native?: NativeStyleObject | null | undefined | false
+  native?: NativeStyleObject | null | false
 }
 
 /** What a shared style function may return. */
@@ -133,19 +126,11 @@ export interface SharedStyleBase<T> {
   whenScheme(scheme: SchemeName): SchemeKey
 }
 
-export type { DefaultStyleOptions, StyledOptions, StyleOptions, ThemeProviderProps }
+export type { DefaultStyleOptions, StyledOptions, ThemeProviderProps }
+export type { StyleOptions } from '@umber-style/react'
 export type { SheetEntry, Theme }
-export type {
-  AlphaColor,
-  NestedKey,
-  SchemeKey,
-  SchemeName,
-  StyleObject,
-  ThemeKey,
-  WebNested,
-  WebProperties,
-  WebStyleObject,
-}
+export type { AlphaColor, StyleObject } from '@umber-style/core'
+export type { NestedKey, SchemeKey, SchemeName, ThemeKey, WebNested, WebProperties, WebStyleObject }
 
 export declare const configure: (options: DefaultStyleOptions) => void
 export declare const styled: SharedStyled<Theme>

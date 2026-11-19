@@ -229,7 +229,8 @@ function toItemDeclarations(
 ): string {
   if (!isAlphaColor(item)) return `${name}:${toValue(key, item)};`
   const hasFallback = hasColorFallbacks && !key.startsWith('--')
-  return `${hasFallback ? `${name}:${item.fallback};` : ''}${name}:${item.value};`
+  const fallback = hasFallback ? `${name}:${item.fallback};` : ''
+  return `${fallback}${name}:${item.value};`
 }
 
 /** The declarations of one property: one for a value, one for each item of a fallback list. */

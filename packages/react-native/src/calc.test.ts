@@ -18,6 +18,21 @@ describe('multiply on React Native', () => {
     expect(multiply('.5', 4)).toBe(2)
   })
 
+  it('reads a number with a point and no digit after it, and rejects a second point', () => {
+    expect(multiply('3.', 2)).toBe(6)
+    expect(multiply('3.px', 2)).toBe(6)
+    expect(multiply('-3.5%', 2)).toBe('-7%')
+    expect(() => multiply('3..5', 2)).toThrow(TypeError)
+    expect(() => multiply('.', 2)).toThrow(TypeError)
+  })
+
+  it('rejects a long run of digits that ends in something else in linear time', () => {
+    const start = performance.now()
+    expect(() => multiply(`${'1'.repeat(200_000)}!`, 2)).toThrow(TypeError)
+    expect(() => multiply(`${'1'.repeat(200_000)}.${'1'.repeat(200_000)}!`, 2)).toThrow(TypeError)
+    expect(performance.now() - start).toBeLessThan(2000)
+  })
+
   it('keeps a percentage a percentage', () => {
     expect(multiply('50%', 2)).toBe('100%')
     expect(multiply('10%', 0.5)).toBe('5%')

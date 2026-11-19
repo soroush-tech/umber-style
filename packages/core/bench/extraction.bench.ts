@@ -7,8 +7,13 @@
 //                  of the one page, and the theme classes trimmed to the variables that page uses.
 //   scan HTML      one `scanHtml(html)` of that page: the pass that reads the class attributes.
 // The cache is built once, before the cases, and is not changed by any of them (extraction only reads).
-import { createCache, createEngine, createMemorySheet, createStyleTag } from '../src'
-import { extractPageStyles } from '../src'
+import {
+  createCache,
+  createEngine,
+  createMemorySheet,
+  createStyleTag,
+  extractPageStyles,
+} from '../src'
 import { scanHtml } from '../src/scanHtml'
 import { runGroup } from '@umber-bench/shared/harness'
 import { createSmallTheme, type SmallTheme } from '@umber-bench/shared/themes'

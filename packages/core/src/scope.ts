@@ -81,5 +81,6 @@ export function createNoSchemeGuard(prefix: string): string {
   const markers = [getSchemeClass(prefix, 'light'), getSchemeClass(prefix, 'dark')].map(
     (name) => `.${name}`
   )
-  return `:where(:not(${[...markers, ...markers.map((marker) => `${marker} *`)].join(',')}))`
+  const nested = markers.map((marker) => `${marker} *`)
+  return `:where(:not(${[...markers, ...nested].join(',')}))`
 }

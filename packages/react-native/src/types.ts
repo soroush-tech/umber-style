@@ -25,10 +25,11 @@ export interface StyledOptions extends StylerOptions {
 }
 
 /** What the `style` prop of a styled component takes: style objects (sheet entries are such objects), in arrays, with falsy values dropped. */
-export type StyleProp = NativeStyleObject | false | null | undefined | readonly StyleProp[]
+type StyleValue = NativeStyleObject | false | null | readonly StyleProp[]
+export type StyleProp = StyleValue | undefined
 
 export type StyledComponent<C extends ElementType, P extends object> = FunctionComponent<
-  Omit<ComponentProps<C>, keyof P | 'as' | 'style'> & P & { as?: ElementType; style?: StyleProp }
+  Omit<ComponentProps<C>, keyof P | 'as' | 'style'> & P & { as?: ElementType; style?: StyleValue }
 >
 
 export type Styled<T> = <C extends ElementType>(

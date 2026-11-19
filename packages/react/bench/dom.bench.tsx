@@ -72,7 +72,10 @@ it('render into the DOM: the tree of 500', async (context) => {
       },
       {
         name: 'tree of 500: re-render with changed props',
-        fn: () => render(changedMounted.root, createApp(changed, (shift = 1 - shift))),
+        fn: () => {
+          shift = 1 - shift
+          return render(changedMounted.root, createApp(changed, shift))
+        },
       },
       {
         name: 'tree of 500: provider re-rendered with the same theme',
@@ -84,13 +87,15 @@ it('render into the DOM: the tree of 500', async (context) => {
       },
       {
         name: 'tree of 500: provider theme change',
-        fn: () =>
-          render(
+        fn: () => {
+          turn = 1 - turn
+          return render(
             themedMounted.root,
-            <themed.style.ThemeProvider theme={alternate[(turn = 1 - turn)]}>
+            <themed.style.ThemeProvider theme={alternate[turn]}>
               {children}
             </themed.style.ThemeProvider>
-          ),
+          )
+        },
       },
     ],
     3

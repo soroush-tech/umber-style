@@ -39,6 +39,40 @@ describe('a token that is registered with true', () => {
     expect(Object.values(others).every((rule) => rule.includes('syntax:"<color>"'))).toBe(true)
   })
 
+  it('reads a color of any case, in the forms of 3, 4, 6 and 8 hex digits, and of each color function', () => {
+    const colors = [
+      '#ABC',
+      '#abcd',
+      '#A1B2C3',
+      '#a1b2c3d4',
+      'RGB(1, 2, 3)',
+      'color(srgb 1 0 0)',
+      'Color-Mix(in srgb, red, blue)',
+      'OKLCH(0.5 0.1 20)',
+      'TRANSPARENT',
+    ]
+    const rules = createTokens(
+      Object.fromEntries(colors.map((value, index) => [`c${index}`, value])),
+      { registered: Object.fromEntries(colors.map((_, index) => [`c${index}`, true])) }
+    ).registrations
+    expect(Object.values(rules)).toHaveLength(colors.length)
+    expect(Object.values(rules).every((rule) => rule.includes('syntax:"<color>"'))).toBe(true)
+  })
+
+  it('does not take a hex color of 5 or 7 digits, an unclosed or unknown function, or a function over two lines', () => {
+    for (const value of [
+      '#abcde',
+      '#abcdefa',
+      'rgb(1, 2, 3',
+      'url(x)',
+      'rgb(1,\n2)',
+      'xrgb(1)',
+      'rgb (1)',
+    ]) {
+      expect(() => createTokens({ c: value }, { registered: { c: true } })).toThrow(TypeError)
+    }
+  })
+
   it('is a length for a number under a length key, written in px, and for a string with a unit', () => {
     const rules = register({ space: true, sizes: true, 'sizes.wide': '*' })
     expect(rules['--u-space-1']).toBe(

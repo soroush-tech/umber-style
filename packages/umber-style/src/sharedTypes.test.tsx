@@ -43,7 +43,8 @@ describe('what a style written for web and mobile accepts', () => {
       borderRadius: 4,
       flexDirection: 'row',
     })
-    render(<Box id="plain" />)
+    const { container } = render(<Box id="plain" />)
+    expect(container.querySelector('#plain')).not.toBeNull()
   })
 
   it('accepts a web part and a native part, each with the keys of its own platform', () => {
@@ -60,41 +61,48 @@ describe('what a style written for web and mobile accepts', () => {
         transform: [{ rotate: '45deg' }],
       },
     })
-    render(<Box id="parts" />)
+    const { container } = render(<Box id="parts" />)
+    expect(container.querySelector('#parts')).not.toBeNull()
   })
 
   it('does not accept a key of one platform at the top level', () => {
-    styled(Host)({
-      // @ts-expect-error a nested selector is web only: put it in `web`
-      '&:hover': { opacity: 0.8 },
-    })
-    styled(Host)({
-      // @ts-expect-error `elevation` is native only: put it in `native`
-      elevation: 2,
-    })
-    styled(Host)({
-      // @ts-expect-error `float` is web only: put it in `web`
-      float: 'left',
-    })
-    styled(Host)({
-      // @ts-expect-error `label` is web only
-      label: 'box',
-    })
-    styled(Host)({
-      // @ts-expect-error a misspelt property
-      backgroudColor: 'red',
-    })
+    const rejected = [
+      styled(Host)({
+        // @ts-expect-error a nested selector is web only: put it in `web`
+        '&:hover': { opacity: 0.8 },
+      }),
+      styled(Host)({
+        // @ts-expect-error `elevation` is native only: put it in `native`
+        elevation: 2,
+      }),
+      styled(Host)({
+        // @ts-expect-error `float` is web only: put it in `web`
+        float: 'left',
+      }),
+      styled(Host)({
+        // @ts-expect-error `label` is web only
+        label: 'box',
+      }),
+      styled(Host)({
+        // @ts-expect-error a misspelt property
+        backgroudColor: 'red',
+      }),
+    ]
+    expectTypeOf(rejected).items.toBeFunction()
   })
 
   it('does not accept a value that one platform lacks', () => {
-    styled(Host)({
-      // @ts-expect-error `grid` is web only
-      display: 'grid',
-    })
-    styled(Host)({
-      // @ts-expect-error a keyword that React Native lacks: it takes 'flex', 'none' and 'contents'
-      display: 'inline-block',
-    })
+    const rejected = [
+      styled(Host)({
+        // @ts-expect-error `grid` is web only
+        display: 'grid',
+      }),
+      styled(Host)({
+        // @ts-expect-error a keyword that React Native lacks: it takes 'flex', 'none' and 'contents'
+        display: 'inline-block',
+      }),
+    ]
+    expectTypeOf(rejected).items.toBeFunction()
   })
 
   it('cannot tell a length with a unit from a length: the platform types any string there', () => {
@@ -105,30 +113,33 @@ describe('what a style written for web and mobile accepts', () => {
   })
 
   it('does not accept a key of the other platform inside a part', () => {
-    styled(Host)({
-      web: {
-        // @ts-expect-error `elevation` is native only
-        elevation: 2,
-      },
-    })
-    styled(Host)({
-      native: {
-        // @ts-expect-error a nested selector is web only
-        '&:hover': { opacity: 0.8 },
-      },
-    })
-    styled(Host)({
-      native: {
-        // @ts-expect-error `float` is web only
-        float: 'left',
-      },
-    })
-    styled(Host)({
-      native: {
-        // @ts-expect-error `grid` is web only
-        display: 'grid',
-      },
-    })
+    const rejected = [
+      styled(Host)({
+        web: {
+          // @ts-expect-error `elevation` is native only
+          elevation: 2,
+        },
+      }),
+      styled(Host)({
+        native: {
+          // @ts-expect-error a nested selector is web only
+          '&:hover': { opacity: 0.8 },
+        },
+      }),
+      styled(Host)({
+        native: {
+          // @ts-expect-error `float` is web only
+          float: 'left',
+        },
+      }),
+      styled(Host)({
+        native: {
+          // @ts-expect-error `grid` is web only
+          display: 'grid',
+        },
+      }),
+    ]
+    expectTypeOf(rejected).items.toBeFunction()
   })
 
   it('does not take the names of the parts from a property of either platform', () => {
@@ -204,10 +215,14 @@ describe('the arithmetic helpers in a shared style', () => {
   })
 
   it('do not take a value that only the web computes', () => {
-    // @ts-expect-error a reference string cannot be computed on React Native
-    multiply('var(--space-2)', 2)
-    // @ts-expect-error a length with a unit is not a percentage
-    add('8px', 4)
+    const rejected = [
+      // @ts-expect-error a reference string cannot be computed on React Native
+      multiply('var(--space-2)', 2),
+      // @ts-expect-error a length with a unit is not a percentage
+      add('8px', 4),
+    ]
+    expectTypeOf(rejected).items.not.toBeAny()
+    expect(rejected).toEqual(['calc(var(--space-2) * 2)', '12px'])
   })
 })
 

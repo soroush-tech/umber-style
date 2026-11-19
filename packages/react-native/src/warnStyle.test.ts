@@ -25,6 +25,38 @@ describe('warnAboutValues', () => {
     expect(warn.mock.calls[0][0]).toContain('"width: 12px" has a CSS unit')
   })
 
+  it('warns about a unit in any case, with white space around, a sign and a missing digit', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    warnAboutValues({ a: ' 12PX ', b: '-.5em', c: '3.rem', d: '+1px', e: '4Q' })
+    expect(warn).toHaveBeenCalledTimes(4)
+    expect(warn.mock.calls.map(([text]) => String(text).split('"')[1])).toEqual([
+      'a:  12PX ',
+      'b: -.5em',
+      'c: 3.rem',
+      'e: 4Q',
+    ])
+  })
+
+  it('does not warn about a unit it does not know, a space between number and unit, or a percentage', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    warnAboutValues({ a: '12foo', b: '12 px', c: 'px', d: '1.2.3px', e: '12%' })
+    expect(warn).not.toHaveBeenCalled()
+  })
+
+  it('reads a long run of digits in linear time', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const digits = '1'.repeat(200_000)
+    const start = performance.now()
+    warnAboutValues({
+      a: `${digits}!`,
+      b: `${digits}${digits}px!`,
+      c: `${'1 '.repeat(100_000)}!`,
+      d: `1${' '.repeat(200_000)}!`,
+    })
+    expect(performance.now() - start).toBeLessThan(2000)
+    expect(warn).not.toHaveBeenCalled()
+  })
+
   it('warns once for each distinct message', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     warnAboutValues({ top: '3px' })

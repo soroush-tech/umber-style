@@ -34,6 +34,19 @@ describe('multiply', () => {
     expect(multiply('0.1px', 3)).toBe('0.3px')
   })
 
+  it('reads a number with a point and no digit after it', () => {
+    expect(multiply('3.px', 2)).toBe('6px')
+    expect(multiply('3.', 2)).toBe('calc(3. * 2)')
+    expect(multiply('3..5px', 2)).toBe('calc(3..5px * 2)')
+  })
+
+  it('reads a long run of digits that ends in something else in linear time', () => {
+    const start = performance.now()
+    expect(multiply(`${'1'.repeat(200_000)}!`, 2)).toContain('* 2)')
+    expect(multiply(`${'1'.repeat(200_000)}.${'1'.repeat(200_000)}!`, 2)).toContain('* 2)')
+    expect(performance.now() - start).toBeLessThan(2000)
+  })
+
   it('falls back to a calc for anything that is not a plain number and unit', () => {
     expect(multiply('8', 2)).toBe('calc(8 * 2)')
     expect(multiply('1px 2px', 2)).toBe('calc(1px 2px * 2)')

@@ -146,6 +146,19 @@ describe('extractPageStyles', () => {
     expect(extractPageStyles(made.cache, html, { themes: [made.darkClass] }).css).toBe(first.css)
   })
 
+  it('writes the theme classes in the order of their names, however they are offered', () => {
+    const made = setup()
+    const html = '<main></main>'
+    const [first, second] = [made.darkClass, made.lightClass]
+      .map((name) => name.split(' ')[0])
+      .sort((x, y) => (x < y ? -1 : 1))
+    const ordered = extractPageStyles(made.cache, html, { themes: [first, second] })
+    const reversed = extractPageStyles(made.cache, html, { themes: [second, first] })
+    expect(reversed).toEqual(ordered)
+    const themeIds = ordered.ids.filter((id) => id.startsWith('u-theme-'))
+    expect(themeIds).toEqual([first, second])
+  })
+
   it('includes the themes it is told to, with the same variables as the theme of the page', () => {
     const made = setup()
     const html = createPages(made).render('home')

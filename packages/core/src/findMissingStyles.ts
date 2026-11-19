@@ -27,10 +27,8 @@ const NAME_CODES = /[a-z0-9_-]/
 
 /** The prefix named by the first style element of an engine on the page, or undefined. */
 function findPrefix(): string | undefined {
-  const element = document.querySelector('style[data-style], style[data-precedence]')
-  return (
-    element?.getAttribute('data-style') ?? element?.getAttribute('data-precedence') ?? undefined
-  )
+  const element = document.querySelector<HTMLElement>('style[data-style], style[data-precedence]')
+  return element?.dataset.style ?? element?.dataset.precedence
 }
 
 /** The style rules under `list`, groups included. */
@@ -73,7 +71,7 @@ function readBareVariables(text: string, start: string): string[] {
 
 /** A short name of `element` for a message. */
 function describe(element: Element): string {
-  const label = element.getAttribute('data-testid') ?? element.id
+  const label = element.attributes.getNamedItem('data-testid')?.value ?? element.id
   return `${element.tagName.toLowerCase()}[${label}]`
 }
 
@@ -100,6 +98,47 @@ function collectRules(prefix: string) {
   }))
 }
 
+type EngineRule = ReturnType<typeof collectRules>[number]
+
+/** The classes of the engine on the element called `label` that no rule names. */
+function findClassProblems(
+  label: string,
+  classes: readonly string[],
+  named: ReadonlySet<string>,
+  problems: StyleProblem[]
+): void {
+  for (const name of classes) {
+    if (named.has(name)) continue
+    const message = `${label} has the class ${name}, which no rule names`
+    problems.push({
+      kind: 'class-without-rule',
+      name,
+      element: label,
+      message,
+      key: `class:${name}`,
+    })
+  }
+}
+
+/** The variables used by a rule that matches `element` and that have no value on it. */
+function findVariableProblems(
+  element: Element,
+  label: string,
+  rules: readonly EngineRule[],
+  problems: StyleProblem[]
+): void {
+  const computed = getComputedStyle(element)
+  for (const { rule, variables, isState } of rules) {
+    if (variables.length === 0 || isState || !isMatched(element, rule)) continue
+    for (const name of variables) {
+      if (computed.getPropertyValue(name).trim() !== '') continue
+      const message = `${label} has no value for ${name}, which ${rule.selectorText} uses`
+      const key = `variable:${name}:${rule.selectorText}`
+      problems.push({ kind: 'variable-without-value', name, element: label, message, key })
+    }
+  }
+}
+
 /**
  * Looks at a page that an engine styled, and lists what is missing. For each element under `root`
  * (the document by default): every class of the engine on it is named by at least one rule of the
@@ -121,36 +160,17 @@ export function findMissingStyles(
   const named = new Set(
     rules.flatMap(({ rule }) => readClassNames(rule.selectorText, `${prefix}-`))
   )
-  const markers = [`${prefix}-boundary`, `${prefix}-scheme-light`, `${prefix}-scheme-dark`]
+  const markers = new Set([`${prefix}-boundary`, `${prefix}-scheme-light`, `${prefix}-scheme-dark`])
   const problems: StyleProblem[] = []
   const elements = [...(scope instanceof Element ? [scope] : []), ...scope.querySelectorAll('*')]
   for (const element of elements) {
     const classes = [...element.classList].filter(
-      (name) => name.startsWith(`${prefix}-`) && !markers.includes(name)
+      (name) => name.startsWith(`${prefix}-`) && !markers.has(name)
     )
     if (classes.length === 0) continue
     const label = describe(element)
-    for (const name of classes) {
-      if (named.has(name)) continue
-      const message = `${label} has the class ${name}, which no rule names`
-      problems.push({
-        kind: 'class-without-rule',
-        name,
-        element: label,
-        message,
-        key: `class:${name}`,
-      })
-    }
-    const computed = getComputedStyle(element)
-    for (const { rule, variables, isState } of rules) {
-      if (variables.length === 0 || isState || !isMatched(element, rule)) continue
-      for (const name of variables) {
-        if (computed.getPropertyValue(name).trim() !== '') continue
-        const message = `${label} has no value for ${name}, which ${rule.selectorText} uses`
-        const key = `variable:${name}:${rule.selectorText}`
-        problems.push({ kind: 'variable-without-value', name, element: label, message, key })
-      }
-    }
+    findClassProblems(label, classes, named, problems)
+    findVariableProblems(element, label, rules, problems)
   }
   return problems
 }

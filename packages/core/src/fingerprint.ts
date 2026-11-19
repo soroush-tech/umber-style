@@ -27,7 +27,8 @@ const CODES: readonly (readonly [string, keyof FingerprintOptions])[] = [
 
 /** The text of one option in the stamp: a flag is 1 or 0, a string is encoded. */
 function toStampValue(value: string | boolean): string {
-  return typeof value === 'boolean' ? (value ? '1' : '0') : encodeURIComponent(value)
+  if (typeof value !== 'boolean') return encodeURIComponent(value)
+  return value ? '1' : '0'
 }
 
 /** The stamp of `options`, short enough for an attribute: `p=umber;x=;l=1;y=1;...`. */

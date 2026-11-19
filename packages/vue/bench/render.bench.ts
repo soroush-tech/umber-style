@@ -94,6 +94,28 @@ function createTree(setup: Setup): VNode[] {
   )
 }
 
+/** The app of three providers, one in the other, over 48 themed elements. */
+function createNestedApp(setup: Setup) {
+  const { ThemeProvider } = setup.style
+  return createSSRApp(() =>
+    h(ThemeProvider, { theme }, () =>
+      h(ThemeProvider, { theme: { palette: { primary: '#d1531b' } } }, () =>
+        h(ThemeProvider, { theme: { palette: { primary: '#123456' } } }, () =>
+          createFortyEight(setup, 'themed')
+        )
+      )
+    )
+  )
+}
+
+/** The operation: a server render of the nested providers, made over a fresh setup and warmed once. */
+async function prepareNested(): Promise<() => Promise<string>> {
+  const setup = createSetup()
+  const run = () => renderToString(createNestedApp(setup))
+  await run()
+  return run
+}
+
 /** The operation: a server app that renders `children` inside a provider, made over a fresh setup and warmed once. */
 async function prepare(children: (setup: Setup) => VNode[]): Promise<() => Promise<string>> {
   const setup = createSetup()
@@ -123,24 +145,7 @@ it('vue: render to string, the tree of 500', async (context) => {
       { name: 'tree of 500 elements, server render to a string', fn: await prepare(createTree) },
       {
         name: 'nested providers three deep, 48 themed elements',
-        fn: await (async () => {
-          const setup = createSetup()
-          const { ThemeProvider } = setup.style
-          const run = () =>
-            renderToString(
-              createSSRApp(() =>
-                h(ThemeProvider, { theme }, () =>
-                  h(ThemeProvider, { theme: { palette: { primary: '#d1531b' } } }, () =>
-                    h(ThemeProvider, { theme: { palette: { primary: '#123456' } } }, () =>
-                      createFortyEight(setup, 'themed')
-                    )
-                  )
-                )
-              )
-            )
-          await run()
-          return run
-        })(),
+        fn: await prepareNested(),
       },
     ],
     3

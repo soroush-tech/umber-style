@@ -35,5 +35,8 @@ export function createDeferredRecord<V>(
   build: () => Record<string, V>
 ): Readonly<Record<string, V>> {
   let built: Record<string, V> | undefined
-  return createLazyRecord(Object.keys(source), (key) => (built ??= build())[key])
+  return createLazyRecord(Object.keys(source), (key) => {
+    built ??= build()
+    return built[key]
+  })
 }

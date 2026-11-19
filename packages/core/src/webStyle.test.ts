@@ -62,21 +62,27 @@ describe('WebStyleObject', () => {
   })
 
   it('rejects a misspelt property, a wrong value and a key that is not a selector', () => {
-    const { engine } = setup()
-    // @ts-expect-error `backgroudColor` is not a property
-    engine.css({ backgroudColor: 'red' })
-    // @ts-expect-error `gird` is not a display value
-    engine.css({ display: 'gird' })
-    // @ts-expect-error a selector needs `&` or a leading `:`
-    engine.css({ '> li': { color: 'red' } })
-    // @ts-expect-error a number is not a display value
-    engine.css({ display: 4 })
-    // @ts-expect-error a boolean is not a value
-    engine.css({ padding: true })
-    // @ts-expect-error a nested style is checked like the top one
-    engine.css({ '&:hover': { backgroudColor: 'red' } })
-    // @ts-expect-error `label` is a string
-    engine.css({ label: 1 })
+    const { engine, sheet } = setup()
+    const classes = [
+      // @ts-expect-error `backgroudColor` is not a property
+      engine.css({ backgroudColor: 'red' }),
+      // @ts-expect-error `gird` is not a display value
+      engine.css({ display: 'gird' }),
+      // @ts-expect-error a selector needs `&` or a leading `:`
+      engine.css({ '> li': { color: 'red' } }),
+      // @ts-expect-error a number is not a display value
+      engine.css({ display: 4 }),
+      // @ts-expect-error a boolean is not a value
+      engine.css({ padding: true }),
+      // @ts-expect-error a nested style is checked like the top one
+      engine.css({ '&:hover': { backgroudColor: 'red' } }),
+      // @ts-expect-error `label` is a string
+      engine.css({ label: 1 }),
+    ]
+    // The types are the only guard: at run time the typo and the wrong value are written as given.
+    expect(classes).toHaveLength(7)
+    expect(sheet.rules.join('')).toContain('backgroud-color:red;')
+    expect(sheet.rules.join('')).toContain('display:gird;')
   })
 
   it('does not catch what a variable holds, and does not check an untyped function return', () => {

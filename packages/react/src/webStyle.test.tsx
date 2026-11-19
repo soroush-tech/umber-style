@@ -65,15 +65,17 @@ describe('what a web style accepts', () => {
   })
 
   it('accepts a condition that gives false, null or undefined, at the top or nested', () => {
-    const { styled } = setup()
+    const { styled, rules } = setup()
     const isOpen = Math.random() > 2
-    styled('div')({
+    const Box = styled('div')({
       color: isOpen && 'red',
       margin: null,
       padding: undefined,
       '&:hover': isOpen && { color: 'red' },
       '@media print': null,
     })
+    render(<Box />)
+    expect(rules.join('')).not.toContain('color')
   })
 
   it('accepts a style function that returns a style, null or false, and gives it the props', () => {
@@ -88,67 +90,90 @@ describe('what a web style accepts', () => {
 
   it('rejects a misspelt property in an object literal', () => {
     const { styled } = setup()
-    // @ts-expect-error `backgroudColor` is not a property
-    styled('div')({ backgroudColor: 'red' })
-    // @ts-expect-error a misspelt property next to valid ones
-    styled('div')({ color: 'red', backgroudColor: 'red' })
-    styled('div')({
-      '&:hover': {
-        // @ts-expect-error a misspelt property in a nested style
-        backgroudColor: 'red',
-      },
-    })
-    styled('div')({
-      '@media print': {
-        // @ts-expect-error a misspelt property in an at-rule
-        paddng: 1,
-      },
-    })
+    const rejected = [
+      // @ts-expect-error `backgroudColor` is not a property
+      styled('div')({ backgroudColor: 'red' }),
+      // @ts-expect-error a misspelt property next to valid ones
+      styled('div')({ color: 'red', backgroudColor: 'red' }),
+      styled('div')({
+        '&:hover': {
+          // @ts-expect-error a misspelt property in a nested style
+          backgroudColor: 'red',
+        },
+      }),
+      styled('div')({
+        '@media print': {
+          // @ts-expect-error a misspelt property in an at-rule
+          paddng: 1,
+        },
+      }),
+    ]
+    expectTypeOf(rejected).items.toBeFunction()
   })
 
   it('rejects a wrong value', () => {
     const { styled } = setup()
-    // @ts-expect-error `gird` is not a display value
-    styled('div')({ display: 'gird' })
-    // @ts-expect-error a number is not a display value
-    styled('div')({ display: 4 })
-    // @ts-expect-error a boolean is not a value
-    styled('div')({ padding: true })
-    // @ts-expect-error a custom property is a string or a number
-    styled('div')({ '--x': { a: 1 } })
+    const rejected = [
+      // @ts-expect-error `gird` is not a display value
+      styled('div')({ display: 'gird' }),
+      // @ts-expect-error a number is not a display value
+      styled('div')({ display: 4 }),
+      // @ts-expect-error a boolean is not a value
+      styled('div')({ padding: true }),
+      // @ts-expect-error a custom property is a string or a number
+      styled('div')({ '--x': { a: 1 } }),
+    ]
+    expectTypeOf(rejected).items.toBeFunction()
   })
 
   it('rejects a key that is neither a property, a selector nor an at-rule', () => {
     const { styled } = setup()
-    // @ts-expect-error a selector needs `&` (or to start with `:`): `& > li`
-    styled('div')({ '> li': { color: 'red' } })
-    // @ts-expect-error `hover` is not a property name
-    styled('div')({ hover: { color: 'red' } })
+    const rejected = [
+      // @ts-expect-error a selector needs `&` (or to start with `:`): `& > li`
+      styled('div')({ '> li': { color: 'red' } }),
+      // @ts-expect-error `hover` is not a property name
+      styled('div')({ hover: { color: 'red' } }),
+    ]
+    expectTypeOf(rejected).items.toBeFunction()
   })
 
   it('does not catch what a variable holds: a typo in a widened object is accepted', () => {
-    const { styled } = setup()
+    const { styled, rules } = setup()
     const widened = { color: 'red', backgroudColor: 'red' }
-    styled('div')(widened)
     const onlyTypo = { backgroudColor: 'red' }
-    styled('div')(onlyTypo)
+    const Widened = styled('div')(widened)
+    const OnlyTypo = styled('div')(onlyTypo)
+    render(
+      <>
+        <Widened />
+        <OnlyTypo />
+      </>
+    )
+    expect(rules.join('')).toContain('backgroud-color:red;')
   })
 
   it('does not catch a typo in an object that a style function returns, unless the return is typed', () => {
     const { styled } = setup()
-    styled('div')(() => ({ backgroudColor: 'red' }))
-    // @ts-expect-error a typed return is checked
-    styled('div')((): WebStyleObject => ({ backgroudColor: 'red' }))
-    // @ts-expect-error `satisfies` checks the literal too
-    styled('div')(() => ({ backgroudColor: 'red' }) satisfies WebStyleObject)
+    const accepted = styled('div')(() => ({ backgroudColor: 'red' }))
+    const rejected = [
+      // @ts-expect-error a typed return is checked
+      styled('div')((): WebStyleObject => ({ backgroudColor: 'red' })),
+      // @ts-expect-error `satisfies` checks the literal too
+      styled('div')(() => ({ backgroudColor: 'red' }) satisfies WebStyleObject),
+    ]
+    expectTypeOf(accepted).toBeFunction()
+    expectTypeOf(rejected).items.toBeFunction()
   })
 
   it('takes the loose style type through a cast', () => {
-    const { styled } = setup()
+    const { styled, rules } = setup()
     const loose: StyleObject = { anything: 'goes', '>li': { x: 1 } }
     // @ts-expect-error the loose type is not accepted as it is
-    styled('div')(loose)
-    styled('div')(loose as WebStyleObject)
+    const Rejected = styled('div')(loose)
+    const Cast = styled('div')(loose as WebStyleObject)
+    render(<Cast />)
+    expectTypeOf(Rejected).toBeFunction()
+    expect(rules.join('')).toContain('anything:goes;')
   })
 })
 

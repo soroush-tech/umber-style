@@ -1,3 +1,4 @@
+import { codeAt } from './codeAt'
 import { scanVariables } from './variables'
 
 /** What the CSS text of an engine's style element holds: the picture of a page that a cache builds at start-up. */
@@ -45,7 +46,7 @@ function readClasses(selector: string, start: string): string[] {
   let from = selector.indexOf(`.${start}`)
   while (from !== -1) {
     let end = from + 1 + start.length
-    while (isNameCode(selector.charCodeAt(end))) end++
+    while (isNameCode(codeAt(selector, end))) end++
     names.push(selector.slice(from + 1, end))
     from = selector.indexOf(`.${start}`, end)
   }
@@ -88,11 +89,32 @@ function record(found: StyleFindings, prefix: string, prelude: string, body: str
     found.themes.set(themeId, declared)
     return
   }
-  const markers = [`${prefix}-boundary`, `${prefix}-scheme-light`, `${prefix}-scheme-dark`]
+  const markers = new Set([`${prefix}-boundary`, `${prefix}-scheme-light`, `${prefix}-scheme-dark`])
   for (const name of classes) {
-    if (!name.startsWith(themeStart) && !markers.includes(name)) found.classes.add(name)
+    if (!name.startsWith(themeStart) && !markers.has(name)) found.classes.add(name)
   }
   for (const name of scanVariables(body, `--${prefix}-`)) found.variables.add(name)
+}
+
+/** Opens a block at `index`, a `{`: its prelude is the text since `boundary`. */
+function openBlock(stack: OpenBlock[], text: string, boundary: number, index: number): void {
+  const parent = stack.at(-1)
+  if (parent) parent.hasChild = true
+  stack.push({ prelude: text.slice(boundary, index).trim(), bodyStart: index + 1, hasChild: false })
+}
+
+/** Closes the innermost block at `index`, a `}`; a block without a block of its own is a rule to record. */
+function closeBlock(
+  stack: OpenBlock[],
+  found: StyleFindings,
+  prefix: string,
+  text: string,
+  index: number
+): void {
+  const block = stack.pop()
+  if (block && !block.hasChild) {
+    record(found, prefix, block.prelude, text.slice(block.bodyStart, index))
+  }
 }
 
 /**
@@ -115,16 +137,10 @@ export function scanStyleText(
       continue
     }
     if (char === '{') {
-      const parent = stack.at(-1)
-      if (parent) parent.hasChild = true
-      const prelude = text.slice(boundary, index).trim()
-      stack.push({ prelude, bodyStart: index + 1, hasChild: false })
+      openBlock(stack, text, boundary, index)
       boundary = index + 1
     } else if (char === '}') {
-      const block = stack.pop()
-      if (block && !block.hasChild) {
-        record(found, prefix, block.prelude, text.slice(block.bodyStart, index))
-      }
+      closeBlock(stack, found, prefix, text, index)
       boundary = index + 1
     } else if (char === ';' && stack.length === 0) {
       if (text.slice(boundary, index).trim().startsWith('@layer')) found.hasLayerOrder = true

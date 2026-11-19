@@ -45,7 +45,8 @@ const createFunctionSheet = (
 it('object sheets', async (context) => {
   const firstEngine = createEngineFor()
   const sheet = firstEngine.createSheet(createObjectSheet())
-  void sheet.root
+  // Reading the entry makes the sheet's record keep it, so that the later reads are the memo.
+  Reflect.get(sheet, 'root')
   const usedCache = createEngineFor()
   const usedSheet = usedCache.createSheet(createObjectSheet())
   usedCache.cache.css(usedSheet.root)

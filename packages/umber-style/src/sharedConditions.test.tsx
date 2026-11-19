@@ -29,10 +29,11 @@ describe('what the condition keys accept in a style written for web and mobile',
 
   it('still rejects a misspelt ordinary key next to a condition', () => {
     const { when } = createStyle({ palette: { primary: '#0000ff' } })
-    styled(Host)({
+    const Box = styled(Host)({
       // @ts-expect-error a misspelt property
       paddng: 8,
       [when({})]: { padding: 4 },
     })
+    expectTypeOf(Box).toBeFunction()
   })
 })

@@ -25,20 +25,28 @@ const SYNTAXES: readonly string[] = [
 
 const NUMBER = String.raw`[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?`
 /** The units that depend on the element or the viewport: a value in them cannot be an initial value. */
-const RELATIVE_UNIT = String.raw`r?em|r?ex|r?cap|r?ch|r?ic|r?lh|[sld]?v(?:w|h|i|b|min|max)|cq(?:w|h|i|b|min|max)`
-const LENGTH_UNIT = String.raw`px|cm|mm|q|in|pt|pc|${RELATIVE_UNIT}`
+const RELATIVE_UNIT =
+  'r?em|r?ex|r?cap|r?ch|r?ic|r?lh|[sld]?v(?:w|h|i|b|min|max)|cq(?:w|h|i|b|min|max)'
+const LENGTH_UNIT = `px|cm|mm|q|in|pt|pc|${RELATIVE_UNIT}`
 
 const NUMBER_PATTERN = new RegExp(`^${NUMBER}$`, 'i')
 const LENGTH_PATTERN = new RegExp(`^${NUMBER}(?:${LENGTH_UNIT})$`, 'i')
 const PERCENTAGE_PATTERN = new RegExp(`^${NUMBER}%$`, 'i')
 const ANGLE_PATTERN = new RegExp(`^${NUMBER}(?:deg|grad|rad|turn)$`, 'i')
 const TIME_PATTERN = new RegExp(`^${NUMBER}(?:ms|s)$`, 'i')
-const COLOR_PATTERN =
-  /^(?:#(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})|(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch|color|color-mix)\(.*\)|transparent)$/i
+const HEX_COLOR_PATTERN = /^#(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i
+const COLOR_FUNCTION_PATTERN = /^(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch|color(?:-mix)?)\(.*\)$/i
+const TRANSPARENT_PATTERN = /^transparent$/i
 const KEYWORD_PATTERN = /^[a-z]+$/i
 const MATH_PATTERN = /^(?:calc|min|max|clamp)\(.*\)$/i
 const RELATIVE_PATTERN = new RegExp(String.raw`[\d.](?:${RELATIVE_UNIT})(?![a-z])`, 'i')
 const DEPENDENT_PATTERN = /\b(?:var|env|attr)\(|currentcolor/i
+
+/** Whether `value` is a color literal: a hex color, a color function or `transparent`. */
+const isColor = (value: string): boolean =>
+  HEX_COLOR_PATTERN.test(value) ||
+  COLOR_FUNCTION_PATTERN.test(value) ||
+  TRANSPARENT_PATTERN.test(value)
 
 /** Whether `value` is a length: 0, or a number with a length unit. */
 const isLength = (value: string): boolean => value === '0' || LENGTH_PATTERN.test(value)
@@ -49,7 +57,7 @@ const isLengthPercentage = (value: string): boolean =>
 
 /** The test of each syntax but `*`; a keyword counts as a color. */
 const MATCHERS: Record<TypedSyntax, (value: string) => boolean> = {
-  '<color>': (value) => COLOR_PATTERN.test(value) || KEYWORD_PATTERN.test(value),
+  '<color>': (value) => isColor(value) || KEYWORD_PATTERN.test(value),
   '<length>': isLength,
   '<number>': (value) => NUMBER_PATTERN.test(value),
   '<percentage>': (value) => PERCENTAGE_PATTERN.test(value),
@@ -69,7 +77,7 @@ function inferFromText(value: string): RegisteredSyntax | undefined {
   if (PERCENTAGE_PATTERN.test(value)) return '<percentage>'
   if (TIME_PATTERN.test(value)) return '<time>'
   if (ANGLE_PATTERN.test(value)) return '<angle>'
-  if (COLOR_PATTERN.test(value)) return '<color>'
+  if (isColor(value)) return '<color>'
   return NUMBER_PATTERN.test(value) ? '<number>' : undefined
 }
 
@@ -87,10 +95,15 @@ export interface RegisteredToken {
   isLength: boolean
 }
 
+/** The syntax that the base value of a token says: a number is a length under a length key; undefined for text that says none. */
+function inferFromSource(source: string | number, isLength: boolean): RegisteredSyntax | undefined {
+  if (typeof source === 'string') return inferFromText(source.trim())
+  return isLength ? '<length>' : '<number>'
+}
+
 /** The syntax for a token registered with `true`: the one that its base value says, or a `TypeError` that asks for one. */
 function inferSyntax({ path, source, isLength }: RegisteredToken): RegisteredSyntax {
-  const inferred =
-    typeof source === 'number' ? (isLength ? '<length>' : '<number>') : inferFromText(source.trim())
+  const inferred = inferFromSource(source, isLength)
   if (inferred === undefined) {
     throw new TypeError(
       `registered: the syntax of "${path}" cannot be inferred from ${JSON.stringify(source)}: give an explicit syntax ('<color>', '<length>', '<number>', '<percentage>', '<length-percentage>', '<angle>', '<time>') or '*'.`

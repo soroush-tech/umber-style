@@ -50,27 +50,33 @@ describe('what a native style accepts', () => {
   it('rejects a nested selector, an at-rule, a custom property and the label', () => {
     const { styled } = createStyle(theme)
     const { View } = createStandIn()
-    // @ts-expect-error a nested selector does not exist on React Native
-    styled(View)({ '&:hover': { opacity: 0.8 } })
-    // @ts-expect-error an at-rule does not exist on React Native
-    styled(View)({ '@media (min-width: 40em)': { padding: 8 } })
-    // @ts-expect-error a custom property does not exist on React Native
-    styled(View)({ '--x': 1 })
-    // @ts-expect-error the label is for the web
-    styled(View)({ label: 'box' })
+    const rejected = [
+      // @ts-expect-error a nested selector does not exist on React Native
+      styled(View)({ '&:hover': { opacity: 0.8 } }),
+      // @ts-expect-error an at-rule does not exist on React Native
+      styled(View)({ '@media (min-width: 40em)': { padding: 8 } }),
+      // @ts-expect-error a custom property does not exist on React Native
+      styled(View)({ '--x': 1 }),
+      // @ts-expect-error the label is for the web
+      styled(View)({ label: 'box' }),
+    ]
+    expectTypeOf(rejected).items.toBeFunction()
   })
 
   it('rejects a value the platform lacks and a misspelt property', () => {
     const { styled } = createStyle(theme)
     const { View } = createStandIn()
-    // @ts-expect-error React Native has no grid
-    styled(View)({ display: 'grid' })
-    // @ts-expect-error `backgroudColor` is not a property
-    styled(View)({ backgroudColor: 'red' })
-    // @ts-expect-error a web-only property
-    styled(View)({ float: 'left' })
-    // @ts-expect-error a misspelt property next to valid ones
-    styled(View)({ padding: 8, paddng: 8 })
+    const rejected = [
+      // @ts-expect-error React Native has no grid
+      styled(View)({ display: 'grid' }),
+      // @ts-expect-error `backgroudColor` is not a property
+      styled(View)({ backgroudColor: 'red' }),
+      // @ts-expect-error a web-only property
+      styled(View)({ float: 'left' }),
+      // @ts-expect-error a misspelt property next to valid ones
+      styled(View)({ padding: 8, paddng: 8 }),
+    ]
+    expectTypeOf(rejected).items.toBeFunction()
   })
 
   it('takes a style function with the props and the theme', () => {
@@ -88,16 +94,19 @@ describe('what a native style accepts', () => {
     const { styled } = createStyle(theme)
     const { View } = createStandIn()
     const widened = { padding: 8, paddng: 8 }
-    styled(View)(widened)
-    styled(View)(() => ({ padding: 8, paddng: 8 }))
+    const accepted = [styled(View)(widened), styled(View)(() => ({ padding: 8, paddng: 8 }))]
     // Nothing is nested here, so a style with no valid key at all is caught as a weak type.
     const onlyTypo = { paddng: 8 }
-    // @ts-expect-error no property in common with a native style
-    styled(View)(onlyTypo)
-    // @ts-expect-error a function that returns no valid key
-    styled(View)(() => ({ paddng: 8 }))
-    // @ts-expect-error a typed return is checked
-    styled(View)((): NativeStyleObject => ({ paddng: 8 }))
+    const rejected = [
+      // @ts-expect-error no property in common with a native style
+      styled(View)(onlyTypo),
+      // @ts-expect-error a function that returns no valid key
+      styled(View)(() => ({ paddng: 8 })),
+      // @ts-expect-error a typed return is checked
+      styled(View)((): NativeStyleObject => ({ paddng: 8 })),
+    ]
+    expectTypeOf(accepted).items.toBeFunction()
+    expectTypeOf(rejected).items.toBeFunction()
   })
 
   it('checks a sheet, useStyle, the style prop and apply', () => {

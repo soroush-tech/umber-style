@@ -266,6 +266,44 @@ function splitClassNames(value: string | SheetEntry): string[] {
   return names.split(/\s+/).filter(Boolean)
 }
 
+/** Sorts the class names of a class string or sheet entry: a registered class is a style to merge, the rest pass through. */
+function sortClassNames(
+  value: string | SheetEntry,
+  registered: ReadonlyMap<string, StyleObject>,
+  styles: StyleObject[],
+  rawClasses: string[]
+): void {
+  for (const name of splitClassNames(value)) {
+    const style = registered.get(name)
+    if (style) styles.push(style)
+    else rawClasses.push(name)
+  }
+}
+
+/** Orders distinct strings by UTF-16 code unit, what a sort without a compare function does. */
+function compareCodeUnits(first: string, second: string): number {
+  return first < second ? -1 : 1
+}
+
+/** Adds to `names` every variable that the theme values of `themeIds` bring in for a name already in it. */
+function addThemeReferences(
+  names: Set<string>,
+  themeIds: readonly string[],
+  themes: ReadonlyMap<string, ThemeEntry>
+): void {
+  const queue = [...names]
+  for (const queued of queue) {
+    for (const id of themeIds) {
+      const value = themes.get(id)?.declarations[queued]
+      if (value === undefined) continue
+      for (const name of scanVariables(value, VARIABLE_START)) {
+        if (!names.has(name)) queue.push(name)
+        names.add(name)
+      }
+    }
+  }
+}
+
 /**
  * Splits `values` into the styles to merge (the style of an entry a cache made, registered classes
  * resolved back) and the class names to pass through. `sole` is the entry when the one style is its own.
@@ -289,11 +327,7 @@ function sortClassValues(
       entry = source
       continue
     }
-    for (const name of splitClassNames(value)) {
-      const style = registered.get(name)
-      if (style) styles.push(style)
-      else rawClasses.push(name)
-    }
+    sortClassNames(value, registered, styles, rawClasses)
   }
   return { styles, rawClasses, sole: styles.length === 1 ? entry : undefined }
 }
@@ -353,9 +387,8 @@ export function createCache(options: CacheOptions = {}): Cache {
   let propertyRules: Readonly<Record<string, string>> = {}
   const themeNames = new Map<string, readonly string[]>()
 
-  const layerOrder = hasLayers
-    ? `@layer ${RULE_LAYERS.map((layer) => `${prefix}-${layer}`).join(',')};`
-    : ''
+  const layerNames = RULE_LAYERS.map((layer) => `${prefix}-${layer}`).join(',')
+  const layerOrder = hasLayers ? `@layer ${layerNames};` : ''
   const layerOrderId = `${prefix}-layers`
 
   const wrapInLayer = (rules: readonly string[], layer?: RuleLayer): readonly string[] =>
@@ -416,8 +449,7 @@ export function createCache(options: CacheOptions = {}): Cache {
     if (!hasPruning) return
     const queue = [...names]
     const fresh: string[] = []
-    for (let index = 0; index < queue.length; index++) {
-      const name = queue[index]
+    for (const name of queue) {
       if (used.has(name)) continue
       used.add(name)
       fresh.push(name)
@@ -618,17 +650,7 @@ export function createCache(options: CacheOptions = {}): Cache {
         for (const name of scanVariables(rule, VARIABLE_START)) names.add(name)
       }
     }
-    const queue = [...names]
-    for (let index = 0; index < queue.length; index++) {
-      for (const id of themeIds) {
-        const value = themes.get(id)?.declarations[queue[index]]
-        if (value === undefined) continue
-        for (const name of scanVariables(value, VARIABLE_START)) {
-          if (!names.has(name)) queue.push(name)
-          names.add(name)
-        }
-      }
-    }
+    addThemeReferences(names, themeIds, themes)
     return names
   }
 
@@ -645,7 +667,7 @@ export function createCache(options: CacheOptions = {}): Cache {
   const extractPage = (classNames: Iterable<string>, pageOptions: PageExtractOptions = {}) => {
     const { themes: offered = [], carried = new Set<string>() } = pageOptions
     const wanted = new Set([...classNames, ...offered])
-    const themeIds = [...wanted].filter((name) => themeNames.has(name)).sort()
+    const themeIds = [...wanted].filter((name) => themeNames.has(name)).sort(compareCodeUnits)
     const classIds = [...wanted]
       .filter((name) => name.startsWith(`${prefix}-`) && !themeNames.has(name))
       .filter((name) => insertedRules.has(name))
@@ -656,7 +678,7 @@ export function createCache(options: CacheOptions = {}): Cache {
     const declared = hasPruning ? names : themeIds.flatMap(readNames)
     const properties = [...new Set(declared)]
       .filter((name) => propertyRules[name] !== undefined && !covered.has(name))
-      .sort()
+      .sort(compareCodeUnits)
     const newThemes = themeIds.filter((id) => !carried.has(id))
     const newClasses = classIds.filter((id) => !carried.has(id))
     const themeRules = newThemes.flatMap((id) => createPageThemeRules(id, names))

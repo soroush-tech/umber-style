@@ -15,7 +15,7 @@ interface Term {
   sign: 1 | -1
 }
 
-const LENGTH_PATTERN = /^(-?(?:\d+\.?\d*|\.\d+))([a-z]+|%)$/i
+const LENGTH_PATTERN = /^(-?(?:\d+(?:\.\d*)?|\.\d+))([a-z]+|%)$/i
 const CALC_PREFIX = 'calc('
 
 /** `value` rounded so that float noise (0.1 * 3) does not reach the CSS; `-0` is `0`. */
@@ -119,7 +119,9 @@ function toCalc(terms: Term[]): string {
   const body = terms
     .map(({ operand, sign }, index) => {
       const term = toTerm(operand)
-      return index === 0 ? term : `${sign === 1 ? '+' : '-'} ${term}`
+      if (index === 0) return term
+      const operator = sign === 1 ? '+' : '-'
+      return `${operator} ${term}`
     })
     .join(' ')
   return `${CALC_PREFIX}${body})`

@@ -1,3 +1,5 @@
+import { codeAt } from './codeAt'
+
 const VARIABLE_OPEN = 'var('
 
 /** Whether `code` is a character of a variable name: a lowercase letter, a digit, '-' or '_'. */
@@ -8,7 +10,7 @@ function isNameCode(code: number): boolean {
 /** The index of the first character at or after `index` that is not whitespace. */
 function skipSpaces(text: string, index: number): number {
   let position = index
-  while (text.charCodeAt(position) <= 32) position++
+  while (codeAt(text, position) <= 32) position++
   return position
 }
 
@@ -23,7 +25,7 @@ export function scanVariables(css: string, start: string): string[] {
     const begin = skipSpaces(css, from + VARIABLE_OPEN.length)
     let end = begin + start.length
     if (css.startsWith(start, begin)) {
-      while (isNameCode(css.charCodeAt(end))) end++
+      while (isNameCode(codeAt(css, end))) end++
       names.push(css.slice(begin, end))
     }
     from = css.indexOf(VARIABLE_OPEN, begin)
