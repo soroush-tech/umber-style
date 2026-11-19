@@ -53,7 +53,8 @@ describe('token modes', () => {
 
   it('reference: a token the base theme does not have gets no fallback', () => {
     const tokens = createTokens(theme, { prefix: 'u', modes: { palette: 'reference' } })
-    const view = tokens.createView({ ...theme, palette: { ...theme.palette, extra: 'x' } })
+    const withExtra = { ...theme, palette: { ...theme.palette, extra: 'x' } }
+    const view = tokens.createView(withExtra)
     expect((view.palette as Record<string, string>).extra).toBe('var(--u-palette-extra)')
   })
 
@@ -113,7 +114,7 @@ describe('token modes', () => {
   })
 
   it('does not take an entry from the prototype of modes', () => {
-    const { refs } = createTokens(theme, { modes: { toString: 'raw' } })
+    const { refs } = createTokens(theme, { modes: { toString: 'raw' as const } })
     expect(refs.palette.primary).toBe('var(--palette-primary)')
   })
 

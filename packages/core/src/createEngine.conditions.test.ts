@@ -1,4 +1,5 @@
 import { createCache, createDomSheet, createMemorySheet } from './cache'
+import { at } from './at'
 import { createEngine } from './createEngine'
 
 const base = { palette: { primary: '#0000ff', surface: '#ffffff' } }
@@ -50,8 +51,8 @@ describe('when()', () => {
     const { engine, sheet } = setup()
     const card = engine.css({
       border: 'none',
-      [engine.when(dark)]: { border: '1px solid white' },
-      [engine.whenScheme('dark')]: { boxShadow: 'none' },
+      ...at(engine.when(dark), { border: '1px solid white' }),
+      ...at(engine.whenScheme('dark'), { boxShadow: 'none' }),
     })
     const id = engine.themeId(dark)
     const rules = sheet.rules.filter((rule) => rule.includes(card))
@@ -68,7 +69,7 @@ describe('when()', () => {
     const { engine, sheet } = setup()
     const styler = engine.createStyler({ name: 'Card' }, [{ color: 'red' }])
     const [, override] = styler
-      .getClassName({}, [{ [engine.when(dark)]: { color: 'blue' } }])
+      .getClassName({}, [{ ...at(engine.when(dark), { color: 'blue' }) }])
       .split(' ')
     expect(sheet.rules.filter((rule) => rule.includes(override))).toEqual([
       `@layer e-overrides{@scope (.${engine.themeId(dark)}) to (.e-boundary){.${override}{color:blue;}}}`,
@@ -78,7 +79,7 @@ describe('when()', () => {
   it('writes the descendant form with hasScope false, and says so in the cache', () => {
     const { engine, sheet, cache } = setup({ hasScope: false, hasLayers: false })
     expect(cache.hasScope).toBe(false)
-    const card = engine.css({ [engine.when(dark)]: { border: '1px solid white' } })
+    const card = engine.css({ ...at(engine.when(dark), { border: '1px solid white' }) })
     expect(sheet.rules).toContain(
       `:where(.${engine.themeId(dark)}) .${card}{border:1px solid white;}`
     )
@@ -94,7 +95,7 @@ describe('when()', () => {
     const { engine, sheet } = setup()
     const key = engine.when(dark)
     expect(sheet.rules.join('')).not.toContain('--e-palette-surface')
-    engine.css({ [key]: { background: engine.refs.palette.surface } })
+    engine.css({ ...at(key, { background: engine.refs.palette.surface }) })
     const id = engine.themeId(dark)
     expect(sheet.rules.join('')).toContain(`.${id}{--e-palette-surface:#111111;}`)
   })
@@ -111,7 +112,7 @@ describe('themes nested as A > B > A', () => {
     expect(b.split(' ')).toHaveLength(3)
     // Each of the three elements carries the boundary, and the rule is scoped to A alone.
     expect([a, b, a2].every((classes) => classes.split(' ').includes('e-boundary'))).toBe(true)
-    const card = engine.css({ [engine.when(dark, 'dark')]: { border: '1px solid white' } })
+    const card = engine.css({ ...at(engine.when(dark, 'dark'), { border: '1px solid white' }) })
     const scoped = sheet.rules.filter((rule) => rule.includes('@scope'))
     expect(scoped).toEqual([
       `@layer e-components{@scope (.${a.split(' ')[0]}) to (.e-boundary){.${card}{border:1px solid white;}}}`,
@@ -125,7 +126,7 @@ describe('themes nested as A > B > A', () => {
       engine.themeClass(theme, scheme)
     const card = engine.css({
       color: 'rgb(0, 0, 0)',
-      [engine.when(dark, 'dark')]: { color: 'rgb(1, 2, 3)' },
+      ...at(engine.when(dark, 'dark'), { color: 'rgb(1, 2, 3)' }),
     })
     const host = document.createElement('div')
     host.innerHTML = `<div class="${classes(dark, 'dark')}"><i id="x1" class="${card}"></i>

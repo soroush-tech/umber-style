@@ -1,4 +1,4 @@
-import { createCache, createEngine, createMemorySheet } from '@umber-style/core'
+import { at, createCache, createEngine, createMemorySheet } from '@umber-style/core'
 import { bindEngine } from './createStyle.server'
 import { findAll, resolveTree } from './vitest.resolveTree'
 import type { CacheFunction } from './serverContext'
@@ -24,8 +24,8 @@ describe('theme conditions in the server build', () => {
     const { styled, when, whenScheme, engine } = setup()
     const Card = styled('div')({
       border: 'none',
-      [when(dark)]: { border: '1px solid white' },
-      [whenScheme('light')]: { opacity: 0.5 },
+      ...at(when(dark), { border: '1px solid white' }),
+      ...at(whenScheme('light'), { opacity: 0.5 }),
     })
     const tree = await resolveTree(<Card>x</Card>)
     const [card] = findAll(tree, 'div')

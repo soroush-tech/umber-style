@@ -60,7 +60,7 @@ export type WebProperties = {
 }
 
 /** What a nested key holds: a style of its own, or nothing (so `isOpen && { ... }` works). */
-type WebNested = WebStyleObject | null | undefined | false
+export type WebNested = WebStyleObject | null | undefined | false
 
 /**
  * A style for the web: any CSS property, a custom property (`--name`), `label`, and nested styles under

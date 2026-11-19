@@ -10,7 +10,7 @@ A style is a plain object. The engine turns it into CSS rules when a component f
 - A number is a length in pixels (`padding: 8` becomes `padding:8px`), except `0`, custom properties, and properties that take no unit (`opacity`, `zIndex`, `lineHeight`, `flex`, `fontWeight` and the others in the serializer's list).
 - An array is a list of fallbacks: `display: ['block', 'grid']` writes `display:block;display:grid;`.
 - `null`, `undefined` and `false` are skipped, so `isOpen && { ... }` works.
-- A nested object is a nested rule. A key with `&` is a selector where `&` stands for the parent (`'&:hover'`, `'& > p'`). A key without `&` is a descendant selector. A key that starts with `@` wraps the rules in an at-rule (`@media`, `@supports`). A key such as `when(theme)` is a theme condition: see [Theme conditions](theme-conditions.md).
+- A nested object is a nested rule. A key with `&` is a selector where `&` stands for the parent (`'&:hover'`, `'& > p'`). A key that starts with `:` and has no `&` is the element itself (`':hover'` is `'&:hover'`). Any other key without `&` is a descendant selector. A key that starts with `@` wraps the rules in an at-rule (`@media`, `@supports`). A key such as `when(theme)` is a theme condition: see [Theme conditions](theme-conditions.md).
 - `label` is not a declaration. It becomes part of the class name.
 
 ```ts

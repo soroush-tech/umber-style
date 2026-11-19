@@ -135,7 +135,6 @@ A `className` you give a styled component is kept, and any class the engine made
 
 ## Limits
 
-- A key built at run time (a media query made from a breakpoint, for example) is not accepted by the web types in an object literal. See [Typed styles](typed-styles.md) for the verified ways around it.
-- A key that starts with `:` and has no `&` (for example `':hover'`) is a nested rule in the types, but the serializer treats a key without `&` as a descendant selector, so `':hover'` becomes `.class :hover` and not `.class:hover`. Write `'&:hover'`.
+- A key built at run time (a media query made from a breakpoint, for example) written directly in a web style object is a type error: write it with `at(key, style)`. See [Typed styles](typed-styles.md).
 - `shouldForwardProp` is the only filter. There is no allow-list of valid HTML attributes: by default every other prop is forwarded to a string tag, valid or not.
 - A function style runs on every render of its component. Keep it cheap.

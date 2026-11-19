@@ -1,3 +1,4 @@
+import { at } from './at'
 import { createCache, createMemorySheet } from './cache'
 import { createEngine } from './createEngine'
 
@@ -50,7 +51,7 @@ describe('a view given to a styler', () => {
     const styler = engine.createStyler({}, [
       ({ theme: view }: { theme: typeof theme }) => ({
         color: view.palette.primary,
-        [`@media (width >= ${view.breakpoints[0]})`]: { padding: view.space[1] },
+        ...at(`@media (width >= ${view.breakpoints[0]})`, { padding: view.space[1] }),
       }),
     ])
     expect(styler.isDynamic).toBe(true)

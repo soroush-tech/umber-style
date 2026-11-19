@@ -59,6 +59,22 @@ describe('compileRules', () => {
     expect(compileRules('.a', { span: { color: 'red' } })).toEqual(['.a span{color:red;}'])
   })
 
+  it('treats a key that starts with a colon as the element itself, like a key that starts with &', () => {
+    expect(
+      compileRules('.a', {
+        ':hover': { color: 'red' },
+        ':is(.b, .c):focus, :first-child': { top: 1 },
+        '::before': { content: '""' },
+        'span :hover': { color: 'blue' },
+      })
+    ).toEqual([
+      '.a:hover{color:red;}',
+      '.a:is(.b, .c):focus,.a:first-child{top:1px;}',
+      '.a::before{content:"";}',
+      '.a span :hover{color:blue;}',
+    ])
+  })
+
   it('crosses nested comma lists with a comma list parent', () => {
     expect(
       compileRules('.a', { '&:hover, &:focus': { '& > span, em': { color: 'red' } } })

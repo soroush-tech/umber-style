@@ -21,6 +21,7 @@ describe('the entry of @umber-style/react', () => {
       'add',
       'subtract',
       'negate',
+      'at',
     ]) {
       expect(entry).toHaveProperty(name)
     }
@@ -29,7 +30,10 @@ describe('the entry of @umber-style/react', () => {
   })
 
   it('configures the default engine once, before it is used', () => {
-    entry.configure({ prefix: 'idx', theme: { palette: { primary: 'red' } } })
+    entry.configure({
+      prefix: 'idx',
+      theme: { palette: { primary: 'red', onPrimary: 'white' }, space: [0, 4] },
+    })
     expect(entry.getEngine().cache.prefix).toBe('idx')
     expect(() => entry.configure({ prefix: 'again' })).toThrow()
   })

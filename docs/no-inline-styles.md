@@ -65,7 +65,7 @@ So do not pass such a value through `style`. Use a style that changes by class (
 
 ## A plain element
 
-The `style` prop is the engine's only on a component made by `styled()`. A sheet entry given to the `style` of a plain element is not merged into a class: React puts it on the element as a style attribute, holding a custom property named after the class. The types reject it (`SharedEntry` is not a `CSSProperties`), so you see it as an error. For a plain element use `apply`:
+The `style` prop is the engine's only on a component made by `styled()`. A sheet entry given to the `style` of a plain element is not merged into a class, and the engine does not put a style attribute on that element either: an entry has one enumerable key, a custom property named after its class with the value `null`, and both React and Vue skip a `null` style value. The types reject it (`SharedEntry` is not a `CSSProperties`), so you see it as an error, and the element gets no class either. For a plain element use `apply`:
 
 ```tsx
 <p {...apply(styles.box)}>a plain element</p>
@@ -89,7 +89,8 @@ The head script that applies a stored theme (see [The root theme and switching](
 
 ## Limits
 
-- The guarantee is about what the engine renders. Your own components, third-party components and the `style` of a plain element are not covered.
+- The guarantee is about what the engine renders. Your own components, third-party components and a plain style object given to the `style` of a plain element are not covered. A sheet entry given there adds nothing to the attribute.
+- Vue's server renderer writes `style=""` for every `style` prop of a plain element, even `null`, so a plain element that is given a sheet entry has an empty `style` attribute in Vue's server output. Nothing is declared in it. React writes no attribute.
 - No nonce support, as above.
 - The cache never removes classes: see "A value that changes".
-- The check that no `style` attribute is rendered was run in jsdom and for server render output. It was not run in a browser.
+- The check that no `style` attribute is rendered was run in jsdom and for server render output. It was not run in a browser, so what a browser does with a `null` custom property value on `element.style` is not observed.

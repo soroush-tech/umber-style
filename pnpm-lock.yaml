@@ -224,6 +224,9 @@ importers:
         specifier: workspace:*
         version: link:../core
     devDependencies:
+      '@types/node':
+        specifier: ^26.6.6
+        version: 26.6.6
       '@umber-style/eslint-config':
         specifier: workspace:*
         version: link:../eslint-config

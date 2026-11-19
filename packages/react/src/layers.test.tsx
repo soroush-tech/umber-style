@@ -133,7 +133,7 @@ describe('the layers of a styled component', () => {
   it('puts sheet entries and apply() in the components layer, theme classes in the theme layer', () => {
     const { apply, StyleSheet, useStyle, ThemeProvider, layerOf, sheet } = setup()
     const { box } = readSheet(useStyle, StyleSheet.create({ box: { color: 'red' } }))
-    const { className } = apply(box, { margin: 1 })
+    const { className } = apply(box, { margin: 1 } as never)
     expect(layerOf(box.className)).toBe('l-components')
     expect(layerOf(className as string)).toBe('l-components')
     render(<ThemeProvider theme={baseTheme}>x</ThemeProvider>)

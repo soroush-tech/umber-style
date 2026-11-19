@@ -38,8 +38,10 @@ describe('an inline token in the server build', () => {
   })
 
   it('sends the whole theme class in its style element, whatever the sheet holds', async () => {
-    const { styled, ThemeProvider, sheet } = setup()
+    const { styled, ThemeProvider, themeClass, sheet } = setup()
     const Box = styled('div')(({ theme: view }) => ({ color: view.palette.primary }))
+    // The app makes the rule of the class it puts on <html>; a root provider only sends it.
+    themeClass(theme)
     const tree = await resolveTree(
       <ThemeProvider theme={theme} isRoot>
         <Box />

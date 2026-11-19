@@ -20,7 +20,7 @@
   },
   "scripts": {
     "lint": "oxlint --deny-warnings",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.defaultStyle.json",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage"
   },
@@ -31,6 +31,7 @@
     "vue": "^3.5.0"
   },
   "devDependencies": {
+    "@types/node": "^26.6.6",
     "@umber-style/eslint-config": "workspace:*",
     "@vitest/coverage-v8": "^5.1.0",
     "jsdom": "^31.0.0",

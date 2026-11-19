@@ -1,12 +1,15 @@
-const HEX_PATTERN = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i
+import { assertAlphaInput, toRgba } from '@umber-style/core'
 
-/** `color` at `opacity` (0 to 1) as rgba(); only #rgb and #rrggbb change, any other string is returned as it is. */
+/**
+ * `color` at `opacity` (0 to 1), as one color string: `rgba(r, g, b, a)` for a literal the core can
+ * read (`#rgb`, `#rgba`, `#rrggbb`, `#rrggbbaa`, `rgb()` and `rgba()` with numbers), any other color as
+ * it is. 1 returns `color` and 0 returns `transparent`. Throws what the web `alpha` throws: a `TypeError`
+ * for a color that is not a string or an opacity that is not a number, a `RangeError` for an opacity
+ * outside 0 to 1.
+ */
 export function alpha(color: string, opacity: number): string {
-  if (!HEX_PATTERN.test(color)) return color
-  const digits = color.slice(1)
-  const full = digits.length === 3 ? [...digits].map((digit) => digit + digit).join('') : digits
-  const [red, green, blue] = [0, 2, 4].map((start) =>
-    Number.parseInt(full.slice(start, start + 2), 16)
-  )
-  return `rgba(${red}, ${green}, ${blue}, ${opacity})`
+  assertAlphaInput(color, opacity)
+  if (opacity === 1) return color
+  if (opacity === 0) return 'transparent'
+  return toRgba(color, opacity) ?? color
 }

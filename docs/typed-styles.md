@@ -14,13 +14,12 @@ Each entry checks the keys of a style in an object literal, for its own platform
 
 ## The web
 
-`WebStyleObject` is the type of a style on the web: every CSS property with its values (a number where CSS takes a length, a list for fallbacks), nested styles under a selector or an at-rule, custom properties (`--name`) and `label`. `engine.css`, `createSheet`, `createStyler`, and the `styled`, `StyleSheet.create` and `style` of the web bindings take it. It comes from `@umber-style/core` (and `umber-style`); the web bindings do not re-export it.
+`WebStyleObject` is the type of a style on the web: every CSS property with its values (a number where CSS takes a length, a list for fallbacks), nested styles under a selector or an at-rule, custom properties (`--name`) and `label`. `engine.css`, `createSheet`, `createStyler`, and the `styled`, `StyleSheet.create` and `style` of the web bindings take it. It comes from `@umber-style/core`. The web bindings re-export it as a type, with `WebProperties`, `WebNested`, `NestedKey`, `StyleObject`, `AlphaColor`, `SheetEntry`, `ThemeKey`, `SchemeKey` and `SchemeName`: `@umber-style/react` (both builds), `@umber-style/vue`, and every entry of `umber-style` but `umber-style/react-native`.
 
 The typings of the CSS properties come from the standard `csstype` package. It is a `dependency` of the core and is only imported as a type, so the core has no run-time dependency on it. The declarations the core publishes refer to it, and a consumer without it would see every property as `any`.
 
 ```ts
-import { createStyle } from '@umber-style/react'
-import type { StyleObject, WebStyleObject } from '@umber-style/core'
+import { createStyle, type StyleObject, type WebStyleObject } from '@umber-style/react'
 
 const { styled } = createStyle({ palette: { primary: '#1b5fd1' } })
 
@@ -60,6 +59,7 @@ What is checked:
 - In an object literal, a key that is not a property, a selector or an at-rule (`backgroudColor`).
 - A wrong value where the property's typing is a closed set of keywords: `display: 'gird'`, `position: 'abslute'`, `flexDirection: 'rows'` and `textAlign: 'midle'` are errors. `display` is written out by the engine, because `csstype` lets any string through for it; the others come from `csstype`. A property whose typing admits any string is not checked: `cursor: 'ponter'` compiles.
 - A nested style under a selector (a key with `&`, or one that starts with `:`) or an at-rule (a key that starts with `@`) is itself checked as a style.
+- A key that starts with `:` (`':hover'`, `'::before'`) is the element itself, written as if it were `'&:hover'`: the rule is `.class:hover`. A key with no `&` that does not start with `:` (`'span'`, `'> li'`) is an error in an object literal, because it would be a descendant selector; the loose `StyleObject` writes it as one.
 
 What is not checked:
 
@@ -71,35 +71,26 @@ A `style` prop of a styled component is checked like a style.
 
 ### Keys built at run time
 
-A key made from a variable, such as a media query from a breakpoint, has the type `string`, which matches none of the key patterns of `WebStyleObject`, and TypeScript rejects the object. These forms were compiled and are accepted:
+A key made from a value, such as a media query from a breakpoint or the key of `when()`, is a computed key. TypeScript gives every computed key in an object literal the type `string`, whatever its template literal type, and checks it against every index signature of `WebStyleObject`. The custom property signature (`--name`) takes no style, so `{ [`@media (min-width: ${bp})`]: { gap: 16 } }` is rejected, though it works at run time. No type can accept the key and still reject a style given to a custom property (the reproduction is in the limits below), so use `at(key, style)`:
 
 ```ts
-import type { WebStyleObject } from '@umber-style/core'
+import { at } from '@umber-style/react'
 
-// 1. Type the dynamic part, then spread it. The rest of the object stays checked.
-styled('div')(({ theme }) => {
-  const wide: Record<`@media ${string}`, WebStyleObject> = {
-    [`@media (min-width: ${theme.breakpoints[0]})`]: { gap: 16 },
-  }
-  return { gap: 8, ...wide }
-})
+styled('div')(({ theme }) => ({
+  gap: 8,
+  ...at(`@media (min-width: ${theme.breakpoints[0]})`, { gap: 16 }),
+}))
 
-// 2. Cast the whole result, when the object also has an ordinary property.
-styled('div')(
-  ({ theme }) =>
-    ({ gap: 8, [`@media (min-width: ${theme.breakpoints[0]})`]: { gap: 16 } }) as WebStyleObject
-)
-
-// 3. Go through unknown, when the dynamic key is the only one.
-styled('div')(
-  ({ theme }) =>
-    ({ [`@media (min-width: ${theme.breakpoints[0]})`]: { gap: 16 } }) as unknown as WebStyleObject
-)
+// A misspelt property inside the style is still an error.
+styled('div')(({ theme }) => ({
+  // @ts-expect-error `gapp` is not a property
+  ...at(`@media (min-width: ${theme.breakpoints[0]})`, { gapp: 16 }),
+}))
 ```
 
-The key of `when()` and `whenScheme()` is a computed key too, and the web types reject it in an object literal. Put the conditions in a variable and spread it: see [Theme conditions](theme-conditions.md).
+`at(key, style)` returns `{ [key]: style }` typed so that it spreads into a style. The key keeps its template literal type, and `style` is checked as a style of its own. The key must be a selector with `&`, one that starts with `:`, or an at-rule (`NestedKey`). `at` is exported by `@umber-style/core`, by every binding and by `umber-style/react`, where it is for the `web` part of a shared style. It is the same function for the keys of `when()` and `whenScheme()`: see [Theme conditions](theme-conditions.md).
 
-A key that starts with `:` and has no `&` (`':hover'`) is accepted by the types but written as a descendant selector. Use `'&:hover'`.
+A key that TypeScript only knows as `string` (a variable of that type) is an error in `at()` too. Build the key in the call, or type it with a template literal. When that is not possible, cast the whole style: `({ gap: 8, [key]: { gap: 16 } }) as WebStyleObject`.
 
 ### The escape hatch
 
@@ -162,7 +153,7 @@ A tag name such as `'div'` type-checks in shared code and throws on React Native
 
 To use a key that a type does not know, cast the style to the type of the platform: `style as WebStyleObject`, or `style as NativeStyleObject`.
 
-The cases above are those of `packages/umber-style/src/sharedTypes.test.tsx`, which `pnpm typecheck` compiles twice, with and without the `react-native` export condition.
+The cases above are those of `packages/umber-style/src/sharedTypes.test.tsx`, which `pnpm typecheck` compiles twice, with and without the `react-native` export condition. The server declarations are compiled with the `react-server` condition (`packages/umber-style/src/sharedServerTypes.test.tsx`).
 
 ## Vue
 
@@ -170,12 +161,24 @@ Vue uses the web types for styles. A styled component's props are not typed: `st
 
 ## Server components
 
-Under the `react-server` condition `@umber-style/react` has no `useTheme` and has `readTheme`. The compiler only sees that if its configuration includes the `react-server` custom condition (`customConditions: ["react-server"]` in `compilerOptions`). Without it the types are those of the client build: `readTheme` is reported as missing, and `useTheme` type-checks and does not exist at run time. See [Server rendering](server-rendering.md).
+Under the `react-server` condition `@umber-style/react` has no `useTheme` and has `readTheme`. The compiler picks the server types when its configuration has the `react-server` custom condition (`"customConditions": ["react-server"]` in `compilerOptions`). Without it the types are those of the client build: `readTheme` is reported as missing. Both `@umber-style/react` and `umber-style/react` follow the condition: under it, `umber-style/react` has `readTheme` and no `useTheme`, because that is what it is at run time. See [Server rendering](server-rendering.md).
 
 ## Limits
 
 - The values of colours and lengths are not checked, on any platform.
-- Computed keys need one of the forms above on the web.
+- A computed key written directly in a web style object is a type error, whatever its type: use `at()`. The cause is in TypeScript, and was reproduced with 7.0.2. The computed key becomes a `string` index signature of the object, which has to satisfy every index signature of the target, the custom property one included:
+
+  ```ts
+  declare const key: `@media ${string}`
+  type Nested = { color?: string }
+  // Accepted: no custom property signature.
+  const a: { color?: string; [k: `@${string}`]: Nested } = { [key]: { color: 'red' } }
+  // Rejected: 'string' and '`--${string}`' index signatures are incompatible.
+  const b: { [k: `--${string}`]: string; [k: `@${string}`]: Nested } = { [key]: { color: 'red' } }
+  ```
+
+  Letting the custom property signature take a style would accept the key and also accept `'--x': { color: 'red' }`.
+
 - The shared types are an intersection: a valid web style (`display: 'block'`) is a type error in shared code and goes in `web`.
 - Types do not know which props of a host element `shouldForwardProp` forwards.
 - The examples were compiled with TypeScript 7.0.2. Other versions were not tried.

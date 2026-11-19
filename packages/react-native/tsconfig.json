@@ -13,6 +13,12 @@
     "jsx": "react-jsx"
   },
   "include": ["src"],
-  "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx"],
-  "files": ["src/augmentation.test.tsx", "src/nativeStyle.test.tsx"]
+  "exclude": [
+    // Each of these declares the `Theme` of the default style for the whole program, and the
+    // declarations differ, so each is compiled apart: tsconfig.augmentation.json and
+    // tsconfig.defaultStyle.json.
+    "src/augmentation.test.tsx",
+    "src/index.test.ts",
+    "src/defaultStyle.test.tsx"
+  ]
 }

@@ -1,0 +1,6 @@
+{
+  "extends": "./tsconfig.json",
+  "include": ["src"],
+  "exclude": ["src/defaultStyle.test.tsx"],
+  "files": ["src/augmentation.test.tsx", "src/index.test.ts"]
+}

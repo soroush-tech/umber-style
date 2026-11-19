@@ -17,6 +17,20 @@ import type {
   WebStyleObject,
 } from '@umber-style/core'
 
+/** The style types of the core that an app annotates with or uses `satisfies` with. */
+export type {
+  AlphaColor,
+  NestedKey,
+  SchemeKey,
+  SchemeName,
+  SheetEntry,
+  StyleObject,
+  ThemeKey,
+  WebNested,
+  WebProperties,
+  WebStyleObject,
+} from '@umber-style/core'
+
 export type StyleOptions<T = never> = BindingOptions<T>
 
 export interface DefaultStyleOptions extends BindingOptions<Theme> {
@@ -25,7 +39,7 @@ export interface DefaultStyleOptions extends BindingOptions<Theme> {
 }
 
 export interface StyledOptions extends StylerOptions {
-  /** Whether a prop is forwarded to a string tag. Default: every prop but `as`, `theme` and `className`. */
+  /** Whether a prop is forwarded to a string tag. Default: every prop but `as`, `theme`, `className` and `style`, which the component handles itself. */
   shouldForwardProp?: (prop: string) => boolean
 }
 

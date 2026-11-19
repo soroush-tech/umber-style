@@ -2,10 +2,12 @@
 import { expectTypeOf } from 'vitest'
 import {
   add,
+  at,
   alpha,
   createCache,
   createLazyEngine,
   createMemorySheet,
+  createSchemeKey,
   divide,
   multiply,
   negate,
@@ -162,5 +164,46 @@ describe('alpha in a web style', () => {
     })
     expect(typeof fn).toBe('function')
     expect(engine.createStyler({}, [fn])).toBeDefined()
+  })
+})
+
+describe('keys that are computed', () => {
+  it('are rejected as a computed key in a web style, and accepted through at()', () => {
+    const { engine, sheet } = setup()
+    const wide: string = 'min-width: 40em'
+    const dark = { palette: { primary: '#8888ff' } }
+    // @ts-expect-error a computed key has the type string; the `--${string}` signature takes no style
+    const direct: WebStyleObject = { [`@media (${wide})`]: { padding: 16 } }
+    expect(direct).toBeDefined()
+    const style: WebStyleObject = {
+      padding: 8,
+      ...at(`@media (${wide})`, { padding: 16, '&:hover': { opacity: 0.5 } }),
+      ...at(engine.when(dark, 'dark'), { color: 'white' }),
+      ...at(createSchemeKey('dark'), { boxShadow: 'none' }),
+      ...at(`&.${'open'}`, { margin: 0 }),
+      ...at(`:${'hover'}`, false),
+    }
+    expect(engine.css(style)).toMatch(/^w-/)
+    expect(sheet.rules.join('')).toContain('@media (min-width: 40em){')
+  })
+
+  it('keep what the type catches: a misspelt property, a wrong value, a custom property value', () => {
+    const { engine } = setup()
+    const wide: string = 'min-width: 40em'
+    // @ts-expect-error a misspelt property inside the style of at()
+    at(`@media (${wide})`, { backgroudColor: 'red' })
+    // @ts-expect-error a misspelt property next to a spread of at()
+    engine.css({ backgroudColor: 'red', ...at(`@media (${wide})`, { padding: 1 }) })
+    // @ts-expect-error a wrong value next to a spread of at()
+    engine.css({ display: 'gird', ...at(`@media (${wide})`, { padding: 1 }) })
+    // @ts-expect-error a label is a string
+    engine.css({ label: 1, ...at(`@media (${wide})`, { padding: 1 }) })
+    // @ts-expect-error a custom property holds a value, not a style
+    engine.css({ '--x': { color: 'red' } })
+    // @ts-expect-error a key of at() is a selector or an at-rule
+    at('> li', { color: 'red' })
+    // @ts-expect-error a key of at() is a literal pattern, not any string
+    at(String(wide), { color: 'red' })
+    expectTypeOf(at(`@print`, null)).not.toBeAny()
   })
 })

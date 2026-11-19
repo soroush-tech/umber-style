@@ -91,7 +91,7 @@ In development it warns, once for each distinct message, about a shorthand with 
 
 ## Arithmetic and `alpha`
 
-The package exports `add`, `subtract`, `multiply`, `divide`, `negate` and `alpha`. Arithmetic returns real numbers, and a percentage stays a percentage; anything that cannot be computed throws. `alpha(color, opacity)` returns `rgba(r, g, b, opacity)` for `#rgb` and `#rrggbb`, and the colour unchanged for anything else. See [Tokens](tokens.md).
+The package exports `add`, `subtract`, `multiply`, `divide`, `negate` and `alpha`. Arithmetic returns real numbers, and a percentage stays a percentage; anything that cannot be computed throws. `alpha(color, opacity)` checks its arguments as the web `alpha` does, returns the colour for `1` and `'transparent'` for `0`, and between them `rgba(r, g, b, a)` for a colour it can read (`#rgb`, `#rgba`, `#rrggbb`, `#rrggbbaa`, `rgb()` and `rgba()` with numbers); any other colour is returned as it is. The package also exports `at`, for the `web` part of a shared style. See [Tokens](tokens.md).
 
 ## One source for both platforms
 
@@ -103,4 +103,4 @@ The package exports `add`, `subtract`, `multiply`, `divide`, `negate` and `alpha
 - Because of that, `StyleSheet.create` returning ids, `Appearance` changes, and the platform's own handling of an unknown key were not exercised.
 - The color scheme of the platform is read when a component renders. A change of the system setting does not re-render a component by itself.
 - Sheets made from a function are registered once for each theme object, kept in a `WeakMap`, so they are released with the theme object. A theme object that is re-created on every render registers a new sheet every time.
-- `alpha` does not check its opacity.
+- `alpha` cannot mix a colour it cannot read as a literal (a named colour, `hsl()`): it returns that colour unchanged.

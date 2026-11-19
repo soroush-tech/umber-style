@@ -1,4 +1,4 @@
-import { createCache, createEngine, createMemorySheet } from '@umber-style/core'
+import { at, createCache, createEngine, createMemorySheet } from '@umber-style/core'
 import { createApp, h } from 'vue'
 import { bindEngine } from './createStyle'
 
@@ -12,8 +12,8 @@ describe('theme conditions in Vue', () => {
     const { styled, ThemeProvider, when, whenScheme } = bindEngine(engine)
     const Card = styled('div')({
       border: 'none',
-      [when(dark, 'dark')]: { border: '1px solid white' },
-      [whenScheme('dark')]: { boxShadow: 'none' },
+      ...at(when(dark, 'dark'), { border: '1px solid white' }),
+      ...at(whenScheme('dark'), { boxShadow: 'none' }),
     })
     const root = document.createElement('div')
     createApp(() => h(ThemeProvider, { theme: dark, colorScheme: 'dark' }, () => h(Card))).mount(

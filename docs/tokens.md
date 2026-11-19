@@ -82,7 +82,7 @@ On React Native a percentage stays a percentage for `multiply`, `divide` and `ne
 
 In shared code (`umber-style/react`) a token is typed as the number it is on React Native, so the result is typed `number` there too.
 
-Vue's binding does not export these helpers. Import them from `@umber-style/core` (or from `umber-style`).
+Every binding exports them, Vue's included, and so does `@umber-style/core`.
 
 ## Colours at an opacity: `alpha`
 
@@ -119,7 +119,7 @@ const className = engine.css({
 const engine = createEngine(theme, { prefix: 'umber', hasColorFallbacks: false })
 ```
 
-On React Native, `alpha` returns an `rgba()` string for `#rgb` and `#rrggbb` and the colour unchanged for anything else. It does not check the opacity: `alpha('#1b5fd1', 2)` is `rgba(27, 95, 209, 2)`, and `0` and `1` give `rgba(..., 0)` and `rgba(..., 1)`, not `transparent` and the colour.
+On React Native, `alpha` follows the same rules, and the result is one colour string, because the platform has no `color-mix()` and no fallback pair. It checks its arguments as the web does (a `TypeError` for a colour that is not a string or an opacity that is not a number, a `RangeError` for an opacity outside 0 to 1 or `NaN`), `1` returns the colour and `0` returns `'transparent'`. Between, a colour that the core can read (`#rgb`, `#rgba`, `#rrggbb`, `#rrggbbaa`, `rgb()` and `rgba()` with numbers, with an alpha it already has multiplied) is returned as `rgba(r, g, b, a)`, as in `alpha('#1b5fd1', 0.5)`, which is `'rgba(27, 95, 209, 0.5)'`. Any other colour (a named colour, `hsl()`) is returned as it is: the platform's own value is better than a wrong one.
 
 ## Token modes
 
@@ -273,7 +273,6 @@ What the tests do check: the rule text and where it is written. In jsdom, which 
 - **Transitions on registered tokens were never observed in a browser.** Both claims above are reasoning from the specification.
 - A token mode is chosen once, when the engine is created. Changing `modes` later is not supported: make another engine.
 - The arithmetic helpers do not know a variable's value. `multiply('var(--x)', 2)` is a `calc()` that the browser computes, so it cannot be used where a plain number is needed (a `z-index`, for example).
-- On React Native, `alpha` does not validate its opacity and does not return `transparent` for `0`.
+- On React Native, `alpha` cannot mix: a colour it cannot read as a literal (a named colour, `hsl()`) is returned at full opacity, whatever the opacity is.
 - `lengthKeys` and `rawKeys` take top-level keys only. For anything deeper use `modes`.
-- Vue does not export the arithmetic helpers or `alpha`.
 - Browser versions for `color-mix()` and `@property` are to be confirmed: see [Browser and platform support](browser-support.md).

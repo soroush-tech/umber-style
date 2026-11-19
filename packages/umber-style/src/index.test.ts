@@ -8,7 +8,14 @@ import * as reactServer from './react.server'
 import * as vue from './vue'
 
 const manifest = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as {
-  exports: Record<string, string | Record<string, string>>
+  exports: Record<string, Target>
+}
+
+type Target = string | { [condition: string]: Target }
+
+/** The files that an exports target points at, through any nesting of conditions. */
+function collectTargets(target: Target): string[] {
+  return typeof target === 'string' ? [target] : Object.values(target).flatMap(collectTargets)
 }
 
 describe('the entries of umber-style', () => {
@@ -46,29 +53,30 @@ describe('the entries of umber-style', () => {
       for (const name of names) expect(binding).toHaveProperty(name)
     }
     for (const binding of [react, vue]) expect(binding).toHaveProperty('getEngine')
-    for (const binding of [react, reactNative]) {
-      for (const name of ['multiply', 'divide', 'add', 'subtract', 'negate']) {
+    for (const binding of [react, reactNative, vue]) {
+      for (const name of ['alpha', 'at', 'multiply', 'divide', 'add', 'subtract', 'negate']) {
         expect(binding).toHaveProperty(name)
       }
     }
     expect(String(react.alpha('red', 0.5))).toBe('color-mix(in srgb, red 50%, transparent)')
     expect(react.alpha('red', 1)).toBe('red')
-    expect(reactNative.alpha('#fff', 1)).toBe('rgba(255, 255, 255, 1)')
+    expect(reactNative.alpha('#fff', 1)).toBe('#fff')
+    expect(reactNative.alpha('#fff', 0.5)).toBe('rgba(255, 255, 255, 0.5)')
   })
 
   it('the exports map points at files that exist, with the platform switch on /react', () => {
-    const targets = Object.values(manifest.exports).flatMap((target) =>
-      typeof target === 'string' ? [target] : Object.values(target)
-    )
-    expect(targets).toHaveLength(7)
+    const targets = Object.values(manifest.exports).flatMap(collectTargets)
+    expect(targets).toHaveLength(8)
     for (const target of targets) {
       expect(existsSync(fileURLToPath(new URL(`../${target}`, import.meta.url)))).toBe(true)
     }
-    // The `types` condition is first: the compiler reads the shared types, a bundler skips it.
+    // The `react-server` condition is first, with its own types: under the custom condition the compiler
+    // reads `shared.server.ts` (`readTheme`), else the `types` condition reads the shared types, and a
+    // bundler skips `types`.
     expect(manifest.exports['./react']).toEqual({
+      'react-server': { types: './src/shared.server.ts', default: './src/react.server.ts' },
       types: './src/shared.ts',
       'react-native': './src/react-native.ts',
-      'react-server': './src/react.server.ts',
       default: './src/react.ts',
     })
   })

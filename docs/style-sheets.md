@@ -74,7 +74,7 @@ and the rules for the card:
 
 The component has two classes: its own (`umber-card-root-1l5hymm`) and one override class for everything it was given from outside. The override class is in a later cascade layer, so it wins. See [Cascade layers and overrides](cascade-layers.md).
 
-The `style` prop is only for components made by `styled()`. On a plain element, `style` is the platform's own prop: a sheet entry there would end up as an inline style attribute that holds a custom property, and the types reject it. Use `apply` for a plain element.
+The `style` prop is only for components made by `styled()`. On a plain element, `style` is the platform's own prop: a sheet entry there is not turned into a class (and writes no style attribute, see [No inline styles](no-inline-styles.md)), and the types reject it. Use `apply` for a plain element.
 
 ## `apply`
 
@@ -145,7 +145,7 @@ Without layers (`hasLayers: false`) there is one merged class and the order of t
 
 ## One component source for web and mobile
 
-`umber-style/react` is the entry for code that runs on the web and on React Native. Under the `react-native` export condition it is the React Native binding at run time, and for the compiler it is always the same set of types, so one source type-checks the same under both. The names it has are the ones both bindings have: `styled`, `StyleSheet`, `useStyle`, `apply`, `ThemeProvider`, `useTheme`, `themeClass`, `when`, `whenScheme`, `configure`, `createStyle`, `createDefaultStyle`, `alpha` and the arithmetic helpers. Web-only members (`getEngine`, `engine`, `cache`) are not in its types: import them from `@umber-style/react`.
+`umber-style/react` is the entry for code that runs on the web and on React Native. Under the `react-native` export condition it is the React Native binding at run time, and for the compiler it is always the same set of types, so one source type-checks the same under both. The names it has are the ones both bindings have: `styled`, `StyleSheet`, `useStyle`, `apply`, `ThemeProvider`, `useTheme`, `themeClass`, `when`, `whenScheme`, `configure`, `createStyle`, `createDefaultStyle`, `alpha`, `at` and the arithmetic helpers. Web-only members (`getEngine`, `engine`, `cache`) are not in its types: import them from `@umber-style/react`.
 
 A tag name works on the web and throws on React Native, so a shared source gets its elements from a module that each platform resolves on its own. React Native's bundler picks `host.native.ts` over `host.ts`:
 

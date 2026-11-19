@@ -7,6 +7,14 @@ import {
 } from '@umber-style/core'
 import { createDefaultStyle } from './defaultStyle'
 
+// The shape of the theme that these tests give the default style.
+declare module '@umber-style/core' {
+  interface Theme {
+    palette: { primary: string }
+    space: { small: number }
+  }
+}
+
 const light = { palette: { primary: '#0000ff' }, space: { small: 4 } }
 
 function setup() {

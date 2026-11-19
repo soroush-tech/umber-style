@@ -101,7 +101,11 @@ describe('styled', () => {
 
   it('keeps the forwarding rule of the component it flattens', () => {
     const { styled } = setup()
-    const Base = styled('div', { shouldForwardProp: (prop) => prop !== 'tone' })({ color: 'red' })
+    const Base = styled('div', { shouldForwardProp: (prop) => prop !== 'tone' })<{ tone?: string }>(
+      {
+        color: 'red',
+      }
+    )
     const Fancy = styled(Base)({ margin: 4 })
     const { container } = render(<Fancy tone="x" data-x="y" title="t" />)
     const element = container.firstElementChild as HTMLElement
@@ -114,7 +118,7 @@ describe('styled', () => {
     const { styled } = setup()
     const Button = styled('button')({ color: 'red' })
     const { container } = render(
-      <Button as="a" href="#top">
+      <Button as="a" {...{ href: '#top' }}>
         x
       </Button>
     )
@@ -124,7 +128,7 @@ describe('styled', () => {
 
   it('forwards every prop to a tag, but `as`, `theme` and `className`', () => {
     const { styled } = setup()
-    const Box = styled('div')({ color: 'red' })
+    const Box = styled('div')<{ tone?: string; theme?: object }>({ color: 'red' })
     const { container } = render(<Box tone="big" theme={{}} data-x="1" id="a" />)
     const element = container.firstElementChild as HTMLElement
     expect(element.getAttributeNames().sort()).toEqual(['class', 'data-x', 'id', 'tone'])
@@ -346,7 +350,7 @@ describe('StyleSheet, useStyle and apply', () => {
     const { StyleSheet, useStyle, ruleOf } = setup()
     const sheet = StyleSheet.create((theme) => ({ box: { color: theme.palette.primary } }))
     const { box } = readSheet(useStyle, sheet)
-    expect(ruleOf(box)).toBe(`.${box}{color:var(--t-palette-primary);}`)
+    expect(ruleOf(box.className)).toBe(`.${box}{color:var(--t-palette-primary);}`)
   })
 
   it('apply makes one class from its entries, and none from nothing', () => {

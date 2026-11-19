@@ -15,6 +15,7 @@ export const {
   whenScheme,
 } = defaults
 
+export { at } from '@umber-style/core'
 export * from './alpha'
 export * from './calc'
 export * from './createStyle'

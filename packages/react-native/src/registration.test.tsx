@@ -57,7 +57,7 @@ describe('the platform StyleSheet', () => {
       return createElement('view')
     }
     const Box = styled(View)(
-      { margin: 1, '&:hover': { color: 'red' } },
+      { margin: 1, '&:hover': { color: 'red' } } as never,
       null as never,
       ({ theme }) => ({
         padding: theme.space.small,
@@ -86,7 +86,7 @@ describe('the platform StyleSheet', () => {
     const { StyleSheet } = createStyle(light)
     expect(StyleSheet.hairlineWidth).toBe(1)
     expect(StyleSheet.absoluteFill).toEqual({ position: 'absolute' })
-    expect(StyleSheet.flatten({ a: 1 })).toEqual({ a: 1 })
+    expect(StyleSheet.flatten({ a: 1 } as never)).toEqual({ a: 1 })
     expect(createDefaultStyle().StyleSheet.hairlineWidth).toBe(1)
   })
 })

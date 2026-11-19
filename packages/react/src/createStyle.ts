@@ -49,6 +49,9 @@ export function bindEngine<T extends object>(engine: Engine<T>): WebStyle<T> {
     useStyle,
     apply: (...entries) => ({ className: engine.css(...entries) || undefined }),
     ThemeProvider: createThemeProvider({
+      learnTheme: (theme) => {
+        if (!engine.hasTheme) engine.setTheme(theme as T)
+      },
       themeClass,
       scopeClass: engine.scopeClass,
       ThemeValueProvider,

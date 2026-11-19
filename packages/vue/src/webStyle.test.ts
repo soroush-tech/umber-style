@@ -2,11 +2,29 @@
 import {
   createCache,
   createMemorySheet,
+  type AlphaColor,
+  type NestedKey,
+  type SheetEntry,
   type StyleObject,
+  type WebNested,
+  type WebProperties,
   type WebStyleObject,
 } from '@umber-style/core'
 import { expectTypeOf } from 'vitest'
 import { createStyle } from './createStyle'
+import {
+  at,
+  type AlphaColor as VueAlpha,
+  type NestedKey as VueKey,
+  type SchemeKey as VueSchemeKey,
+  type SchemeName as VueSchemeName,
+  type SheetEntry as VueEntry,
+  type StyleObject as VueLoose,
+  type ThemeKey as VueThemeKey,
+  type WebNested as VueNested,
+  type WebProperties as VueProperties,
+  type WebStyleObject as VueWebStyle,
+} from './index'
 
 function setup() {
   const sheet = createMemorySheet()
@@ -79,5 +97,21 @@ describe('what a web style accepts through the Vue binding', () => {
     StyleSheet.create({ box: { backgroudColor: 'red' } })
     // @ts-expect-error a wrong value in a sheet
     StyleSheet.create({ box: { display: 'gird' } })
+  })
+})
+
+describe('the style types of the Vue binding', () => {
+  it('are re-exported for an app that annotates a style or uses satisfies', () => {
+    expectTypeOf<VueWebStyle>().toEqualTypeOf<WebStyleObject>()
+    expectTypeOf<VueProperties>().toEqualTypeOf<WebProperties>()
+    expectTypeOf<VueNested>().toEqualTypeOf<WebNested>()
+    expectTypeOf<VueKey>().toEqualTypeOf<NestedKey>()
+    expectTypeOf<VueLoose>().toEqualTypeOf<StyleObject>()
+    expectTypeOf<VueAlpha>().toEqualTypeOf<AlphaColor>()
+    expectTypeOf<VueEntry>().toEqualTypeOf<SheetEntry>()
+    const key: VueThemeKey | VueSchemeKey | VueSchemeName = 'dark'
+    expect(key).toBe('dark')
+    const style = { color: 'red', ...at(`&.${'open'}`, { margin: 0 }) } satisfies VueWebStyle
+    expect(Object.keys(style)).toEqual(['color', '&.open'])
   })
 })

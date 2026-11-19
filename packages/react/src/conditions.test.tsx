@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react'
-import { createCache, createEngine, createMemorySheet } from '@umber-style/core'
+import { at, createCache, createEngine, createMemorySheet } from '@umber-style/core'
 import { bindEngine } from './createStyle'
 
 const base = { palette: { primary: '#0000ff', surface: '#ffffff' } }
@@ -20,8 +20,8 @@ describe('theme conditions in the client build', () => {
     const { styled, ThemeProvider, when, whenScheme, engine, sheet } = setup()
     const Card = styled('div')({
       border: 'none',
-      [when(dark, 'dark')]: { border: '1px solid white', '&:hover': { borderColor: 'red' } },
-      [whenScheme('dark')]: { boxShadow: 'none' },
+      ...at(when(dark, 'dark'), { border: '1px solid white', '&:hover': { borderColor: 'red' } }),
+      ...at(whenScheme('dark'), { boxShadow: 'none' }),
     })
     render(
       <ThemeProvider theme={dark} colorScheme="dark">
@@ -52,7 +52,7 @@ describe('theme conditions in the client build', () => {
 
   it('writes the descendant form with hasScope false', () => {
     const { styled, when, engine, sheet } = setup({ hasScope: false })
-    const Card = styled('div')({ [when(dark)]: { border: '1px solid white' } })
+    const Card = styled('div')({ ...at(when(dark), { border: '1px solid white' }) })
     render(<Card>a</Card>)
     const card = screen.getByText('a').className
     expect(sheet.rules).toContain(

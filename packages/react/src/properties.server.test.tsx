@@ -39,7 +39,9 @@ describe('registered properties in the server build', () => {
   })
 
   it('sends it for a root provider too, and not with the element of a component class', async () => {
-    const { ThemeProvider, Box } = setup()
+    const { ThemeProvider, Box, themeClass } = setup()
+    // The app makes the rule of the class it puts on <html>; a root provider only sends it.
+    themeClass(theme)
     const tree = await resolveTree(
       <ThemeProvider theme={theme} isRoot>
         <Box />

@@ -65,7 +65,7 @@ describe('styled', () => {
 
   it('gives function styles the attributes, and the same class for the same attributes', () => {
     const { styled } = setup()
-    const Box = styled('div')(({ size }: { size?: number }) => ({ padding: size }))
+    const Box = styled('div')(({ size }) => ({ padding: size as number | undefined }))
     const root = mount(() =>
       h('div', null, [h(Box, { size: 4 }), h(Box, { size: 4 }), h(Box, { size: 8 })])
     )

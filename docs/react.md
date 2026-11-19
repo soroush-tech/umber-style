@@ -41,7 +41,7 @@ configure({ prefix: 'umber', theme: lightTheme })
 
 Types: `StyleOptions`, `DefaultStyleOptions`, `StyledOptions`, `StyledStatics`, `StyleProp`, `StyledComponent`, `Styled`, `SheetDefinition`, `ThemeProviderProps`, `WebThemeProviderProps`, `Style`, `WebStyle`, `ServerStyle`.
 
-`createStyle` returns a `WebStyle`: `styled`, `StyleSheet`, `useStyle`, `apply`, `ThemeProvider`, `useTheme`, `themeClass`, `when`, `whenScheme`, and `engine` and `cache`, the engine and its cache. The direct imports have no `engine` or `cache`: use `getEngine()` and `getEngine().cache`. `WebStyleObject` and the other style types are from `@umber-style/core`, not from this package.
+`createStyle` returns a `WebStyle`: `styled`, `StyleSheet`, `useStyle`, `apply`, `ThemeProvider`, `useTheme`, `themeClass`, `when`, `whenScheme`, and `engine` and `cache`, the engine and its cache. The direct imports have no `engine` or `cache`: use `getEngine()` and `getEngine().cache`. `WebStyleObject` and the other style types (`WebProperties`, `WebNested`, `NestedKey`, `StyleObject`, `AlphaColor`, `SheetEntry`) are re-exported from this package as types, in both builds, and `at` and `alpha` and the arithmetic helpers are exported as values. See [Typed styles](typed-styles.md).
 
 ## `ThemeProvider`
 
@@ -51,7 +51,7 @@ Types: `StyleOptions`, `DefaultStyleOptions`, `StyledOptions`, `StyledStatics`, 
 | `colorScheme` | `'light' \| 'dark' \| 'light dark'` | none    | Sets `color-scheme` in the theme class and, for `light` and `dark`, adds the scheme marker class |
 | `className`   | `string`                            | none    | Added to the classes of the wrapper                                                              |
 | `as`          | `string`                            | `'div'` | The element that carries the theme class                                                         |
-| `isRoot`      | `boolean`                           | `false` | Renders no element and no class: see [The root theme and switching](root-theme.md)               |
+| `isRoot`      | `boolean`                           | `false` | Renders no element, no class and no rule: see [The root theme and switching](root-theme.md)      |
 | `children`    | `ReactNode`                         | none    | The subtree                                                                                      |
 
 ## `styled` in React

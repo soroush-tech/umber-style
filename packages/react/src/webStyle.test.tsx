@@ -3,11 +3,34 @@ import { render } from '@testing-library/react'
 import {
   createCache,
   createMemorySheet,
+  type AlphaColor,
+  type NestedKey,
+  type SheetEntry,
   type StyleObject,
+  type WebNested,
+  type WebProperties,
   type WebStyleObject,
 } from '@umber-style/core'
 import { expectTypeOf } from 'vitest'
 import { createStyle } from './createStyle'
+import {
+  at,
+  type AlphaColor as ClientAlpha,
+  type NestedKey as ClientKey,
+  type SchemeKey as ClientSchemeKey,
+  type SchemeName as ClientSchemeName,
+  type SheetEntry as ClientEntry,
+  type StyleObject as ClientLoose,
+  type ThemeKey as ClientThemeKey,
+  type WebNested as ClientNested,
+  type WebProperties as ClientWebProperties,
+  type WebStyleObject as ClientWebStyle,
+} from './index'
+import {
+  at as serverAt,
+  type StyleObject as ServerLoose,
+  type WebStyleObject as ServerWebStyle,
+} from './index.server'
 
 function setup() {
   const sheet = createMemorySheet()
@@ -163,5 +186,24 @@ describe('what a sheet, the style prop and apply accept', () => {
     // @ts-expect-error a wrong value in the style prop
     ;<Box style={[{ display: 'gird' }]} />
     expectTypeOf(Panel).toBeFunction()
+  })
+})
+
+describe('the style types, from the client build and the server build', () => {
+  it('are re-exported for an app that annotates a style or uses satisfies', () => {
+    expectTypeOf<ClientWebStyle>().toEqualTypeOf<WebStyleObject>()
+    expectTypeOf<ServerWebStyle>().toEqualTypeOf<WebStyleObject>()
+    expectTypeOf<ClientWebProperties>().toEqualTypeOf<WebProperties>()
+    expectTypeOf<ClientNested>().toEqualTypeOf<WebNested>()
+    expectTypeOf<ClientKey>().toEqualTypeOf<NestedKey>()
+    expectTypeOf<ClientLoose>().toEqualTypeOf<StyleObject>()
+    expectTypeOf<ClientAlpha>().toEqualTypeOf<AlphaColor>()
+    expectTypeOf<ClientEntry>().toEqualTypeOf<SheetEntry>()
+    expectTypeOf<ServerLoose>().toEqualTypeOf<StyleObject>()
+    const key: ClientThemeKey | ClientSchemeKey | ClientSchemeName = 'dark'
+    expect(key).toBe('dark')
+    const style = { color: 'red', ...at(`&.${'open'}`, { margin: 0 }) } satisfies ClientWebStyle
+    expect(Object.keys(style)).toEqual(['color', '&.open'])
+    expect(serverAt).toBe(at)
   })
 })

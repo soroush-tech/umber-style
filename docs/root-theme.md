@@ -6,7 +6,7 @@ After this page you can switch light and dark with no render, store the choice a
 
 A normal `ThemeProvider` renders an element that carries its theme's class, and that class declares the whole theme for everything below it. If your app also puts a theme class on `<html>` to switch themes, the wrapper of the outermost provider would override it for the entire page, and the switch would do nothing.
 
-So the outermost provider is a root provider. With `isRoot` it renders no element and no class. It does three things: it gives the engine its base theme, it makes sure the rule of the theme exists, and it feeds the context for `useTheme` and function styles. You put the class on an ancestor you control, usually `<html>`.
+So the outermost provider is a root provider. With `isRoot` it renders no element, no class and no rule. It does two things: it gives the engine its base theme (when the engine has none yet) and it feeds the context for `useTheme` and function styles. You put the class on an ancestor you control, usually `<html>`, and the call that gives you the class, `themeClass`, makes the rule: see below.
 
 ```tsx
 const App = () => (
@@ -18,7 +18,7 @@ const App = () => (
 
 `isRoot` is a prop of the provider in every binding. React Native accepts it and ignores it, because React Native has no classes. Nested providers stay normal: they change only the tokens they give, below their own element.
 
-Pass the same `colorScheme` to the root provider that you gave `themeClass`. The provider looks up the theme class for its `theme` and `colorScheme`; with a different `colorScheme` it makes a different class, and an extra unused rule is sent.
+A root provider makes no theme class, so its `colorScheme` makes no rule and changes nothing in the markup: the class that matters is the one you got from `themeClass(theme, colorScheme)` and put on `<html>`. Call `themeClass` for the root theme, at start-up, as for every theme you switch to. An app that never calls it has no rule for its root theme at all, and a root provider does not make one for it.
 
 ## The class on `<html>`
 
@@ -167,5 +167,5 @@ The same works for any element, in any binding, since the class is plain: `getEn
 - "No flash" is reasoned from the order of events (the script runs before the first paint). It was not observed in a browser.
 - The switch was checked in jsdom, which resolves custom properties from classes on an ancestor. A real browser was not used.
 - The inline script needs a content security policy nonce or hash. The engine has no option to produce one.
-- With `isRoot`, the provider renders no `umber-scope` wrapper and no theme class. If the class is not on an ancestor, the variables are not declared and styles that use them have no values.
-- The server components build handles `isRoot` too (it still sends the theme's `<style>`); see [Server rendering](server-rendering.md).
+- With `isRoot`, the provider renders no `umber-scope` wrapper, no theme class and makes no theme rule. If the class is not on an ancestor, or `themeClass` was not called for it, the variables are not declared and styles that use them have no values.
+- The server components build handles `isRoot` too: it sends the `<style>` of the theme classes that `themeClass` already made for its theme object, and makes none; see [Server rendering](server-rendering.md).

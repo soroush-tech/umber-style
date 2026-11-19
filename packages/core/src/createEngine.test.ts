@@ -1,5 +1,5 @@
 import { createCache, createMemorySheet } from './cache'
-import { createEngine } from './createEngine'
+import { createEngine, createLazyEngine } from './createEngine'
 import { isSheetEntry } from './sheetEntry'
 
 const theme = {
@@ -40,6 +40,22 @@ describe('createEngine', () => {
     expect(shared.themeClass({})).toMatch(/^given-theme-/)
   })
 
+  it('takes the prefix of a given cache for the variables too', () => {
+    const cache = createCache({ hasLayers: false, prefix: 'given', sheet: createMemorySheet() })
+    const engine = createEngine(theme, { cache })
+    expect(engine.themeClass({})).toMatch(/^given-theme-/)
+    expect(String(engine.refs.palette.primary)).toMatch(/^var\(--given-/)
+    const same = createEngine(theme, { cache, prefix: 'given' })
+    expect(String(same.refs.palette.primary)).toMatch(/^var\(--given-/)
+  })
+
+  it('throws a TypeError that names both prefixes when a prefix differs from the cache', () => {
+    const cache = createCache({ hasLayers: false, prefix: 'given', sheet: createMemorySheet() })
+    expect(() => createEngine(theme, { cache, prefix: 'other' })).toThrow(TypeError)
+    expect(() => createEngine(theme, { cache, prefix: 'other' })).toThrow(/"other".*"given"/)
+    expect(() => createLazyEngine({ cache, prefix: 'other' })).toThrow(TypeError)
+  })
+
   it('makes one class for a theme object and color scheme, once', () => {
     const { engine, sheet } = setup()
     const partial = { palette: { primary: '#ff0000' } }
@@ -50,6 +66,18 @@ describe('createEngine', () => {
     expect(engine.themeId(partial, 'dark')).toBe(dark)
     expect(sheet.rules.filter((rule) => rule.startsWith('.e-theme-'))).toHaveLength(2)
     expect(sheet.rules).toContain(`.${first}{--e-palette-primary:#ff0000;}`)
+  })
+
+  it('finds the classes already made for a theme object, and makes none', () => {
+    const { engine, sheet } = setup()
+    const partial = { palette: { primary: '#ff0000' } }
+    expect(engine.findThemeIds(partial)).toEqual([])
+    expect(sheet.rules).toHaveLength(0)
+    const light = engine.themeId(partial, 'light')
+    const none = engine.themeId(partial)
+    expect(engine.findThemeIds(partial)).toEqual([light, none])
+    expect(engine.findThemeIds({ palette: { primary: '#ff0000' } })).toEqual([])
+    expect(sheet.rules).toHaveLength(2)
   })
 
   it('makes the classes of a sheet on first use, and only once', () => {

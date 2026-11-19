@@ -23,7 +23,7 @@
   },
   "scripts": {
     "lint": "oxlint --deny-warnings",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.augmentation.json && tsc --noEmit -p tsconfig.server.json",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage"
   },

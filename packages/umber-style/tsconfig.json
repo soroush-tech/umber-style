@@ -14,8 +14,7 @@
   },
   "include": ["src", "../core/src", "../react/src", "../react-native/src", "../vue/src"],
   "exclude": [
-    "src/**/*.test.ts",
-    "src/**/*.test.tsx",
+    // The tests of the other packages are compiled by their own packages.
     "../core/src/**/*.test.ts",
     "../core/src/**/*.test.tsx",
     "../react/src/**/*.test.ts",
@@ -23,7 +22,13 @@
     "../react-native/src/**/*.test.ts",
     "../react-native/src/**/*.test.tsx",
     "../vue/src/**/*.test.ts",
-    "../vue/src/**/*.test.tsx"
-  ],
-  "files": ["src/sharedTypes.test.tsx"]
+    "../vue/src/**/*.test.tsx",
+    // Compiled with the `react-server` condition: tsconfig.server.json.
+    "src/sharedServerTypes.test.tsx",
+    // These run one source on both platforms at run time, and erase the type of the host component
+    // with `as never` to do it (its props become `never`). The types of a shared style are covered by
+    // sharedTypes.test.tsx and sharedConditions.test.tsx.
+    "src/platformParts.test.tsx",
+    "src/sharedSource.test.tsx"
+  ]
 }

@@ -18,8 +18,7 @@ After this page you can give a subtree its own theme, read theme values in JavaS
 The `theme` prop is a partial theme. A nested provider gives only what it changes and the rest comes from the provider above:
 
 ```tsx
-import { createStyle } from '@umber-style/react'
-import type { WebStyleObject } from '@umber-style/core'
+import { at, createStyle } from '@umber-style/react'
 
 const lightTheme = {
   palette: { primary: '#1b5fd1', text: '#1a1a1a', surface: '#ffffff' },
@@ -29,12 +28,11 @@ const lightTheme = {
 
 const { styled, ThemeProvider, useTheme } = createStyle(lightTheme, { prefix: 'umber' })
 
-const Card = styled('div', { name: 'Card' })(({ theme }) => {
-  const wide: Record<`@media ${string}`, WebStyleObject> = {
-    [`@media (min-width: ${theme.breakpoints[0]})`]: { padding: theme.space[3] },
-  }
-  return { color: theme.palette.text, backgroundColor: theme.palette.surface, ...wide }
-})
+const Card = styled('div', { name: 'Card' })(({ theme }) => ({
+  color: theme.palette.text,
+  backgroundColor: theme.palette.surface,
+  ...at(`@media (min-width: ${theme.breakpoints[0]})`, { padding: theme.space[3] }),
+}))
 
 function Swatch() {
   const theme = useTheme()
@@ -199,5 +197,5 @@ The same works with `@umber-style/vue` and `@umber-style/react-native`. One `The
 
 - The module declaration names `@umber-style/core`, and TypeScript resolves that name from the file that holds the declaration. It was verified with the workspace layout of this repository. With a package manager that does not let your app see a package it did not install itself, you may need to install `@umber-style/core` directly; that was reasoned, not tried.
 - `Theme` is one interface for the whole program. Two different themes in one program (two `createStyle` calls with different shapes) are typed by `createStyle`, not by `Theme`.
-- A key built at run time in a style, such as the media query above, needs the `Record<...>` form shown. See [Typed styles](typed-styles.md).
+- A key built at run time in a web style, such as the media query above, is written with `at()`: written directly it is a type error. See [Typed styles](typed-styles.md).
 - A provider that changes only raw values (a breakpoint) declares nothing, and its theme class is always `umber-theme-0`. No rule is written for it, and every such provider shares that name.

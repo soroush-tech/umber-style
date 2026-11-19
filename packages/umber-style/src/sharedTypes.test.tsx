@@ -1,13 +1,14 @@
 // The type tests of `umber-style/react`: `pnpm typecheck` compiles this file twice, with and without the
 // `react-native` export condition (tsconfig.json and tsconfig.native.json), and both must pass.
 import { render } from '@testing-library/react'
-import type { WebProperties } from '@umber-style/core'
+import type { WebProperties, WebStyleObject } from '@umber-style/core'
 import type { NativeStyleObject } from '@umber-style/react-native'
 import type { ReactNode } from 'react'
 import { expectTypeOf } from 'vitest'
 import {
   add,
   apply,
+  at,
   createStyle,
   divide,
   multiply,
@@ -20,6 +21,8 @@ import {
   type SharedStyled,
   type SharedStyleObject,
   type Theme,
+  type WebNested,
+  type WebStyleObject as SharedWebStyle,
 } from 'umber-style/react'
 
 interface HostProps {
@@ -205,5 +208,18 @@ describe('the arithmetic helpers in a shared style', () => {
     multiply('var(--space-2)', 2)
     // @ts-expect-error a length with a unit is not a percentage
     add('8px', 4)
+  })
+})
+
+describe('the web part of a shared style', () => {
+  it('takes a computed key through at(), and its types are exported', () => {
+    expectTypeOf<SharedWebStyle>().toEqualTypeOf<WebStyleObject>()
+    expectTypeOf<WebNested>().toEqualTypeOf<WebStyleObject | null | undefined | false>()
+    const breakpoint: string = '40em'
+    const Box = styled(Host)({
+      padding: 8,
+      web: { gap: 8, ...at(`@media (width >= ${breakpoint})`, { gap: 16 }) },
+    })
+    render(<Box id="computed" />)
   })
 })

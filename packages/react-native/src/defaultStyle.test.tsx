@@ -4,6 +4,14 @@ import { createElement } from 'react'
 import { createDefaultStyle } from './defaultStyle'
 import { createStyle } from './createStyle'
 
+// The shape of the theme that these tests give the default style.
+declare module '@umber-style/core' {
+  interface Theme {
+    palette: { primary: string }
+    space: { small: number }
+  }
+}
+
 const light = { palette: { primary: '#0000ff' }, space: { small: 4 } }
 const other = { palette: { primary: '#ff0000' }, space: { small: 8 } }
 

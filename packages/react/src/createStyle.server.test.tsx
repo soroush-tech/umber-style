@@ -1,4 +1,5 @@
 import {
+  at,
   createCache,
   createEngine,
   createLazyEngine,
@@ -33,7 +34,7 @@ function setup() {
   const style = bindEngine(engine, requestCache)
   const Box = style.styled('div', { name: 'Box' })(({ theme: view }) => ({
     color: view.palette.primary,
-    [`@media (width >= ${view.breakpoints[0]})`]: { padding: view.space[1] },
+    ...at(`@media (width >= ${view.breakpoints[0]})`, { padding: view.space[1] }),
   }))
   return { ...style, sheet, Box }
 }
@@ -139,9 +140,13 @@ describe('the server build of styled', () => {
 
   it('throws without a theme, from a function style and from useStyle', async () => {
     const style = bindEngine(createLazyEngine(), requestCache)
-    const Box = style.styled('div')(({ theme: view }) => ({ color: view.palette }))
+    const Box = style.styled('div')(({ theme: view }) => ({
+      color: (view as unknown as { palette: string }).palette,
+    }))
     await expect(resolveTree(<Box />)).rejects.toThrow(NO_THEME_MESSAGE)
-    const dynamic = style.StyleSheet.create((view) => ({ a: { color: view.palette } }))
+    const dynamic = style.StyleSheet.create((view) => ({
+      a: { color: (view as unknown as { palette: string }).palette },
+    }))
     expect(() => style.useStyle(dynamic)).toThrow(NO_THEME_MESSAGE)
   })
 

@@ -2,7 +2,7 @@ import { createCache, createMemorySheet, NO_THEME_MESSAGE } from '@umber-style/c
 import { createDefaultStyle } from './defaultStyle.server'
 import { findAll, resolveTree } from './vitest.resolveTree'
 
-const theme = { palette: { primary: '#0000ff' }, space: [0, 4] }
+const theme = { palette: { primary: '#0000ff', onPrimary: '#ffffff' }, space: [0, 4] }
 
 function setup() {
   const style = createDefaultStyle()

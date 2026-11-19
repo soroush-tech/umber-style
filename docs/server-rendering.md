@@ -141,7 +141,7 @@ Without a `document`, the cache keeps its rules in memory (`createMemorySheet`),
 
 ## Server components
 
-`@umber-style/react` has two builds. The package picks one by the `react-server` export condition, and so does the `umber-style/react` entry:
+`@umber-style/react` has two builds. The package picks one by the `react-server` export condition, and so does the `umber-style/react` entry. In this repository the targets are TypeScript source, so each target is also the types of its build:
 
 ```json
 "exports": {
@@ -152,12 +152,23 @@ Without a `document`, the cache keeps its rules in memory (`createMemorySheet`),
 }
 ```
 
+```json
+"./react": {
+  "react-server": { "types": "./src/shared.server.ts", "default": "./src/react.server.ts" },
+  "types": "./src/shared.ts",
+  "react-native": "./src/react-native.ts",
+  "default": "./src/react.ts"
+}
+```
+
+The second map is that of `umber-style`: under the `react-server` condition, the compiler and the bundler both take the server entry, and the compiler reads the server declarations. The first was traced with `tsc --traceResolution`: with `customConditions: ["react-server"]` it resolves to `index.server.ts`, without to `index.ts`. A published package needs the same shape, with a `types` file for each build, in its `publishConfig`; none is published yet.
+
 | Build                   | Theme reaches a component by      | Style elements                        | Hooks                                     |
 | ----------------------- | --------------------------------- | ------------------------------------- | ----------------------------------------- |
 | Client (the default)    | A React context                   | None: the cache inserts rules         | `useTheme`, `useStyle`                    |
 | Server (`react-server`) | A slot that lives for one request | `<style href precedence>` per element | None: `readTheme()` instead of `useTheme` |
 
-Both builds export `configure`, `getEngine`, `styled`, `StyleSheet`, `useStyle`, `ThemeProvider`, `apply`, `themeClass`, `when`, `whenScheme`, `createStyle` and the arithmetic helpers and `alpha`. The server build has `readTheme` and no `useTheme`.
+Both builds export `configure`, `getEngine`, `styled`, `StyleSheet`, `useStyle`, `ThemeProvider`, `apply`, `themeClass`, `when`, `whenScheme`, `createStyle`, `at`, the arithmetic helpers and `alpha`, and the style types. The server build has `readTheme` and no `useTheme`.
 
 A server component page:
 
@@ -170,7 +181,10 @@ const theme = {
   breakpoints: ['600px', '900px'],
 }
 
-const { styled, ThemeProvider, readTheme } = createStyle(theme, { prefix: 'umber' })
+const { styled, ThemeProvider, readTheme, themeClass } = createStyle(theme, { prefix: 'umber' })
+
+// The class for <html>, which the layout puts there. Asking for it makes the rule that the root provider sends.
+export const htmlClass = themeClass(theme)
 
 const Hero = styled('section', { name: 'Hero' })(({ theme }) => ({
   backgroundColor: theme.palette.primary,
@@ -200,7 +214,7 @@ What this renders, and what each part means:
 - **The request-scoped root theme.** A server component has no React context. The server `ThemeProvider` writes its theme into a slot that `React.cache` keeps for the length of one request. Only the first provider that renders in a request writes it: server components can render out of order, and a nested provider must not change what the root gave. Both `FirstBreakpoint` components read `600px`, the root's breakpoint, because the nested provider's `300px` is not written. A nested provider still changes the variables below it, through its theme class.
 - **What a server component gets.** A function style gets the tokens as variables everywhere, and the real values (breakpoints, functions, your own settings) of the root theme. `readTheme()` returns the real values of the root theme merged over the base theme; with no provider it returns the base theme, and it throws if there is none.
 - **Style elements.** Each styled element and each provider renders `<style href precedence>` elements for its classes. React 19 moves them to the head and renders each `href` once. The `precedence` is the cache prefix. Each one starts with the layer order statement, so it is right on its own. For the page above the elements are `umber-theme-b2oxy9` (the theme class with every variable), `umber-hero-root-1gepzxb` (the Hero rule) and `umber-scope`.
-- **`isRoot`.** A root provider renders no wrapper element but still sends the style of the theme class, so you put the class on an ancestor you control, as in [The root theme and switching](root-theme.md).
+- **`isRoot`.** A root provider renders no wrapper element and makes no theme class. It sends the `<style>` of the theme classes that `themeClass(theme, colorScheme)` already made for its `theme` (one for each colour scheme you asked with), so call `themeClass` for the class you put on an ancestor you control, in a component that renders before the provider (the layout that renders `<html>`), as in [The root theme and switching](root-theme.md). Without that call nothing is sent for the root theme.
 - **`apply()` and sheets.** They make classes and rules, but nothing renders those rules: `apply(entry)` returns a class name and no `<style>` element comes with it. Use them through `styled` (a sheet entry in `style`), or add the rules yourself with `createStyleTag`.
 
 The element of a theme class carries every variable of that theme (`cache.getFullRules`), because it is sent before the elements below it render, so a provider cannot know which variables they will use. Only the classic server render and the browser get the smaller, pruned classes: see [Tokens](tokens.md).
@@ -241,7 +255,17 @@ The file imports the theme itself instead of receiving it as a prop. Use the sam
 
 ### Types
 
-A server component file needs the `react-server` custom condition in its TypeScript configuration (`"customConditions": ["react-server"]`) to see `readTheme`. Without it the types are those of the client build: `readTheme` is reported as missing and `useTheme` is typed although it does not exist there.
+A server component file needs the `react-server` custom condition in its TypeScript configuration to see `readTheme`:
+
+```json
+{
+  "compilerOptions": {
+    "customConditions": ["react-server"]
+  }
+}
+```
+
+The condition applies to the whole program, so a project that also type-checks client components uses the condition only for the server files: a second `tsconfig` that extends the first and includes the server component files. Without the condition the types are those of the client build: `readTheme` is reported as missing and `useTheme` is typed although it does not exist there. `@umber-style/react` and `umber-style/react` both follow it (the exports map of each names its own types under `react-server`): under it, `umber-style/react` types `readTheme` and has no `useTheme`. `readTheme` is typed in that entry only under the condition, because the React Native binding has no `readTheme` and no server build: shared code that has to run on React Native does not call it.
 
 ## Limits
 

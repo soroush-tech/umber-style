@@ -73,6 +73,8 @@ export interface Engine<T> {
   themeClass(theme: DeepPartial<T>, colorScheme?: ColorScheme): string
   /** The theme class alone, `<prefix>-theme-<hash>`: the id that rules and style elements are keyed by. Makes the theme class as `themeClass` does. */
   themeId(theme: DeepPartial<T>, colorScheme?: ColorScheme): string
+  /** The theme classes already made for this theme object (one for each color scheme it was asked with), without making any. */
+  findThemeIds(theme: DeepPartial<T>): string[]
   /** A style key for "the nearest theme is this theme": `{ [when(dark)]: { border: ... } }`. Needs `@scope` (see `hasScope`). */
   when(theme: DeepPartial<T>, colorScheme?: ColorScheme): ThemeKey
   /** A style key for "the nearest color scheme is this one": the nearest theme given that `colorScheme`, else the system preference. */
@@ -112,7 +114,12 @@ export function createLazyEngine<T extends object = Theme>(options: EngineOption
   const { hasScope } = options
   const { alwaysDeclare = [] } = options
   const { rawKeys, lengthKeys, modes, registered } = options
-  const prefix = options.prefix ?? given?.prefix ?? 'css'
+  if (given && options.prefix !== undefined && options.prefix !== given.prefix) {
+    throw new TypeError(
+      `the engine options give the prefix "${options.prefix}", which differs from the prefix "${given.prefix}" of the given cache; variables and classes would use two prefixes. Leave out \`prefix\`, or give the same one.`
+    )
+  }
+  const prefix = given?.prefix ?? options.prefix ?? 'css'
   const cache =
     given ??
     createCache({ prefix, suffix, hasLabels, hasLayers, hasPruning, hasColorFallbacks, hasScope })
@@ -164,6 +171,7 @@ export function createLazyEngine<T extends object = Theme>(options: EngineOption
     }
     return className
   }
+  const findThemeIds = (partial: DeepPartial<T>) => [...(themeClasses.get(partial)?.values() ?? [])]
   const themeClass = (partial: DeepPartial<T>, colorScheme?: ColorScheme) =>
     createThemeClassName(cache.prefix, themeId(partial, colorScheme), colorScheme)
   const when = (partial: DeepPartial<T>, colorScheme?: ColorScheme) =>
@@ -273,6 +281,7 @@ export function createLazyEngine<T extends object = Theme>(options: EngineOption
     createThemeView,
     themeClass,
     themeId,
+    findThemeIds,
     when,
     whenScheme: createSchemeKey,
     createSheet,

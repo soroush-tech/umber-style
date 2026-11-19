@@ -13,11 +13,18 @@
     "jsx": "react-jsx"
   },
   "include": ["src"],
-  "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx", "src/**/vitest.*.ts"],
-  "files": [
+  "exclude": [
+    // A test helper that the tests import; it has no types of its own to check.
+    "src/**/vitest.*.ts",
+    // Compiled with the `react-server` condition: tsconfig.server.json.
+    "src/serverTypes.test.tsx",
+    // These give the default style an app's `Theme` (the one that augmentation.test.tsx declares for
+    // the whole program), so they are compiled together with it: tsconfig.augmentation.json.
     "src/augmentation.test.tsx",
-    "src/webStyle.test.tsx",
-    "src/webStyle.server.test.tsx",
-    "src/styledSystem.types.test.tsx"
+    "src/defaultStyle.test.tsx",
+    "src/defaultStyle.server.test.tsx",
+    "src/defaultStyle.ssr.test.tsx",
+    "src/index.test.ts",
+    "src/index.server.test.ts"
   ]
 }

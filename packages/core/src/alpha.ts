@@ -74,12 +74,28 @@ function readFunction(color: string): Rgba | undefined {
   return undefined
 }
 
-/** `color` at `opacity` as rgba(), when `color` is a literal that can be read, else `color` itself. */
-function createFallback(color: string, opacity: number): string {
+/**
+ * `color` at `opacity` as `rgba(r, g, b, a)`, when `color` is a literal that can be read (`#rgb`, `#rgba`,
+ * `#rrggbb`, `#rrggbbaa`, `rgb()` or `rgba()` with numbers; its own alpha is multiplied), else undefined.
+ */
+export function toRgba(color: string, opacity: number): string | undefined {
   const channels = readHex(color.trim()) ?? readFunction(color.trim())
-  if (channels === undefined) return color
+  if (channels === undefined) return undefined
   const { red, green, blue } = channels
   return `rgba(${red}, ${green}, ${blue}, ${round(channels.opacity * opacity)})`
+}
+
+/** Throws what `alpha()` throws: a `TypeError` for a color that is not a string or an opacity that is not a number, a `RangeError` for an opacity outside 0 to 1 or NaN. */
+export function assertAlphaInput(color: unknown, opacity: unknown): void {
+  if (typeof color !== 'string') {
+    throw new TypeError(`alpha(): the color must be a string, got ${typeof color}`)
+  }
+  if (typeof opacity !== 'number') {
+    throw new TypeError(`alpha(): the opacity must be a number, got ${typeof opacity}`)
+  }
+  if (!(opacity >= 0 && opacity <= 1)) {
+    throw new RangeError(`alpha(): the opacity must be from 0 to 1, got ${opacity}`)
+  }
 }
 
 /**
@@ -91,22 +107,14 @@ function createFallback(color: string, opacity: number): string {
  * that is not a string or an opacity that is not a number, a `RangeError` for an opacity outside 0 to 1.
  */
 export function alpha(color: string, opacity: number): AlphaColor | string {
-  if (typeof color !== 'string') {
-    throw new TypeError(`alpha(): the color must be a string, got ${typeof color}`)
-  }
-  if (typeof opacity !== 'number') {
-    throw new TypeError(`alpha(): the opacity must be a number, got ${typeof opacity}`)
-  }
-  if (!(opacity >= 0 && opacity <= 1)) {
-    throw new RangeError(`alpha(): the opacity must be from 0 to 1, got ${opacity}`)
-  }
+  assertAlphaInput(color, opacity)
   if (opacity === 1) return color
   if (opacity === 0) return 'transparent'
   const percent = Math.round(opacity * 10000) / 100
   const value = `color-mix(in srgb, ${color} ${percent}%, transparent)`
   const mix = {}
   Object.defineProperties(mix, {
-    fallback: { value: createFallback(color, opacity), enumerable: true },
+    fallback: { value: toRgba(color, opacity) ?? color, enumerable: true },
     value: { value, enumerable: true },
     toString: { value: () => value },
     [BRAND]: { value: true },

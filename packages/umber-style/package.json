@@ -18,9 +18,12 @@
   "exports": {
     ".": "./src/index.ts",
     "./react": {
+      "react-server": {
+        "types": "./src/shared.server.ts",
+        "default": "./src/react.server.ts"
+      },
       "types": "./src/shared.ts",
       "react-native": "./src/react-native.ts",
-      "react-server": "./src/react.server.ts",
       "default": "./src/react.ts"
     },
     "./react-native": "./src/react-native.ts",
@@ -28,7 +31,7 @@
   },
   "scripts": {
     "lint": "oxlint --deny-warnings",
-    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.native.json",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.native.json && tsc --noEmit -p tsconfig.server.json",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage"
   },

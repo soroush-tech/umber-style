@@ -11,11 +11,13 @@ export interface SheetEntry {
 
 /**
  * Makes the entry of a class name: a frozen object that `isSheetEntry` knows and that prints as the
- * class name. Its one enumerable key is a custom property named after the class, so that a framework
- * that merges the style objects of an array (Vue does) keeps every entry, and `flattenStyle` finds them.
+ * class name. Its one enumerable key is a custom property named after the class, with the value `null`,
+ * so that a framework that merges the style objects of an array (Vue does) keeps every entry, and
+ * `flattenStyle` finds them by the key. Both frameworks skip a `null` style value on a plain element, on
+ * the client and on the server, so an entry given to a plain element renders no style attribute.
  */
 export function createSheetEntry(className: string): SheetEntry {
-  const entry = { [`${ENTRY_KEY_PREFIX}${className}`]: className, [BRAND]: true }
+  const entry = { [`${ENTRY_KEY_PREFIX}${className}`]: null, [BRAND]: true }
   Object.defineProperties(entry, {
     className: { value: className },
     toString: { value: () => className },
@@ -46,7 +48,8 @@ export function flattenStyle(style: unknown): (SheetEntry | WebStyleObject)[] {
     } else if (typeof value === 'object' && value !== null) {
       const rest: StyleObject = {}
       for (const [key, item] of Object.entries(value)) {
-        if (key.startsWith(ENTRY_KEY_PREFIX)) flat.push(createSheetEntry(item as string))
+        if (key.startsWith(ENTRY_KEY_PREFIX))
+          flat.push(createSheetEntry(key.slice(ENTRY_KEY_PREFIX.length)))
         else rest[key] = item
       }
       if (Object.keys(rest).length > 0) flat.push(rest as WebStyleObject)

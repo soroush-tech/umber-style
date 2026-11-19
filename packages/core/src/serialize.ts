@@ -104,13 +104,17 @@ function splitSelectors(selector: string): string[] {
   return parts
 }
 
+/** The selector of one part of a key inside one parent: `&` is the parent, a leading colon is the parent itself, anything else is a descendant. */
+function joinSelector(one: string, part: string): string {
+  if (part.includes('&')) return part.replaceAll('&', one)
+  return part.startsWith(':') ? one + part : `${one} ${part}`
+}
+
 /** The selector a nested key makes inside `parent`, with `&` standing for the parent. */
 function resolveSelector(parent: string, key: string): string {
   const parents = splitSelectors(parent)
   return splitSelectors(key)
-    .flatMap((part) =>
-      parents.map((one) => (part.includes('&') ? part.replaceAll('&', one) : `${one} ${part}`))
-    )
+    .flatMap((part) => parents.map((one) => joinSelector(one, part)))
     .join(',')
 }
 

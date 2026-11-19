@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react'
-import { createCache, createMemorySheet, NO_THEME_MESSAGE } from '@umber-style/core'
+import { at, createCache, createMemorySheet, NO_THEME_MESSAGE } from '@umber-style/core'
 import { space } from '@soroush.tech/styled-system/space'
 import { createStyle } from './createStyle'
 import { createDefaultStyle } from './defaultStyle'
@@ -26,7 +26,7 @@ describe('function styles read the real theme of the nearest provider', () => {
     const { styled, ThemeProvider, rulesOf } = setup()
     const Box = styled('div')(({ theme: view }) => ({
       color: view.palette.primary,
-      [`@media (width >= ${view.breakpoints[0]})`]: { padding: view.space[1] },
+      ...at(`@media (width >= ${view.breakpoints[0]})`, { padding: view.space[1] }),
     }))
     render(
       <ThemeProvider theme={theme}>
@@ -84,7 +84,7 @@ describe('function styles read the real theme of the nearest provider', () => {
   it('reads the theme of useStyle sheets from the nearest provider too', () => {
     const { StyleSheet, useStyle, ThemeProvider, rulesOf } = setup()
     const sheet = StyleSheet.create((view) => ({
-      box: { [`@media (width >= ${view.breakpoints[0]})`]: { margin: 1 } },
+      box: { ...at(`@media (width >= ${view.breakpoints[0]})`, { margin: 1 }) },
     }))
     const seen: string[] = []
     const Probe = () => {
@@ -116,7 +116,9 @@ describe('what reads no context', () => {
 
   it('throws for a function style with no theme', () => {
     const { styled } = createDefaultStyle()
-    const Box = styled('div')(({ theme: view }) => ({ color: view.palette }))
+    const Box = styled('div')(({ theme: view }) => ({
+      color: (view as unknown as { palette: string }).palette,
+    }))
     vi.spyOn(console, 'error').mockImplementation(() => undefined)
     expect(() => render(<Box />)).toThrow(NO_THEME_MESSAGE)
   })

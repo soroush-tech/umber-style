@@ -1,0 +1,7 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "customConditions": ["react-server"]
+  },
+  "files": ["src/sharedServerTypes.test.tsx"]
+}

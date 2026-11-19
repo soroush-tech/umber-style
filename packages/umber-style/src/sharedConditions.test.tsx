@@ -3,7 +3,7 @@
 import { render } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { expectTypeOf } from 'vitest'
-import { createStyle, styled } from 'umber-style/react'
+import { at, createStyle, styled } from 'umber-style/react'
 
 interface HostProps {
   id?: string
@@ -19,7 +19,7 @@ describe('what the condition keys accept in a style written for web and mobile',
       padding: 8,
       [when(dark)]: { padding: 4 },
       [whenScheme('dark')]: { opacity: 0.5 },
-      web: { [when(dark)]: { '&:hover': { opacity: 0.8 } } },
+      web: { ...at(when(dark), { '&:hover': { opacity: 0.8 } }) },
       native: { [whenScheme('light')]: { elevation: 2 } },
     })
     render(<Box id="conditions" />)
