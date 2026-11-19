@@ -1,8 +1,0 @@
-blank_issues_enabled: false
-contact_links:
-  - name: Questions & Discussions
-    url: https://github.com/soroush-tech/umber-style/discussions
-    about: Please use Discussions for questions, ideas, or general feedback.
-  - name: Documentation
-    url: https://umber-style.soroush.design
-    about: Check the docs before opening an issue.
