@@ -156,6 +156,11 @@ jobs:
       - name: Check typography
         run: ${{ needs.prepare.outputs.runner }} run check:typography
 
+      # Every publishable package has a release-notes file for its current version, so a version
+      # bump cannot reach main without its notes (cd-packages.yml refuses to publish without them).
+      - name: Check release notes
+        run: ${{ needs.prepare.outputs.runner }} run check:release-notes
+
   # One row per package: install, run its `test:coverage`, upload its lcov under its
   # own Codecov flag. Packages are alike, so they are a matrix rather than a job each.
   packages:
@@ -201,6 +206,34 @@ jobs:
           slug: soroush-tech/umber-style
           flags: ${{ matrix.flag }}
           name: ${{ matrix.flag }}
+
+  # What a pull request must prove about publishing: the five packages build, and the packed
+  # tarballs work together from outside the workspace (import, require, the export conditions, a
+  # server render, the declarations under two module resolutions). The smoke test installs from npm.
+  build:
+    needs: [prepare, lint]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 15
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Setup pnpm, Node and dependencies
+        uses: ./.github/actions/setup
+        with:
+          node_version: ${{ needs.prepare.outputs.node_version }}
+          manager: ${{ needs.prepare.outputs.manager }}
+          command: ${{ needs.prepare.outputs.command }}
+
+      - name: Build the packages
+        run: ${{ needs.prepare.outputs.runner }} run build
+
+      - name: Smoke-test the packed packages
+        run: node scripts/smoke-packed.mjs
 
   # Tier 1 of docs/testing.md: the engine's own output in real headless Chromium, in the packages that
   # have a `test:browser` script. The default test and coverage runs above need no browser.
@@ -459,7 +492,7 @@ jobs:
   ci-ok:
     name: ci-ok
     if: always()
-    needs: [prepare, lint, packages, browser, e2e, e2e-dev, bench]
+    needs: [prepare, lint, packages, build, browser, e2e, e2e-dev, bench]
     runs-on: ubuntu-latest
     permissions: {}
     timeout-minutes: 5

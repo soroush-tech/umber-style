@@ -4,16 +4,17 @@ After this page you can install a package and render a themed button with React,
 
 ## Install
 
-Nothing is published yet. Once it is, install the package for your platform:
+Install the package for your platform:
 
 ```sh
-# Not yet published. Once it is:
 pnpm add @umber-style/react        # React on the web
 pnpm add @umber-style/vue          # Vue
 pnpm add @umber-style/react-native # React Native
 pnpm add @umber-style/core         # plain JavaScript, no framework
 pnpm add umber-style               # all of them, as subpaths
 ```
+
+Until the first stable release, the packages are published as prereleases: add `@alpha` to the name, for example `pnpm add umber-style@alpha`. Without it you get an empty `0.0.0` placeholder. See [Releasing](releasing.md).
 
 `umber-style` re-exports the core at its root and each binding as `umber-style/react`, `umber-style/react-native` and `umber-style/vue`. The pages use the scoped packages for web code. `umber-style/react` is special: it is the entry for one source that runs on the web and on React Native, and its types are the intersection of both platforms. See [Typed styles](typed-styles.md) and [Style sheets and the style prop](style-sheets.md).
 

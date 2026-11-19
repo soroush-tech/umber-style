@@ -98,15 +98,23 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
   the pre-commit hook enforce it.
 - **Packages:** everything under `packages/` is a workspace package. `packages/packages.md` is the
   **standard** for packages - read it first, and follow it when creating or changing any package
-  (structure, exports, publishing, registration chores). Every package is `private` until it is
-  published; a publishable package must declare a license and ship a `LICENSE` file.
+  (structure, exports, publishing, registration chores). The five packages are publishable and built with
+  tsdown (`pnpm build`); they consume source inside the workspace and `publishConfig` swaps in `dist` only
+  when a tarball is made, so release with `pnpm` through the workflow, never `npm publish`. A publishable
+  package must declare a license, ship a `LICENSE` file, and have `release-notes/<version>.md`;
+  `eslint-config` stays `private`.
+- **Releasing:** `.github/workflows/cd-packages.yml` is dispatched by hand with a `package` and a
+  `channel` (`alpha` from a branch whose `ci-ok` passed, `rc` and `stable` from `main`), and publishes by
+  npm Trusted Publishing. `package.json` always holds the target version, never a prerelease.
+  `docs/releasing.md` is the guide; `pnpm smoke:packed` proves the packed tarballs work from outside the
+  workspace and runs in CI.
 - **Generated config:** `.codecov.yml`, the "Affected area" lists of the issue forms and the allowlist
   of `label-area.yml` are written by `pnpm gen:publish-options` from the folders under `packages/`.
   Run it after adding or removing a package; the pre-commit hook and CI run it with `--check`.
 - **Documentation:** all documentation lives in `docs/` at the repository root, organised by topic and
   written once for every platform: `docs/README.md` is the index. A feature's documentation goes
   there, in the page for its topic - never in a package README, which stays a short stub (what the
-  package is, a not-yet-published install line, one import example, a link to `docs/`). Every code
+  package is, an install line, one import example, a link to `docs/`). Every code
   example is verified against the code (compiled, run, or copied from a passing test), and every page
   with limits ends with a "Limits" section that says what is not checked or not observed. The pages
   follow the same rules as the code: no library names, ASCII punctuation only, no inline styles.
@@ -126,6 +134,7 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 | Umbrella         | `packages/umber-style`                                    | Re-exports core and the bindings as subpaths. Its tests prove one source runs on every one |
 | Lint config      | `packages/eslint-config`                                  | Private oxlint base and React layers, shared by every package                              |
 | Package standard | `packages/packages.md`                                    | Structure, exports, publishing, 100% coverage, licensing, linting                          |
+| Releasing        | `docs/releasing.md`, `.github/workflows/cd-packages.yml`  | Channels, the order of the packages, installing a prerelease, verifying a tarball          |
 | Documentation    | `docs/`                                                   | One set of pages by topic for every platform, written once; the index is `docs/README.md`  |
 
 ## Quick checklist before pushing
@@ -134,3 +143,4 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 2. `pnpm lint`
 3. `pnpm typecheck`
 4. `pnpm test:coverage` - verify 100% on all touched files
+5. `pnpm build` - and `pnpm smoke:packed` when a package's exports, build or dependencies changed

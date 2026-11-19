@@ -7,6 +7,10 @@
   "scripts": {
     "prepare": "husky",
     "gen:publish-options": "node scripts/gen-publish-options.mjs",
+    "build": "pnpm --filter \"./packages/*\" build",
+    "smoke:packed": "pnpm build && node scripts/smoke-packed.mjs",
+    "check:release-notes": "node scripts/check-release-notes.mjs",
+    "deprecate-alpha": "node scripts/deprecate-alpha.mjs",
     "lint": "pnpm -r lint",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",

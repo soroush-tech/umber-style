@@ -36,7 +36,7 @@ packages/
     tsconfig.json         <- bundler resolution, noEmit; NOT in the root solution
     .oxlintrc.json        <- extends @umber-style/eslint-config's base (or React layer) + env
     vitest.config.ts      <- v8 coverage, reporter ['text', 'lcov'], 100% thresholds
-    tsdown.config.ts      <- publishable packages only
+    tsdown.config.ts      <- the build of a publishable package
     README.md             <- a short stub: what it is, install, one import example, a link to docs/
     LICENSE               <- publishable packages only
 ```
@@ -67,16 +67,23 @@ Keep the **public API in `index.ts`**; extract internal helpers into sibling mod
 
 ## Publishing
 
-Every package is `"private": true` at version `0.1.0` until it is published; none is published yet.
-Internal-only packages consume source directly. To make a package publishable:
+The five packages (`core`, `react`, `react-native`, `vue`, `umber-style`) are publishable; `eslint-config`
+stays `"private": true` and is never built. Internal-only packages consume source directly. A
+publishable package has:
 
-- Drop `private`; add `description`, `keywords`, `files: ["dist"]`. `license`, `author`, `homepage`,
-  `repository` (with `directory`) and `bugs` are already in every package.
+- No `private`; a `description`, `keywords`, `files: ["dist"]`, `license`, `author`, `homepage`,
+  `repository` (with `directory`) and `bugs`, and a `LICENSE` file.
 - `repository.url` is this repo - `git+https://github.com/soroush-tech/umber-style.git` - and `bugs.url`
   its issues. npm verifies a publish's provenance against `repository.url` and refuses one that names
   another repo.
-- Build with **tsdown** (`format: ['esm', 'cjs']`, `dts: true`) -> `dist/`. tsdown emits declarations
-  via Oxc/Rolldown and does **not** inject the deprecated `baseUrl` that breaks `.d.ts`.
+- Build with **tsdown** (`format: ['esm', 'cjs']`, `dts: true`) -> `dist/`, with `pnpm build` (the root
+  script builds the five). tsdown emits declarations via Oxc/Rolldown and does **not** inject the
+  deprecated `baseUrl` that breaks `.d.ts`. One entry in the config for each file an export points at:
+  `react` has `index` and `index.server` (the `react-server` condition), and `umber-style` has one entry
+  for the code of each subpath and one for the declarations of `umber-style/react` (`shared`,
+  `shared.server`), because its code and its types come from different files. `react` and
+  `react-native` build unbundled so the `'use client'` directive of the module that holds the theme
+  context stays on that module.
 - Keep `exports -> ./src/index.ts` for the workspace, and use **`publishConfig`** to swap
   `exports`/`main`/`module`/`types` to `dist/` **only on publish** - so the workspace keeps consuming
   source while npm gets compiled output:
@@ -93,20 +100,28 @@ Internal-only packages consume source directly. To make a package publishable:
 
 - Declare the host framework as a **`peerDependency`** (`react`, `react-native`, `vue`); never bundle
   the peer. `react-native` is an optional peer of its binding.
+- `@umber-style/core` is a `dependency` of the bindings and of the umbrella, never bundled into them: one
+  engine is shared. `workspace:*` is published as the exact version, so the five move together.
+  `csstype` is a dependency of `core` because its declarations name it.
+- Keep every export condition of the source exports in `publishConfig.exports`, each split into
+  `import` and `require` with their own `types`. The order of the conditions is part of the meaning
+  (`react-server` before `react-native` before the default).
 - A peer on a **sibling package** is an explicit range covering every major it supports, widened
   deliberately when a new major lands, never `workspace:^`: pnpm freezes `workspace:^` to
   `^<the sibling's version at publish time>`. The `devDependency` stays `workspace:*`.
-- `prepublishOnly: pnpm build`; verify the tarball with `pnpm pack` before publishing.
+- `prepublishOnly: pnpm build`; verify the tarball with `pnpm pack` before publishing: `pnpm smoke:packed`
+  does it for all five (see [Releasing](../docs/releasing.md)).
 
 ### Releasing to npm - always via pnpm, never `npm publish`
 
 The `publishConfig` -> `dist` swap above is a **pnpm feature**. `pnpm pack` / `pnpm publish` rewrite the
 top-level `exports`/`main`/`module`/`types` to the `dist` targets before packing. **`npm publish` does
 not** - it ships the raw `exports: "./src/index.ts"`, but the tarball only contains `dist`, so every
-consumer's `import` fails. Publish from the repo root with
-`pnpm --filter '<name>' publish --no-git-checks`, and verify the published artifact, not just the
-metadata: download the tarball and confirm `exports` resolves to `dist`. A publish workflow does not
-exist yet; until it does, nothing is published.
+consumer's `import` fails. Release through the `cd-packages.yml` workflow: manual dispatch, a `package`
+and a `channel` (`alpha`, `rc`, `stable`), npm Trusted Publishing, and `pnpm publish` underneath, so the
+swap is always applied and there is no long-lived token. [Releasing](../docs/releasing.md) has the
+channels, the order of the packages and how to verify a published tarball. Every package has
+`release-notes/<version>.md`, which the workflow and `pnpm check:release-notes` require.
 
 ---
 
@@ -135,8 +150,7 @@ coverage-ignore comments.
 
 - A **publishable** (non-`private`) package **must** declare a `license` field and ship a `LICENSE`
   file.
-- **Private** packages already carry the `license` field, but get no `LICENSE` copy until `private` is
-  removed.
+- **Private** packages carry the `license` field, but get no `LICENSE` copy while they are `private`.
 
 ---
 
@@ -149,8 +163,8 @@ at the repository root, and is written for all platforms together.
   `docs/` folder of its own and no conventions file.
 - Every code example in `docs/` is verified against the code: compiled, run, or copied from a passing
   test. A page ends with a "Limits" section for what is not checked or not observed.
-- The package `README.md` stays a stub: what the package is, an install line marked as not yet
-  published, one import example, and a link to `docs/`. Do not document features in it.
+- The package `README.md` stays a stub: what the package is, an install line, one import example, and a
+  link to `docs/`. Do not document features in it.
 
 ---
 

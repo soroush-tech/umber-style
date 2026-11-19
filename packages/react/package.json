@@ -1,7 +1,17 @@
 {
   "name": "@umber-style/react",
-  "private": true,
   "version": "0.1.0",
+  "description": "UmberStyle for React: styled, ThemeProvider, useTheme, StyleSheet, useStyle and apply, with a server build for server components.",
+  "keywords": [
+    "styling",
+    "theme",
+    "design-tokens",
+    "css-variables",
+    "react",
+    "ssr",
+    "server-components",
+    "typescript"
+  ],
   "license": "MIT",
   "author": "Masoud Soroush <masoud@soroush.tech>",
   "homepage": "https://umber-style.soroush.design",
@@ -15,18 +25,51 @@
   },
   "type": "module",
   "sideEffects": false,
+  "files": [
+    "dist"
+  ],
   "exports": {
     ".": {
       "react-server": "./src/index.server.ts",
       "default": "./src/index.ts"
     }
   },
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      ".": {
+        "react-server": {
+          "import": {
+            "types": "./dist/index.server.d.mts",
+            "default": "./dist/index.server.mjs"
+          },
+          "require": {
+            "types": "./dist/index.server.d.cts",
+            "default": "./dist/index.server.cjs"
+          }
+        },
+        "import": {
+          "types": "./dist/index.d.mts",
+          "default": "./dist/index.mjs"
+        },
+        "require": {
+          "types": "./dist/index.d.cts",
+          "default": "./dist/index.cjs"
+        }
+      }
+    },
+    "main": "./dist/index.cjs",
+    "module": "./dist/index.mjs",
+    "types": "./dist/index.d.mts"
+  },
   "scripts": {
+    "build": "tsdown",
     "lint": "oxlint --deny-warnings",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.augmentation.json && tsc --noEmit -p tsconfig.server.json",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "test:browser": "vitest run --config vitest.browser.config.ts"
+    "test:browser": "vitest run --config vitest.browser.config.ts",
+    "prepublishOnly": "pnpm build"
   },
   "dependencies": {
     "@umber-style/core": "workspace:*"
@@ -50,6 +93,7 @@
     "playwright": "1.65.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
+    "tsdown": "^0.23.7",
     "typescript": "~7.0.2",
     "vitest": "^5.1.0"
   }

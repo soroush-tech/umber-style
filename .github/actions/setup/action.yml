@@ -24,6 +24,10 @@ inputs:
     description: The folder to install in - the workspace root unless a job installs a second checkout (the benchmark job's base).
     required: false
     default: .
+  registry_url:
+    description: The registry setup-node writes into .npmrc - the release workflow passes npm's; every other job leaves it empty.
+    required: false
+    default: ''
 
 runs:
   using: composite
@@ -37,6 +41,7 @@ runs:
       with:
         node-version: ${{ inputs.node_version }}
         cache: ${{ inputs.manager }}
+        registry-url: ${{ inputs.registry_url }}
 
     # Both inputs reach the shell through env and a fixed dispatch, never spliced into
     # the run body - zizmor: template-injection. `$COMMAND` is deliberately unquoted: it

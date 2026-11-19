@@ -2,7 +2,7 @@
 
 The UmberStyle engine: theme tokens as CSS variables, the class cache and theme classes. It knows no framework.
 
-Not yet published. Once it is: `pnpm add @umber-style/core`.
+Install: `pnpm add @umber-style/core`.
 
 ```ts
 import { createEngine } from '@umber-style/core'
