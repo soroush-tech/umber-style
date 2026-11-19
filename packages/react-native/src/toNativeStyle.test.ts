@@ -1,7 +1,7 @@
 import { toNativeStyle } from './toNativeStyle'
 
 describe('toNativeStyle', () => {
-  it('drops the label and every nested object, whole', () => {
+  it('drops the label, selectors and at-rules, whole', () => {
     expect(
       toNativeStyle({
         label: 'button-root',
@@ -11,6 +11,21 @@ describe('toNativeStyle', () => {
         '@media (min-width: 40em)': { padding: 16 },
       })
     ).toEqual({ color: '#fff', padding: 8 })
+  })
+
+  it('drops custom properties and a selector without a nested object', () => {
+    expect(
+      toNativeStyle({ '--accent': '#1b5fd1', ':hover': 1, 'a &': 2, '@supports': 3, padding: 8 })
+    ).toEqual({ padding: 8 })
+  })
+
+  it('keeps the object-valued properties of the platform', () => {
+    const style = {
+      shadowOffset: { width: 0, height: 2 },
+      textShadowOffset: { width: 1, height: 1 },
+      transform: [{ rotate: '45deg' }, { translateX: 4 }],
+    }
+    expect(toNativeStyle(style)).toEqual(style)
   })
 
   it('keeps arrays, null, undefined and false', () => {
