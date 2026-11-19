@@ -11,7 +11,7 @@
     "skipLibCheck": true,
     "types": ["vitest/globals", "node"]
   },
-  "include": ["src"],
+  "include": ["src", "bench"],
   "exclude": [
     // It declares the `Theme` of the default style for the whole program, which no other test uses:
     // tsconfig.defaultStyle.json.

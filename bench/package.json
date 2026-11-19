@@ -1,0 +1,29 @@
+{
+  "name": "@umber-bench/shared",
+  "private": true,
+  "version": "0.1.0",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    "./themes": "./src/themes.ts",
+    "./styles": "./src/styles.ts",
+    "./harness": "./src/harness.ts"
+  },
+  "scripts": {
+    "lint": "oxlint --deny-warnings",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage"
+  },
+  "dependencies": {
+    "@umber-style/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "@umber-style/eslint-config": "workspace:*",
+    "@vitest/coverage-v8": "^5.1.0",
+    "oxlint": "^1.93.0",
+    "typescript": "~7.0.2",
+    "vitest": "^5.1.0"
+  }
+}

@@ -39,3 +39,6 @@ e2e/reports
 .next
 next-env.d.ts
 *.tsbuildinfo
+
+# Benchmarks: what a run measured
+bench/results

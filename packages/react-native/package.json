@@ -37,6 +37,7 @@
     }
   },
   "devDependencies": {
+    "@umber-bench/shared": "workspace:*",
     "@testing-library/react": "^16.3.3",
     "@types/node": "^26.6.6",
     "@types/react": "^19.3.0",

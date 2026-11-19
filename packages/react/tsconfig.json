@@ -12,7 +12,7 @@
     "types": ["vitest/globals", "node"],
     "jsx": "react-jsx"
   },
-  "include": ["src"],
+  "include": ["src", "bench"],
   "exclude": [
     // A test helper that the tests import; it has no types of its own to check.
     "src/**/vitest.*.ts",

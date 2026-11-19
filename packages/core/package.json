@@ -29,6 +29,7 @@
     "csstype": "^3.2.3"
   },
   "devDependencies": {
+    "@umber-bench/shared": "workspace:*",
     "@types/node": "^26.6.6",
     "@umber-style/eslint-config": "workspace:*",
     "@vitest/browser-playwright": "^5.1.1",
