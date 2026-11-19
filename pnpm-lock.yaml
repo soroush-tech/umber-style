@@ -27,6 +27,9 @@ importers:
         specifier: workspace:*
         version: link:../packages/core
     devDependencies:
+      '@soroush.tech/bench':
+        specifier: ^2.2.3
+        version: 2.2.3
       '@types/node':
         specifier: ^26.6.6
         version: 26.6.6
@@ -1650,6 +1653,11 @@ packages:
     resolution: {integrity: sha512-b/DoiT4LhiyxKpd8ssNU7SbHUyTujTnIwo5C/PvyF+mFT2yV697vhU1xrMebG5oPkRZzwApvXxiFnxhmR66vIg==}
     cpu: [x64]
     os: [win32]
+
+  '@soroush.tech/bench@2.2.3':
+    resolution: {integrity: sha512-5qTaZrq8qr0wMvdynOh/C8gJk4zbfqfTvmFX2xhUZ3FymsCLuyfQXO+Z7tjt37dWL0QSmXve9qCjfBMxtd0wig==}
+    engines: {node: '>=24.19.0'}
+    hasBin: true
 
   '@soroush.tech/styled-system@6.0.1':
     resolution: {integrity: sha512-wOrYgTqxrSSF9CItOKh3sCFZpBb5c/50R/6DC/RyqP852EjHsvTZzmQ7KUUXZxZRRvjEj0WQWiJL27RBcxvMHQ==}
@@ -4702,6 +4710,8 @@ snapshots:
 
   '@soroush.tech/ai-watermark-guard-win32-x64@0.2.0':
     optional: true
+
+  '@soroush.tech/bench@2.2.3': {}
 
   '@soroush.tech/styled-system@6.0.1(@emotion/is-prop-valid@1.4.0)':
     dependencies:

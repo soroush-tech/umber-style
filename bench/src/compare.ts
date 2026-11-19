@@ -1,4 +1,4 @@
-// Compares two result files case by case. It is what the later continuous-integration gate runs.
+// Compares two result files case by case. `pnpm bench:compare` (the local exploration suite, not the CI gate).
 // Node runs this file directly (`bin/compare.mjs`), so it imports types only.
 import type { ResultFile } from './types'
 

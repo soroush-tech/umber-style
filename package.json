@@ -22,8 +22,7 @@
     "test:e2e:dev": "pnpm --filter @umber-fixtures/e2e test:e2e:dev",
     "test:browser": "pnpm -r --if-present test:browser",
     "bench": "node bench/bin/run.mjs",
-    "bench:compare": "node bench/bin/compare.mjs",
-    "bench:gate": "node bench/bin/gate.mjs"
+    "bench:compare": "node bench/bin/compare.mjs"
   },
   "devDependencies": {
     "ai-watermark-guard": "^0.2.0",
