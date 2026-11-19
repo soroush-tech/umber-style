@@ -38,8 +38,8 @@ describe('the web part and the native part of a shared style', () => {
     const [own, given, ...rest] = screen.getByText('card').className.split(' ')
     expect(rest).toEqual([])
     const rules = memory.rules.filter((rule) => rule.includes('.p-'))
-    // The first rule is the class of the sheet entry itself (components); the override merges it.
-    expect(rules.slice(1)).toEqual([
+    // The entry is the only thing given through style, so its own class is the override: one rule, no merge.
+    expect(rules).toEqual([
       `@layer p-components{.${own}{padding:8px;color:red;}}`,
       `@layer p-components{.${own}:hover{opacity:0.8;}}`,
       `@layer p-overrides{.${given}{margin:4px;cursor:pointer;}}`,

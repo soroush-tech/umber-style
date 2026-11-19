@@ -4,8 +4,8 @@ import type {
   ColorScheme,
   DeepPartial,
   Engine,
+  ObjectSheet,
   SheetEntry,
-  SheetInput,
   SheetStyles,
   StyleInput,
   StylerOptions,
@@ -49,9 +49,8 @@ export type Styled<T> = (
   options?: StyledOptions
 ) => (...styles: StyleInput<T, Record<string, unknown>>[]) => StyledComponent
 
-/** A set of named styles: its class names are made on first use. */
+/** A set of named styles made from a function of the theme: it has no entries until `useStyle` resolves it. */
 export interface Sheet<S extends SheetStyles> {
-  isDynamic: boolean
   resolve(theme?: unknown): { [K in keyof S]: SheetEntry }
 }
 
@@ -70,7 +69,16 @@ export interface Style<T> {
   cache: Engine<T>['cache']
   styled: Styled<T>
   StyleSheet: {
-    create<K extends string>(styles: SheetInput<K, T>): Sheet<Record<K, WebStyleObject>>
+    /** A sheet given as an object is its entries, usable at once, with no hook and no theme. */
+    create<K extends string>(styles: ObjectSheet<K>): { readonly [P in K]: SheetEntry }
+    /** A sheet given as a function of the theme is for `useStyle`, which resolves it against the theme. */
+    create<K extends string>(
+      styles: (theme: T) => Record<K, WebStyleObject>
+    ): Sheet<Record<K, WebStyleObject>>
+  }
+  /** The entries of a sheet; an object sheet is its own entries and is returned as it is. */
+  useStyle<K extends string>(sheet: { readonly [P in K]: SheetEntry }): {
+    readonly [P in K]: SheetEntry
   }
   useStyle<S extends SheetStyles>(sheet: Sheet<S>): { [K in keyof S]: SheetEntry }
   /** The attributes that apply entries of a sheet: a class. */

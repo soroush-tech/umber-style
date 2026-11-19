@@ -5,8 +5,10 @@ import {
   type ColorScheme,
   type DeepPartial,
   type Engine,
+  isThemedSheet,
+  type ObjectSheet,
+  type SheetEntries,
   type SheetEntry,
-  type SheetInput,
   type SheetStyles,
   type WebStyleObject,
 } from '@umber-style/core'
@@ -19,7 +21,6 @@ export type { StyleOptions } from './types'
 
 /** A sheet on the server: it makes its class names on first use. */
 interface ServerSheet<S extends SheetStyles> extends SheetDefinition<S, SheetEntry> {
-  isDynamic: boolean
   resolve(theme?: unknown): { [K in keyof S]: SheetEntry }
 }
 
@@ -54,14 +55,21 @@ export function bindEngine<T extends object>(
   const themeClass = (partial: DeepPartial<T>, colorScheme?: ColorScheme) =>
     engine.themeClass(partial, colorScheme)
 
-  const useStyle = <S extends SheetStyles>(sheet: SheetDefinition<S, SheetEntry>) => {
-    const { isDynamic, resolve } = sheet as ServerSheet<S>
-    return resolve(isDynamic ? engine.createThemeView(readTheme()) : undefined)
-  }
+  // An object sheet is its own entries: it reads no theme, so it works with none.
+  const useStyle = ((sheet: object) =>
+    isThemedSheet(sheet)
+      ? sheet.resolve(engine.createThemeView(readTheme()))
+      : sheet) as ServerStyle<T>['useStyle']
 
-  const create = <K extends string>(
-    styles: SheetInput<K, T>
-  ): ServerSheet<Record<K, WebStyleObject>> => engine.createSheet(styles)
+  function create<K extends string>(styles: ObjectSheet<K>): SheetEntries<K>
+  function create<K extends string>(
+    styles: (theme: T) => Record<K, WebStyleObject>
+  ): ServerSheet<Record<K, WebStyleObject>>
+  function create(
+    styles: ObjectSheet<string> | ((theme: T) => Record<string, WebStyleObject>)
+  ): unknown {
+    return engine.createSheet(styles as never)
+  }
 
   return {
     engine,

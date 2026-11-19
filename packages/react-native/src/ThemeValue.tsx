@@ -37,8 +37,13 @@ export function createThemeValue<T extends object>(holder: ThemeHolder<T>) {
     )
   }
 
+  /** The theme above, or the base theme, or undefined when there is none. */
+  function useThemeValue(): T | undefined {
+    return useContext(ThemeContext) ?? holder.baseTheme
+  }
+
   function useTheme(): T {
-    const value = useContext(ThemeContext) ?? holder.baseTheme
+    const value = useThemeValue()
     if (value === undefined) throw new Error(NO_THEME_MESSAGE)
     return value
   }
@@ -48,5 +53,5 @@ export function createThemeValue<T extends object>(holder: ThemeHolder<T>) {
     return useContext(ConditionContext) ?? { theme: holder.baseTheme, colorScheme: undefined }
   }
 
-  return { ThemeValueProvider, useTheme, useCondition }
+  return { ThemeValueProvider, useTheme, useThemeValue, useCondition }
 }

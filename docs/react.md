@@ -27,17 +27,17 @@ configure({ prefix: 'umber', theme: lightTheme })
 
 ## What the binding exports
 
-| Name                                                       | What it is                                                                     |
-| ---------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| `createStyle(theme, options?)`                             | A new style for one theme: returns everything below, plus `engine` and `cache` |
-| `bindEngine(engine)`                                       | The same over an engine you made yourself                                      |
-| `createDefaultStyle()`                                     | Makes one default style; the direct imports are made with it                   |
-| `configure(options)`                                       | Options and base theme of the default style, before first use                  |
-| `getEngine()`                                              | The engine of the default style                                                |
-| `styled`, `StyleSheet`, `useStyle`, `apply`                | Styling, sheets, and putting entries on elements                               |
-| `ThemeProvider`, `useTheme`, `themeClass`                  | The theme                                                                      |
-| `when`, `whenScheme`                                       | Keys for [theme conditions](theme-conditions.md)                               |
-| `add`, `alpha`, `divide`, `multiply`, `negate`, `subtract` | The helpers of [Tokens](tokens.md)                                             |
+| Name                                                       | What it is                                                                             |
+| ---------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `createStyle(theme, options?)`                             | A new style for one theme: returns everything below, plus `engine` and `cache`         |
+| `bindEngine(engine)`                                       | The same over an engine you made yourself                                              |
+| `createDefaultStyle()`                                     | Makes one default style; the direct imports are made with it                           |
+| `configure(options)`                                       | Options and base theme of the default style, before first use                          |
+| `getEngine()`                                              | The engine of the default style                                                        |
+| `styled`, `StyleSheet`, `useStyle`, `apply`                | Styling, sheets (an object sheet needs no `useStyle`), and putting entries on elements |
+| `ThemeProvider`, `useTheme`, `themeClass`                  | The theme                                                                              |
+| `when`, `whenScheme`                                       | Keys for [theme conditions](theme-conditions.md)                                       |
+| `add`, `alpha`, `divide`, `multiply`, `negate`, `subtract` | The helpers of [Tokens](tokens.md)                                                     |
 
 Types: `StyleOptions`, `DefaultStyleOptions`, `StyledOptions`, `StyledStatics`, `StyleProp`, `StyledComponent`, `Styled`, `SheetDefinition`, `ThemeProviderProps`, `WebThemeProviderProps`, `Style`, `WebStyle`, `ServerStyle`.
 

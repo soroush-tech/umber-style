@@ -1,14 +1,8 @@
-import type { Theme } from '@umber-style/core'
-import type { NativeSheetStyles, NativeStyleObject } from './nativeStyle'
+import { createDeferredRecord, type Theme } from '@umber-style/core'
+import type { NativeStyleObject } from './nativeStyle'
 import { bindHolder, type NativeHolder } from './createStyle'
 import { platformStyleSheet } from './platform'
-import type {
-  NativeStyle,
-  SheetDefinition,
-  Styled,
-  StyleOptions,
-  ThemeProviderProps,
-} from './types'
+import type { NativeStyle, Styled, StyleOptions, ThemeProviderProps } from './types'
 
 export interface DefaultStyleOptions extends StyleOptions<Theme> {
   /** The base theme, for an app that has no provider at all. */
@@ -33,14 +27,18 @@ export function createDefaultStyle() {
 
   const styled = ((tag, options) => getStyle().styled(tag, options)) as Styled<Theme>
 
+  // An object sheet is registered on first read, so a module can create one before `configure` is called.
   const StyleSheet: NativeStyle<Theme>['StyleSheet'] = {
     ...platformStyleSheet,
-    create: (styles) => getStyle().StyleSheet.create(styles),
+    create: ((styles: Record<string, NativeStyleObject> | ((theme: Theme) => never)) =>
+      typeof styles === 'function'
+        ? getStyle().StyleSheet.create(styles)
+        : createDeferredRecord(styles, () =>
+            getStyle().StyleSheet.create(styles)
+          )) as NativeStyle<Theme>['StyleSheet']['create'],
   }
 
-  function useStyle<S extends NativeSheetStyles>(sheet: SheetDefinition<S, NativeStyleObject>) {
-    return getStyle().useStyle(sheet)
-  }
+  const useStyle = ((sheet: never) => getStyle().useStyle(sheet)) as NativeStyle<Theme>['useStyle']
 
   function useTheme(): Theme {
     return getStyle().useTheme()

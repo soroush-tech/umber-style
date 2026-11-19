@@ -88,11 +88,32 @@ A style can carry its own `label` key. `name` and `slot` write one for you.
 `styled(tag)(...styles)` takes any number of styles. Each is an object or a function:
 
 - An object is used as it is. A component made only of objects reads no context at run time, and its class is computed once.
-- A function receives the component's props and `theme`, and returns an object, or `null`, `undefined` or `false` for nothing. It runs on each render. Equal results give the same class, so nothing grows.
+- A function receives the component's props and `theme`, and returns an object, or `null`, `undefined` or `false` for nothing. A function that reads only `theme` is worked out once for each theme (it is part of the base, below). One that reads a prop runs on each render. Equal results give the same class, so nothing grows.
 
 `theme` in a function style is the theme as references: a token is a `var(--name)` string, and everything that is not a token (breakpoints, your own functions) is its real value from the nearest provider. See [Themes](themes.md). A `theme` prop passed to the component is not forwarded to the element and does not replace this `theme`.
 
-Styles merge in order, and a later key wins. In `Row`, the three styles become one class: `display: flex`, then `padding`, then the media rule and hover rule.
+Styles merge in order, and a later key wins. In `Row`, none of the three styles reads a prop, so they become one class: `display: flex`, then `padding`, then the media rule and hover rule.
+
+## The base and the props part
+
+The base is the leading part of a component's styles that does not depend on props; it may use theme tokens. It is one class, written once. The props part is everything from the first style that depends on props, and gives one class for each distinct result:
+
+```tsx
+const Flex = styled('div', { name: 'Flex' })<{ gap?: number }>(
+  { display: 'flex', minWidth: 0 },
+  ({ theme }) => ({ color: theme.palette.text }),
+  ({ gap }) => ({ gap }),
+  { boxSizing: 'border-box' }
+)
+```
+
+Here the base is `display`, `min-width` and `color` (the function reads only `theme`). The props part is the `gap` function and the `boxSizing` object after it: `boxSizing` does not depend on props, but it comes after a style that does, and it must stay after it. An element is `<div class="umber-flex-root-... umber-flex-root-...">`: the base, then the props class.
+
+- A style depends on props when it is a function that reads any key of its argument other than `theme`, spreads or lists it (`{ ...props }`, `Object.keys(props)`, `'x' in props`), or is a parser that reads props by key, such as `space` from `@soroush.tech/styled-system`.
+- A component made only of objects, or of objects and functions that read only `theme`, has no props part: one class, as before.
+- A component whose first style depends on props has no base class.
+- `hasBaseClass: false` (see [Options reference](options.md)) writes one class for the whole list, as before the split existed.
+- With `hasLayers: false`, a component that is given something from outside (`style`, `className`) merges everything into one class, as before: without layers there is no order between classes to rely on.
 
 Give a function the type of your props with the type argument, as `Badge` does: `styled('span')<{ tone?: 'primary' | 'plain' }>(...)`.
 
@@ -129,6 +150,12 @@ const BlueLink = styled(Link)({ color: 'blue' })
 
 The component must accept `className` and put it on an element, as it must for any styling that uses classes.
 
+Wrapping a component that has a base class keeps that base. The wrapper's styles come after the styles of the wrapped component, and the split is made on the whole list:
+
+- the wrapped component has props-dependent styles: the wrapper's element carries the same base class, and the rest of the list (the props part of the wrapped component, then all of the wrapper's styles) is its props part;
+- the wrapped component has none (it is all base) and the wrapper's styles start with a function that reads props: the element carries the base class of the wrapped component as it is, and the wrapper's styles are the props part;
+- the wrapped component has none and the wrapper's styles start with plain objects: the plain objects are added to the base, which is then a new, larger class under the wrapper's label. The declarations of the wrapped component are written again in it. The other choice, keeping the base of the wrapped component and adding the objects as a second fixed class, would write fewer declarations once, but it would put them in the props part, so that they would be repeated in every distinct props class. A wrapper without any props-dependent style also keeps the single class it always had.
+
 ## Merging with `className` and `style`
 
 A `className` you give a styled component is kept, and any class the engine made in it is merged into the component's overrides. The `style` prop takes sheet entries and objects and turns them into a class. Both are covered in [Style sheets and the style prop](style-sheets.md) and [Cascade layers and overrides](cascade-layers.md).
@@ -137,4 +164,5 @@ A `className` you give a styled component is kept, and any class the engine made
 
 - A key built at run time (a media query made from a breakpoint, for example) written directly in a web style object is a type error: write it with `at(key, style)`. See [Typed styles](typed-styles.md).
 - `shouldForwardProp` is the only filter. There is no allow-list of valid HTML attributes: by default every other prop is forwarded to a string tag, valid or not.
-- A function style runs on every render of its component. Keep it cheap.
+- A function style that reads props runs on every render of its component. Keep it cheap. One that reads only `theme` runs once for each theme object.
+- Style functions must be pure: the base keeps the first result of a function that read no prop, for a theme. A function that reads a prop only inside something it returns (a callback) is not seen reading it.

@@ -35,7 +35,9 @@ Run in a browser, the engine writes into a `<style data-style="umber">` element 
 
 ## Sheets
 
-`engine.createSheet` is what `StyleSheet.create` is built on. It takes an object of styles or a function of the theme:
+`engine.createSheet` is what `StyleSheet.create` is built on. It takes a function of the theme or an object of styles, and they give different things.
+
+A function gives a sheet, which `resolve` turns into entries:
 
 ```ts
 const sheet = engine.createSheet((view) => ({
@@ -46,7 +48,18 @@ const { box, accent } = sheet.resolve()
 const merged = engine.css(box, accent, { opacity: 0.9 })
 ```
 
-`box.className` is `umber-qdsl9p` and `accent.className` is `umber-n8ncc0`. `merged` is `umber-1ntlncu`: one class with all three. `sheet.resolve()` resolves against the base theme; `resolve(view)` takes the theme view that `engine.createThemeView(realTheme)` makes. `sheet.isDynamic` says whether the sheet is a function.
+`merged` is `umber-1ntlncu`: one class with all three. `sheet.resolve()` resolves against the base theme; `resolve(view)` takes the theme view that `engine.createThemeView(realTheme)` makes. `isThemedSheet(value)` says whether a value is such a sheet.
+
+An object gives the entries themselves, at once, with no `resolve` and no theme:
+
+```ts
+const plain = engine.createSheet({ title: { fontSize: 18 }, note: { opacity: 0.5 } })
+const title = plain.title.className // 'umber-1uho00b'
+```
+
+An object sheet works with an engine that has no theme yet (`createLazyEngine`, before `setTheme`), because it reads none: its styles cannot use tokens (there are no references to write), only plain values and `var(--name)` strings. The entries are made when a key is first read, so `createSheet` itself computes and writes nothing. `Object.keys` and a spread list the keys; a spread reads every one, which makes the entries and still writes no rule.
+
+An entry writes its rule when it is first used, not when it is made. Using it is reading its `className`, passing it to `css`, or giving it to a styled component's `style`. `box` and `accent` above were only merged, so their own classes (`umber-qdsl9p`, `umber-n8ncc0`, which `className` would write) are not in the sheet. An entry has two classes, one for each way it is used: on its own it is in the `components` layer, and given alone to a styled component it is in the `overrides` layer; each is written only when used that way. See [Style sheets and the style prop](style-sheets.md).
 
 ## Getting the CSS out
 
@@ -61,7 +74,7 @@ const tag = createStyleTag(engine.cache)
 ```html
 <style
   data-style="umber"
-  data-ids="umber-sarboa umber-layers umber-theme-jg3s2a umber-theme-l0twti umber-qdsl9p umber-n8ncc0 umber-1ntlncu --umber-palette-primary --umber-space-2"
+  data-ids="umber-sarboa umber-layers umber-theme-jg3s2a umber-theme-l0twti umber-1ntlncu --umber-palette-primary --umber-space-2"
 >
   @layer umber-theme, umber-global, umber-components, umber-overrides;
   @layer umber-components {
@@ -86,16 +99,6 @@ const tag = createStyleTag(engine.cache)
     .umber-theme-l0twti {
       --umber-palette-primary: #8ab4ff;
       color-scheme: dark;
-    }
-  }
-  @layer umber-components {
-    .umber-qdsl9p {
-      padding: var(--umber-space-2);
-    }
-  }
-  @layer umber-components {
-    .umber-n8ncc0 {
-      color: var(--umber-palette-primary);
     }
   }
   @layer umber-components {
@@ -125,7 +128,7 @@ engine.css({ padding: engine.refs.space[1] })
 
 `sheet.rules` is then the layer statement and `@layer umber-components{.umber-d940h0{padding:var(--umber-space-1);}}`.
 
-When you give an engine a cache, its `hasLayers`, `hasPruning`, `hasColorFallbacks`, `hasScope`, `suffix` and `hasLabels` come from the cache. The engine takes the `prefix` of the cache for its variable names too, so give only the cache. Giving the engine a `prefix` as well is allowed only if it is the same one: a different one throws a `TypeError` that names both prefixes.
+When you give an engine a cache, its `hasLayers`, `hasBaseClass`, `hasPruning`, `hasColorFallbacks`, `hasScope`, `suffix` and `hasLabels` come from the cache. The engine takes the `prefix` of the cache for its variable names too, so give only the cache. Giving the engine a `prefix` as well is allowed only if it is the same one: a different one throws a `TypeError` that names both prefixes.
 
 ## An engine with no theme yet
 
@@ -159,28 +162,28 @@ const class1 = engine.css({ color: engine.refs.palette.primary }) // 'umber-n8nc
 | `findThemeIds(theme)`                             | The theme classes already made for a theme object, without making any                                      |
 | `when(theme, colorScheme?)`, `whenScheme(scheme)` | Keys for [theme conditions](theme-conditions.md)                                                           |
 | `scopeClass()`                                    | The class of the `display: contents` wrapper a provider renders, made once                                 |
-| `createSheet(styles)`                             | A sheet, as above                                                                                          |
-| `createStyler(options, styles, inherited?)`       | What every web `styled` shares: the label, the style list and the class memo                               |
+| `createSheet(styles)`                             | The entries of an object of styles, or a sheet for a function of the theme, as above                       |
+| `createStyler(options, styles, inherited?)`       | What every web `styled` shares: the label, the style list, the base and props classes and the class memo   |
 
 ## Everything `@umber-style/core` exports
 
-| Export                                                                                                                                                                          | What it is                                                                                                                              |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| `createEngine`, `createLazyEngine`, `NO_THEME_MESSAGE`                                                                                                                          | The engine, the engine without a theme, and the error text of "no theme yet"                                                            |
-| `createCache`, `createMemorySheet`, `createDomSheet`                                                                                                                            | The cache and its two sheets                                                                                                            |
-| `RULE_LAYERS`                                                                                                                                                                   | `['theme', 'global', 'components', 'overrides']`                                                                                        |
-| `createStyleTag`                                                                                                                                                                | The `<style>` element of a cache, as a string                                                                                           |
-| `add`, `subtract`, `multiply`, `divide`, `negate`                                                                                                                               | Arithmetic on tokens                                                                                                                    |
-| `alpha`, `isAlphaColor`, `toRgba`, `assertAlphaInput`                                                                                                                           | A colour at an opacity, the test for its result, the rgba() parser that the React Native `alpha` shares, and the check of the arguments |
-| `at`                                                                                                                                                                            | `{ [key]: style }` typed to spread into a web style: see [Typed styles](typed-styles.md)                                                |
-| `createSheetEntry`, `isSheetEntry`, `flattenStyle`                                                                                                                              | Sheet entries and the flattening of a `style` prop into a list                                                                          |
-| `mergeStyles`, `compileRules`, `readLabel`                                                                                                                                      | The serializer: merge style objects, compile one to rules, read its label                                                               |
-| `createThemeKey`, `createSchemeKey`, `readCondition`, `createThemeClassName`, `getBoundaryClass`, `getSchemeClass`, `createScopeRule`, `createNoSchemeGuard`, `DEFAULT_SCOPING` | The pieces of theme conditions                                                                                                          |
-| `createThemeClass`, `toDeclarationText`                                                                                                                                         | Make a theme class from declarations                                                                                                    |
-| `createTokens`                                                                                                                                                                  | Turn a theme into references and declarations                                                                                           |
-| `mergeDeep`, `hashString`                                                                                                                                                       | Merge a partial theme over a theme, and the hash that class names use                                                                   |
+| Export                                                                                                                                                                          | What it is                                                                                                                                              |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `createEngine`, `createLazyEngine`, `NO_THEME_MESSAGE`                                                                                                                          | The engine, the engine without a theme, and the error text of "no theme yet"                                                                            |
+| `createCache`, `createMemorySheet`, `createDomSheet`                                                                                                                            | The cache and its two sheets                                                                                                                            |
+| `RULE_LAYERS`                                                                                                                                                                   | `['theme', 'global', 'components', 'overrides']`                                                                                                        |
+| `createStyleTag`                                                                                                                                                                | The `<style>` element of a cache, as a string                                                                                                           |
+| `add`, `subtract`, `multiply`, `divide`, `negate`                                                                                                                               | Arithmetic on tokens                                                                                                                                    |
+| `alpha`, `isAlphaColor`, `toRgba`, `assertAlphaInput`                                                                                                                           | A colour at an opacity, the test for its result, the rgba() parser that the React Native `alpha` shares, and the check of the arguments                 |
+| `at`                                                                                                                                                                            | `{ [key]: style }` typed to spread into a web style: see [Typed styles](typed-styles.md)                                                                |
+| `createSheetEntry`, `isSheetEntry`, `readEntrySource`, `flattenStyle`, `isThemedSheet`, `createLazyRecord`, `createDeferredRecord`                                              | Sheet entries, the flattening of a `style` prop into a list, the test for a sheet made from a function, and objects whose values are made on first read |
+| `mergeStyles`, `compileRules`, `readLabel`                                                                                                                                      | The serializer: merge style objects, compile one to rules, read its label                                                                               |
+| `createThemeKey`, `createSchemeKey`, `readCondition`, `createThemeClassName`, `getBoundaryClass`, `getSchemeClass`, `createScopeRule`, `createNoSchemeGuard`, `DEFAULT_SCOPING` | The pieces of theme conditions                                                                                                                          |
+| `createThemeClass`, `toDeclarationText`                                                                                                                                         | Make a theme class from declarations                                                                                                                    |
+| `createTokens`                                                                                                                                                                  | Turn a theme into references and declarations                                                                                                           |
+| `mergeDeep`, `hashString`                                                                                                                                                       | Merge a partial theme over a theme, and the hash that class names use                                                                                   |
 
-Types include `Engine`, `EngineOptions`, `BindingOptions`, `Cache`, `CacheOptions`, `Sheet`, `SheetEntry`, `Styler`, `StylerOptions`, `Theme`, `ThemeKey`, `SchemeKey`, `SchemeName`, `ColorScheme`, `TokenMode`, `TokenOptions`, `Tokens`, `DeepPartial`, `RegisteredSyntax`, `AlphaColor`, `WebStyleObject`, `WebProperties`, `WebNested`, `NestedKey`, `StyleObject`, `StyleInput`, `StyleFunction`, `StyleResult`, `SheetStyles` and `SheetInput`. Every option is in [Options reference](options.md).
+Types include `Engine`, `EngineOptions`, `BindingOptions`, `Cache`, `CacheOptions`, `Sheet`, `SheetEntry`, `Styler`, `StylerOptions`, `Theme`, `ThemeKey`, `SchemeKey`, `SchemeName`, `ColorScheme`, `TokenMode`, `TokenOptions`, `Tokens`, `DeepPartial`, `RegisteredSyntax`, `AlphaColor`, `WebStyleObject`, `WebProperties`, `WebNested`, `NestedKey`, `StyleObject`, `StyleInput`, `StyleFunction`, `StyleResult`, `SheetStyles`, `SheetInput`, `SheetEntries`, `ThemedSheet`, `ObjectSheet` and `ClassOptions`. Every option is in [Options reference](options.md).
 
 ## Limits
 

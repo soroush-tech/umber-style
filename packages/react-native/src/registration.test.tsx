@@ -37,16 +37,22 @@ describe('the platform StyleSheet', () => {
     expect(registeredWith()).toEqual([{ box: { padding: 4 } }, { box: { padding: 8 } }])
   })
 
-  it('registers the styles of an object sheet once', () => {
+  it('registers the styles of an object sheet once, when the first one is read', () => {
     const { StyleSheet, useStyle } = createStyle(light)
-    const sheet = StyleSheet.create({ box: { margin: 1 } })
+    const sheet = StyleSheet.create({ box: { margin: 1 }, text: { margin: 2 } })
+    expect(registeredWith()).toEqual([])
+    const seen: unknown[] = []
     const Probe = () => {
-      useStyle(sheet)
+      seen.push(useStyle(sheet))
       return null
     }
     const { rerender } = render(<Probe />)
     rerender(<Probe />)
-    expect(registeredWith()).toEqual([{ box: { margin: 1 } }])
+    expect(seen[0]).toBe(sheet)
+    expect(registeredWith()).toEqual([])
+    expect(sheet.box).toBe(sheet.box)
+    expect(sheet.text).toEqual({ margin: 2 })
+    expect(registeredWith()).toEqual([{ box: { margin: 1 }, text: { margin: 2 } }])
   })
 
   it('registers the object styles of a styled component when it is made, and not again', () => {

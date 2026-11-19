@@ -206,10 +206,11 @@ describe('styled with when() and whenScheme()', () => {
 describe('a sheet with when() and whenScheme()', () => {
   it('resolves the conditional entries against the providers, and keeps the others registered', () => {
     const { StyleSheet, useStyle, when, ThemeProvider } = createStyle(base)
-    const sheet = StyleSheet.create({
+    // A condition needs the providers, so the sheet is a function (an object sheet has no hook to read them).
+    const sheet = StyleSheet.create(() => ({
       card: { padding: 8, [when(dark)]: { padding: 4 } },
       plain: { margin: 1 },
-    })
+    }))
     const seen: Record<string, unknown>[] = []
     const Probe = () => {
       seen.push(useStyle(sheet))
@@ -225,7 +226,8 @@ describe('a sheet with when() and whenScheme()', () => {
     )
     expect(seen[0]).toEqual({ card: { padding: 8 }, plain: { margin: 1 } })
     expect(seen[1]).toEqual({ card: { padding: 4 }, plain: { margin: 1 } })
-    expect(seen[0].plain).toBe(seen[1].plain)
+    // A sheet made from a function is registered once for each theme, so the plain entry is equal, not the same.
+    expect(seen[0].plain).toEqual(seen[1].plain)
   })
 
   it('does the same for a sheet made from the theme, and returns one object when nothing is conditional', () => {

@@ -3,8 +3,10 @@ import {
   createEngine,
   type DeepPartial,
   type Engine,
+  isThemedSheet,
+  type ObjectSheet,
+  type SheetEntries,
   type SheetEntry,
-  type SheetInput,
   type SheetStyles,
   type WebStyleObject,
 } from '@umber-style/core'
@@ -17,7 +19,6 @@ export type { StyleOptions } from './types'
 
 /** A sheet on the web: it makes its class names on first use. */
 interface WebSheet<S extends SheetStyles> extends SheetDefinition<S, SheetEntry> {
-  isDynamic: boolean
   resolve(theme?: unknown): { [K in keyof S]: SheetEntry }
 }
 
@@ -31,15 +32,23 @@ export function bindEngine<T extends object>(engine: Engine<T>): WebStyle<T> {
   const themeClass = (partial: DeepPartial<T>, colorScheme?: ColorScheme) =>
     engine.themeClass(partial, colorScheme)
 
-  const useStyle = <S extends SheetStyles>(sheet: SheetDefinition<S, SheetEntry>) => {
+  // The context is read first, for every sheet, so that the hooks of a component never change; an object
+  // sheet is its own entries and uses no theme.
+  const useStyle = ((sheet: object) => {
     const real = useThemeValue()
-    const { isDynamic, resolve } = sheet as WebSheet<S>
-    return resolve(isDynamic && real !== undefined ? engine.createThemeView(real) : undefined)
-  }
+    if (!isThemedSheet(sheet)) return sheet
+    return sheet.resolve(real !== undefined ? engine.createThemeView(real) : undefined)
+  }) as WebStyle<T>['useStyle']
 
-  const create = <K extends string>(
-    styles: SheetInput<K, T>
-  ): WebSheet<Record<K, WebStyleObject>> => engine.createSheet(styles)
+  function create<K extends string>(styles: ObjectSheet<K>): SheetEntries<K>
+  function create<K extends string>(
+    styles: (theme: T) => Record<K, WebStyleObject>
+  ): WebSheet<Record<K, WebStyleObject>>
+  function create(
+    styles: ObjectSheet<string> | ((theme: T) => Record<string, WebStyleObject>)
+  ): unknown {
+    return engine.createSheet(styles as never)
+  }
 
   return {
     engine,

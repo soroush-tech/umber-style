@@ -40,7 +40,7 @@ describe('a sheet entry given to the style of a styled component', () => {
       { palette: { primary: '#0000ff' } },
       { prefix: 'h', cache: createCache({ hasLayers: false, prefix: 'h', sheet }) }
     )
-    const entries = engine.createSheet({ one: { color: 'red' }, two: { margin: 1 } }).resolve()
+    const entries = engine.createSheet({ one: { color: 'red' }, two: { margin: 1 } })
     const Box = styled('div')({ padding: 1 })
     const one = render(<Box style={entries.one}>a</Box>).container.firstElementChild as HTMLElement
     const same = render(<Box style={[entries.one, [entries.one]]}>a</Box>).container

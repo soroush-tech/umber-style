@@ -97,14 +97,15 @@ describe('one component source on the web', () => {
     expect(ruleOf(element.className).join('')).not.toContain('background')
   })
 
-  it('overrides the styles of a Button through style, in a second class that keeps the label', () => {
+  it('overrides the styles of a Button through style, in a second class', () => {
     const { binding, ruleOf } = setupWeb()
     const { Custom } = createComponents(binding, 'button')
     render(<Custom />)
     const [component, override, ...rest] = screen.getByText('custom').className.split(' ')
     expect(rest).toEqual([])
     expect(component).toMatch(/^u-button-root-/)
-    expect(override).toMatch(/^u-button-root-/)
+    // The entry given alone is the override as it is, so it has no label of the Button.
+    expect(override).toMatch(/^u-[a-z0-9]+$/)
     expect(ruleOf(component)).toEqual([
       `@layer u-components{.${component}{background:var(--u-palette-primary);border-radius:8px;padding:var(--u-space-1);}}`,
       `@layer u-components{.${component}:hover:not(:disabled){background:var(--u-palette-hover);}}`,

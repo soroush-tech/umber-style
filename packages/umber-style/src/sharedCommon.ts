@@ -64,6 +64,9 @@ export type SharedSheetInput<K extends string, T> =
   | Record<K, SharedStyleObject>
   | ((theme: T) => Record<K, SharedStyleObject>)
 
+/** A shared sheet given as an object: one style for each name, with a function left out (the compiler tries the object form first). */
+export type SharedObjectSheet<K extends string> = Record<K, SharedStyleObject> & { call?: never }
+
 /** An entry of a sheet: a class name on the web, a style object on React Native. Pass it on; do not read it. */
 export type SharedEntry = SheetEntry | NativeStyleObject
 
@@ -92,8 +95,11 @@ export interface SharedSheetDefinition<S extends SharedSheetStyles> {
 }
 
 export interface SharedStyleSheet<T> {
+  /** A sheet given as an object is its entries, usable at once, with no hook and no theme. */
+  create<K extends string>(styles: SharedObjectSheet<K>): { readonly [P in K]: SharedEntry }
+  /** A sheet given as a function of the theme is for `useStyle`, which resolves it against the theme. */
   create<K extends string>(
-    styles: SharedSheetInput<K, T>
+    styles: (theme: T) => Record<K, SharedStyleObject>
   ): SharedSheetDefinition<Record<K, SharedStyleObject>>
 }
 
@@ -111,6 +117,10 @@ export type SharedApply = (
 export interface SharedStyleBase<T> {
   styled: SharedStyled<T>
   StyleSheet: SharedStyleSheet<T>
+  /** The entries of a sheet; an object sheet is its own entries and is returned as it is. */
+  useStyle<K extends string>(sheet: { readonly [P in K]: SharedEntry }): {
+    readonly [P in K]: SharedEntry
+  }
   useStyle<S extends SharedSheetStyles>(
     sheet: SharedSheetDefinition<S>
   ): { [K in keyof S]: SharedEntry }

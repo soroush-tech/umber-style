@@ -5,10 +5,10 @@ import type {
   ColorScheme,
   DeepPartial,
   Engine,
+  ObjectSheet,
   SchemeKey,
   SchemeName,
   SheetEntry,
-  SheetInput,
   SheetStyles,
   StyleInput,
   StylerOptions,
@@ -104,10 +104,15 @@ export interface WebThemeProviderProps<T> extends ThemeProviderProps<T> {
 export interface Style<T, E> {
   styled: Styled<T>
   StyleSheet: {
+    /** A sheet given as an object is its entries, usable at once, with no hook and no theme. */
+    create<K extends string>(styles: ObjectSheet<K>): { readonly [P in K]: E }
+    /** A sheet given as a function of the theme is for `useStyle`, which resolves it against the theme. */
     create<K extends string>(
-      styles: SheetInput<K, T>
+      styles: (theme: T) => Record<K, WebStyleObject>
     ): SheetDefinition<Record<K, WebStyleObject>, E>
   }
+  /** The entries of a sheet; an object sheet is its own entries and is returned as it is. */
+  useStyle<K extends string>(sheet: { readonly [P in K]: E }): { readonly [P in K]: E }
   useStyle<S extends SheetStyles>(sheet: SheetDefinition<S, E>): { [K in keyof S]: E }
   ThemeProvider(props: ThemeProviderProps<T>): ReactElement
   /** The real theme values, for JavaScript that needs a number or a name. */

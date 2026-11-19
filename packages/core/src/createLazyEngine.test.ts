@@ -27,7 +27,7 @@ describe('createLazyEngine without a theme', () => {
     const { engine } = setup()
     expect(engine.css({ color: 'red' })).toMatch(/^l-/)
     expect(engine.createStyler({}, [{ color: 'red' }]).getClassName({})).toMatch(/^l-/)
-    expect(engine.createSheet({ a: { margin: 1 } }).resolve().a.className).toMatch(/^l-/)
+    expect(engine.createSheet({ a: { margin: 1 } }).a.className).toMatch(/^l-/)
   })
 
   it('throws one clear error for a function style or a function sheet', () => {
@@ -86,12 +86,14 @@ describe('setTheme', () => {
     const { engine, sheet } = setup()
     engine.setTheme(light as typeof light)
     const make = vi.fn((theme: typeof other) => ({ a: { color: theme.palette.accent ?? 'x' } }))
-    const created = engine.createSheet(make as never)
+    const created = engine.createSheet(
+      make as unknown as (theme: typeof light) => { a: { color: string } }
+    )
     const objectSheet = engine.createSheet({ b: { margin: 1 } })
     const styler = engine.createStyler({}, [{ margin: 2 }])
     const themeClassBefore = engine.themeClass(light)
     const staticBefore = styler.getClassName({})
-    const objectBefore = objectSheet.resolve()
+    const objectBefore = objectSheet.b
     const before = created.resolve()
     expect(make).toHaveBeenCalledTimes(1)
 
@@ -102,7 +104,7 @@ describe('setTheme', () => {
     expect(make).toHaveBeenCalledTimes(2)
     expect(after).not.toBe(before)
     expect(created.resolve()).toBe(after)
-    expect(objectSheet.resolve()).toBe(objectBefore)
+    expect(objectSheet.b).toBe(objectBefore)
     expect(styler.getClassName({})).toBe(staticBefore)
     expect(engine.themeClass(light)).toBe(themeClassBefore)
     expect(sheet.rules.filter((rule) => rule.startsWith('.l-theme-'))).toHaveLength(1)

@@ -58,23 +58,25 @@ The components receive these `style` props:
 
 ## What is different
 
-| Area                  | React Native                                                                                                |
-| --------------------- | ----------------------------------------------------------------------------------------------------------- |
-| `styled(tag)`         | Needs a component. A string such as `'div'` throws a `TypeError`                                            |
-| `styled` options      | Only `shouldForwardProp` is used. `name` and `slot` are accepted and ignored: there are no class names      |
-| Forwarded props       | Every prop but `as`, `theme` and `style`. `style` is rebuilt: the styles, then yours                        |
-| Style functions       | Receive the real theme: `theme.space[2]` is `8`. They run on each render                                    |
-| Object styles         | Registered once with the platform `StyleSheet`, when the component is made                                  |
-| `StyleSheet`          | The platform's `StyleSheet`, with a `create` that resolves a function of the theme and registers the styles |
-| `useStyle(sheet)`     | Returns style objects. Sheets made from a function are registered once for each theme object                |
-| `apply(...entries)`   | Returns `{ style: [...] }`: the entries that are not falsy                                                  |
-| `ThemeProvider`       | Takes `theme`, `colorScheme` and `children`. `className` and `isRoot` are accepted and ignored              |
-| `themeClass(...)`     | Always `''`                                                                                                 |
-| `when`, `whenScheme`  | Matched at render against the nearest provider: see [Theme conditions](theme-conditions.md)                 |
-| `useTheme()`          | The real theme values, merged over the providers above                                                      |
-| `createStyle` options | Accepted so that one call runs on both platforms. Not used                                                  |
-| `configure`           | Only `theme` is used. Throws after first use, as on the web                                                 |
-| Engine                | There is none: no `getEngine`, `engine` or `cache`                                                          |
+| Area                             | React Native                                                                                                                                                                                                                                     |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `styled(tag)`                    | Needs a component. A string such as `'div'` throws a `TypeError`                                                                                                                                                                                 |
+| `styled` options                 | Only `shouldForwardProp` is used. `name` and `slot` are accepted and ignored: there are no class names                                                                                                                                           |
+| Forwarded props                  | Every prop but `as`, `theme` and `style`. `style` is rebuilt: the styles, then yours                                                                                                                                                             |
+| Style functions                  | Receive the real theme: `theme.space[2]` is `8`. They run on each render                                                                                                                                                                         |
+| Object styles                    | Registered once with the platform `StyleSheet`, when the component is made                                                                                                                                                                       |
+| `StyleSheet`                     | The platform's `StyleSheet`, with a `create` that resolves a function of the theme and registers the styles                                                                                                                                      |
+| `StyleSheet.create(object)`      | The registered styles themselves, usable at once, with no hook and no theme. Registered with the platform once, when the first key is read. A `when()` or `whenScheme()` key is dropped: use a function, which is resolved against the providers |
+| `useStyle(sheet)`                | Returns style objects. Sheets made from a function are registered once for each theme object; an object sheet is returned as it is                                                                                                               |
+| Styles before the first function | Each plain object of `styled` is registered once with the platform when the component is made, and the functions run on each render: the split that the web makes into a base class already holds here, so there is nothing to change            |
+| `apply(...entries)`              | Returns `{ style: [...] }`: the entries that are not falsy                                                                                                                                                                                       |
+| `ThemeProvider`                  | Takes `theme`, `colorScheme` and `children`. `className` and `isRoot` are accepted and ignored                                                                                                                                                   |
+| `themeClass(...)`                | Always `''`                                                                                                                                                                                                                                      |
+| `when`, `whenScheme`             | Matched at render against the nearest provider: see [Theme conditions](theme-conditions.md)                                                                                                                                                      |
+| `useTheme()`                     | The real theme values, merged over the providers above                                                                                                                                                                                           |
+| `createStyle` options            | Accepted so that one call runs on both platforms. Not used                                                                                                                                                                                       |
+| `configure`                      | Only `theme` is used. Throws after first use, as on the web                                                                                                                                                                                      |
+| Engine                           | There is none: no `getEngine`, `engine` or `cache`                                                                                                                                                                                               |
 
 The outermost provider that renders gives the base theme, as on the web, unless you set one with `configure({ theme })` or `createStyle(theme)`.
 

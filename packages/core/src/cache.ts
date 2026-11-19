@@ -1,5 +1,12 @@
 import { hashString } from './hash'
-import { isSheetEntry, type SheetEntry } from './sheetEntry'
+import {
+  createSheetEntry,
+  isSheetEntry,
+  readEntrySource,
+  type EntryRole,
+  type EntrySource,
+  type SheetEntry,
+} from './sheetEntry'
 import { compileRules, mergeStyles, readLabel, type StyleObject } from './serialize'
 import { toDeclarationText } from './theme'
 import { scanVariables } from './variables'
@@ -32,6 +39,13 @@ export interface CacheOptions {
    * drops the scoped rules and keeps the rest.
    */
   hasScope?: boolean
+  /**
+   * Whether a styled component's style list is split by position into a base class (the plain objects
+   * before the first function, made once) and a props class (the rest, made for each render), both in the
+   * `components` layer. Default true. Without it the whole list is one class, as before. The cache only
+   * holds the option; the engine's `createStyler` reads it.
+   */
+  hasBaseClass?: boolean
   /** Where rules go. Default: a DOM sheet when `document` exists, otherwise an in-memory one. */
   sheet?: Sheet
 }
@@ -54,6 +68,21 @@ export type ClassLayer = 'components' | 'overrides'
 
 export type ClassValue = WebStyleObject | SheetEntry | string | null | undefined | false
 
+/** How `cssWith` makes a class, beyond what is in it. */
+export interface ClassOptions {
+  /** The layer of the class. Default `components`. */
+  layer?: ClassLayer
+  /** A label for the class; it wins over the labels of the values. */
+  label?: string
+  /**
+   * A class of this cache that is written before this one, and that this one is only used with (the base
+   * class of a component, for its props class). It is part of the name, so that the same styles after two
+   * different classes are two classes, each written after its own; and a sheet entry is merged in, never
+   * used as it is, because its own class may have been written before `after`.
+   */
+  after?: string
+}
+
 export interface Cache {
   readonly prefix: string
   /** Whether rules go into cascade layers. */
@@ -70,6 +99,18 @@ export interface Cache {
   css(...values: ClassValue[]): string
   /** `css`, with the layer of the class given: `overrides` for what a component is given from outside. */
   cssIn(layer: ClassLayer, ...values: ClassValue[]): string
+  /**
+   * `cssIn` with more to say about the class (see `ClassOptions`). When `values` is exactly one sheet
+   * entry (and class names that are not the cache's) and there is no `after`, no class is made: the class
+   * of the entry for that layer is used, and written if it was not.
+   */
+  cssWith(options: ClassOptions, ...values: ClassValue[]): string
+  /** The entry of a style: its class names are worked out now and their rules are written when the entry is first used, in the layer of how it is used. */
+  createEntry(style: WebStyleObject): SheetEntry
+  /** The entry that `createEntry` made, by the class name it has when used on its own, for a framework that merged entries into one object. */
+  findEntry(className: string): SheetEntry | undefined
+  /** Whether a component's styles are split into a base class and a props class. */
+  readonly hasBaseClass: boolean
   /**
    * Inserts `rules` once under `id`; returns whether it inserted them. With a `layer` (and layers on)
    * each rule is wrapped in it. Without one the rules are written as they are, outside every layer:
@@ -184,17 +225,27 @@ function splitClassNames(value: string | SheetEntry): string[] {
   return names.split(/\s+/).filter(Boolean)
 }
 
-/** Splits `values` into the styles to merge (registered classes resolved back) and the class names to pass through. */
+/**
+ * Splits `values` into the styles to merge (the style of an entry a cache made, registered classes
+ * resolved back) and the class names to pass through. `sole` is the entry when the one style is its own.
+ */
 function sortClassValues(
   values: readonly ClassValue[],
   registered: ReadonlyMap<string, StyleObject>
-): { styles: StyleObject[]; rawClasses: string[] } {
+): { styles: StyleObject[]; rawClasses: string[]; sole: EntrySource | undefined } {
   const styles: StyleObject[] = []
   const rawClasses: string[] = []
+  let entry: EntrySource | undefined
   for (const value of values) {
     if (!value) continue
     if (typeof value !== 'string' && !isSheetEntry(value)) {
       styles.push(value)
+      continue
+    }
+    const source = typeof value === 'string' ? undefined : readEntrySource(value)
+    if (source) {
+      styles.push(source.style)
+      entry = source
       continue
     }
     for (const name of splitClassNames(value)) {
@@ -203,7 +254,7 @@ function sortClassValues(
       else rawClasses.push(name)
     }
   }
-  return { styles, rawClasses }
+  return { styles, rawClasses, sole: styles.length === 1 ? entry : undefined }
 }
 
 /** Makes a cache: it turns styles into classes and inserts each class's rules once. */
@@ -216,6 +267,7 @@ export function createCache(options: CacheOptions = {}): Cache {
     hasPruning = true,
     hasColorFallbacks = true,
     hasScope = true,
+    hasBaseClass = true,
   } = options
   if (!PREFIX_PATTERN.test(prefix)) {
     throw new Error(`Invalid cache prefix "${prefix}": use lowercase letters, digits and hyphens.`)
@@ -229,6 +281,7 @@ export function createCache(options: CacheOptions = {}): Cache {
     options.sheet ??
     (typeof document === 'undefined' ? createMemorySheet() : createDomSheet(prefix))
   const registered = new Map<string, StyleObject>()
+  const entries = new Map<string, SheetEntry>()
   const scoping = { prefix, hasScope }
 
   const insertedRules = new Map<string, readonly string[]>()
@@ -381,20 +434,60 @@ export function createCache(options: CacheOptions = {}): Cache {
     return [...properties, ...(body ? wrapInLayer([`.${id}{${body}}`], 'theme') : [])]
   }
 
-  const cssIn = (layer: ClassLayer, ...values: ClassValue[]): string => {
-    const { styles, rawClasses } = sortClassValues(values, registered)
+  /** The name of a class: the layer and `after` are part of the hash, so that the same styles in two layers, or after two classes, are two classes. */
+  const nameClass = (
+    layer: ClassLayer,
+    merged: StyleObject,
+    rules: readonly string[],
+    after: string
+  ): string => {
+    const label = hasLabels ? readLabel(merged) : ''
+    const hash = hashString(
+      (hasLayers && layer === 'overrides' ? layer : '') + after + rules.join('')
+    )
+    return [prefix, label, hash].filter(Boolean).join('-') + suffix
+  }
+
+  const cssWith = (options: ClassOptions, ...values: ClassValue[]): string => {
+    const { layer = 'components', label, after = '' } = options
+    const { styles, rawClasses, sole } = sortClassValues(values, registered)
+    if (sole && after === '') return [...rawClasses, sole.use(layer)].filter(Boolean).join(' ')
     if (styles.length === 0) return rawClasses.join(' ')
 
-    const merged = mergeStyles(styles)
+    const merged = mergeStyles(label ? [...styles, { label }] : styles)
     const rules = compileRules('&', merged, hasColorFallbacks, scoping)
     if (rules.length === 0) return rawClasses.join(' ')
-    const label = hasLabels ? readLabel(merged) : ''
-    // The layer is part of the hash, so that the same styles in two layers are two classes.
-    const hash = hashString((hasLayers && layer === 'overrides' ? layer : '') + rules.join(''))
-    const className = [prefix, label, hash].filter(Boolean).join('-') + suffix
+    const className = nameClass(layer, merged, rules, after)
     registered.set(className, merged)
     insertOnce(className, compileRules(`.${className}`, merged, hasColorFallbacks, scoping), layer)
     return [...rawClasses, className].join(' ')
+  }
+
+  const cssIn = (layer: ClassLayer, ...values: ClassValue[]): string =>
+    cssWith({ layer }, ...values)
+
+  const createEntry = (style: WebStyleObject): SheetEntry => {
+    const merged = mergeStyles([style as StyleObject])
+    const rules = compileRules('&', merged, hasColorFallbacks, scoping)
+    const names: Partial<Record<EntryRole, string>> = {}
+    const nameFor = (role: EntryRole): string => {
+      names[role] ??= rules.length === 0 ? '' : nameClass(role, merged, rules, '')
+      return names[role]
+    }
+    const source: EntrySource = {
+      style: merged,
+      use(role) {
+        const name = nameFor(role)
+        if (name !== '' && !registered.has(name)) {
+          registered.set(name, merged)
+          insertOnce(name, compileRules(`.${name}`, merged, hasColorFallbacks, scoping), role)
+        }
+        return name
+      },
+    }
+    const entry = createSheetEntry(nameFor('components'), source)
+    entries.set(nameFor('components'), entry)
+    return entry
   }
 
   return {
@@ -404,6 +497,10 @@ export function createCache(options: CacheOptions = {}): Cache {
     registered,
     css: (...values) => cssIn('components', ...values),
     cssIn,
+    cssWith,
+    createEntry,
+    findEntry: (className) => entries.get(className),
+    hasBaseClass,
     hasScope,
     hasPruning,
     usedVariables: used,

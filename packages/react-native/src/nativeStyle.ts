@@ -33,6 +33,12 @@ export type NativeStyleFunction<T, P> = (props: P & { theme: T }) => NativeStyle
 /** A native style object, or a function of the props and the theme; the defaults accept any function. */
 export type NativeStyleInput<T = never, P = never> = NativeStyleObject | NativeStyleFunction<T, P>
 
+/**
+ * A native sheet given as an object: one style for each name. It is a record of styles with a function
+ * left out, so that a function of the theme is not taken for one (the compiler tries the object form first).
+ */
+export type NativeObjectSheet<K extends string> = Record<K, NativeStyleObject> & { call?: never }
+
 /** What a native sheet is made from: one style for each name, or a function of the theme that returns them. */
 export type NativeSheetInput<K extends string, T> =
   | Record<K, NativeStyleObject>

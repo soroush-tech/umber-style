@@ -8,11 +8,11 @@ const theme = {
   breakpoints: { md: 768 },
 }
 
-function setup(prefix = 'e') {
+function setup(prefix = 'e', hasBaseClass = true) {
   const sheet = createMemorySheet()
   const engine = createEngine(theme, {
     prefix,
-    cache: createCache({ hasLayers: false, hasPruning: false, prefix, sheet }),
+    cache: createCache({ hasLayers: false, hasPruning: false, hasBaseClass, prefix, sheet }),
   })
   const ruleOf = (className: string) =>
     sheet.rules.find((rule) => rule.startsWith(`.${className}{`))
@@ -90,7 +90,7 @@ describe('createEngine', () => {
     expect(created.resolve()).toEqual({ box })
     expect(make).toHaveBeenCalledTimes(1)
     expect(ruleOf(box.className)).toBe(`.${box.className}{color:var(--e-palette-primary);}`)
-    expect(engine.createSheet({ a: { margin: 1 } }).resolve().a.className).toMatch(/^e-/)
+    expect(engine.createSheet({ a: { margin: 1 } }).a.className).toMatch(/^e-/)
   })
 })
 
@@ -136,7 +136,7 @@ describe('createStyler', () => {
   })
 
   it('keeps object styles next to function styles', () => {
-    const { engine, ruleOf } = setup()
+    const { engine, ruleOf } = setup('e', false)
     const styler = engine.createStyler({}, [{ margin: 4 }, () => ({ color: 'red' })])
     const className = styler.getClassName({})
     expect(ruleOf(className)).toBe(`.${className}{margin:4px;color:red;}`)
@@ -160,9 +160,7 @@ describe('createStyler', () => {
 describe('sheet entries in classes', () => {
   it('merges entries and class names in order, with a later one winning', () => {
     const { engine, ruleOf } = setup()
-    const { a, b } = engine
-      .createSheet({ a: { color: 'red', margin: 1 }, b: { color: 'blue' } })
-      .resolve()
+    const { a, b } = engine.createSheet({ a: { color: 'red', margin: 1 }, b: { color: 'blue' } })
     const merged = engine.css(a, b)
     expect(ruleOf(merged)).toBe(`.${merged}{margin:1px;color:blue;}`)
     expect(engine.css(a.className, b)).toBe(merged)
@@ -170,7 +168,7 @@ describe('sheet entries in classes', () => {
 
   it('puts entries after the styles of a styler and before a class name', () => {
     const { engine, ruleOf } = setup()
-    const { a } = engine.createSheet({ a: { color: 'green' } }).resolve()
+    const { a } = engine.createSheet({ a: { color: 'green' } })
     const styler = engine.createStyler({}, [{ color: 'red', margin: 4 }])
     const className = styler.getClassName({}, [a, false, 'external'])
     const [external, engineClass] = className.split(' ')

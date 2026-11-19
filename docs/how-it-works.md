@@ -57,6 +57,73 @@ Several styles merge into one class: later keys win, nested objects merge key by
 
 Classes that the cache made can be passed back in. They are resolved to their styles and merged, so `engine.css(sheetEntry, { opacity: 0.9 })` is one class, not two.
 
+## A base class and a props class
+
+A component made by `styled` does not always write one class. Its styles are split by position into two parts:
+
+- the **base** is the leading part of the styles that does not depend on props; it may use theme tokens. It is one class, made once;
+- the **props part** starts at the first style that depends on props and takes everything after it. It is made again for each render, and gives one class for each distinct result.
+
+```tsx
+const Flex = styled('div', { name: 'Flex' })<{ gap?: number; direction?: 'row' | 'column' }>(
+  { display: 'flex', minWidth: 0 },
+  ({ gap, direction }) => ({ gap, flexDirection: direction })
+)
+
+const App = () => (
+  <>
+    <Flex gap={4} direction="row" />
+    <Flex gap={8} direction="row" />
+    <Flex gap={8} direction="column" />
+  </>
+)
+```
+
+The three elements share one base class, and each has a props class of its own:
+
+```html
+<div class="umber-flex-root-182dnr0 umber-flex-root-1o6pbk7"></div>
+<div class="umber-flex-root-182dnr0 umber-flex-root-1gb9ruy"></div>
+<div class="umber-flex-root-182dnr0 umber-flex-root-canzou"></div>
+```
+
+```css
+@layer umber-components {
+  .umber-flex-root-182dnr0 {
+    display: flex;
+    min-width: 0;
+  }
+}
+@layer umber-components {
+  .umber-flex-root-1o6pbk7 {
+    gap: 4px;
+    flex-direction: row;
+  }
+}
+@layer umber-components {
+  .umber-flex-root-1gb9ruy {
+    gap: 8px;
+    flex-direction: row;
+  }
+}
+@layer umber-components {
+  .umber-flex-root-canzou {
+    gap: 8px;
+    flex-direction: column;
+  }
+}
+```
+
+Without the split (`hasBaseClass: false`) each of the three would be one class with `display: flex; min-width: 0` repeated in it. With many props the saving grows: a layout component with three fixed declarations and six props, rendered with 48 distinct combinations, writes 291 declarations and 7216 bytes of CSS with the split, and 432 declarations and 9388 bytes without it (one more rule, the base; `packages/core/src/measureBase.test.ts` makes this measurement).
+
+A style is **props-independent** when it is a plain object, or a function that reads nothing from its argument except `theme`. The engine finds out by calling such a function once with its props wrapped so that every read of a prop is noted (so is spreading or listing the props). A function that reads no prop took a path that only depends on the theme, so its result is the same for every later call with that theme and is kept. The base is worked out once for each theme object (the view that the nearest provider gives), not once for each component: two providers that differ only in token values give one base class and one rule, because a token is the same `var(--name)` reference under both.
+
+Order matters, so the split is by position and not by kind. A plain object that comes after the first props-dependent style is in the props part, even though it does not depend on props, so that it still wins over what came before it.
+
+The element carries `base props [foreign] [override]`: the base class, the props class, class names that are not the engine's, and, only when something is given from outside, the override class (see [Cascade layers and overrides](cascade-layers.md)). A component with no props-dependent style has the base class only, with the name it always had. A component whose first style depends on props has no base class.
+
+The base and the props class are in the same layer, and the base is always written first, so a rule of the props class wins a tie. [Cascade layers and overrides](cascade-layers.md) says exactly which rules this decides, and where it differs from one merged class.
+
 ## Tokens are variables
 
 A theme is a plain object. The engine reads it once and gives back the same shape with a `var(--name)` reference in place of each value:
@@ -141,4 +208,6 @@ The web bindings (`@umber-style/react`, `@umber-style/vue`) use this model. Reac
 
 - The explanation of one class for every theme holds for the `variable` and `reference` token modes. In `inline` mode the real value is written into the rule, so a theme that changes it makes another class. See [Tokens](tokens.md).
 - Classes are never removed from the cache or from the style sheet while the page lives. A style that is built from many different values (a measured number, for example) adds one class and its rules for each value. See [No inline styles](no-inline-styles.md).
+- The base of a component is only as good as the test that a function reads no prop. A prop that is read inside a function that the style returns, or later (a callback), is not seen; a style that reads module state that changes is not pure, and the base would keep its first result for a theme. Style functions are expected to be pure functions of their props and the theme.
+- The first call of a style function for a theme object runs with the wrapped props; later calls for that theme use the plain props. A theme object that is made again on every render (an inline `theme={{ ... }}` on a provider) is a new theme object each time, so each render works the base out again.
 - The serializer's list of properties that take no unit is fixed in the code. A unitless number for a property that is not in the list gets `px`; write it as a string.

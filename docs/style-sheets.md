@@ -35,11 +35,39 @@ function Box({ isActive }: { isActive?: boolean }) {
 }
 ```
 
-`StyleSheet.create` takes an object of styles, or a function of the theme that returns one. A function receives the theme as references, like a function style, and is resolved against the nearest provider: a theme that changes a breakpoint gets its own entries. An object is resolved once.
+`StyleSheet.create` takes a function of the theme that returns the styles, or an object of styles. They give different things:
 
-`useStyle(sheet)` returns one entry for each name. On the web an entry is a frozen object that holds a class name. It prints as that class name (`String(entry)` and `entry.className` agree). On React Native an entry is a style object. Treat an entry as opaque: pass it on, do not read it, so that your code runs on both platforms.
+- A **function** receives the theme as references, like a function style, and gives a sheet. `useStyle(sheet)` resolves it against the nearest provider and returns one entry for each name: a theme that changes a breakpoint gets its own entries. The sheet is not an entry and has none: `sheet.box` and `apply(sheet)` are type errors.
+- An **object** gives the entries themselves, at once, with no hook: see "A sheet without a hook" below.
+
+On the web an entry is a frozen object that holds a class name. It prints as that class name (`String(entry)` and `entry.className` agree). On React Native an entry is a style object. Treat an entry as opaque: pass it on, do not read it, so that your code runs on both platforms.
 
 `useStyle` is a hook on React (call it in a component) and must run in `setup` on Vue. `StyleSheet.create` is not a hook.
+
+## A sheet without a hook
+
+Given an object, `StyleSheet.create` returns the entries, and they are usable where the sheet is made: in a `style` prop, in `apply`, in another module. `useStyle` is not needed, and given an object sheet it returns the same object, so existing code that calls it keeps working.
+
+```tsx
+const overrides = StyleSheet.create({
+  danger: { backgroundColor: 'firebrick', borderRadius: 0 },
+})
+
+const Page = () => <Button style={overrides.danger}>Delete</Button>
+```
+
+An object sheet has no theme. It works with no theme set and with no provider above it, in the server components build and before any provider has rendered, and a module can create one before the app calls `configure()`. Nothing is computed when `create` is called: an entry is made when its key is first read, and a sheet that is imported and never used writes nothing. `Object.keys` and a spread list the keys (the entries of a sheet that was only imported are not made until a spread reads them; `JSON.stringify` of an entry is not meaningful).
+
+Its limit is that it cannot use tokens. A token is a reference that comes from the theme, so a style that needs `theme.palette.primary` is written as a function: `StyleSheet.create((theme) => ({ ... }))`. An object can still use plain values and `var(--name)` strings that you write yourself. On React Native an object sheet is registered with the platform when its first key is read, and a `when()` or `whenScheme()` key in it is dropped, because there is no hook to read the providers: use a function sheet for those.
+
+## When a rule is written
+
+Resolving a sheet writes no rule. An entry writes its rule when it is first used, and an entry can be used in two ways:
+
+- on its own, through `apply` or on a plain element, or by reading `className`: its class is in the `components` layer;
+- given alone to a styled component through `style`: its class is in the `overrides` layer.
+
+These are two classes, because one class name cannot be in two layers. Each is written only when the entry is first used that way: an entry that is only ever given through `style` writes one rule, in `overrides`, and none in `components`; one that is used both ways writes one rule for each. Merging an entry into another class (more than one thing given, see below) does not use its own class, so it writes neither.
 
 ## The `style` prop of a styled component
 
@@ -72,7 +100,9 @@ and the rules for the card:
 }
 ```
 
-The component has two classes: its own (`umber-card-root-1l5hymm`) and one override class for everything it was given from outside. The override class is in a later cascade layer, so it wins. See [Cascade layers and overrides](cascade-layers.md).
+The component has two classes: its own (`umber-card-root-1l5hymm`) and one override class for everything it was given from outside. A component that has props-dependent styles has a base class and a props class instead of the one, see [Cascade layers and overrides](cascade-layers.md). The override class is in a later cascade layer, so it wins.
+
+Here three things were given (two entries and an object), so they are merged into one new class, which keeps the label of the component. When exactly **one** sheet entry is given, and nothing else that needs merging (no plain object, no second entry, no engine class in `className`), the entry's own class is the override class: no second class is made, and the same entry given to ten components is one rule. Class names that are not the engine's do not count: they pass through.
 
 The `style` prop is only for components made by `styled()`. On a plain element, `style` is the platform's own prop: a sheet entry there is not turned into a class (and writes no style attribute, see [No inline styles](no-inline-styles.md)), and the types reject it. Use `apply` for a plain element.
 
@@ -103,8 +133,7 @@ const overrides = StyleSheet.create({
 })
 
 function DangerButton() {
-  const styles = useStyle(overrides)
-  return <Button style={[styles.danger, styles.dangerHover]}>Delete</Button>
+  return <Button style={[overrides.danger, overrides.dangerHover]}>Delete</Button>
 }
 ```
 
@@ -140,6 +169,19 @@ The button has the Button's class and an override class, and both keep the label
 ```
 
 Because the override class is in a later layer, its `background-color` beats the Button's `:hover` background even though the entry has no `:hover` rule of its own: a later layer wins whatever the specificity. `dangerHover` is there to give the hovered button a colour of its own.
+
+Given one entry alone, `<Button style={overrides.danger}>Delete</Button>`, the button is `<button class="umber-button-root-sx8930 umber-sz1m68">`, and the entry's own override class is the only rule written for it:
+
+```css
+@layer umber-overrides {
+  .umber-sz1m68 {
+    background-color: firebrick;
+    border-radius: 0;
+  }
+}
+```
+
+That class has no label of the Button, because it is the entry's class and the same one for every component that is given the entry. With `hasLayers: false` there is no such class: what is given from outside is always merged into the one class.
 
 Without layers (`hasLayers: false`) there is one merged class and the order of the rules decides, so a style given from outside no longer beats a nested rule of the component such as `:hover`, unless it has its own `:hover` rule. See [Cascade layers and overrides](cascade-layers.md).
 
@@ -216,6 +258,8 @@ A sheet entry in the `style` prop only works on a component made by `styled()`. 
 
 - The shared types are the intersection of the two platforms, so a web-only value (`display: 'grid'`, the `border` shorthand, `display: 'block'`) is a type error in shared code and belongs in `web`. See [Typed styles](typed-styles.md).
 - A length with a unit (`'10px'`) and a shorthand with several values type-check in shared code, because the platform's own types accept any string there. React Native warns about them in development; the web writes what you give.
+- An object sheet cannot use tokens, and on React Native it drops `when()` and `whenScheme()` keys. Both need a function sheet and `useStyle`.
+- The rule that one entry given alone is the override class holds with layers; without layers it is merged.
 - A shared source that uses `useStyle` or function sheets resolves them with the platform's own rules: on the web, entries are classes, on React Native they are registered objects.
 - The `host.native.ts` file was compiled in the React Native package, against the real `react-native` types, apart from the shared source that imports `./host`.
 - The shared source was run on the web in a test, and its React Native half is covered by the repository's test of one source on both platforms (`packages/umber-style/src/sharedSource.test.tsx`), which uses a stand-in for the platform.

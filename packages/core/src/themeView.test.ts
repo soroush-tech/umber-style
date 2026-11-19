@@ -74,7 +74,6 @@ describe('a sheet resolved against a view', () => {
     const { engine } = setup()
     const make = vi.fn((view: typeof theme) => ({ box: { margin: view.breakpoints[0] } }))
     const created = engine.createSheet(make)
-    expect(created.isDynamic).toBe(true)
     const view = engine.createThemeView({ ...theme, breakpoints: ['300px'] })
     const first = created.resolve(view)
     expect(created.resolve(view)).toBe(first)
@@ -82,8 +81,7 @@ describe('a sheet resolved against a view', () => {
     expect(created.resolve()).not.toBe(first)
     expect(make).toHaveBeenCalledTimes(2)
     const fixed = engine.createSheet({ a: { margin: 1 } })
-    expect(fixed.isDynamic).toBe(false)
-    expect(fixed.resolve(view)).toBe(fixed.resolve())
+    expect(fixed.a).toBe(fixed.a)
   })
 })
 

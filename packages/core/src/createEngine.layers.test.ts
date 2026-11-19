@@ -4,7 +4,7 @@ import { createSheetEntry } from './sheetEntry'
 
 const theme = { palette: { primary: '#0000ff' } }
 
-function setup(options: { hasLayers?: boolean } = {}) {
+function setup(options: { hasLayers?: boolean; hasBaseClass?: boolean } = {}) {
   const sheet = createMemorySheet()
   const cache = createCache({ hasPruning: false, prefix: 'e', sheet, ...options })
   const engine = createEngine(theme, { prefix: 'e', cache })
@@ -54,7 +54,7 @@ describe('a styler with layers', () => {
       a: { color: 'red', margin: 1 },
       b: { color: 'green', padding: 2 },
     })
-    const { a, b } = sheet.resolve()
+    const { a, b } = sheet
     const styler = engine.createStyler({}, [button])
     const classes = styler.getClassName({}, [a, b, { color: 'black' }]).split(' ')
     expect(classes).toHaveLength(2)
@@ -127,7 +127,9 @@ describe('a styler with layers', () => {
 
   it('puts a sheet entry on its own, and css and apply, in the components layer', () => {
     const { engine, sheet } = setup()
-    const { box } = engine.createSheet({ box: { color: 'red' } }).resolve()
+    const { box } = engine.createSheet({ box: { color: 'red' } })
+    expect(sheet.rules).toEqual([])
+    expect(box.className).toMatch(/^e-/)
     const css = engine.css({ margin: 2 })
     expect(sheet.rules).toEqual([
       '@layer e-theme,e-global,e-components,e-overrides;',
@@ -151,7 +153,7 @@ describe('a styler with layers', () => {
 
 describe('a styler with hasLayers: false', () => {
   it('merges everything into one class and writes no layer', () => {
-    const { engine, sheet, cache } = setup({ hasLayers: false })
+    const { engine, sheet, cache } = setup({ hasLayers: false, hasBaseClass: false })
     const styler = engine.createStyler({ name: 'Button' }, [button])
     const own = styler.getClassName({})
     const merged = styler.getClassName({}, [{ background: 'purple' }, 'foreign'])
@@ -166,7 +168,7 @@ describe('a styler with hasLayers: false', () => {
   })
 
   it('keeps one class for function styles with extras', () => {
-    const { engine } = setup({ hasLayers: false })
+    const { engine } = setup({ hasLayers: false, hasBaseClass: false })
     const styler = engine.createStyler({}, [() => ({ color: 'red' })] as never)
     expect(styler.getClassName({}, [{ margin: 1 }]).split(' ')).toHaveLength(1)
   })

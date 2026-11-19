@@ -197,7 +197,7 @@ describe('styled, the class of a style with no function', () => {
 
   it('is made on every render when a style is a function', () => {
     const cache = createCache({ hasLayers: false, prefix: 't', sheet: createMemorySheet() })
-    const spy = vi.spyOn(cache, 'css')
+    const spy = vi.spyOn(cache, 'cssWith')
     const { styled } = createStyle(baseTheme, { prefix: 't', cache })
     const Box = styled('div')<{ $on?: boolean }>(({ $on }) => ({ color: $on ? 'red' : 'blue' }))
     const { rerender } = render(<Box data-testid="box" />)
@@ -343,6 +343,9 @@ describe('StyleSheet, useStyle and apply', () => {
     const first = readSheet(useStyle, sheet)
     expect(readSheet(useStyle, sheet)).toBe(first)
     expect(Object.keys(first)).toEqual(['box', 'text'])
+    // Resolving writes nothing: a rule is written when its entry is first used.
+    expect(rules.rules).toHaveLength(0)
+    expect(first.box.className).not.toBe(first.text.className)
     expect(rules.rules).toHaveLength(2)
   })
 
@@ -382,10 +385,11 @@ describe('createStyle', () => {
 
   it('leaves raw keys without variables', () => {
     const { sheet, StyleSheet, useStyle } = setup()
-    readSheet(
+    const { box } = readSheet(
       useStyle,
       StyleSheet.create((theme) => ({ box: { width: theme.breakpoints.md } }))
     )
+    expect(box.className).toMatch(/^t-/)
     expect(sheet.rules.join('')).toContain('width:768px;')
   })
 })

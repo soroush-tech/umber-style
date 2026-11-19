@@ -8,7 +8,7 @@ import type {
   ThemeKey,
 } from '@umber-style/core'
 import type {
-  NativeSheetInput,
+  NativeObjectSheet,
   NativeSheetStyles,
   NativeStyleInput,
   NativeStyleObject,
@@ -56,11 +56,18 @@ export interface ThemeProviderProps<T> {
 
 export interface NativeStyle<T> {
   styled: Styled<T>
-  /** The platform StyleSheet, with a `create` that resolves the styles with the theme and registers them. */
+  /** The platform StyleSheet, with a `create` that registers the styles, and resolves them with the theme when they are a function of it. */
   StyleSheet: Omit<typeof platformStyleSheet, 'create'> & {
+    /** A sheet given as an object is registered with the platform on first read and is its registered styles, usable at once, with no hook and no theme. */
+    create<K extends string>(styles: NativeObjectSheet<K>): { readonly [P in K]: NativeStyleObject }
+    /** A sheet given as a function of the theme is for `useStyle`, which resolves it against the theme. */
     create<K extends string>(
-      styles: NativeSheetInput<K, T>
+      styles: (theme: T) => Record<K, NativeStyleObject>
     ): SheetDefinition<Record<K, NativeStyleObject>, NativeStyleObject>
+  }
+  /** The styles of a sheet; an object sheet is its own registered styles and is returned as it is. */
+  useStyle<K extends string>(sheet: { readonly [P in K]: NativeStyleObject }): {
+    readonly [P in K]: NativeStyleObject
   }
   useStyle<S extends NativeSheetStyles>(
     sheet: SheetDefinition<S, NativeStyleObject>

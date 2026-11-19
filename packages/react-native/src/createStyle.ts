@@ -1,16 +1,21 @@
 import { createElement, type ReactElement } from 'react'
 import { createNativeThemeKey, type NativeCondition } from './conditions'
-import { createSchemeKey } from '@umber-style/core'
+import {
+  createLazyRecord,
+  createSchemeKey,
+  isThemedSheet,
+  NO_THEME_MESSAGE,
+} from '@umber-style/core'
 import { createThemeValue } from './ThemeValue'
 import type { NativeStyle, SheetDefinition, StyleOptions, ThemeProviderProps } from './types'
-import type { NativeSheetInput, NativeSheetStyles, NativeStyleObject } from './nativeStyle'
+import type { NativeObjectSheet, NativeSheetStyles, NativeStyleObject } from './nativeStyle'
 import { createStyled } from './styled'
 import { platformStyleSheet } from './platform'
 import { hasConditions, toNativeStyle } from './toNativeStyle'
 
 export type { StyleOptions } from './types'
 
-/** A sheet on React Native: its styles are registered with the platform once for each theme (once in all, for objects). */
+/** A sheet made from a function on React Native: its styles are registered with the platform once for each theme. */
 interface NativeSheet<S extends NativeSheetStyles, T> extends SheetDefinition<
   S,
   NativeStyleObject
@@ -55,7 +60,7 @@ export interface NativeHolder<T> {
 
 /** Makes the React Native styling over a holder of the base theme. */
 export function bindHolder<T extends object>(holder: NativeHolder<T>): NativeStyle<T> {
-  const { ThemeValueProvider, useTheme, useCondition } = createThemeValue(holder)
+  const { ThemeValueProvider, useTheme, useThemeValue, useCondition } = createThemeValue(holder)
 
   function ThemeProvider({
     theme: partial,
@@ -68,17 +73,25 @@ export function bindHolder<T extends object>(holder: NativeHolder<T>): NativeSty
   }
 
   function create<K extends string>(
-    styles: NativeSheetInput<K, T>
-  ): NativeSheet<Record<K, NativeStyleObject>, T> {
-    type S = Record<K, NativeStyleObject>
-    const byTheme = new WeakMap<object, RegisteredSheet<S>>()
-    let fixed: RegisteredSheet<S> | undefined
+    styles: NativeObjectSheet<K>
+  ): { readonly [P in K]: NativeStyleObject }
+  function create<K extends string>(
+    styles: (theme: T) => Record<K, NativeStyleObject>
+  ): NativeSheet<Record<K, NativeStyleObject>, T>
+  function create(
+    styles: NativeObjectSheet<string> | ((theme: T) => Record<string, NativeStyleObject>)
+  ): unknown {
+    if (typeof styles !== 'function') {
+      // Registered with the platform when the first key is read, once. There is no theme and no condition.
+      let registered: RegisteredSheet<NativeSheetStyles> | undefined
+      return createLazyRecord(
+        Object.keys(styles),
+        (key) => (registered ??= register(styles as NativeSheetStyles)).entries[key]
+      )
+    }
+    const byTheme = new WeakMap<object, RegisteredSheet<Record<string, NativeStyleObject>>>()
     return {
-      resolve(current, condition) {
-        if (typeof styles !== 'function') {
-          fixed ??= register(styles)
-          return resolveEntries(fixed, condition)
-        }
+      resolve(current: T, condition?: NativeCondition) {
         let sheet = byTheme.get(current)
         if (!sheet) {
           sheet = register(styles(current))
@@ -89,9 +102,15 @@ export function bindHolder<T extends object>(holder: NativeHolder<T>): NativeSty
     }
   }
 
-  function useStyle<S extends NativeSheetStyles>(sheet: SheetDefinition<S, NativeStyleObject>) {
-    return (sheet as NativeSheet<S, T>).resolve(useTheme(), useCondition())
-  }
+  // The contexts are read first, for every sheet, so that the hooks of a component never change; an
+  // object sheet is its own registered styles and uses no theme.
+  const useStyle = ((sheet: object) => {
+    const theme = useThemeValue()
+    const condition = useCondition()
+    if (!isThemedSheet(sheet)) return sheet
+    if (theme === undefined) throw new Error(NO_THEME_MESSAGE)
+    return (sheet as NativeSheet<NativeSheetStyles, T>).resolve(theme, condition)
+  }) as NativeStyle<T>['useStyle']
 
   return {
     styled: createStyled(useTheme, useCondition),

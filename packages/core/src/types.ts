@@ -1,4 +1,5 @@
 import type { Cache } from './cache'
+import type { SheetEntry } from './sheetEntry'
 import type { WebStyleObject } from './webStyle'
 import type { TokenOptions } from './tokens'
 
@@ -17,6 +18,8 @@ export interface EngineOptions extends TokenOptions {
   hasScope?: boolean
   /** Whether a theme class declares only the variables that rules refer to. Default true; used when the engine makes its cache. */
   hasPruning?: boolean
+  /** Whether a component's styles are split by position into a base class (made once) and a props class (made for each render). Default true; used when the engine makes its cache. */
+  hasBaseClass?: boolean
   /** Theme paths (dotted, or top-level keys) whose variables are always declared, for code outside the engine that reads them. */
   alwaysDeclare?: readonly string[]
   /** The cache to use; one is made when not given. */
@@ -51,6 +54,21 @@ export type SheetStyles = Record<string, WebStyleObject>
 export type SheetInput<K extends string, T> =
   | Record<K, WebStyleObject>
   | ((theme: T) => Record<K, WebStyleObject>)
+
+/**
+ * A sheet given as an object: one style for each name. It is a record of styles with a function
+ * left out, so that a function of the theme is not taken for one (the compiler tries the object form first).
+ */
+export type ObjectSheet<K extends string> = Record<K, WebStyleObject> & { call?: never }
+
+/** The entries of a sheet, by name: each is made on first access, and its rule is written when it is first used. */
+export type SheetEntries<K extends string> = { readonly [P in K]: SheetEntry }
+
+/** A sheet made from a function of the theme: it has no entries until it is resolved against a theme, which `useStyle` does. */
+export interface ThemedSheet<K extends string, T> {
+  /** The entries, against `theme` (a theme view) when given, else against the base theme. */
+  resolve(theme?: T): SheetEntries<K>
+}
 
 /**
  * The shape of the theme of an app. It has no members of its own (the optional one below only keeps it

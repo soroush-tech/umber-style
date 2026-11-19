@@ -102,7 +102,7 @@ describe('WebStyleObject', () => {
   it('is what createSheet and createStyler take', () => {
     const { engine } = setup()
     const sheet = engine.createSheet({ box: { padding: 8, '&:hover': { opacity: 1 } } })
-    expectTypeOf(sheet.resolve().box).toHaveProperty('className')
+    expectTypeOf(sheet.box).toHaveProperty('className')
     engine.createSheet((theme) => ({ box: { color: theme.palette.primary } }))
     // @ts-expect-error a misspelt property in a sheet
     engine.createSheet({ box: { backgroudColor: 'red' } })
