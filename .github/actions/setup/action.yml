@@ -20,6 +20,10 @@ inputs:
   command:
     description: The manager's install command, with its flags.
     required: true
+  directory:
+    description: The folder to install in - the workspace root unless a job installs a second checkout (the benchmark job's base).
+    required: false
+    default: .
 
 runs:
   using: composite
@@ -39,6 +43,7 @@ runs:
     # is a flag list ("install --frozen-lockfile --ignore-scripts"), not a single word.
     - name: Install dependencies
       shell: bash
+      working-directory: ${{ inputs.directory }}
       env:
         CI: true
         MANAGER: ${{ inputs.manager }}

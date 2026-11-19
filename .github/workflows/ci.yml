@@ -407,10 +407,59 @@ jobs:
         env:
           CI: true
 
+  # The benchmark gate of docs/benchmarks.md: the head of the pull request against its base, measured
+  # in interleaved rounds on this one machine, compared by the median ratio of each case. The base is
+  # the pull request's base commit, or the commit before a push to main, checked out beside the head;
+  # a base with no benchmark suite passes with a notice. The comparison table goes to the job summary.
+  bench:
+    needs: [prepare, lint]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 20
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Checkout the base
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.base.sha || github.event.before }}
+          path: base
+          persist-credentials: false
+
+      - name: Setup pnpm, Node and dependencies
+        uses: ./.github/actions/setup
+        with:
+          node_version: ${{ needs.prepare.outputs.node_version }}
+          manager: ${{ needs.prepare.outputs.manager }}
+          command: ${{ needs.prepare.outputs.command }}
+
+      # The base installs by itself, in its own folder: it is its own workspace.
+      - name: Setup the base's dependencies
+        uses: ./.github/actions/setup
+        with:
+          node_version: ${{ needs.prepare.outputs.node_version }}
+          manager: ${{ needs.prepare.outputs.manager }}
+          command: ${{ needs.prepare.outputs.command }}
+          directory: base
+
+      - name: Run the benchmark gate
+        run: ${{ needs.prepare.outputs.runner }} run bench:gate --base base --head .
+
+      - name: Write the comparison to the job summary
+        if: always()
+        run: |
+          if [ -f bench/results/gate/gate.md ]; then
+            cat bench/results/gate/gate.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+
   ci-ok:
     name: ci-ok
     if: always()
-    needs: [prepare, lint, packages, browser, e2e, e2e-dev]
+    needs: [prepare, lint, packages, browser, e2e, e2e-dev, bench]
     runs-on: ubuntu-latest
     permissions: {}
     timeout-minutes: 5

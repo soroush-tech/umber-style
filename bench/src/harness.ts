@@ -30,6 +30,11 @@ export const BENCH_WARMUP = Number(process.env.BENCH_WARMUP ?? Math.round(BENCH_
 
 const parts = new Map<string, PartFile>()
 
+/** Collects garbage, when the runner allows it (the benchmark configs pass `--expose-gc`). */
+function collectGarbage(): void {
+  ;(globalThis as { gc?: () => void }).gc?.()
+}
+
 /** The package folder this run is in: `BENCH_PACKAGE`, else the folder the runner was started in. */
 function readPackage(): string {
   return process.env.BENCH_PACKAGE ?? basename(process.cwd())
@@ -75,7 +80,8 @@ export async function runGroup(
   const { bench } = context
   const part = getPart(context)
   const registrations = cases.map(({ name, fn, beforeEach, afterEach }) =>
-    bench(name, { beforeEach, afterEach }, fn)
+    // A collection before each case, so that it does not pay for the garbage of the one before.
+    bench(name, { beforeAll: collectGarbage, beforeEach, afterEach }, fn)
   )
   const options = {
     time: BENCH_TIME * timeFactor,

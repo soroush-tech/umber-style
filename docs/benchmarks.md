@@ -82,7 +82,7 @@ pnpm bench:compare before.json after.json          # thresholds 0.8 and 1.25
 pnpm bench:compare before.json after.json 0.9 1.1  # lower, then upper
 ```
 
-For each case it prints the ratio of the second run to the first in operations per second: below 1 the case got slower. A case below the lower threshold is marked `SLOWER` and a case above the upper one `faster`; a case that only one file has is `added` or `removed`. The exit code is 1 when any case is `SLOWER`, 2 for a wrong call, and 0 otherwise. The continuous integration gate that a later step adds uses this command. The logic is in `bench/src/compare.ts`, with its unit tests.
+For each case it prints the ratio of the second run to the first in operations per second: below 1 the case got slower. A case below the lower threshold is marked `SLOWER` and a case above the upper one `faster`; a case that only one file has is `added` or `removed`. The exit code is 1 when any case is `SLOWER`, 2 for a wrong call, and 0 otherwise. The continuous integration gate does not use this command (it compares rounds, below), but this is the way to look at two single runs. The logic is in `bench/src/compare.ts`, with its unit tests.
 
 The two files should come from the same machine, in the same state, with the same `BENCH_TIME`.
 
@@ -104,7 +104,14 @@ A figure is the mean of many samples, so its own margin is small, but two runs c
 
 - Compare runs from one machine, with nothing else busy. A browser, a build or a virus scan during a run moves the figures of the cases that ran at that time.
 - Cases of a few nanoseconds to a microsecond move the most in relative terms; so do the cases that make a fresh engine for each operation.
-- A threshold of 0.8 is meant to catch a change of a quarter in a case that is steady. Do not gate on a case that is listed as noisy.
+- A threshold of 0.8 is meant to catch a change of a quarter in a case that is steady. Do not gate on a case that is listed as noisy: the gate below gates only the cases that proved steady.
+
+What was found to make cases unstable, and what is done about it:
+
+- **The machine drifts between runs.** Whole groups of cases move together, in one direction, for the length of a run (a second run was faster than the first in most of the 139 cases). Nothing in the harness can remove that. The gate measures both sides in turn, in rounds, and takes the median.
+- **A case settles at its own speed in each process.** The operations of a few nanoseconds (`core/helpers`, `core/sheets`) ran at different speeds in different processes with the same code, which no run time evens out. They are measured and not gated. Files run one after the other, never two at once.
+- **Garbage of the case before.** Each case now starts with a forced collection (`beforeAll` in `runGroup`), so that it does not pay for what the one before left. This lowered the number of cases more than 10% apart between two runs of the same files a little (26 and 29 of 70 before, 17, 19 and 26 of 70 after); the machine's drift is larger than this effect, and it was kept because it costs nothing.
+- **Time and warm-up were left alone.** A longer `BENCH_TIME` was not tried: it makes each figure better known, but not less dependent on the process or the minute it was measured in, and it multiplies the time of every round.
 
 ## Noise of two runs
 
@@ -117,7 +124,78 @@ Two runs of the whole suite, one after the other on one Windows laptop (Node 26,
 | `vue`          | 7     | 0.91         | 0.72   | 1.51    | 1                       |
 | `react-native` | 9     | 0.76         | 0.65   | 1.54    | 1                       |
 
-80 of the 139 cases were within the default thresholds of 0.8 and 1.25, and `pnpm bench:compare` between the two runs exited 1 with 42 cases below 0.8. The margin of error each run printed (mostly 1% to 10%) was far smaller than that: it does not cover what the machine did between the runs. The cases that moved most (below 0.5 or above 1.5) were the start-up reads, the theme classes made for a new object, and the first and small cases of the React server render, the DOM render of the same props, and the React Native object sheet. Do not gate on a case from a laptop in this state: use a quiet machine, a larger `BENCH_TIME`, and compare against a run made just before on the same machine.
+80 of the 139 cases were within the default thresholds of 0.8 and 1.25, and `pnpm bench:compare` between the two runs exited 1 with 42 cases below 0.8. The margin of error each run printed (mostly 1% to 10%) was far smaller than that: it does not cover what the machine did between the runs. The cases that moved most (below 0.5 or above 1.5) were the start-up reads, the theme classes made for a new object, and the first and small cases of the React server render, the DOM render of the same props, and the React Native object sheet. Do not gate on one run of a case from a laptop in this state: compare against a run made just before on the same machine, and better, take the median of rounds as the gate below does.
+
+## The gate
+
+The continuous integration job `bench` runs the gate: it measures the head of a pull request against its base, in the same job on the same machine, and fails when a gated case is slower in the head. Only UmberStyle is measured, against itself.
+
+```sh
+pnpm bench:gate --base <folder> --head <folder>     # 4 rounds, the threshold of the config
+pnpm bench:gate --base ../base --head . --rounds 6 --threshold 0.85 --out some/folder
+```
+
+`--base` and `--head` are two checkouts, each installed, each with its own `bench/`. The gate starts `bench/bin/run.mjs` of each one, so each side runs its own suite. To try it on one checkout, give it twice: `pnpm bench:gate --base . --head .` measures the same code against itself, which is how the noise below was measured. The result goes to `bench/results/gate/` (or `--out`): `gate.md`, the table, and `round-N-base/` and `round-N-head/` with the result files of each run.
+
+### How it works
+
+1. **Rounds.** The gate runs the suite of the base and then of the head, then the head and then the base, and so on for 4 rounds: the order alternates so that neither side always runs first.
+2. **The same conditions for both sides.** Both get `BENCH_TIME=200` from `GATE_SUITE` in `bench/src/gate-config.ts`, whatever the defaults of each side's own harness are, and both run the same list of files: those of `pnpm bench` except the option sweep (`options`), the start-up checks and the memory figures. A `BENCH_TIME` already in the environment wins.
+3. **The ratio.** For each case the gate takes, in each round, the operations per second of the head divided by those of the base, and then the **median** of the rounds. One round that hit a busy moment of the machine moves the range and not the median.
+4. **The verdict.** A gated case whose median is below the threshold fails the gate (exit code 1). A case that is not gated is shown and never fails. A base with no benchmark suite (no `bench/bin/run.mjs` in its folder, as before the suite existed) passes with a notice. A suite that fails to run is exit code 2.
+
+The threshold and what is gated are in one file, `bench/src/gate-config.ts`. The rounds are in `bench/src/gate.ts` (with its unit tests), started by `bench/bin/gate.mjs`. In the continuous integration the base is the pull request's base commit, or the commit before a push to `main`, checked out into a folder beside the head and installed there; the job writes `gate.md` to its summary.
+
+### What is gated
+
+| Kind        | Cases                                                                                                                                                           | Count |
+| ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- |
+| Gated       | `core`: classes, tokens (except the nested partial theme), pruning, extraction. `react`: the string render, the DOM render and hydration, the server components | 52    |
+| Report only | `core/helpers`, `core/sheets`, the nested partial theme, and all of `vue` and `react-native`                                                                    | 42    |
+| Not run     | `react/options`, `core/startup`, `core/memory`: left out to keep the time of the job down; `pnpm bench` still runs them                                         | -     |
+
+Why each report-only group is not gated:
+
+- `core/helpers` and `core/sheets` are operations of 20 nanoseconds to 2 microseconds. With the same code on both sides, their median ratio came out at 0.6 to 0.8 in one gate run and near 1 in another: a case can settle at another speed in each process, and no threshold separates a change from that.
+- The nested partial theme builds a large theme in each operation and ranged from 0.5 to 1.0 between rounds.
+- `vue` and `react-native` were steady in the runs below (medians within 0.97 to 1.08), but the gate gates the core and the React cases first. Moving them into `gated` is a one-line change once they have proved themselves in the continuous integration.
+
+### The threshold
+
+The threshold is **0.8**: a gated case fails when the head does 80% or less of the base's operations per second, as the median of 4 rounds (a loss of a fifth or more).
+
+It comes from the noise of the gate itself, measured with the same code on both sides (`--base . --head .`) on the laptop of the section below, with nothing else asked of it:
+
+| Measure                                 | Two single runs of the whole suite | The gate: 4 rounds, same code on both sides |
+| --------------------------------------- | ---------------------------------- | ------------------------------------------- |
+| Cases compared                          | 139 (94 in the gate's files)       | 94                                          |
+| Cases more than 10% apart               | 72 of 139 (40 of the 94)           | 7, 6 and 26 of 94, in three runs            |
+| Cases more than 20% apart               | 40 of 139 (18 of the 94)           | 0, 1 and 24 of 94, in three runs            |
+| The 52 gated cases, more than 10% apart | -                                  | 3, 1 and 1                                  |
+| The 52 gated cases, more than 20% apart | -                                  | 0, 0 and 0                                  |
+| The 52 gated cases, lowest to highest   | -                                  | 0.86 to 1.13                                |
+
+The 24 cases of the third run were report-only ones (`core/helpers` and `core/sheets`, as low as 0.29: something else was busy on the machine for part of the run). In the same run one round of a gated case went as low as 0.06 and another as high as 3.7, and the medians of the gated cases stayed within 0.87 to 1.09: that is what the median over rounds is for.
+
+The gated medians stayed within 0.86 and 1.13 with the same code on both sides, so 0.8 leaves a margin of 0.06 under the lowest. A large loss is seen (the slowdown below); a loss near the threshold is caught only some of the time, and a loss of a tenth is under the noise and not seen (this is read from the margin, not measured). Three runs on one laptop do not prove it for every machine: a gated case that fails with the same code on both sides belongs in `reportOnly`.
+
+To check that the gate sees a regression, one extra call of the serializer was put into `compileRules` of the head only (and removed again): the gate exited 1 with 9 of the 52 gated cases below 0.8 (medians 0.49 to 0.80): the cases that compile or create classes, and one React server case. Do the same on your machine to see what a failure looks like.
+
+### Reading a failure
+
+```text
+| case                                       | kind  | median ratio | range over rounds | rounds below |      |
+| core/classes > style object to rules > ... | gated | 0.49         | 0.38 to 0.93      | 3/4          | FAIL |
+```
+
+- **median ratio** is what the gate decides on. **range over rounds** is the lowest and the highest ratio of the rounds. **rounds below** is how many rounds had a ratio under the threshold.
+- A **regression** has most of its rounds below the threshold and a median well under it: the head is slower nearly every time it is measured (the injected slowdown above gave medians of 0.49 to 0.76 with 3 of 4 rounds below).
+- **Noise** has a median just under the threshold, one or two rounds below, and a wide range. Run the job again. A case that fails again with a wide range, on a change that cannot touch it, belongs in `reportOnly`.
+- To look closer, run `pnpm bench:gate --base <the base checkout> --head .` and read `bench/results/gate/gate.md` and the per-round files next to it (`pnpm bench:compare` reads them too).
+
+### What the job costs
+
+One suite run is about 50 seconds on the laptop, so the 4 rounds of two sides take about 7 minutes. Two checkouts and two installs add one to two minutes. The job runs next to the others, after `lint`, so expect 9 to 10 minutes on a hosted runner. A hosted runner shares its machine; the gate measures both sides on it in turn, but its noise is not measured, and the first runs in the continuous integration are the real test of the threshold.
 
 ## Whole pages
 
