@@ -1,0 +1,20 @@
+import { createDefaultStyle } from './defaultStyle'
+
+const defaults = createDefaultStyle()
+
+export const {
+  configure,
+  getEngine,
+  styled,
+  StyleSheet,
+  useStyle,
+  useTheme,
+  ThemeProvider,
+  apply,
+  themeClass,
+} = defaults
+
+export { alpha } from '@umber-style/core'
+export * from './createStyle'
+export * from './defaultStyle'
+export * from './types'
