@@ -1,0 +1,36 @@
+{
+  "name": "@umber-style/core",
+  "private": true,
+  "version": "0.1.0",
+  "license": "MIT",
+  "author": "Masoud Soroush <masoud@soroush.tech>",
+  "homepage": "https://umber-style.soroush.design",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/soroush-tech/umber-style.git",
+    "directory": "packages/core"
+  },
+  "bugs": {
+    "url": "https://github.com/soroush-tech/umber-style/issues"
+  },
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "lint": "oxlint --deny-warnings",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "@umber-style/eslint-config": "workspace:*",
+    "@vitest/coverage-v8": "^5.1.0",
+    "jsdom": "^31.0.0",
+    "oxlint": "^1.93.0",
+    "typescript": "~7.0.2",
+    "vitest": "^5.1.0"
+  }
+}
