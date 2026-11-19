@@ -24,7 +24,10 @@ afterEach(() => {
 
 function setup() {
   const sheet = createMemorySheet()
-  const style = createStyle(baseTheme, { prefix: 'l', cache: createCache({ prefix: 'l', sheet }) })
+  const style = createStyle(baseTheme, {
+    prefix: 'l',
+    cache: createCache({ hasPruning: false, prefix: 'l', sheet }),
+  })
   const Button = style.styled('button', { name: 'Button' })({
     background: 'blue',
     color: 'white',

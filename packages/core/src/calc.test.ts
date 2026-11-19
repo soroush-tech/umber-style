@@ -222,3 +222,22 @@ describe('a style that uses them', () => {
     ])
   })
 })
+
+describe('a reference with a fallback', () => {
+  const reference = 'var(--u-space-2, 8px)'
+
+  it('is an opaque value in every helper', () => {
+    expect(multiply(reference, 2)).toBe('calc(var(--u-space-2, 8px) * 2)')
+    expect(divide(reference, 2)).toBe('calc(var(--u-space-2, 8px) / 2)')
+    expect(negate(reference)).toBe('calc(var(--u-space-2, 8px) * -1)')
+    expect(add(reference, 4)).toBe('calc(var(--u-space-2, 8px) + 4px)')
+    expect(add(reference, reference)).toBe('calc(var(--u-space-2, 8px) + var(--u-space-2, 8px))')
+    expect(subtract(12, reference)).toBe('calc(12px - var(--u-space-2, 8px))')
+  })
+
+  it('is kept as written when the factor is 1 and is nested in a calc as one term', () => {
+    expect(multiply(reference, 1)).toBe(reference)
+    expect(add(multiply(reference, 2), 1)).toBe('calc((var(--u-space-2, 8px) * 2) + 1px)')
+    expect(multiply(add(reference, 4), 2)).toBe('calc((var(--u-space-2, 8px) + 4px) * 2)')
+  })
+})

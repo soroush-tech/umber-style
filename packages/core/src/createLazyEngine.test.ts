@@ -8,7 +8,7 @@ function setup() {
   const sheet = createMemorySheet()
   const engine = createLazyEngine<typeof light>({
     prefix: 'l',
-    cache: createCache({ hasLayers: false, prefix: 'l', sheet }),
+    cache: createCache({ hasLayers: false, hasPruning: false, prefix: 'l', sheet }),
   })
   return { engine, sheet }
 }

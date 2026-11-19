@@ -11,6 +11,10 @@ export interface EngineOptions extends TokenOptions {
   hasLabels?: boolean
   /** Whether every rule goes into a cascade layer. Default true. */
   hasLayers?: boolean
+  /** Whether a theme class declares only the variables that rules refer to. Default true; used when the engine makes its cache. */
+  hasPruning?: boolean
+  /** Theme paths (dotted, or top-level keys) whose variables are always declared, for code outside the engine that reads them. */
+  alwaysDeclare?: readonly string[]
   /** The cache to use; one is made when not given. */
   cache?: Cache
 }

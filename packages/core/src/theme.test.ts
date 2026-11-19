@@ -4,7 +4,7 @@ import { createThemeClass } from './theme'
 describe('createThemeClass', () => {
   it('gives the same declarations the same class and one rule', () => {
     const sheet = createMemorySheet()
-    const cache = createCache({ hasLayers: false, prefix: 'ds', sheet })
+    const cache = createCache({ hasLayers: false, hasPruning: false, prefix: 'ds', sheet })
     const first = createThemeClass(cache, { '--a': 'b', '--c': 'd' })
     const second = createThemeClass(cache, { '--a': 'b', '--c': 'd' })
     expect(second).toBe(first)
@@ -23,7 +23,7 @@ describe('createThemeClass', () => {
   it('sets color-scheme in the rule', () => {
     const sheet = createMemorySheet()
     const className = createThemeClass(
-      createCache({ hasLayers: false, sheet }),
+      createCache({ hasLayers: false, hasPruning: false, sheet }),
       { '--a': 'b' },
       { colorScheme: 'dark' }
     )

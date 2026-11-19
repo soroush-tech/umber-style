@@ -89,9 +89,11 @@ function createLabel({ name, slot = 'root' }: StylerOptions): string {
 
 /** Makes an engine that has no theme yet: it takes one from `setTheme`, or from the first `themeClass`. It needs no framework. */
 export function createLazyEngine<T extends object = Theme>(options: EngineOptions = {}): Engine<T> {
-  const { cache: given, rawKeys, lengthKeys, suffix, hasLabels, hasLayers } = options
+  const { cache: given, suffix, hasLabels, hasLayers, hasPruning, alwaysDeclare = [] } = options
+  const { rawKeys, lengthKeys, modes } = options
   const prefix = options.prefix ?? given?.prefix ?? 'css'
-  const cache = given ?? createCache({ prefix, suffix, hasLabels, hasLayers })
+  const cache = given ?? createCache({ prefix, suffix, hasLabels, hasLayers, hasPruning })
+  const tokenOptions = { prefix, rawKeys, lengthKeys, modes }
   let baseTheme: T | undefined
   let tokens: Tokens<T> | undefined
   // Counts the base themes, so that a sheet made from a function is made again for a new one.
@@ -105,15 +107,19 @@ export function createLazyEngine<T extends object = Theme>(options: EngineOption
   const setTheme = (theme: T) => {
     if (theme === baseTheme) return
     baseTheme = theme
-    tokens = createTokens(theme, { prefix, rawKeys, lengthKeys })
+    tokens = createTokens(theme, tokenOptions)
+    views = new WeakMap()
+    // Variables that code outside the engine reads are always declared.
+    cache.markUsed(tokens.findNames(alwaysDeclare))
     version++
   }
 
-  const views = new WeakMap<object, T>()
+  // A view keeps the base value as the fallback of a reference token, so a new base makes new views.
+  let views = new WeakMap<object, T>()
   const createThemeView = (realTheme: T): T => {
     let view = views.get(realTheme)
     if (view === undefined) {
-      view = createTokens(realTheme, { prefix, rawKeys, lengthKeys }).refs
+      view = (tokens ?? createTokens(realTheme, tokenOptions)).createView(realTheme)
       views.set(realTheme, view)
     }
     return view

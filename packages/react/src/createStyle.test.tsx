@@ -25,7 +25,7 @@ function setup(prefix = 't') {
   const sheet = createMemorySheet()
   const style = createStyle(baseTheme, {
     prefix,
-    cache: createCache({ hasLayers: false, prefix, sheet }),
+    cache: createCache({ hasLayers: false, hasPruning: false, prefix, sheet }),
   })
   const ruleOf = (className: string) =>
     sheet.rules.find((rule) => rule.startsWith(`.${className}{`))

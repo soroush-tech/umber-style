@@ -15,7 +15,7 @@ describe('a server ThemeProvider with isRoot', () => {
     const sheet = createMemorySheet()
     const engine = createEngine(theme, {
       prefix: 'r',
-      cache: createCache({ hasLayers: false, prefix: 'r', sheet }),
+      cache: createCache({ hasLayers: false, hasPruning: false, prefix: 'r', sheet }),
     })
     const { ThemeProvider, readTheme } = bindEngine(engine, requestCache)
     const tree = await resolveTree(

@@ -6,7 +6,7 @@ const theme = { palette: { primary: '#0000ff' } }
 
 function setup(options: { hasLayers?: boolean } = {}) {
   const sheet = createMemorySheet()
-  const cache = createCache({ prefix: 'e', sheet, ...options })
+  const cache = createCache({ hasPruning: false, prefix: 'e', sheet, ...options })
   const engine = createEngine(theme, { prefix: 'e', cache })
   return { engine, sheet, cache }
 }

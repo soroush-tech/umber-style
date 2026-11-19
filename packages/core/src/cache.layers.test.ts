@@ -10,7 +10,7 @@ const ORDER = '@layer u-theme,u-global,u-components,u-overrides;'
 
 function setup(prefix = 'u') {
   const sheet = createMemorySheet()
-  return { sheet, cache: createCache({ prefix, sheet }) }
+  return { sheet, cache: createCache({ hasPruning: false, prefix, sheet }) }
 }
 
 describe('the layers of a cache', () => {

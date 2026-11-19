@@ -28,7 +28,7 @@ function setup() {
   const sheet = createMemorySheet()
   const engine = createEngine(theme, {
     prefix: 'f',
-    cache: createCache({ hasLayers: false, prefix: 'f', sheet }),
+    cache: createCache({ hasLayers: false, hasPruning: false, prefix: 'f', sheet }),
   })
   const style = bindEngine(engine, requestCache)
   const Box = style.styled('div', { name: 'Box' })(({ theme: view }) => ({

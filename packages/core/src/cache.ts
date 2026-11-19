@@ -1,6 +1,8 @@
 import { hashString } from './hash'
 import { isSheetEntry, type SheetEntry } from './sheetEntry'
 import { compileRules, mergeStyles, readLabel, type StyleObject } from './serialize'
+import { toDeclarationText } from './theme'
+import { scanVariables } from './variables'
 import type { WebStyleObject } from './webStyle'
 
 export interface CacheOptions {
@@ -12,6 +14,11 @@ export interface CacheOptions {
   hasLabels?: boolean
   /** Whether every rule goes into a cascade layer (`<prefix>-theme`, `-global`, `-components`, `-overrides`). Default true. */
   hasLayers?: boolean
+  /**
+   * Whether a theme class declares only the variables that rules refer to (and those marked with
+   * `markUsed`), appending more as rules come in. Default true. Without it, a theme class declares every token.
+   */
+  hasPruning?: boolean
   /** Where rules go. Default: a DOM sheet when `document` exists, otherwise an in-memory one. */
   sheet?: Sheet
 }
@@ -20,6 +27,8 @@ export interface Sheet {
   insert(rule: string): void
   /** Every rule inserted so far, in order. */
   readonly rules: readonly string[]
+  /** Replaces the rule inserted at `index` of `rules`; a sheet that cannot (a browser one) has none, and the cache appends instead. */
+  replace?(index: number, rule: string): void
 }
 
 /** The cascade layers of a cache, from the lowest priority to the highest. */
@@ -52,8 +61,49 @@ export interface Cache {
   insertOnce(id: string, rules: readonly string[], layer?: RuleLayer): boolean
   /** The rules this cache inserted under `id` (a class name), or none: for a style element that a server component renders. */
   getRules(id: string): readonly string[]
-  /** The CSS inserted so far and the ids it covers, for a server render or a static page. */
+  /** Whether theme classes declare only the variables in use. */
+  readonly hasPruning: boolean
+  /** The names of the variables that rules refer to, or that were marked: the only ones a pruned theme class declares. It only grows. */
+  readonly usedVariables: ReadonlySet<string>
+  /** Marks variables as used, plus those that the values of themes refer to, and declares them in every theme class that has them. Does nothing without pruning. */
+  markUsed(names: Iterable<string>): void
+  /**
+   * Registers a theme class: `declarations` are all its variables, `colorScheme` is set by its rule.
+   * Only the used variables are written, more when they become used; the class itself always exists.
+   * Does nothing for a class that is already there.
+   */
+  insertTheme(
+    className: string,
+    declarations: Readonly<Record<string, string>>,
+    colorScheme?: string
+  ): void
+  /** `getRules` with every declaration of a theme class, used or not: for a style element that is sent before the rules that use the class. */
+  getFullRules(id: string): readonly string[]
+  /** The CSS inserted so far and the ids it covers (class names, then the used variables), for a server render or a static page. */
   extract(): { css: string; ids: string[] }
+}
+
+/** The start of every variable name, and of the ids that mark a used variable. */
+const VARIABLE_START = '--'
+
+/** A theme class that a pruning cache has registered. */
+interface ThemeEntry {
+  /** Every variable of the theme class. */
+  declarations: Readonly<Record<string, string>>
+  /** The color-scheme declaration, or ''. */
+  schemeText: string
+  /** Whether a server render already sent the rule of this class (its color-scheme and the variables used then). */
+  isSent: boolean
+  /** Whether a first rule was written. */
+  isStarted: boolean
+  /** The variables written so far. */
+  written: Set<string>
+  /** The text of those variables. */
+  variables: string
+  /** Where the rule of the class is in the sheet, when the sheet can replace it. */
+  index: number | undefined
+  /** The rules written for the class. */
+  rules: readonly string[]
 }
 
 const PREFIX_PATTERN = /^[a-z][a-z0-9-]*$/
@@ -65,6 +115,9 @@ export function createMemorySheet(): Sheet {
     rules,
     insert(rule) {
       rules.push(rule)
+    },
+    replace(index, rule) {
+      rules[index] = rule
     },
   }
 }
@@ -129,11 +182,21 @@ function sortClassValues(
 
 /** Makes a cache: it turns styles into classes and inserts each class's rules once. */
 export function createCache(options: CacheOptions = {}): Cache {
-  const { prefix = 'css', suffix = '', hasLabels = true, hasLayers = true } = options
+  const {
+    prefix = 'css',
+    suffix = '',
+    hasLabels = true,
+    hasLayers = true,
+    hasPruning = true,
+  } = options
   if (!PREFIX_PATTERN.test(prefix)) {
     throw new Error(`Invalid cache prefix "${prefix}": use lowercase letters, digits and hyphens.`)
   }
-  const insertedIds = new Set<string>(readInsertedIds(prefix))
+  const hydratedIds = readInsertedIds(prefix)
+  const insertedIds = new Set<string>(hydratedIds.filter((id) => !id.startsWith(VARIABLE_START)))
+  // A server render marks the variables it declared, and declared no more than those.
+  const hydratedUsed = new Set<string>(hydratedIds.filter((id) => id.startsWith(VARIABLE_START)))
+  const used = new Set<string>(hydratedUsed)
   const sheet =
     options.sheet ??
     (typeof document === 'undefined' ? createMemorySheet() : createDomSheet(prefix))
@@ -146,19 +209,127 @@ export function createCache(options: CacheOptions = {}): Cache {
     : ''
   const layerOrderId = `${prefix}-layers`
 
-  const insertOnce = (id: string, rules: readonly string[], layer?: RuleLayer): boolean => {
-    if (insertedIds.has(id)) return false
-    insertedIds.add(id)
-    const layered =
-      hasLayers && layer ? rules.map((rule) => `@layer ${prefix}-${layer}{${rule}}`) : rules
-    insertedRules.set(id, layered)
-    // The order statement goes in before the first rule, once; a server render already marked it.
+  const wrapInLayer = (rules: readonly string[], layer?: RuleLayer): readonly string[] =>
+    hasLayers && layer ? rules.map((rule) => `@layer ${prefix}-${layer}{${rule}}`) : rules
+
+  // The order statement goes in before the first rule, once; a server render already marked it.
+  const insertLayered = (layered: readonly string[]): void => {
     if (hasLayers && layered.length > 0 && !insertedIds.has(layerOrderId)) {
       insertedIds.add(layerOrderId)
       sheet.insert(layerOrder)
     }
     for (const rule of layered) sheet.insert(rule)
+  }
+
+  // Pruning: each registered theme class, with what it declares and what of that is written.
+  const themes = new Map<string, ThemeEntry>()
+
+  /** Writes `names` for a theme class: a rule of its own, or in place of the rule it has when the sheet can replace. */
+  const writeTheme = (className: string, entry: ThemeEntry, names: readonly string[]): void => {
+    const added = toDeclarationText(names.map((name) => [name, entry.declarations[name]]))
+    const ownScheme = entry.isSent ? '' : entry.schemeText
+    const first = entry.isStarted ? '' : ownScheme
+    if (added + first === '') return
+    entry.isStarted = true
+    for (const name of names) entry.written.add(name)
+    entry.variables += added
+    const { index } = entry
+    const body = index === undefined ? added + first : entry.variables + ownScheme
+    const rules = wrapInLayer([`.${className}{${body}}`], 'theme')
+    if (sheet.replace && index !== undefined) {
+      sheet.replace(index, rules[0])
+      entry.rules = rules
+    } else {
+      const before = sheet.rules.length
+      insertLayered(rules)
+      if (sheet.replace && sheet.rules.length > before) entry.index = sheet.rules.length - 1
+      entry.rules = [...entry.rules, ...rules]
+    }
+    insertedRules.set(className, entry.rules)
+  }
+
+  const markUsed = (names: Iterable<string>): void => {
+    if (!hasPruning) return
+    const queue = [...names]
+    const fresh: string[] = []
+    for (let index = 0; index < queue.length; index++) {
+      const name = queue[index]
+      if (used.has(name)) continue
+      used.add(name)
+      fresh.push(name)
+      // The value of a token in some theme may refer to another variable, which is then used too.
+      for (const { declarations } of themes.values()) {
+        const value = declarations[name]
+        if (value !== undefined) queue.push(...scanVariables(value, VARIABLE_START))
+      }
+    }
+    if (fresh.length === 0) return
+    for (const [className, entry] of themes) {
+      writeTheme(
+        className,
+        entry,
+        fresh.filter((name) => entry.declarations[name] !== undefined)
+      )
+    }
+  }
+
+  const insertTheme = (
+    className: string,
+    declarations: Readonly<Record<string, string>>,
+    colorScheme?: string
+  ): void => {
+    const schemeText = colorScheme ? `color-scheme:${colorScheme};` : ''
+    const body = toDeclarationText(Object.entries(declarations)) + schemeText
+    if (!hasPruning) {
+      insertOnce(className, body ? [`.${className}{${body}}`] : [], 'theme')
+      return
+    }
+    if (themes.has(className)) return
+    // A theme class that the server sent has its color-scheme, and the variables that were used then.
+    const isSent = insertedIds.has(className)
+    insertedIds.add(className)
+    const names = Object.keys(declarations)
+    const written = new Set(isSent ? names.filter((name) => hydratedUsed.has(name)) : [])
+    const entry: ThemeEntry = {
+      declarations,
+      schemeText,
+      isSent,
+      isStarted: false,
+      written,
+      variables: '',
+      index: undefined,
+      rules: [],
+    }
+    themes.set(className, entry)
+    insertedRules.set(className, [])
+    // A value of this theme may refer to a variable that no rule uses yet.
+    markUsed(
+      names
+        .filter((name) => used.has(name))
+        .flatMap((name) => scanVariables(declarations[name], VARIABLE_START))
+    )
+    writeTheme(
+      className,
+      entry,
+      names.filter((name) => used.has(name) && !entry.written.has(name))
+    )
+  }
+
+  function insertOnce(id: string, rules: readonly string[], layer?: RuleLayer): boolean {
+    if (insertedIds.has(id)) return false
+    insertedIds.add(id)
+    const layered = wrapInLayer(rules, layer)
+    insertedRules.set(id, layered)
+    insertLayered(layered)
+    if (hasPruning) markUsed(rules.flatMap((rule) => scanVariables(rule, VARIABLE_START)))
     return true
+  }
+
+  const getFullRules = (id: string): readonly string[] => {
+    const entry = themes.get(id)
+    if (entry === undefined) return insertedRules.get(id) ?? []
+    const body = toDeclarationText(Object.entries(entry.declarations)) + entry.schemeText
+    return body ? wrapInLayer([`.${id}{${body}}`], 'theme') : []
   }
 
   const cssIn = (layer: ClassLayer, ...values: ClassValue[]): string => {
@@ -184,8 +355,13 @@ export function createCache(options: CacheOptions = {}): Cache {
     registered,
     css: (...values) => cssIn('components', ...values),
     cssIn,
+    hasPruning,
+    usedVariables: used,
+    markUsed,
+    insertTheme,
     insertOnce,
     getRules: (id) => insertedRules.get(id) ?? [],
-    extract: () => ({ css: sheet.rules.join(''), ids: [...insertedIds] }),
+    getFullRules,
+    extract: () => ({ css: sheet.rules.join(''), ids: [...insertedIds, ...used] }),
   }
 }

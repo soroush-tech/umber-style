@@ -112,3 +112,80 @@ Layers need a browser from 2022 on (Chrome 99, Firefox 97, Safari 15.4); an olde
 rules. Pass `hasLayers: false` (to `createCache`, `createStyle` or `configure`) to turn them off: no
 `@layer` is written and an element gets one merged class, as before. A style given from outside then
 does not beat a nested rule of the component such as `:hover`.
+
+## Token modes
+
+Each token of the theme is written in one of four modes:
+
+| Mode        | In a rule                   | Declared by a theme class | Value in a style function           |
+| ----------- | --------------------------- | ------------------------- | ----------------------------------- |
+| `variable`  | `var(--name)`               | yes                       | the reference                       |
+| `reference` | `var(--name, <base value>)` | yes                       | the reference, with a fallback      |
+| `inline`    | the real value              | no                        | the real value of the nearest theme |
+| `raw`       | never written by the engine | no                        | the real value of the nearest theme |
+
+`variable` is the default. A `reference` token works with no theme class on any ancestor, because the
+fallback is the value of the base theme; a theme class that declares it still overrides it, a nested
+theme included. `inline` writes the real value into the rule, so a theme that changes it makes another
+class (a number is written as the serializer writes any number: `px` for a length property, none for
+`zIndex`). `raw` is for what is not a CSS value at all (breakpoints, component settings, functions).
+
+The `modes` option (of `createStyle`, `configure` and `createEngine`) gives the mode by dotted theme
+path. The most specific path wins: a path on a leaf beats one on its parent, which beats the top-level
+key. `rawKeys` still works and means `raw` for those top-level keys; an entry in `modes` beats it.
+Without options `breakpoints` and `components` are `raw` and everything else is `variable`.
+
+```ts
+import { createStyle } from 'umber-style/react'
+
+const { styled } = createStyle(theme, {
+  modes: {
+    zIndex: 'inline',
+    'transitions.duration': 'variable',
+    'palette.primary': 'reference',
+  },
+})
+
+const Modal = styled('div')(({ theme }) => ({
+  zIndex: theme.zIndex.modal, // 100
+  color: theme.palette.primary, // var(--css-palette-primary, #0b57d0)
+  transitionDuration: theme.transitions.duration.short, // var(--css-transitions-duration-short)
+}))
+```
+
+The class of `Modal` is `.x{z-index:100;color:var(--css-palette-primary, #0b57d0);transition-duration:var(--css-transitions-duration-short);}`.
+Arithmetic helpers (`add`, `multiply`, and the others) treat `var(--x, 8px)` as one opaque value, as
+they do `var(--x)`.
+
+## Only used variables
+
+A theme class does not declare every token. The engine scans each rule it inserts for `var(--name`
+(with or without a fallback, nested fallbacks included, in one pass over the text) and keeps the set
+of used names in the cache. A theme class declares the used names it has a value for, and nothing else.
+
+- A token whose value refers to another variable (`var(--css-palette-blue)`, or a value that contains
+  one) makes that variable used too, to any depth.
+- `alwaysDeclare: ['space', 'palette.text']` lists theme paths (a top-level key or a dotted path) whose
+  variables are always declared, for code outside the engine that reads them, such as an app
+  stylesheet. A variable that only such code uses must be listed, or it is not declared.
+- `hasPruning: false` (an option of the engine and of `createCache`) turns it off: every theme class
+  declares every token, as before.
+- The name of a theme class is the hash of all the declarations of its theme, so it does not change
+  as more variables come into use.
+- A theme class that nothing uses yet still exists and writes no rule (with `colorScheme` it writes
+  the `color-scheme` rule only).
+
+`cache.extract()` and `createStyleTag` give each theme class as one rule with the used tokens. In the
+browser the rules come in over time: when a rule first uses a variable, one rule declaring the new
+variables of that insert is appended for each theme class that has them. All of it is in the
+`<prefix>-theme` layer, so the order in which theme rules arrive does not change what wins between
+layers; two theme classes on one element are decided by the order they were written in.
+
+A page that was extracted on the server and hydrated does not repeat a declaration and loses none:
+`data-ids` lists the used variables too, and a theme class that the server sent is taken to have
+those and no more.
+
+In the server-components build each `<style href precedence>` is sent before the elements below it
+render, so a provider cannot know which variables they use. It sends every variable of its theme
+class, as before (`cache.getFullRules`). Pruning is on in that engine's cache, but only the classic
+server render and the browser are smaller.

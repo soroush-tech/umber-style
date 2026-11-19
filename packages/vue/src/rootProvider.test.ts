@@ -19,7 +19,7 @@ describe('a ThemeProvider with isRoot', () => {
       themeClass,
     } = createStyle(theme, {
       prefix: 'r',
-      cache: createCache({ hasLayers: false, prefix: 'r', sheet }),
+      cache: createCache({ hasLayers: false, hasPruning: false, prefix: 'r', sheet }),
     })
     let seen: unknown
     const Probe = defineComponent({

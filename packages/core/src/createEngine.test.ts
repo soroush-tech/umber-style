@@ -12,7 +12,7 @@ function setup(prefix = 'e') {
   const sheet = createMemorySheet()
   const engine = createEngine(theme, {
     prefix,
-    cache: createCache({ hasLayers: false, prefix, sheet }),
+    cache: createCache({ hasLayers: false, hasPruning: false, prefix, sheet }),
   })
   const ruleOf = (className: string) =>
     sheet.rules.find((rule) => rule.startsWith(`.${className}{`))

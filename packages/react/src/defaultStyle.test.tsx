@@ -14,7 +14,7 @@ const other = { palette: { primary: '#ff0000', onPrimary: '#000000' }, space: [0
 /** A default style over an in-memory sheet, like a fresh module would be. */
 function setup() {
   const sheet = createMemorySheet()
-  const cache = createCache({ hasLayers: false, prefix: 'd', sheet })
+  const cache = createCache({ hasLayers: false, hasPruning: false, prefix: 'd', sheet })
   const style = createDefaultStyle()
   style.configure({ prefix: 'd', cache })
   const ruleOf = (className: string) =>

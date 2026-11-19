@@ -9,7 +9,7 @@ describe('a ThemeProvider with isRoot', () => {
     const sheet = createMemorySheet()
     const { ThemeProvider, useTheme, themeClass } = createStyle(theme, {
       prefix: 'r',
-      cache: createCache({ hasLayers: false, prefix: 'r', sheet }),
+      cache: createCache({ hasLayers: false, hasPruning: false, prefix: 'r', sheet }),
     })
     const seen: unknown[] = []
     const Probe = () => {
