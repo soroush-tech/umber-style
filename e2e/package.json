@@ -1,0 +1,17 @@
+{
+  "name": "@umber-fixtures/e2e",
+  "private": true,
+  "version": "0.1.0",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "test:e2e": "playwright test",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.65.0",
+    "@types/node": "^26.6.6",
+    "lighthouse": "13.6.0",
+    "typescript": "~7.0.2"
+  }
+}

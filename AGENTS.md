@@ -87,6 +87,8 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
   (vitest). A file that needs another environment says so with a `// @vitest-environment node`
   comment, or uses a `*.server.test.ts(x)` suffix in `@umber-style/react` (run with the `react-server`
   condition).
+- **Which tier a test belongs in:** the lowest that can see the thing (`docs/testing.md`). Text of a rule, class names, what is inserted: a `*.test.ts(x)` unit test. What a browser's cascade or layout decides (which rule wins, a computed value, a transition): a `*.browser.test.ts(x)` in `core` or `react`, run by `pnpm test:browser`, outside coverage. What a framework does with the engine on a built page (first HTML, hydration, navigation, no script): an end-to-end test in `e2e/` on an app in `fixtures/`, run by `pnpm test:e2e`. A test that documents behaviour the engine does not have yet is marked as a known failure (`known` in `e2e/fixtures.ts`, `it.fails` in vitest) with a reason that starts with KNOWN; one that starts to pass fails the run.
+- **Fixtures are not packages:** fixture apps live in `fixtures/`, never in `packages/`: they are not registered with Codecov, not in the package matrix, and need no `LICENSE`.
 - **100% coverage:** every package keeps 100% statements, branches, functions and lines, with no
   coverage-ignore comments. `pnpm test:coverage` fails below it.
 - **Lint and format:** `pnpm lint` runs `oxlint --deny-warnings` - any warning fails. Formatting is not

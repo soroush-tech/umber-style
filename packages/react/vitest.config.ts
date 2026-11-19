@@ -19,7 +19,7 @@ export default defineConfig({
           name: 'client',
           environment: 'jsdom',
           include: ['src/**/*.test.{ts,tsx}'],
-          exclude: ['src/**/*.server.test.{ts,tsx}'],
+          exclude: ['src/**/*.server.test.{ts,tsx}', 'src/**/*.browser.test.{ts,tsx}'],
         },
       },
       {

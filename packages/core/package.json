@@ -22,7 +22,8 @@
     "lint": "oxlint --deny-warnings",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "test:browser": "vitest run --config vitest.browser.config.ts"
   },
   "dependencies": {
     "csstype": "^3.2.3"
@@ -30,9 +31,11 @@
   "devDependencies": {
     "@types/node": "^26.6.6",
     "@umber-style/eslint-config": "workspace:*",
+    "@vitest/browser-playwright": "^5.1.1",
     "@vitest/coverage-v8": "^5.1.0",
     "jsdom": "^31.0.0",
     "oxlint": "^1.93.0",
+    "playwright": "1.65.0",
     "typescript": "~7.0.2",
     "vitest": "^5.1.0"
   }

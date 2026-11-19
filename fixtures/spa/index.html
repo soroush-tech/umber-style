@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>UmberStyle fixture</title>
+    <link rel="icon" href="data:," />
+    <!-- The static background of each scheme: it paints before any script runs, and with scripting disabled.
+         The system preference decides until a stored choice sets data-scheme on <html>. -->
+    <style>
+      html {
+        background-color: #ffffff;
+      }
+      @media (prefers-color-scheme: dark) {
+        html:not([data-scheme]) {
+          background-color: #101114;
+        }
+      }
+      html[data-scheme='light'] {
+        background-color: #ffffff;
+      }
+      html[data-scheme='dark'] {
+        background-color: #101114;
+      }
+    </style>
+    <!-- Applies the stored scheme to <html> before the first paint. -->
+    <script>
+      try {
+        var stored = localStorage.getItem('umber-fixture-scheme')
+        if (stored === 'dark' || stored === 'light') {
+          document.documentElement.setAttribute('data-scheme', stored)
+        }
+      } catch (error) {
+        // Storage can be blocked: the system preference decides.
+      }
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

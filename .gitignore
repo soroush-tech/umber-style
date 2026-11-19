@@ -33,3 +33,9 @@ dist-ssr
 
 # Local artifacts
 *.tgz
+
+# End-to-end tier: what the suite measured, and the apps' build output
+e2e/reports
+.next
+next-env.d.ts
+*.tsbuildinfo

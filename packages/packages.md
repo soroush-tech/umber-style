@@ -125,6 +125,7 @@ coverage-ignore comments.
   package's flag and component in [`.codecov.yml`](../.codecov.yml), the "Affected area" lists of the
   issue forms and the allowlist of `label-area.yml`. The pre-commit hook and CI run it with `--check`.
   Flag name == component id == directory name.
+- **Which tier a test goes in** (see [Testing](../docs/testing.md)): a check of text, names or insertion is a unit test (`*.test.ts(x)`, counted by coverage). A check that only a browser can settle - which rule wins, a computed value, a transition - is a `*.browser.test.ts(x)`, run by the package's `test:browser` script (a `vitest.browser.config.ts` of its own, headless Chromium through Playwright, `playwright` pinned to one exact version across packages) and not counted by coverage. A check of a built app belongs in `e2e/`, against a fixture in `fixtures/`, not in a package.
 - Code a test environment cannot run is isolated behind an injectable input or a stand-in: the React
   Native binding's one platform import resolves to `vitest.react-native.ts` in tests.
 
