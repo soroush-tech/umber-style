@@ -1,0 +1,92 @@
+# Options reference
+
+After this page you can look up any option or prop of UmberStyle: its name, type, default and effect, and which function takes it.
+
+## Who takes which options
+
+| Function                                                           | Takes                                                                                 |
+| ------------------------------------------------------------------ | ------------------------------------------------------------------------------------- |
+| `createEngine(theme, options)`, `createLazyEngine(options)`        | The engine options below                                                              |
+| `createCache(options)`                                             | The cache options below                                                               |
+| `createStyle(theme, options)` (React, Vue)                         | The engine options, and `engine`                                                      |
+| `configure(options)` (React, Vue)                                  | The same as `createStyle`, and `theme`                                                |
+| `createStyle(theme, options)`, `configure(options)` (React Native) | Accepted so that one call runs on both platforms. Only `theme` of `configure` is used |
+| `styled(tag, options)`                                             | The styled options below                                                              |
+| `<ThemeProvider />`                                                | The props below                                                                       |
+
+An engine makes its own cache from the options that are shared with the cache. If you give the engine a `cache`, those options are taken from the cache and the engine's own are ignored.
+
+## Engine options
+
+| Name                | Type                                       | Default                                                    | Effect                                                                                                                                                                              |
+| ------------------- | ------------------------------------------ | ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `prefix`            | `string`                                   | the cache's prefix, else `'css'`                           | First part of every class name and variable name. Must match `/^[a-z][a-z0-9-]*$/`, or the cache throws                                                                             |
+| `suffix`            | `string`                                   | `''`                                                       | Appended to every class name                                                                                                                                                        |
+| `hasLabels`         | `boolean`                                  | `true`                                                     | Whether a style's label is part of its class name                                                                                                                                   |
+| `hasLayers`         | `boolean`                                  | `true`                                                     | Whether every rule goes into a cascade layer. See [Cascade layers and overrides](cascade-layers.md)                                                                                 |
+| `hasColorFallbacks` | `boolean`                                  | `true`                                                     | Whether `alpha()` writes a fallback before the `color-mix()` value. See [Tokens](tokens.md)                                                                                         |
+| `hasScope`          | `boolean`                                  | `true`                                                     | Whether `when()` and `whenScheme()` use `@scope`. Without it the rule is a plain descendant selector, which is wrong for nested themes. See [Theme conditions](theme-conditions.md) |
+| `hasPruning`        | `boolean`                                  | `true`                                                     | Whether a theme class declares only the variables that rules use. See [Tokens](tokens.md)                                                                                           |
+| `alwaysDeclare`     | `readonly string[]`                        | `[]`                                                       | Theme paths (a top-level key or a dotted path) whose variables are always declared                                                                                                  |
+| `cache`             | `Cache`                                    | one is made                                                | The cache to use. Its `prefix` is used when the engine has none                                                                                                                     |
+| `rawKeys`           | `readonly string[]`                        | `['breakpoints', 'components']`                            | Top-level theme keys that stay real values and get no variable. A list you give replaces the default                                                                                |
+| `lengthKeys`        | `readonly string[]`                        | `['space', 'sizes', 'radii', 'fontSizes', 'borderWidths']` | Top-level keys whose numbers are lengths, declared with `px`. A list you give replaces the default                                                                                  |
+| `modes`             | `Record<string, TokenMode>`                | none                                                       | The mode of a token by dotted theme path: `'variable'`, `'inline'`, `'reference'` or `'raw'`. The most specific path wins, and an entry beats `rawKeys`                             |
+| `registered`        | `Record<string, RegisteredSyntax \| true>` | none                                                       | Tokens that are registered custom properties (an `@property` rule), by dotted path. `true` infers the syntax. See [Tokens](tokens.md)                                               |
+
+`hasLayers`, `hasColorFallbacks`, `hasScope`, `hasPruning`, `suffix` and `hasLabels` are used when the engine makes its cache. `prefix`, `rawKeys`, `lengthKeys`, `modes`, `registered` and `alwaysDeclare` are always the engine's.
+
+`TokenMode` is `'variable' | 'inline' | 'reference' | 'raw'`. `RegisteredSyntax` is `'<color>' | '<length>' | '<number>' | '<percentage>' | '<length-percentage>' | '<angle>' | '<time>' | '*'`.
+
+## Cache options
+
+`createCache(options)`:
+
+| Name                | Type      | Default                                                        | Effect                                                                                           |
+| ------------------- | --------- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `prefix`            | `string`  | `'css'`                                                        | First part of every class name. Must match `/^[a-z][a-z0-9-]*$/`; otherwise `createCache` throws |
+| `suffix`            | `string`  | `''`                                                           | Appended to every class name                                                                     |
+| `hasLabels`         | `boolean` | `true`                                                         | Whether a style's label is part of its class name                                                |
+| `hasLayers`         | `boolean` | `true`                                                         | Whether every rule goes into `<prefix>-theme`, `-global`, `-components` or `-overrides`          |
+| `hasPruning`        | `boolean` | `true`                                                         | Whether a theme class declares only the variables in use, appending more as rules come in        |
+| `hasColorFallbacks` | `boolean` | `true`                                                         | Whether a property whose value is `alpha()` gets a fallback declaration first                    |
+| `hasScope`          | `boolean` | `true`                                                         | Whether conditional rules use `@scope`                                                           |
+| `sheet`             | `Sheet`   | a DOM sheet when `document` exists, otherwise an in-memory one | Where rules go                                                                                   |
+
+A `Sheet` has `insert(rule)`, a readonly `rules` list, and optionally `replace(index, rule)`. `createMemorySheet()` and `createDomSheet(key, container = document.head)` make the two sheets that the package has.
+
+## Binding options
+
+| Name     | Type            | Default | Effect                                                                                                            |
+| -------- | --------------- | ------- | ----------------------------------------------------------------------------------------------------------------- |
+| `engine` | `Engine<Theme>` | none    | An engine to use, and to share with another binding. When given, the engine options in the same call are not used |
+| `theme`  | the theme       | none    | `configure` only: the base theme of the default style                                                             |
+
+`configure` throws if the default style has been used already.
+
+## `styled` options
+
+| Name                | Type                        | Default                                                                         | Effect                                                                                                     |
+| ------------------- | --------------------------- | ------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `name`              | `string`                    | none                                                                            | With `slot`, the label of the class: `name-slot` in kebab-case. Ignored on React Native                    |
+| `slot`              | `string`                    | `'root'`                                                                        | The part of the component this style is for. Ignored on React Native                                       |
+| `shouldForwardProp` | `(prop: string) => boolean` | forwards every prop but `as`, `theme`, `className` (`class` on Vue) and `style` | Which props reach a string tag. On React Native it applies to every component and `className` is forwarded |
+
+## `ThemeProvider` props
+
+| Name          | Type                                | React | Vue              | React Native | Default | Effect                                                                                            |
+| ------------- | ----------------------------------- | ----- | ---------------- | ------------ | ------- | ------------------------------------------------------------------------------------------------- |
+| `theme`       | `DeepPartial<Theme>`                | yes   | yes              | yes          | none    | The theme, or the part of it that this subtree changes                                            |
+| `colorScheme` | `'light' \| 'dark' \| 'light dark'` | yes   | yes              | yes          | none    | Sets `color-scheme` and the scheme marker class (web); the scheme for `whenScheme` (React Native) |
+| `className`   | `string`                            | yes   | no (use `class`) | ignored      | none    | Added to the classes of the wrapper                                                               |
+| `as`          | `string`                            | yes   | yes              | no           | `'div'` | The element that carries the theme class                                                          |
+| `isRoot`      | `boolean`                           | yes   | yes              | ignored      | `false` | Renders no element and no class                                                                   |
+
+## Other signatures with options
+
+| Call                                     | Argument                                           | Effect                                                                               |
+| ---------------------------------------- | -------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| `engine.themeClass(theme, colorScheme?)` | `colorScheme`: `'light' \| 'dark' \| 'light dark'` | Sets `color-scheme` in the theme class. `light` and `dark` add a scheme marker class |
+| `engine.when(theme, colorScheme?)`       | same                                               | The `colorScheme` must match the one given to the provider                           |
+| `alpha(color, opacity)`                  | `opacity`: 0 to 1                                  | Outside the range throws a `RangeError`                                              |
+| `createDomSheet(key, container?)`        | `key`: string                                      | The `data-style` of the style element it uses or creates                             |

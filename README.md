@@ -15,6 +15,7 @@
 ## Documentation
 
 For full documentation, visit [umber-style.soroush.design](https://umber-style.soroush.design).
+Until the site exists, the same pages are in the [`docs/`](docs/README.md) folder of this repository.
 
 ## Community
 

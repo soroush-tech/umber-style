@@ -37,7 +37,7 @@ packages/
     .oxlintrc.json        <- extends @umber-style/eslint-config's base (or React layer) + env
     vitest.config.ts      <- v8 coverage, reporter ['text', 'lcov'], 100% thresholds
     tsdown.config.ts      <- publishable packages only
-    README.md             <- what it is, install, one import example
+    README.md             <- a short stub: what it is, install, one import example, a link to docs/
     LICENSE               <- publishable packages only
 ```
 
@@ -136,6 +136,20 @@ coverage-ignore comments.
   file.
 - **Private** packages already carry the `license` field, but get no `LICENSE` copy until `private` is
   removed.
+
+---
+
+## Documentation
+
+Documentation is not kept in a package. It lives once, organised by topic, in [`docs/`](../docs/README.md)
+at the repository root, and is written for all platforms together.
+
+- A feature's documentation goes in the page of `docs/` for its topic, written once. A package gets no
+  `docs/` folder of its own and no conventions file.
+- Every code example in `docs/` is verified against the code: compiled, run, or copied from a passing
+  test. A page ends with a "Limits" section for what is not checked or not observed.
+- The package `README.md` stays a stub: what the package is, an install line marked as not yet
+  published, one import example, and a link to `docs/`. Do not document features in it.
 
 ---
 

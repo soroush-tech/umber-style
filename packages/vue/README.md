@@ -7,3 +7,5 @@ Not yet published. Once it is: `pnpm add @umber-style/vue`.
 ```ts
 import { styled, ThemeProvider } from '@umber-style/vue'
 ```
+
+Documentation: [docs](../../docs/README.md), and [Vue](../../docs/vue.md) for this package.

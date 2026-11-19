@@ -100,6 +100,13 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 - **Generated config:** `.codecov.yml`, the "Affected area" lists of the issue forms and the allowlist
   of `label-area.yml` are written by `pnpm gen:publish-options` from the folders under `packages/`.
   Run it after adding or removing a package; the pre-commit hook and CI run it with `--check`.
+- **Documentation:** all documentation lives in `docs/` at the repository root, organised by topic and
+  written once for every platform: `docs/README.md` is the index. A feature's documentation goes
+  there, in the page for its topic - never in a package README, which stays a short stub (what the
+  package is, a not-yet-published install line, one import example, a link to `docs/`). Every code
+  example is verified against the code (compiled, run, or copied from a passing test), and every page
+  with limits ends with a "Limits" section that says what is not checked or not observed. The pages
+  follow the same rules as the code: no library names, ASCII punctuation only, no inline styles.
 - **Issue artifacts:** any epic, task, RFC, bug report, user story, feature request or
   documentation-feedback item you draft - whether as a file or for GitHub - must follow the matching
   template in `.github/ISSUE_TEMPLATE/` (`4.epic.yml`, `6.task.yml`, `3.rfc.yml`, `1.bug_report.yml`,
@@ -116,6 +123,7 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 | Umbrella         | `packages/umber-style`                                    | Re-exports core and the bindings as subpaths. Its tests prove one source runs on every one |
 | Lint config      | `packages/eslint-config`                                  | Private oxlint base and React layers, shared by every package                              |
 | Package standard | `packages/packages.md`                                    | Structure, exports, publishing, 100% coverage, licensing, linting                          |
+| Documentation    | `docs/`                                                   | One set of pages by topic for every platform, written once; the index is `docs/README.md`  |
 
 ## Quick checklist before pushing
 
