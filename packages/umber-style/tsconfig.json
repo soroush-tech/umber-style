@@ -1,0 +1,28 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2023", "DOM"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "verbatimModuleSyntax": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "types": ["vitest/globals", "node"],
+    "jsx": "react-jsx"
+  },
+  "include": ["src", "../core/src", "../react/src", "../react-native/src", "../vue/src"],
+  "exclude": [
+    "src/**/*.test.ts",
+    "src/**/*.test.tsx",
+    "../core/src/**/*.test.ts",
+    "../core/src/**/*.test.tsx",
+    "../react/src/**/*.test.ts",
+    "../react/src/**/*.test.tsx",
+    "../react-native/src/**/*.test.ts",
+    "../react-native/src/**/*.test.tsx",
+    "../vue/src/**/*.test.ts",
+    "../vue/src/**/*.test.tsx"
+  ]
+}

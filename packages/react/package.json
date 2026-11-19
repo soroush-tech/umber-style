@@ -1,0 +1,52 @@
+{
+  "name": "@umber-style/react",
+  "private": true,
+  "version": "0.1.0",
+  "license": "MIT",
+  "author": "Masoud Soroush <masoud@soroush.tech>",
+  "homepage": "https://umber-style.soroush.design",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/soroush-tech/umber-style.git",
+    "directory": "packages/react"
+  },
+  "bugs": {
+    "url": "https://github.com/soroush-tech/umber-style/issues"
+  },
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "react-server": "./src/index.server.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "lint": "oxlint --deny-warnings",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage"
+  },
+  "dependencies": {
+    "@umber-style/core": "workspace:*"
+  },
+  "peerDependencies": {
+    "react": "^19.2.8"
+  },
+  "devDependencies": {
+    "@emotion/is-prop-valid": "^1.4.0",
+    "@soroush.tech/styled-system": "^6.0.1",
+    "@testing-library/react": "^16.3.3",
+    "@types/node": "^26.6.6",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@umber-style/eslint-config": "workspace:*",
+    "@vitest/coverage-v8": "^5.1.0",
+    "jsdom": "^31.0.0",
+    "oxlint": "^1.93.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "typescript": "~7.0.2",
+    "vitest": "^5.1.0"
+  }
+}
