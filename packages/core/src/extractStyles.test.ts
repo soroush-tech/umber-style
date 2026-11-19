@@ -7,7 +7,7 @@ afterEach(() => {
 
 describe('createStyleTag', () => {
   it('writes the css and the ids of a cache into one style element', () => {
-    const cache = createCache({ prefix: 'u', sheet: createMemorySheet() })
+    const cache = createCache({ hasLayers: false, prefix: 'u', sheet: createMemorySheet() })
     const name = cache.css({ color: 'red' })
     cache.insertOnce('base', ['body{margin:0;}'])
     expect(createStyleTag(cache)).toBe(
@@ -16,17 +16,17 @@ describe('createStyleTag', () => {
   })
 
   it('writes an empty element for an empty cache', () => {
-    const cache = createCache({ prefix: 'u', sheet: createMemorySheet() })
+    const cache = createCache({ hasLayers: false, prefix: 'u', sheet: createMemorySheet() })
     expect(createStyleTag(cache)).toBe('<style data-style="u" data-ids=""></style>')
   })
 
   it('makes a cache in the browser skip what the markup holds', () => {
-    const server = createCache({ prefix: 'u', sheet: createMemorySheet() })
+    const server = createCache({ hasLayers: false, prefix: 'u', sheet: createMemorySheet() })
     const name = server.css({ color: 'red' })
     document.head.innerHTML = createStyleTag(server)
 
     const sheet = createMemorySheet()
-    const client = createCache({ prefix: 'u', sheet })
+    const client = createCache({ hasLayers: false, prefix: 'u', sheet })
     expect(client.css({ color: 'red' })).toBe(name)
     expect(sheet.rules).toEqual([])
     client.css({ color: 'blue' })

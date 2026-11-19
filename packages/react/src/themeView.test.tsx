@@ -12,7 +12,10 @@ const theme = {
 
 function setup() {
   const sheet = createMemorySheet()
-  const style = createStyle(theme, { prefix: 'b', cache: createCache({ prefix: 'b', sheet }) })
+  const style = createStyle(theme, {
+    prefix: 'b',
+    cache: createCache({ hasLayers: false, prefix: 'b', sheet }),
+  })
   const rulesOf = (className: string) =>
     sheet.rules.filter((rule) => rule.includes(`.${className}`))
   return { ...style, sheet, rulesOf }

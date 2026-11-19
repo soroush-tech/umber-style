@@ -9,6 +9,8 @@ export interface EngineOptions extends TokenOptions {
   suffix?: string
   /** Whether a style's label is part of its class name. */
   hasLabels?: boolean
+  /** Whether every rule goes into a cascade layer. Default true. */
+  hasLayers?: boolean
   /** The cache to use; one is made when not given. */
   cache?: Cache
 }

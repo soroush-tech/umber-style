@@ -16,7 +16,10 @@ const baseTheme = {
 
 function setup(theme = baseTheme) {
   const sheet = createMemorySheet()
-  const style = createStyle(theme, { prefix: 'p', cache: createCache({ prefix: 'p', sheet }) })
+  const style = createStyle(theme, {
+    prefix: 'p',
+    cache: createCache({ hasLayers: false, prefix: 'p', sheet }),
+  })
   const cssOf = () => sheet.rules.join('')
   return { ...style, sheet, cssOf }
 }

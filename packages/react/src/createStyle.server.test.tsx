@@ -26,7 +26,10 @@ const requestCache: CacheFunction = (make) => {
 
 function setup() {
   const sheet = createMemorySheet()
-  const engine = createEngine(theme, { prefix: 'f', cache: createCache({ prefix: 'f', sheet }) })
+  const engine = createEngine(theme, {
+    prefix: 'f',
+    cache: createCache({ hasLayers: false, prefix: 'f', sheet }),
+  })
   const style = bindEngine(engine, requestCache)
   const Box = style.styled('div', { name: 'Box' })(({ theme: view }) => ({
     color: view.palette.primary,
@@ -100,7 +103,7 @@ describe('the server build of styled', () => {
   })
 
   it('merges entries and plain objects of style into the one class, with no style attribute', async () => {
-    const style = bindEngine(createEngine(theme, { prefix: 'k' }), requestCache)
+    const style = bindEngine(createEngine(theme, { prefix: 'k', hasLayers: false }), requestCache)
     const { custom } = style.useStyle(style.StyleSheet.create({ custom: { color: 'blue' } }))
     const View = style.styled('div')({ margin: 1 })
     const tree = await resolveTree(<View style={[custom, { opacity: 0.7 }]} />)

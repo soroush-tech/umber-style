@@ -10,7 +10,10 @@ const theme = {
 
 function setup(prefix = 'e') {
   const sheet = createMemorySheet()
-  const engine = createEngine(theme, { prefix, cache: createCache({ prefix, sheet }) })
+  const engine = createEngine(theme, {
+    prefix,
+    cache: createCache({ hasLayers: false, prefix, sheet }),
+  })
   const ruleOf = (className: string) =>
     sheet.rules.find((rule) => rule.startsWith(`.${className}{`))
   return { engine, sheet, ruleOf }
@@ -31,7 +34,7 @@ describe('createEngine', () => {
     expect(createEngine(theme).cache.prefix).toBe('css')
     const own = createEngine(theme, { prefix: 'my', suffix: '-s', hasLabels: false })
     expect(own.css({ label: 'x', color: 'red' })).toMatch(/^my-[a-z0-9]+-s$/)
-    const cache = createCache({ prefix: 'given', sheet: createMemorySheet() })
+    const cache = createCache({ hasLayers: false, prefix: 'given', sheet: createMemorySheet() })
     const shared = createEngine(theme, { cache })
     expect(shared.cache).toBe(cache)
     expect(shared.themeClass({})).toMatch(/^given-theme-/)

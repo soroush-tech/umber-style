@@ -17,7 +17,7 @@ import {
 function setup() {
   const sheet = createMemorySheet()
   const engine = createLazyEngine<{ palette: { primary: string } }>({
-    cache: createCache({ prefix: 'w', sheet }),
+    cache: createCache({ hasLayers: false, prefix: 'w', sheet }),
   })
   return { engine, sheet }
 }

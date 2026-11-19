@@ -30,7 +30,12 @@ export interface Styler {
   styles: readonly StyleInput[]
   /** Whether a style is a function: only then the class depends on the props and the theme. */
   isDynamic: boolean
-  /** The one class for these props and what comes in after the styles (sheet entries, a className), merged in order, so the last wins. */
+  /**
+   * The class names for these props and what comes in after the styles (sheet entries, plain objects,
+   * a className). With layers: the component class (the styles, in the `components` layer) and, only
+   * when something comes in, one override class (all of it merged in order, the last winning, in the
+   * `overrides` layer); foreign class names pass through. Without layers: one merged class.
+   */
   getClassName(
     props: Record<string, unknown>,
     extra?: ClassValue | readonly ClassValue[],
@@ -84,9 +89,9 @@ function createLabel({ name, slot = 'root' }: StylerOptions): string {
 
 /** Makes an engine that has no theme yet: it takes one from `setTheme`, or from the first `themeClass`. It needs no framework. */
 export function createLazyEngine<T extends object = Theme>(options: EngineOptions = {}): Engine<T> {
-  const { cache: given, rawKeys, lengthKeys, suffix, hasLabels } = options
+  const { cache: given, rawKeys, lengthKeys, suffix, hasLabels, hasLayers } = options
   const prefix = options.prefix ?? given?.prefix ?? 'css'
-  const cache = given ?? createCache({ prefix, suffix, hasLabels })
+  const cache = given ?? createCache({ prefix, suffix, hasLabels, hasLayers })
   let baseTheme: T | undefined
   let tokens: Tokens<T> | undefined
   // Counts the base themes, so that a sheet made from a function is made again for a new one.
@@ -131,7 +136,7 @@ export function createLazyEngine<T extends object = Theme>(options: EngineOption
 
   const scopeName = `${cache.prefix}-scope`
   const scopeClass = () => {
-    cache.insertOnce(scopeName, [`.${scopeName}{display:contents;}`])
+    cache.insertOnce(scopeName, [`.${scopeName}{display:contents;}`], 'theme')
     return scopeName
   }
 
@@ -198,12 +203,20 @@ export function createLazyEngine<T extends object = Theme>(options: EngineOption
       isDynamic: hasFunction,
       getClassName(props, extra, theme) {
         const extras = Array.isArray(extra) ? extra : [extra]
-        if (hasFunction) {
-          return cache.css(...list.map((style) => resolveStyle(style, props, theme)), ...extras)
+        const hasExtras = extras.some(Boolean)
+        const resolved = () => list.map((style) => resolveStyle(style, props, theme))
+        if (!cache.hasLayers) {
+          if (hasFunction) return cache.css(...resolved(), ...extras)
+          if (hasExtras) return cache.css(...(list as WebStyleObject[]), ...extras)
+          staticClass ??= cache.css(...(list as WebStyleObject[]))
+          return staticClass
         }
-        if (extras.some(Boolean)) return cache.css(...(list as WebStyleObject[]), ...extras)
-        staticClass ??= cache.css(...(list as WebStyleObject[]))
-        return staticClass
+        if (!hasFunction) staticClass ??= cache.css(...(list as WebStyleObject[]))
+        const own = hasFunction ? cache.css(...resolved()) : (staticClass as string)
+        if (!hasExtras) return own
+        // The override class takes the label of the component, so that it can be told from the others.
+        const overrides = cache.cssIn('overrides', ...extras, ...(label ? [{ label }] : []))
+        return [own, overrides].filter(Boolean).join(' ')
       },
     }
   }

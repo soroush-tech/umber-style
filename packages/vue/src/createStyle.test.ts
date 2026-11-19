@@ -9,7 +9,10 @@ const baseTheme = {
 
 function setup(prefix = 'v') {
   const sheet = createMemorySheet()
-  const style = createStyle(baseTheme, { prefix, cache: createCache({ prefix, sheet }) })
+  const style = createStyle(baseTheme, {
+    prefix,
+    cache: createCache({ hasLayers: false, prefix, sheet }),
+  })
   const ruleOf = (className: string) =>
     sheet.rules.find((rule) => rule.startsWith(`.${className}{`))
   return { ...style, sheet, ruleOf }
@@ -183,7 +186,7 @@ describe('createStyle', () => {
   it('shares an engine, and so the class of a theme', () => {
     const engine = createEngine(baseTheme, {
       prefix: 's',
-      cache: createCache({ prefix: 's', sheet: createMemorySheet() }),
+      cache: createCache({ hasLayers: false, prefix: 's', sheet: createMemorySheet() }),
     })
     const first = createStyle(baseTheme, { engine })
     const second = createStyle(baseTheme, { engine })

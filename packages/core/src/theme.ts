@@ -18,6 +18,6 @@ export function createThemeClass(
     .join('')
   const body = colorScheme ? `${variables}color-scheme:${colorScheme};` : variables
   const className = `${cache.prefix}-theme-${hashString(body)}`
-  cache.insertOnce(className, body ? [`.${className}{${body}}`] : [])
+  cache.insertOnce(className, body ? [`.${className}{${body}}`] : [], 'theme')
   return className
 }

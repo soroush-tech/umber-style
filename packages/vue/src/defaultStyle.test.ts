@@ -12,7 +12,7 @@ const light = { palette: { primary: '#0000ff' }, space: { small: 4 } }
 function setup() {
   const sheet = createMemorySheet()
   const style = createDefaultStyle()
-  style.configure({ prefix: 'd', cache: createCache({ prefix: 'd', sheet }) })
+  style.configure({ prefix: 'd', cache: createCache({ hasLayers: false, prefix: 'd', sheet }) })
   const ruleOf = (className: string) =>
     sheet.rules.find((rule) => rule.startsWith(`.${className}{`))
   return { ...style, sheet, ruleOf }
@@ -66,7 +66,7 @@ describe('the default style', () => {
   it('shares the engine it is configured with', () => {
     const engine = createLazyEngine({
       prefix: 's',
-      cache: createCache({ prefix: 's', sheet: createMemorySheet() }),
+      cache: createCache({ hasLayers: false, prefix: 's', sheet: createMemorySheet() }),
     })
     const first = createDefaultStyle()
     first.configure({ engine, theme: light })

@@ -23,7 +23,10 @@ const baseTheme = {
 /** A style with its own in-memory sheet, so that a test can read the rules. */
 function setup(prefix = 't') {
   const sheet = createMemorySheet()
-  const style = createStyle(baseTheme, { prefix, cache: createCache({ prefix, sheet }) })
+  const style = createStyle(baseTheme, {
+    prefix,
+    cache: createCache({ hasLayers: false, prefix, sheet }),
+  })
   const ruleOf = (className: string) =>
     sheet.rules.find((rule) => rule.startsWith(`.${className}{`))
   return { ...style, sheet, ruleOf }
@@ -173,7 +176,7 @@ describe('styled', () => {
 
 describe('styled, the class of a style with no function', () => {
   it('is made once, and made again when a className is given', () => {
-    const cache = createCache({ prefix: 't', sheet: createMemorySheet() })
+    const cache = createCache({ hasLayers: false, prefix: 't', sheet: createMemorySheet() })
     const spy = vi.spyOn(cache, 'css')
     const { styled } = createStyle(baseTheme, { prefix: 't', cache })
     const Box = styled('div')({ color: 'red' })
@@ -189,7 +192,7 @@ describe('styled, the class of a style with no function', () => {
   })
 
   it('is made on every render when a style is a function', () => {
-    const cache = createCache({ prefix: 't', sheet: createMemorySheet() })
+    const cache = createCache({ hasLayers: false, prefix: 't', sheet: createMemorySheet() })
     const spy = vi.spyOn(cache, 'css')
     const { styled } = createStyle(baseTheme, { prefix: 't', cache })
     const Box = styled('div')<{ $on?: boolean }>(({ $on }) => ({ color: $on ? 'red' : 'blue' }))
@@ -366,7 +369,7 @@ describe('createStyle', () => {
   })
 
   it('takes its prefix from a given cache, then from the default', () => {
-    const cache = createCache({ prefix: 'given', sheet: createMemorySheet() })
+    const cache = createCache({ hasLayers: false, prefix: 'given', sheet: createMemorySheet() })
     const given = createStyle(baseTheme, { cache })
     expect(given.cache).toBe(cache)
     expect(given.themeClass({})).toMatch(/^given-theme-/)

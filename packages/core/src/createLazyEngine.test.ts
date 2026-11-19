@@ -8,7 +8,7 @@ function setup() {
   const sheet = createMemorySheet()
   const engine = createLazyEngine<typeof light>({
     prefix: 'l',
-    cache: createCache({ prefix: 'l', sheet }),
+    cache: createCache({ hasLayers: false, prefix: 'l', sheet }),
   })
   return { engine, sheet }
 }
@@ -109,7 +109,7 @@ describe('setTheme', () => {
   })
 
   it('createEngine with a theme has it from the start', () => {
-    const engine = createEngine(light, { prefix: 'c' })
+    const engine = createEngine(light, { prefix: 'c', hasLayers: false })
     expect(engine.hasTheme).toBe(true)
     expect(engine.baseTheme).toBe(light)
   })

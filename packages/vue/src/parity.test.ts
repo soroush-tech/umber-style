@@ -16,7 +16,7 @@ function setup() {
   const sheet = createMemorySheet()
   const style = createStyle(baseTheme, {
     prefix: 'p',
-    cache: createCache({ prefix: 'p', sheet }),
+    cache: createCache({ hasLayers: false, prefix: 'p', sheet }),
   })
   const ruleOf = (className: string) =>
     sheet.rules.find((rule) => rule.startsWith(`.${className}{`))
@@ -146,7 +146,7 @@ describe('styling a styled component', () => {
 describe('createStyle and bindEngine with an engine', () => {
   it('gives a lazy engine the theme, and keeps the theme of an engine that has one', () => {
     const engine = createLazyEngine<typeof baseTheme>({
-      cache: createCache({ prefix: 'c', sheet: createMemorySheet() }),
+      cache: createCache({ hasLayers: false, prefix: 'c', sheet: createMemorySheet() }),
     })
     const style = createStyle(baseTheme, { engine })
     expect(engine.baseTheme).toBe(baseTheme)

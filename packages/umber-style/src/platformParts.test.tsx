@@ -34,11 +34,15 @@ describe('the web part and the native part of a shared style', () => {
     })
     const { Card } = createComponents(binding as unknown as SharedStyle<typeof theme>, 'div')
     render(<Card />)
-    const { className } = screen.getByText('card')
-    const rules = memory.rules.filter((rule) => rule.includes(`.${className}`))
-    expect(rules).toEqual([
-      `.${className}{padding:8px;color:red;margin:4px;cursor:pointer;}`,
-      `.${className}:hover{opacity:0.8;}`,
+    // The Box styles are one class (components), the entry of the card another (overrides).
+    const [own, given, ...rest] = screen.getByText('card').className.split(' ')
+    expect(rest).toEqual([])
+    const rules = memory.rules.filter((rule) => rule.includes('.p-'))
+    // The first rule is the class of the sheet entry itself (components); the override merges it.
+    expect(rules.slice(1)).toEqual([
+      `@layer p-components{.${own}{padding:8px;color:red;}}`,
+      `@layer p-components{.${own}:hover{opacity:0.8;}}`,
+      `@layer p-overrides{.${given}{margin:4px;cursor:pointer;}}`,
     ])
     expect(rules.join('')).not.toContain('elevation')
   })

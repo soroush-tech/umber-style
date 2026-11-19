@@ -67,3 +67,52 @@ const Card = styled(View)(({ theme }) => ({
 | `divide(x, 0)`                | throws a `RangeError`          | throws a `RangeError`                                 |
 
 On React Native a percentage stays a percentage for `multiply`, `divide` and `negate`, and for `add` and `subtract` when every operand is one; anything that cannot be computed (a `var(...)` string, mixed units) throws, because a silently wrong value would be worse. The shared types take numbers and percentages only, so a reference string or a length with a unit is a type error in shared code. Write those in the `web` part.
+
+## Cascade layers
+
+Every rule the engine writes is in a CSS cascade layer. The layers are named after the cache prefix
+(`css` by default) and declared in this order, lowest priority first, by the first rule of the sheet:
+
+```css
+@layer css-theme, css-global, css-components, css-overrides;
+```
+
+| Layer                 | What goes in it                                                                                  |
+| --------------------- | ------------------------------------------------------------------------------------------------ |
+| `<prefix>-theme`      | The theme scope classes (the token variables) and the `display: contents` scope rule.            |
+| `<prefix>-global`     | Reserved for global styles. Nothing is written there yet.                                        |
+| `<prefix>-components` | The own styles of a `styled` component, and sheet entries used on their own (`css`, `apply`).    |
+| `<prefix>-overrides`  | What a component is given from outside: its `style` prop, and engine classes in its `className`. |
+
+A later layer beats an earlier one whatever the specificity, so
+`<Button style={{ background: 'purple' }}>` beats the `&:hover` background of the Button.
+
+An element made by `styled` can carry two engine classes: its component class and, only when
+something is given from outside, one override class (all of it merged, the last winning). Class
+names that are not the engine's pass through. `styled(Button)(more)` is still one component class.
+
+Unlayered CSS always beats layered CSS, whatever its specificity. That makes it easy for an app's own
+stylesheet to override a component. It also means that an unlayered reset such as
+`button { background: none }` overrides component styles. Put a reset in a layer that is declared
+before the engine's:
+
+```css
+@layer reset, css-theme, css-global, css-components, css-overrides;
+@layer reset {
+  button {
+    background: none;
+  }
+}
+```
+
+The order of layers is fixed by the first place each name is declared in the document, across all
+style sheets, and a later statement never reorders it. The engine's own statement does not help
+here: it comes first in the engine's sheet, but a sheet that the app adds after it would put `reset`
+after `css-overrides`, which gives the reset the highest priority. So the app's statement must be in a
+style or link that comes before the engine's `<style>` in the document. (The same holds for the
+server build, where every `<style href precedence>` starts with the statement.)
+
+Layers need a browser from 2022 on (Chrome 99, Firefox 97, Safari 15.4); an older one drops the
+rules. Pass `hasLayers: false` (to `createCache`, `createStyle` or `configure`) to turn them off: no
+`@layer` is written and an element gets one merged class, as before. A style given from outside then
+does not beat a nested rule of the component such as `:hover`.

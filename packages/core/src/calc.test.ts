@@ -207,7 +207,7 @@ describe('a style that uses them', () => {
     const sheet = createMemorySheet()
     const engine = createEngine(
       { space: [0, 4, 8] },
-      { prefix: 'u', cache: createCache({ prefix: 'u', sheet }) }
+      { prefix: 'u', cache: createCache({ hasLayers: false, prefix: 'u', sheet }) }
     )
     const className = engine.css({
       marginLeft: negate(engine.refs.space[2]),

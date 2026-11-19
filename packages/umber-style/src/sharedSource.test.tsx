@@ -71,19 +71,20 @@ function createStandIn() {
 function setupWeb() {
   const sheet = createMemorySheet()
   const binding = createWebStyle(theme, { prefix: 'u', cache: createCache({ prefix: 'u', sheet }) })
-  const ruleOf = (className: string) => sheet.rules.filter((rule) => rule.includes(`.${className}`))
+  const ruleOf = (className: string) =>
+    sheet.rules.filter((rule) => rule.includes(`.${className}{`) || rule.includes(`.${className}:`))
   return { binding, ruleOf }
 }
 
 describe('one component source on the web', () => {
-  it('gives one class for the entries and the plain object, and no style attribute', () => {
+  it('gives the View no class of its own, one override class for the entries and the plain object, and no style attribute', () => {
     const { binding, ruleOf } = setupWeb()
     const { Panel } = createComponents(binding, 'div')
     render(<Panel isActive />)
     const element = screen.getByText('panel')
     expect(element.className.split(' ')).toHaveLength(1)
     expect(ruleOf(element.className)).toEqual([
-      `.${element.className}{padding:var(--u-space-2);background:var(--u-palette-primary);opacity:0.9;}`,
+      `@layer u-overrides{.${element.className}{padding:var(--u-space-2);background:var(--u-palette-primary);opacity:0.9;}}`,
     ])
     expect(element.hasAttribute('style')).toBe(false)
   })
@@ -93,30 +94,34 @@ describe('one component source on the web', () => {
     const { Panel } = createComponents(binding, 'div')
     render(<Panel />)
     const element = screen.getByText('panel')
-    expect(ruleOf(element.className)[0]).not.toContain('background')
+    expect(ruleOf(element.className).join('')).not.toContain('background')
   })
 
-  it('overrides the styles of a Button through style, in one class that keeps the label', () => {
+  it('overrides the styles of a Button through style, in a second class that keeps the label', () => {
     const { binding, ruleOf } = setupWeb()
     const { Custom } = createComponents(binding, 'button')
     render(<Custom />)
-    const { className } = screen.getByText('custom')
-    expect(className).toMatch(/^u-button-root-/)
-    expect(className.split(' ')).toHaveLength(1)
-    expect(ruleOf(className)).toEqual([
-      `.${className}{padding:var(--u-space-1);background:rebeccapurple;border-radius:0;}`,
-      // The Button sets its hover background in its own rule: a plain background does not reach it.
-      `.${className}:hover:not(:disabled){background:var(--u-palette-hover);}`,
+    const [component, override, ...rest] = screen.getByText('custom').className.split(' ')
+    expect(rest).toEqual([])
+    expect(component).toMatch(/^u-button-root-/)
+    expect(override).toMatch(/^u-button-root-/)
+    expect(ruleOf(component)).toEqual([
+      `@layer u-components{.${component}{background:var(--u-palette-primary);border-radius:8px;padding:var(--u-space-1);}}`,
+      `@layer u-components{.${component}:hover:not(:disabled){background:var(--u-palette-hover);}}`,
+    ])
+    // The override is in a later layer, so its background beats the hover background of the Button.
+    expect(ruleOf(override)).toEqual([
+      `@layer u-overrides{.${override}{background:rebeccapurple;border-radius:0;}}`,
     ])
   })
 
-  it('overrides the hover background when the entry has its own hover rule', () => {
+  it('overrides the hover background when the entry has its own hover rule too', () => {
     const { binding, ruleOf } = setupWeb()
     const { Custom } = createComponents(binding, 'button')
     render(<Custom withHover />)
-    const { className } = screen.getByText('custom')
-    expect(ruleOf(className)).toContain(
-      `.${className}:hover:not(:disabled){background:rebeccapurple;}`
+    const override = screen.getByText('custom').className.split(' ')[1]
+    expect(ruleOf(override)).toContain(
+      `@layer u-overrides{.${override}:hover:not(:disabled){background:rebeccapurple;}}`
     )
   })
 })
@@ -173,7 +178,7 @@ describe('arithmetic on tokens in one component source', () => {
     render(<Spacing />)
     const { className } = screen.getByText('spacing')
     expect(ruleOf(className)).toEqual([
-      `.${className}{padding:calc(var(--u-space-1) * 2);margin-left:calc(var(--u-space-2) * -1);}`,
+      `@layer u-components{.${className}{padding:calc(var(--u-space-1) * 2);margin-left:calc(var(--u-space-2) * -1);}}`,
     ])
   })
 
