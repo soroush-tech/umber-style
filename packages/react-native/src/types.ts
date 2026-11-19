@@ -38,14 +38,14 @@ export interface SheetDefinition<S extends SheetStyles, E> {
 
 export interface ThemeProviderProps<T> {
   /** The theme, or the part of it that this subtree changes. */
-  theme: DeepPartial<T>
+  readonly theme: DeepPartial<T>
   /** Ignored on React Native. */
-  colorScheme?: ColorScheme
+  readonly colorScheme?: ColorScheme
   /** Ignored on React Native. */
-  className?: string
+  readonly className?: string
   /** Accepted and ignored: there are no classes on React Native, so the provider never renders an element. */
-  isRoot?: boolean
-  children?: ReactNode
+  readonly isRoot?: boolean
+  readonly children?: ReactNode
 }
 
 export interface NativeStyle<T> {

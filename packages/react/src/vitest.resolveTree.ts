@@ -21,13 +21,15 @@ export type ResolvedNode = string | ResolvedElement
  */
 export async function resolveTree(node: ReactNode): Promise<ResolvedNode[]> {
   if (Array.isArray(node)) {
-    const resolved: ResolvedNode[] = []
-    for (const item of node) resolved.push(...(await resolveTree(item)))
-    return resolved
+    // One promise chain, so that each item starts after the one before it has finished.
+    return node.reduce<Promise<ResolvedNode[]>>(
+      async (before, item) => [...(await before), ...(await resolveTree(item))],
+      Promise.resolve([])
+    )
   }
   if (node === null || node === undefined || typeof node === 'boolean') return []
   if (typeof node === 'string' || typeof node === 'number') return [String(node)]
-  if (!isValidElement(node)) throw new Error('resolveTree needs elements, strings and numbers.')
+  if (!isValidElement(node)) throw new TypeError('resolveTree needs elements, strings and numbers.')
 
   const { type, props } = node as ReactElement<Record<string, unknown>, ElementType>
   if (typeof type === 'function') {

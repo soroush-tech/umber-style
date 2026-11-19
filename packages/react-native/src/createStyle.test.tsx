@@ -64,6 +64,7 @@ describe('styled on React Native', () => {
 
   it('throws for a string tag when it is created', () => {
     const { styled } = createStyle(baseTheme)
+    expect(() => styled('div')).toThrow(TypeError)
     expect(() => styled('div')).toThrow(
       'styled needs a component on React Native, not the tag "div".'
     )

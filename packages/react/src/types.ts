@@ -68,19 +68,19 @@ export interface SheetDefinition<S extends SheetStyles, E> {
 
 export interface ThemeProviderProps<T> {
   /** The theme, or the part of it that this subtree changes. */
-  theme: DeepPartial<T>
+  readonly theme: DeepPartial<T>
   /** Web only. */
-  colorScheme?: ColorScheme
+  readonly colorScheme?: ColorScheme
   /** Web only. */
-  className?: string
+  readonly className?: string
   /** Web only. Renders no element and no class: the app puts `themeClass(theme)` on an ancestor, usually `<html>`. The theme still reaches the engine and the context. */
-  isRoot?: boolean
-  children?: ReactNode
+  readonly isRoot?: boolean
+  readonly children?: ReactNode
 }
 
 export interface WebThemeProviderProps<T> extends ThemeProviderProps<T> {
   /** The element that carries the theme class. Default 'div'. */
-  as?: string
+  readonly as?: string
 }
 
 export interface Style<T, E> {

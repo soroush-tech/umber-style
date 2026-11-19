@@ -10,7 +10,7 @@ export function hashString(text: string): string {
   let hash = 0
   let index = 0
   let remaining = text.length
-  const codeAt = (position: number) => text.charCodeAt(position) & 0xff
+  const codeAt = (position: number) => (text.codePointAt(position) as number) & 0xff
 
   for (; remaining >= 4; index += 4, remaining -= 4) {
     let chunk =

@@ -1,6 +1,6 @@
 import { createCache, createMemorySheet, NO_THEME_MESSAGE } from '@umber-style/core'
 import { createDefaultStyle } from './defaultStyle.server'
-import { findAll, resolveTree } from './resolveTree'
+import { findAll, resolveTree } from './vitest.resolveTree'
 
 const theme = { palette: { primary: '#0000ff' }, space: [0, 4] }
 

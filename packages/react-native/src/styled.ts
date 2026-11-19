@@ -16,7 +16,7 @@ type StyleFunction = (
 export function createStyled<T>(useTheme: () => T): Styled<T> {
   const styled = (tag: ElementType, options: StyledOptions = {}) => {
     if (typeof tag === 'string') {
-      throw new Error(`styled needs a component on React Native, not the tag "${tag}".`)
+      throw new TypeError(`styled needs a component on React Native, not the tag "${tag}".`)
     }
     const { shouldForwardProp: shouldForward } = options
 

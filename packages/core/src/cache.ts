@@ -57,7 +57,7 @@ export function createDomSheet(key: string, container: Node = document.head): Sh
   let element = document.querySelector<HTMLStyleElement>(`style[data-style="${key}"]`)
   if (!element) {
     element = document.createElement('style')
-    element.setAttribute('data-style', key)
+    element.dataset.style = key
     container.appendChild(element)
   }
   const sheet = element.sheet as CSSStyleSheet
@@ -78,8 +78,36 @@ export function createDomSheet(key: string, container: Node = document.head): Sh
 /** The ids a server render marked as inserted, from its style element. */
 function readInsertedIds(prefix: string): string[] {
   if (typeof document === 'undefined') return []
-  const element = document.querySelector(`style[data-style="${prefix}"]`)
-  return (element?.getAttribute('data-ids') ?? '').split(/\s+/).filter(Boolean)
+  const element = document.querySelector<HTMLElement>(`style[data-style="${prefix}"]`)
+  return (element?.dataset.ids ?? '').split(/\s+/).filter(Boolean)
+}
+
+/** The class names in `value`, a class string or a sheet entry. */
+function splitClassNames(value: string | SheetEntry): string[] {
+  const names = typeof value === 'string' ? value : value.className
+  return names.split(/\s+/).filter(Boolean)
+}
+
+/** Splits `values` into the styles to merge (registered classes resolved back) and the class names to pass through. */
+function sortClassValues(
+  values: readonly ClassValue[],
+  registered: ReadonlyMap<string, StyleObject>
+): { styles: StyleObject[]; rawClasses: string[] } {
+  const styles: StyleObject[] = []
+  const rawClasses: string[] = []
+  for (const value of values) {
+    if (!value) continue
+    if (typeof value !== 'string' && !isSheetEntry(value)) {
+      styles.push(value)
+      continue
+    }
+    for (const name of splitClassNames(value)) {
+      const style = registered.get(name)
+      if (style) styles.push(style)
+      else rawClasses.push(name)
+    }
+  }
+  return { styles, rawClasses }
 }
 
 /** Makes a cache: it turns styles into classes and inserts each class's rules once. */
@@ -105,21 +133,7 @@ export function createCache(options: CacheOptions = {}): Cache {
   }
 
   const css = (...values: ClassValue[]): string => {
-    const styles: StyleObject[] = []
-    const rawClasses: string[] = []
-    for (const value of values) {
-      if (!value) continue
-      if (typeof value === 'string' || isSheetEntry(value)) {
-        const names = typeof value === 'string' ? value : value.className
-        for (const name of names.split(/\s+/).filter(Boolean)) {
-          const style = registered.get(name)
-          if (style) styles.push(style)
-          else rawClasses.push(name)
-        }
-      } else {
-        styles.push(value)
-      }
-    }
+    const { styles, rawClasses } = sortClassValues(values, registered)
     if (styles.length === 0) return rawClasses.join(' ')
 
     const merged = mergeStyles(styles)

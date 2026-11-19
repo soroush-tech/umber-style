@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { createServerOnlyContext, readServerContext, type CacheFunction } from './serverContext'
-import { resolveTree } from './resolveTree'
+import { resolveTree } from './vitest.resolveTree'
 
 /** One request: a cache that keeps the value it made, like `React.cache` does inside a server render. */
 function createRequest(): CacheFunction {

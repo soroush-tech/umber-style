@@ -113,6 +113,22 @@ export function mergeStyles(styles: readonly StyleObject[]): StyleObject {
   return merged
 }
 
+/** The rules of the nested style `value` under `key`: an at-rule wraps them, any other key is a selector inside `selector`. */
+function compileNested(selector: string, key: string, value: StyleObject): string[] {
+  if (!key.startsWith('@')) return compileRules(resolveSelector(selector, key), value)
+  return compileRules(selector, value).map((rule) => `${key}{${rule}}`)
+}
+
+/** The declarations of one property: one for a value, one for each item of a fallback list. */
+function toDeclarations(
+  key: string,
+  value: string | number | readonly (string | number)[]
+): string {
+  const name = toPropertyName(key)
+  const items = typeof value === 'object' ? value : [value]
+  return items.map((item) => `${name}:${toValue(key, item)};`).join('')
+}
+
 /** The flat CSS rules of `style` for `selector`. */
 export function compileRules(selector: string, style: StyleObject): string[] {
   let declarations = ''
@@ -120,17 +136,8 @@ export function compileRules(selector: string, style: StyleObject): string[] {
 
   for (const [key, value] of Object.entries(style)) {
     if (key === 'label' || value === null || value === undefined || value === false) continue
-    if (isStyleObject(value)) {
-      if (key.startsWith('@')) {
-        nested.push(...compileRules(selector, value).map((rule) => `${key}{${rule}}`))
-      } else {
-        nested.push(...compileRules(resolveSelector(selector, key), value))
-      }
-    } else {
-      const name = toPropertyName(key)
-      const items = typeof value === 'object' ? value : [value]
-      for (const item of items) declarations += `${name}:${toValue(key, item)};`
-    }
+    if (isStyleObject(value)) nested.push(...compileNested(selector, key, value))
+    else declarations += toDeclarations(key, value)
   }
 
   return declarations ? [`${selector}{${declarations}}`, ...nested] : nested

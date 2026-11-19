@@ -6,7 +6,7 @@ import {
   NO_THEME_MESSAGE,
 } from '@umber-style/core'
 import { bindEngine, createStyle } from './createStyle.server'
-import { findAll, resolveTree, type ResolvedElement } from './resolveTree'
+import { findAll, resolveTree, type ResolvedElement } from './vitest.resolveTree'
 import type { CacheFunction } from './serverContext'
 
 const theme = {

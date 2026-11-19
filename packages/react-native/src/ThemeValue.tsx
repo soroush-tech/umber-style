@@ -4,8 +4,8 @@ import { createContext, useContext, useMemo, type ReactNode } from 'react'
 import { type DeepPartial, mergeDeep, NO_THEME_MESSAGE } from '@umber-style/core'
 
 export interface ThemeValueProviderProps<T> {
-  theme: DeepPartial<T>
-  children?: ReactNode
+  readonly theme: DeepPartial<T>
+  readonly children?: ReactNode
 }
 
 /** Where the base theme comes from while no provider is above: an engine, or any object with a `baseTheme`. */

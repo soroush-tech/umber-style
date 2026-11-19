@@ -1,6 +1,6 @@
 import { createCache, createEngine, createMemorySheet } from '@umber-style/core'
 import { bindEngine } from './createStyle.server'
-import { findAll, resolveTree } from './resolveTree'
+import { findAll, resolveTree } from './vitest.resolveTree'
 import type { CacheFunction } from './serverContext'
 
 const theme = { palette: { primary: '#0000ff' } }

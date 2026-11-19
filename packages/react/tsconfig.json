@@ -13,6 +13,6 @@
     "jsx": "react-jsx"
   },
   "include": ["src"],
-  "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx"],
+  "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx", "src/**/vitest.*.ts"],
   "files": ["src/augmentation.test.tsx"]
 }

@@ -30,7 +30,7 @@ export function bindHolder<T extends object>(holder: NativeHolder<T>): NativeSty
 
   function ThemeProvider({ theme: partial, children }: ThemeProviderProps<T>): ReactElement {
     // The outermost provider that renders gives the base theme, as on the web.
-    if (holder.baseTheme === undefined) holder.baseTheme = partial as T
+    holder.baseTheme ??= partial as T
     return createElement(ThemeValueProvider, { theme: partial }, children)
   }
 
