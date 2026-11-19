@@ -1,6 +1,6 @@
 import { createApp, defineComponent, h, type Component } from 'vue'
-import { createCache, createMemorySheet } from '@umber-style/core'
-import { createStyle } from './createStyle'
+import { createCache, createLazyEngine, createMemorySheet } from '@umber-style/core'
+import { bindEngine, createStyle } from './createStyle'
 
 const theme = { palette: { primary: '#0000ff' }, space: [0, 4] }
 
@@ -16,10 +16,10 @@ describe('a ThemeProvider with isRoot', () => {
     const {
       ThemeProvider,
       useTheme: readTheme,
-      themeClass,
+      engine,
     } = createStyle(theme, {
       prefix: 'r',
-      cache: createCache({ prefix: 'r', sheet }),
+      cache: createCache({ hasLayers: false, hasPruning: false, prefix: 'r', sheet }),
     })
     let seen: unknown
     const Probe = defineComponent({
@@ -42,7 +42,7 @@ describe('a ThemeProvider with isRoot', () => {
     expect(root.children[1].className).toMatch(/^r-theme-/)
     expect(seen).toEqual(theme)
     expect(sheet.rules).toContain(
-      `.${themeClass(theme)}{--r-palette-primary:#0000ff;--r-space-0:0;--r-space-1:4px;}`
+      `.${engine.themeId(theme)}{--r-palette-primary:#0000ff;--r-space-0:0;--r-space-1:4px;}`
     )
   })
 })
@@ -60,5 +60,36 @@ describe('the wrapper of a ThemeProvider', () => {
     plain.className = themeClass(theme)
     document.body.append(plain)
     expect(getComputedStyle(plain).display).not.toBe('contents')
+  })
+})
+
+describe('a ThemeProvider with isRoot and a color scheme of its own', () => {
+  it('makes no theme rule and no class: the app made the one it uses with themeClass', () => {
+    const sheet = createMemorySheet()
+    const { ThemeProvider, themeClass } = createStyle(theme, {
+      prefix: 'r',
+      cache: createCache({ hasLayers: false, hasPruning: false, prefix: 'r', sheet }),
+    })
+    themeClass(theme, 'light')
+    const before = [...sheet.rules]
+    expect(before).toHaveLength(1)
+    const root = mount(() =>
+      h(ThemeProvider, { theme, colorScheme: 'dark', isRoot: true }, () => h('i'))
+    )
+    expect(sheet.rules).toEqual(before)
+    expect(root.innerHTML).toBe('<i></i>')
+  })
+
+  it('still gives the engine its base theme, when the engine had none', () => {
+    const sheet = createMemorySheet()
+    const engine = createLazyEngine<typeof theme>({
+      prefix: 'r',
+      cache: createCache({ hasLayers: false, prefix: 'r', sheet }),
+    })
+    const { ThemeProvider } = bindEngine(engine)
+    expect(engine.hasTheme).toBe(false)
+    mount(() => h(ThemeProvider, { theme, isRoot: true }, () => h('i')))
+    expect(engine.baseTheme).toBe(theme)
+    expect(sheet.rules).toEqual([])
   })
 })

@@ -1,4 +1,5 @@
 import {
+  at,
   createCache,
   createEngine,
   createLazyEngine,
@@ -6,7 +7,7 @@ import {
   NO_THEME_MESSAGE,
 } from '@umber-style/core'
 import { bindEngine, createStyle } from './createStyle.server'
-import { findAll, resolveTree, type ResolvedElement } from './resolveTree'
+import { findAll, resolveTree, type ResolvedElement } from './vitest.resolveTree'
 import type { CacheFunction } from './serverContext'
 
 const theme = {
@@ -26,11 +27,14 @@ const requestCache: CacheFunction = (make) => {
 
 function setup() {
   const sheet = createMemorySheet()
-  const engine = createEngine(theme, { prefix: 'f', cache: createCache({ prefix: 'f', sheet }) })
+  const engine = createEngine(theme, {
+    prefix: 'f',
+    cache: createCache({ hasLayers: false, hasPruning: false, prefix: 'f', sheet }),
+  })
   const style = bindEngine(engine, requestCache)
   const Box = style.styled('div', { name: 'Box' })(({ theme: view }) => ({
     color: view.palette.primary,
-    [`@media (width >= ${view.breakpoints[0]})`]: { padding: view.space[1] },
+    ...at(`@media (width >= ${view.breakpoints[0]})`, { padding: view.space[1] }),
   }))
   return { ...style, sheet, Box }
 }
@@ -63,7 +67,7 @@ describe('the server build of styled', () => {
       </ThemeProvider>
     )
     const [section] = findAll(tree, 'section')
-    expect(classOf(section)).toMatch(/^f-theme-\w+ f-scope mine$/)
+    expect(classOf(section)).toMatch(/^f-theme-\w+ f-boundary f-scope mine$/)
     expect(section.props.style).toBeUndefined()
     expect(section.children).toEqual(['text'])
     const [style] = findAll(tree, 'style')
@@ -100,7 +104,7 @@ describe('the server build of styled', () => {
   })
 
   it('merges entries and plain objects of style into the one class, with no style attribute', async () => {
-    const style = bindEngine(createEngine(theme, { prefix: 'k' }), requestCache)
+    const style = bindEngine(createEngine(theme, { prefix: 'k', hasLayers: false }), requestCache)
     const { custom } = style.useStyle(style.StyleSheet.create({ custom: { color: 'blue' } }))
     const View = style.styled('div')({ margin: 1 })
     const tree = await resolveTree(<View style={[custom, { opacity: 0.7 }]} />)
@@ -136,9 +140,13 @@ describe('the server build of styled', () => {
 
   it('throws without a theme, from a function style and from useStyle', async () => {
     const style = bindEngine(createLazyEngine(), requestCache)
-    const Box = style.styled('div')(({ theme: view }) => ({ color: view.palette }))
+    const Box = style.styled('div')(({ theme: view }) => ({
+      color: (view as unknown as { palette: string }).palette,
+    }))
     await expect(resolveTree(<Box />)).rejects.toThrow(NO_THEME_MESSAGE)
-    const dynamic = style.StyleSheet.create((view) => ({ a: { color: view.palette } }))
+    const dynamic = style.StyleSheet.create((view) => ({
+      a: { color: (view as unknown as { palette: string }).palette },
+    }))
     expect(() => style.useStyle(dynamic)).toThrow(NO_THEME_MESSAGE)
   })
 

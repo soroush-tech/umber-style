@@ -1,0 +1,28 @@
+{
+  "name": "@umber-fixtures/vike-ssg",
+  "private": true,
+  "version": "0.1.0",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --port 4201 --strictPort",
+    "build": "vike build",
+    "start": "vike preview --port 4101",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@umber-fixtures/shared": "workspace:*",
+    "@umber-style/core": "workspace:*",
+    "@umber-style/react": "workspace:*",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "vike": "0.4.270"
+  },
+  "devDependencies": {
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "6.3.0",
+    "typescript": "~7.0.2",
+    "vite": "8.3.8"
+  }
+}

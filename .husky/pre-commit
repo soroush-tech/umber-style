@@ -7,4 +7,6 @@ pnpm exec oxfmt-quick --staged
 # quoted string is how a file stops parsing.
 pnpm exec aiwg --staged --fix
 pnpm gen:publish-options --check
+# A publishable package has notes for its version, and a staged one is ahead of npm.
+pnpm check:release-notes
 pnpm test

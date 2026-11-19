@@ -1,8 +1,17 @@
 import { render, screen } from '@testing-library/react'
 import { createElement } from 'react'
 import { createCache, createMemorySheet } from './index'
-import { createStyle as createWebStyle } from './react'
-import { createStyle as createNativeStyle } from './react-native'
+import {
+  multiply as multiplyWeb,
+  negate as negateWeb,
+  createStyle as createWebStyle,
+} from './react'
+import {
+  multiply as multiplyNative,
+  negate as negateNative,
+  createStyle as createNativeStyle,
+} from './react-native'
+import type * as Shared from './shared'
 
 const theme = {
   palette: { primary: '#0000ff', hover: '#000080' },
@@ -62,19 +71,20 @@ function createStandIn() {
 function setupWeb() {
   const sheet = createMemorySheet()
   const binding = createWebStyle(theme, { prefix: 'u', cache: createCache({ prefix: 'u', sheet }) })
-  const ruleOf = (className: string) => sheet.rules.filter((rule) => rule.includes(`.${className}`))
+  const ruleOf = (className: string) =>
+    sheet.rules.filter((rule) => rule.includes(`.${className}{`) || rule.includes(`.${className}:`))
   return { binding, ruleOf }
 }
 
 describe('one component source on the web', () => {
-  it('gives one class for the entries and the plain object, and no style attribute', () => {
+  it('gives the View no class of its own, one override class for the entries and the plain object, and no style attribute', () => {
     const { binding, ruleOf } = setupWeb()
     const { Panel } = createComponents(binding, 'div')
     render(<Panel isActive />)
     const element = screen.getByText('panel')
     expect(element.className.split(' ')).toHaveLength(1)
     expect(ruleOf(element.className)).toEqual([
-      `.${element.className}{padding:var(--u-space-2);background:var(--u-palette-primary);opacity:0.9;}`,
+      `@layer u-overrides{.${element.className}{padding:var(--u-space-2);background:var(--u-palette-primary);opacity:0.9;}}`,
     ])
     expect(element.hasAttribute('style')).toBe(false)
   })
@@ -84,30 +94,35 @@ describe('one component source on the web', () => {
     const { Panel } = createComponents(binding, 'div')
     render(<Panel />)
     const element = screen.getByText('panel')
-    expect(ruleOf(element.className)[0]).not.toContain('background')
+    expect(ruleOf(element.className).join('')).not.toContain('background')
   })
 
-  it('overrides the styles of a Button through style, in one class that keeps the label', () => {
+  it('overrides the styles of a Button through style, in a second class', () => {
     const { binding, ruleOf } = setupWeb()
     const { Custom } = createComponents(binding, 'button')
     render(<Custom />)
-    const { className } = screen.getByText('custom')
-    expect(className).toMatch(/^u-button-root-/)
-    expect(className.split(' ')).toHaveLength(1)
-    expect(ruleOf(className)).toEqual([
-      `.${className}{padding:var(--u-space-1);background:rebeccapurple;border-radius:0;}`,
-      // The Button sets its hover background in its own rule: a plain background does not reach it.
-      `.${className}:hover:not(:disabled){background:var(--u-palette-hover);}`,
+    const [component, override, ...rest] = screen.getByText('custom').className.split(' ')
+    expect(rest).toEqual([])
+    expect(component).toMatch(/^u-button-root-/)
+    // The entry given alone is the override as it is, so it has no label of the Button.
+    expect(override).toMatch(/^u-[a-z0-9]+$/)
+    expect(ruleOf(component)).toEqual([
+      `@layer u-components{.${component}{background:var(--u-palette-primary);border-radius:8px;padding:var(--u-space-1);}}`,
+      `@layer u-components{.${component}:hover:not(:disabled){background:var(--u-palette-hover);}}`,
+    ])
+    // The override is in a later layer, so its background beats the hover background of the Button.
+    expect(ruleOf(override)).toEqual([
+      `@layer u-overrides{.${override}{background:rebeccapurple;border-radius:0;}}`,
     ])
   })
 
-  it('overrides the hover background when the entry has its own hover rule', () => {
+  it('overrides the hover background when the entry has its own hover rule too', () => {
     const { binding, ruleOf } = setupWeb()
     const { Custom } = createComponents(binding, 'button')
     render(<Custom withHover />)
-    const { className } = screen.getByText('custom')
-    expect(ruleOf(className)).toContain(
-      `.${className}:hover:not(:disabled){background:rebeccapurple;}`
+    const override = screen.getByText('custom').className.split(' ')[1]
+    expect(ruleOf(override)).toContain(
+      `@layer u-overrides{.${override}:hover:not(:disabled){background:rebeccapurple;}}`
     )
   })
 })
@@ -133,6 +148,108 @@ describe('the same component source on React Native', () => {
     expect(calls[2].style).toEqual([
       { background: '#0000ff', borderRadius: 8, padding: 4 },
       { background: 'rebeccapurple', borderRadius: 0 },
+    ])
+  })
+})
+
+type Helpers = Pick<typeof Shared, 'multiply' | 'negate'>
+
+/** The one source of a component that does arithmetic on tokens; the helpers are the ones of the platform. */
+function createSpacing(
+  binding: ReturnType<typeof createWebStyle<typeof theme>>,
+  Host: string | ((props: Record<string, unknown>) => unknown),
+  { multiply, negate }: Helpers
+) {
+  const Spaced = binding.styled(Host as never)(({ theme: refs }: { theme: typeof theme }) => ({
+    padding: multiply(refs.space[1], 2),
+    marginLeft: negate(refs.space[2]),
+  }))
+  return function Spacing() {
+    return <Spaced>spacing</Spaced>
+  }
+}
+
+describe('arithmetic on tokens in one component source', () => {
+  it('computes in the browser on the web', () => {
+    const { binding, ruleOf } = setupWeb()
+    const Spacing = createSpacing(binding, 'div', {
+      multiply: multiplyWeb as unknown as Helpers['multiply'],
+      negate: negateWeb as unknown as Helpers['negate'],
+    })
+    render(<Spacing />)
+    const { className } = screen.getByText('spacing')
+    expect(ruleOf(className)).toEqual([
+      `@layer u-components{.${className}{padding:calc(var(--u-space-1) * 2);margin-left:calc(var(--u-space-2) * -1);}}`,
+    ])
+  })
+
+  it('gives the real numbers on React Native', () => {
+    const { View, calls } = createStandIn()
+    const Spacing = createSpacing(
+      createNativeStyle(theme) as unknown as ReturnType<typeof createWebStyle<typeof theme>>,
+      View,
+      {
+        multiply: multiplyNative as unknown as Helpers['multiply'],
+        negate: negateNative as unknown as Helpers['negate'],
+      }
+    )
+    render(<Spacing />)
+    expect(calls[0].style).toEqual([{ padding: 8, marginLeft: -8 }])
+  })
+})
+
+const darkTheme = { palette: { primary: '#8888ff', hover: '#ccccff' }, space: [0, 4, 8] }
+
+/** The one source of a component that differs in a dark theme and in a dark color scheme. */
+function createConditional(
+  binding: ReturnType<typeof createWebStyle<typeof theme>>,
+  Host: string | ((props: Record<string, unknown>) => unknown)
+) {
+  const { styled, when, whenScheme } = binding
+  const Card = styled(Host as never)({
+    padding: 8,
+    [when(darkTheme)]: { padding: 4 },
+    [whenScheme('dark')]: { opacity: 0.5 },
+  })
+  return function Conditional() {
+    return <Card>card</Card>
+  }
+}
+
+describe('theme conditions in one component source', () => {
+  it('compiles to a scoped rule and a scheme rule on the web', () => {
+    const { binding, ruleOf } = setupWeb()
+    const Conditional = createConditional(binding, 'div')
+    render(<Conditional />)
+    const { className } = screen.getByText('card')
+    const id = binding.engine.themeId(darkTheme)
+    expect(ruleOf(className)).toEqual([
+      `@layer u-components{.${className}{padding:8px;}}`,
+      `@layer u-components{@scope (.${id}) to (.u-boundary){.${className}{padding:4px;}}}`,
+      `@layer u-components{@scope (.u-scheme-dark) to (.u-scheme-light,.u-scheme-dark){.${className}{opacity:0.5;}}}`,
+      expect.stringContaining('@media (prefers-color-scheme: dark)'),
+    ])
+  })
+
+  it('matches the nearest provider on React Native', () => {
+    const binding = createNativeStyle(theme)
+    const { View, calls } = createStandIn()
+    const Conditional = createConditional(
+      binding as unknown as ReturnType<typeof createWebStyle<typeof theme>>,
+      View
+    )
+    const { ThemeProvider } = binding
+    render(
+      <>
+        <Conditional />
+        <ThemeProvider theme={darkTheme} colorScheme="dark">
+          <Conditional />
+        </ThemeProvider>
+      </>
+    )
+    expect(calls.map((call) => call.style)).toEqual([
+      [{ padding: 8 }],
+      [{ padding: 4, opacity: 0.5 }],
     ])
   })
 })

@@ -10,18 +10,30 @@ describe('the entry of @umber-style/react', () => {
       'useStyle',
       'apply',
       'themeClass',
+      'when',
+      'whenScheme',
       'getEngine',
       'configure',
       'createStyle',
       'alpha',
+      'multiply',
+      'divide',
+      'add',
+      'subtract',
+      'negate',
+      'at',
     ]) {
       expect(entry).toHaveProperty(name)
     }
-    expect(entry.alpha('red', 0.5)).toBe('color-mix(in srgb, red 50%, transparent)')
+    expect(String(entry.alpha('red', 0.5))).toBe('color-mix(in srgb, red 50%, transparent)')
+    expect(entry.multiply('var(--x)', 2)).toBe('calc(var(--x) * 2)')
   })
 
   it('configures the default engine once, before it is used', () => {
-    entry.configure({ prefix: 'idx', theme: { palette: { primary: 'red' } } })
+    entry.configure({
+      prefix: 'idx',
+      theme: { palette: { primary: 'red', onPrimary: 'white' }, space: [0, 4] },
+    })
     expect(entry.getEngine().cache.prefix).toBe('idx')
     expect(() => entry.configure({ prefix: 'again' })).toThrow()
   })

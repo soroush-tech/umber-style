@@ -9,7 +9,10 @@ const baseTheme = {
 
 function setup(prefix = 'v') {
   const sheet = createMemorySheet()
-  const style = createStyle(baseTheme, { prefix, cache: createCache({ prefix, sheet }) })
+  const style = createStyle(baseTheme, {
+    prefix,
+    cache: createCache({ hasLayers: false, prefix, sheet }),
+  })
   const ruleOf = (className: string) =>
     sheet.rules.find((rule) => rule.startsWith(`.${className}{`))
   return { ...style, sheet, ruleOf }
@@ -62,7 +65,7 @@ describe('styled', () => {
 
   it('gives function styles the attributes, and the same class for the same attributes', () => {
     const { styled } = setup()
-    const Box = styled('div')(({ size }: { size?: number }) => ({ padding: size }))
+    const Box = styled('div')(({ size }) => ({ padding: size as number | undefined }))
     const root = mount(() =>
       h('div', null, [h(Box, { size: 4 }), h(Box, { size: 4 }), h(Box, { size: 8 })])
     )
@@ -157,7 +160,7 @@ describe('ThemeProvider and useTheme', () => {
       space: { small: 8 },
     })
     const outer = root.querySelector('[class*="v-theme-"]') as HTMLElement
-    expect(outer.className).toMatch(/^v-theme-[a-z0-9]+ v-scope mine$/)
+    expect(outer.className).toMatch(/^v-theme-[a-z0-9]+ v-boundary v-scope mine$/)
     expect(root.querySelectorAll('[style]')).toHaveLength(0)
     const buttons = [...root.querySelectorAll('button')].map((button) => button.className)
     expect(new Set(buttons).size).toBe(1)
@@ -183,7 +186,7 @@ describe('createStyle', () => {
   it('shares an engine, and so the class of a theme', () => {
     const engine = createEngine(baseTheme, {
       prefix: 's',
-      cache: createCache({ prefix: 's', sheet: createMemorySheet() }),
+      cache: createCache({ hasLayers: false, prefix: 's', sheet: createMemorySheet() }),
     })
     const first = createStyle(baseTheme, { engine })
     const second = createStyle(baseTheme, { engine })

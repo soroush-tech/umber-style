@@ -1,5 +1,8 @@
 packages:
   - 'packages/*'
+  - 'fixtures/*'
+  - 'e2e'
+  - 'bench'
 
 # pnpm 10: only these packages may run install/postinstall scripts
 onlyBuiltDependencies:

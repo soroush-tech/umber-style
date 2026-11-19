@@ -4,16 +4,32 @@ import type {
   ColorScheme,
   DeepPartial,
   Engine,
+  ObjectSheet,
   SheetEntry,
   SheetStyles,
   StyleInput,
   StylerOptions,
+  WebStyleObject,
+} from '@umber-style/core'
+
+/** The style types of the core that an app annotates with or uses `satisfies` with. */
+export type {
+  AlphaColor,
+  NestedKey,
+  SchemeKey,
+  SchemeName,
+  SheetEntry,
+  StyleObject,
+  ThemeKey,
+  WebNested,
+  WebProperties,
+  WebStyleObject,
 } from '@umber-style/core'
 
 export type StyleOptions<T = never> = BindingOptions<T>
 
 export interface StyledOptions extends StylerOptions {
-  /** Whether an attribute is forwarded to a string tag. Default: every attribute but `as`, `theme` and `class`. */
+  /** Whether an attribute is forwarded to a string tag. Default: every attribute but `as`, `theme`, `class` and `style`, which the component handles itself. */
   shouldForwardProp?: (prop: string) => boolean
 }
 
@@ -33,9 +49,8 @@ export type Styled<T> = (
   options?: StyledOptions
 ) => (...styles: StyleInput<T, Record<string, unknown>>[]) => StyledComponent
 
-/** A set of named styles: its class names are made on first use. */
+/** A set of named styles made from a function of the theme: it has no entries until `useStyle` resolves it. */
 export interface Sheet<S extends SheetStyles> {
-  isDynamic: boolean
   resolve(theme?: unknown): { [K in keyof S]: SheetEntry }
 }
 
@@ -54,7 +69,16 @@ export interface Style<T> {
   cache: Engine<T>['cache']
   styled: Styled<T>
   StyleSheet: {
-    create<S extends SheetStyles>(styles: S | ((theme: T) => S)): Sheet<S>
+    /** A sheet given as an object is its entries, usable at once, with no hook and no theme. */
+    create<K extends string>(styles: ObjectSheet<K>): { readonly [P in K]: SheetEntry }
+    /** A sheet given as a function of the theme is for `useStyle`, which resolves it against the theme. */
+    create<K extends string>(
+      styles: (theme: T) => Record<K, WebStyleObject>
+    ): Sheet<Record<K, WebStyleObject>>
+  }
+  /** The entries of a sheet; an object sheet is its own entries and is returned as it is. */
+  useStyle<K extends string>(sheet: { readonly [P in K]: SheetEntry }): {
+    readonly [P in K]: SheetEntry
   }
   useStyle<S extends SheetStyles>(sheet: Sheet<S>): { [K in keyof S]: SheetEntry }
   /** The attributes that apply entries of a sheet: a class. */
@@ -63,4 +87,8 @@ export interface Style<T> {
   /** The real theme values, merged over the providers above; reactive. Call it in `setup`. */
   useTheme(): ComputedRef<T>
   themeClass: Engine<T>['themeClass']
+  /** A style key for "the nearest theme is this theme"; it needs `@scope`. */
+  when: Engine<T>['when']
+  /** A style key for "the nearest color scheme is this one": the nearest theme given that `colorScheme`, else the system preference. */
+  whenScheme: Engine<T>['whenScheme']
 }

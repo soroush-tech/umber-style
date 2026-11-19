@@ -1,12 +1,11 @@
-import { createLazyEngine, type SheetEntry, type SheetStyles, type Theme } from '@umber-style/core'
+import {
+  createDeferredRecord,
+  createLazyEngine,
+  type Theme,
+  type WebStyleObject,
+} from '@umber-style/core'
 import { bindEngine } from './createStyle'
-import type {
-  DefaultStyleOptions,
-  SheetDefinition,
-  Styled,
-  WebStyle,
-  WebThemeProviderProps,
-} from './types'
+import type { DefaultStyleOptions, Styled, WebStyle, WebThemeProviderProps } from './types'
 
 /** Makes the default styling: one engine, made on first use, behind `styled`, `ThemeProvider` and the rest. */
 export function createDefaultStyle() {
@@ -17,7 +16,7 @@ export function createDefaultStyle() {
     if (!bound) {
       const engine = pending.engine ?? createLazyEngine<Theme>(pending)
       if (pending.theme) engine.setTheme(pending.theme)
-      bound = bindEngine(engine)
+      bound = bindEngine(engine, pending)
     }
     return bound
   }
@@ -30,13 +29,17 @@ export function createDefaultStyle() {
 
   const styled = ((tag, options) => getStyle().styled(tag, options)) as Styled<Theme>
 
+  // An object sheet is made on first read, so a module can create one before `configure` is called.
   const StyleSheet: WebStyle<Theme>['StyleSheet'] = {
-    create: (styles) => getStyle().StyleSheet.create(styles),
+    create: ((styles: Record<string, WebStyleObject> | ((theme: Theme) => never)) =>
+      typeof styles === 'function'
+        ? getStyle().StyleSheet.create(styles)
+        : createDeferredRecord(styles, () =>
+            getStyle().StyleSheet.create(styles)
+          )) as WebStyle<Theme>['StyleSheet']['create'],
   }
 
-  function useStyle<S extends SheetStyles>(sheet: SheetDefinition<S, SheetEntry>) {
-    return getStyle().useStyle(sheet)
-  }
+  const useStyle = ((sheet: never) => getStyle().useStyle(sheet)) as WebStyle<Theme>['useStyle']
 
   function useTheme(): Theme {
     return getStyle().useTheme()
@@ -55,6 +58,8 @@ export function createDefaultStyle() {
     useTheme,
     ThemeProvider,
     apply: ((...entries) => getStyle().apply(...entries)) as WebStyle<Theme>['apply'],
+    when: ((theme, colorScheme) => getStyle().when(theme, colorScheme)) as WebStyle<Theme>['when'],
+    whenScheme: ((scheme) => getStyle().whenScheme(scheme)) as WebStyle<Theme>['whenScheme'],
     themeClass: ((theme, colorScheme) =>
       getStyle().themeClass(theme, colorScheme)) as WebStyle<Theme>['themeClass'],
   }

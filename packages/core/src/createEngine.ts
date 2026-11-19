@@ -1,18 +1,35 @@
+import { hashString } from './hash'
+import { createLazyRecord } from './lazyRecord'
 import { createCache, type Cache, type ClassValue } from './cache'
-import { createSheetEntry, type SheetEntry } from './sheetEntry'
-import type { StyleObject } from './serialize'
+import {
+  createSchemeKey,
+  createThemeClassName,
+  createThemeKey,
+  type SchemeKey,
+  type SchemeName,
+  type ThemeKey,
+} from './scope'
+import { isStyleFunction, splitLeading } from './styleBase'
 import { createThemeClass } from './theme'
 import { createTokens, type DeepPartial, type Tokens } from './tokens'
+import type { WebStyleObject } from './webStyle'
 import type {
   ColorScheme,
   EngineOptions,
-  SheetStyles,
+  ObjectSheet,
+  SheetEntries,
   StyleFunction,
   StyleInput,
   StylerOptions,
   StyleResult,
   Theme,
+  ThemedSheet,
 } from './types'
+
+/** Whether `sheet` is a sheet made from a function of the theme, which `resolve` turns into entries; an object sheet is its entries, none of which is a function. */
+export function isThemedSheet(sheet: object): sheet is ThemedSheet<string, unknown> {
+  return typeof (sheet as { resolve?: unknown }).resolve === 'function'
+}
 
 /** What is thrown when something needs the shape of the theme before any theme is known. */
 export const NO_THEME_MESSAGE =
@@ -29,7 +46,16 @@ export interface Styler {
   styles: readonly StyleInput[]
   /** Whether a style is a function: only then the class depends on the props and the theme. */
   isDynamic: boolean
-  /** The one class for these props and what comes in after the styles (sheet entries, a className), merged in order, so the last wins. */
+  /**
+   * The class names for these props and what comes in after the styles (sheet entries, plain objects,
+   * a className). With layers: the base class (the plain objects before the first function, made once)
+   * and the props class (from the first function on, made for each render), both in the `components`
+   * layer, base first; then, only when something comes in, one override class in the `overrides` layer
+   * (all of it merged in order, the last winning; or, when it is exactly one sheet entry, the class of
+   * that entry for the layer); foreign class names pass through. Without layers there is no order between
+   * classes to rely on, so when something comes in all of it is merged into one class. Without
+   * `hasBaseClass`: one class for the styles.
+   */
   getClassName(
     props: Record<string, unknown>,
     extra?: ClassValue | readonly ClassValue[],
@@ -50,19 +76,31 @@ export interface Engine<T> {
   /** Gives the engine its base theme. The same object again does nothing; another one replaces the base. */
   setTheme(theme: T): void
   css: Cache['css']
-  /** The scope class of a theme, made once for each theme object and color scheme. With no base theme yet, this theme becomes it. */
+  /**
+   * The classes of a theme, made once for each theme object and color scheme: the theme class (the
+   * variables), the boundary marker `<prefix>-boundary`, and for a `light` or `dark` color scheme the
+   * marker `<prefix>-scheme-light` or `-dark`. Put the whole string where a class goes. With no base
+   * theme yet, this theme becomes it.
+   */
   themeClass(theme: DeepPartial<T>, colorScheme?: ColorScheme): string
+  /** The theme class alone, `<prefix>-theme-<hash>`: the id that rules and style elements are keyed by. Makes the theme class as `themeClass` does. */
+  themeId(theme: DeepPartial<T>, colorScheme?: ColorScheme): string
+  /** The theme classes already made for this theme object (one for each color scheme it was asked with), without making any. */
+  findThemeIds(theme: DeepPartial<T>): string[]
+  /** A style key for "the nearest theme is this theme": `{ [when(dark)]: { border: ... } }`. Needs `@scope` (see `hasScope`). */
+  when(theme: DeepPartial<T>, colorScheme?: ColorScheme): ThemeKey
+  /** A style key for "the nearest color scheme is this one": the nearest theme given that `colorScheme`, else the system preference. */
+  whenScheme(scheme: SchemeName): SchemeKey
   /** The class of a wrapper that a provider renders: it only has display: contents. Inserted once. It is not part of a theme class, which is also put on <html>. */
   scopeClass(): string
-  /** The class name of each key of a sheet, made on first use. */
-  createSheet<S extends SheetStyles>(
-    styles: S | ((theme: T) => S)
-  ): {
-    /** Whether the styles are a function of the theme. */
-    isDynamic: boolean
-    /** The entries; for a function, against `theme` (a theme view) when given, else against the base theme. */
-    resolve(theme?: T): { [K in keyof S]: SheetEntry }
-  }
+  /**
+   * A sheet of named styles. Given a function of the theme it is a sheet that is resolved against a
+   * theme (`resolve`, which `useStyle` calls). Given an object it is the entries themselves, usable at
+   * once: no theme is read, so it works before there is one. Entries are made on first access and a
+   * class's rule is written when the entry is first used, in the layer of how it is used.
+   */
+  createSheet<K extends string>(styles: ObjectSheet<K>): SheetEntries<K>
+  createSheet<K extends string>(styles: (theme: T) => Record<K, WebStyleObject>): ThemedSheet<K, T>
   /** The logic that every web `styled` shares: the label, the style list, function styles and the class memo. */
   createStyler(
     options: StylerOptions,
@@ -81,11 +119,41 @@ function createLabel({ name, slot = 'root' }: StylerOptions): string {
   return name ? `${toKebabCase(name)}-${toKebabCase(slot)}` : ''
 }
 
+/** A short text for the token options of an engine, or '' when it has none of its own: they are part of what the server and the browser must agree on. */
+function createTokenSignature(values: readonly unknown[]): string {
+  const isDefault = values.every(
+    (value) => value === undefined || (Array.isArray(value) && value.length === 0)
+  )
+  return isDefault ? '' : hashString(JSON.stringify(values))
+}
+
 /** Makes an engine that has no theme yet: it takes one from `setTheme`, or from the first `themeClass`. It needs no framework. */
 export function createLazyEngine<T extends object = Theme>(options: EngineOptions = {}): Engine<T> {
-  const { cache: given, rawKeys, lengthKeys, suffix, hasLabels } = options
-  const prefix = options.prefix ?? given?.prefix ?? 'css'
-  const cache = given ?? createCache({ prefix, suffix, hasLabels })
+  const { cache: given, suffix, hasLabels, hasLayers, hasPruning, hasColorFallbacks } = options
+  const { hasScope, hasBaseClass, hasDevChecks } = options
+  const { alwaysDeclare = [] } = options
+  const { rawKeys, lengthKeys, modes, registered } = options
+  if (given && options.prefix !== undefined && options.prefix !== given.prefix) {
+    throw new TypeError(
+      `the engine options give the prefix "${options.prefix}", which differs from the prefix "${given.prefix}" of the given cache; variables and classes would use two prefixes. Leave out \`prefix\`, or give the same one.`
+    )
+  }
+  const prefix = given?.prefix ?? options.prefix ?? 'css'
+  const cache =
+    given ??
+    createCache({
+      prefix,
+      suffix,
+      hasLabels,
+      hasLayers,
+      hasPruning,
+      hasColorFallbacks,
+      hasScope,
+      hasBaseClass,
+      hasDevChecks,
+      tokenSignature: createTokenSignature([rawKeys, lengthKeys, modes, registered, alwaysDeclare]),
+    })
+  const tokenOptions = { prefix, rawKeys, lengthKeys, modes, registered }
   let baseTheme: T | undefined
   let tokens: Tokens<T> | undefined
   // Counts the base themes, so that a sheet made from a function is made again for a new one.
@@ -99,15 +167,21 @@ export function createLazyEngine<T extends object = Theme>(options: EngineOption
   const setTheme = (theme: T) => {
     if (theme === baseTheme) return
     baseTheme = theme
-    tokens = createTokens(theme, { prefix, rawKeys, lengthKeys })
+    tokens = createTokens(theme, tokenOptions)
+    views = new WeakMap()
+    // A registered variable gets its @property rule when a rule first uses it.
+    cache.registerProperties(tokens.registrations)
+    // Variables that code outside the engine reads are always declared.
+    cache.markUsed(tokens.findNames(alwaysDeclare))
     version++
   }
 
-  const views = new WeakMap<object, T>()
+  // A view keeps the base value as the fallback of a reference token, so a new base makes new views.
+  let views = new WeakMap<object, T>()
   const createThemeView = (realTheme: T): T => {
     let view = views.get(realTheme)
     if (view === undefined) {
-      view = createTokens(realTheme, { prefix, rawKeys, lengthKeys }).refs
+      view = (tokens ?? createTokens(realTheme, tokenOptions)).createView(realTheme)
       views.set(realTheme, view)
     }
     return view
@@ -115,7 +189,7 @@ export function createLazyEngine<T extends object = Theme>(options: EngineOption
 
   // A theme object is read once per color scheme: a theme object is not changed after it is used.
   const themeClasses = new WeakMap<object, Map<string, string>>()
-  const themeClass = (partial: DeepPartial<T>, colorScheme?: ColorScheme) => {
+  const themeId = (partial: DeepPartial<T>, colorScheme?: ColorScheme) => {
     if (!tokens) setTheme(partial as T)
     const key = colorScheme ?? ''
     const known = themeClasses.get(partial) ?? new Map<string, string>()
@@ -127,46 +201,56 @@ export function createLazyEngine<T extends object = Theme>(options: EngineOption
     }
     return className
   }
+  const findThemeIds = (partial: DeepPartial<T>) => [...(themeClasses.get(partial)?.values() ?? [])]
+  const themeClass = (partial: DeepPartial<T>, colorScheme?: ColorScheme) =>
+    createThemeClassName(cache.prefix, themeId(partial, colorScheme), colorScheme)
+  const when = (partial: DeepPartial<T>, colorScheme?: ColorScheme) =>
+    createThemeKey(themeId(partial, colorScheme))
 
   const scopeName = `${cache.prefix}-scope`
   const scopeClass = () => {
-    cache.insertOnce(scopeName, [`.${scopeName}{display:contents;}`])
+    cache.insertOnce(scopeName, [`.${scopeName}{display:contents;}`], 'theme')
     return scopeName
   }
 
-  const createSheet = <S extends SheetStyles>(styles: S | ((theme: T) => S)) => {
-    const isDynamic = typeof styles === 'function'
-    const makeClasses = (view?: T) => {
-      const source = typeof styles === 'function' ? styles(view as T) : styles
-      const entries = Object.entries(source).map(([key, style]) => [
-        key,
-        createSheetEntry(cache.css(style)),
-      ])
-      return Object.fromEntries(entries) as { [K in keyof S]: SheetEntry }
-    }
-    // The classes against the base theme are made again for a new base; those against a view are made once.
-    let baseClasses: { [K in keyof S]: SheetEntry } | undefined
+  /** The entries of `source`, each made on first access; nothing is written until an entry is used. */
+  const createEntries = <K extends string>(source: Record<K, WebStyleObject>): SheetEntries<K> =>
+    createLazyRecord(Object.keys(source) as K[], (key) => cache.createEntry(source[key]))
+
+  const createThemedSheet = <K extends string>(
+    styles: (theme: T) => Record<K, WebStyleObject>
+  ): ThemedSheet<K, T> => {
+    // The entries against the base theme are made again for a new base; those against a view are made once.
+    let baseEntries: SheetEntries<K> | undefined
     let madeAt = 0
-    const viewClasses = new WeakMap<object, { [K in keyof S]: SheetEntry }>()
+    const viewEntries = new WeakMap<object, SheetEntries<K>>()
     return {
-      isDynamic,
       resolve(theme?: T) {
-        if (theme !== undefined && isDynamic) {
-          let classes = viewClasses.get(theme)
-          if (classes === undefined) {
-            classes = makeClasses(theme)
-            viewClasses.set(theme, classes)
+        if (theme !== undefined) {
+          let entries = viewEntries.get(theme)
+          if (entries === undefined) {
+            entries = createEntries(styles(theme))
+            viewEntries.set(theme, entries)
           }
-          return classes
+          return entries
         }
-        const isStale = isDynamic && madeAt !== version
-        if (baseClasses === undefined || isStale) {
-          baseClasses = makeClasses(isDynamic ? readTokens().refs : undefined)
+        if (baseEntries === undefined || madeAt !== version) {
+          baseEntries = createEntries(styles(readTokens().refs))
           madeAt = version
         }
-        return baseClasses
+        return baseEntries
       },
     }
+  }
+
+  function createSheet<K extends string>(styles: ObjectSheet<K>): SheetEntries<K>
+  function createSheet<K extends string>(
+    styles: (theme: T) => Record<K, WebStyleObject>
+  ): ThemedSheet<K, T>
+  function createSheet<K extends string>(
+    styles: ObjectSheet<K> | ((theme: T) => Record<K, WebStyleObject>)
+  ) {
+    return typeof styles === 'function' ? createThemedSheet(styles) : createEntries(styles)
   }
 
   const createStyler = (
@@ -176,7 +260,7 @@ export function createLazyEngine<T extends object = Theme>(options: EngineOption
   ): Styler => {
     const label = createLabel(stylerOptions)
     const list = [...inherited, ...(label ? [{ label }] : []), ...styles]
-    const hasFunction = list.some((style) => typeof style === 'function')
+    const hasFunction = list.some(isStyleFunction)
     const resolveStyle = (
       style: StyleInput,
       props: Record<string, unknown>,
@@ -188,21 +272,82 @@ export function createLazyEngine<T extends object = Theme>(options: EngineOption
             theme: theme ?? readTokens().refs,
           })
         : style
+    const resolveAll = (
+      source: readonly StyleInput[],
+      props: Record<string, unknown>,
+      theme: unknown
+    ): StyleResult[] => source.map((style) => resolveStyle(style, props, theme))
 
-    // Without function styles the class only changes when something comes in after the styles.
-    let staticClass: string | undefined
+    /** The base class (written first) and the styles that make the props class, which is made for each render. */
+    interface Plan {
+      baseClass: string
+      propsStyles: readonly StyleInput[]
+    }
+
+    // Without `hasBaseClass`, or without any function, the split does not depend on the theme: the whole
+    // list is the base when it has no function, and the props part when it has one.
+    let fixed: Plan | undefined
+    const getFixed = (): Plan =>
+      (fixed ??= hasFunction
+        ? { baseClass: '', propsStyles: list }
+        : { baseClass: cache.css(...(list as WebStyleObject[])), propsStyles: [] })
+
+    // With functions, where the props part starts depends on the theme view, because a function that
+    // reads only the theme is part of the base, and what it reads from the theme may differ per view.
+    // A view is worked out once, with the props of the first call: a function that read no prop then
+    // takes the same path for every later call with that view.
+    const plans = new WeakMap<object, Plan>()
+    const makePlan = (props: Record<string, unknown>, view: object): Plan => {
+      const { base, propsFrom } = splitLeading(list, props, view)
+      const hasProps = propsFrom < list.length
+      const lead = label ? [{ label }] : []
+      return {
+        baseClass: base.some(Boolean) ? cache.css(...(base as WebStyleObject[])) : '',
+        propsStyles: hasProps ? [...lead, ...list.slice(propsFrom)] : [],
+      }
+    }
+    const getPlan = (props: Record<string, unknown>, theme: unknown): Plan => {
+      if (!cache.hasBaseClass || !hasFunction) return getFixed()
+      const view = (theme ?? readTokens().refs) as object
+      let plan = plans.get(view)
+      if (plan === undefined) {
+        plan = makePlan(props, view)
+        plans.set(view, plan)
+      }
+      return plan
+    }
+
+    /** The classes of the styles: the base, then the props class that is made after it. */
+    const getOwn = (plan: Plan, props: Record<string, unknown>, theme: unknown) => {
+      if (plan.propsStyles.length === 0) return plan.baseClass
+      const resolved = resolveAll(plan.propsStyles, props, theme)
+      const second = cache.cssWith({ after: plan.baseClass }, ...resolved)
+      return [plan.baseClass, second].filter(Boolean).join(' ')
+    }
+
+    /** Without layers there is no override class and no order between classes to rely on: what comes in is merged with all of the styles, into the one class. */
+    const getMerged = (
+      props: Record<string, unknown>,
+      theme: unknown,
+      extras: readonly ClassValue[]
+    ) => cache.css(...resolveAll(list, props, theme), ...extras)
 
     return {
       styles: list,
       isDynamic: hasFunction,
       getClassName(props, extra, theme) {
         const extras = Array.isArray(extra) ? extra : [extra]
-        if (hasFunction) {
-          return cache.css(...list.map((style) => resolveStyle(style, props, theme)), ...extras)
-        }
-        if (extras.some(Boolean)) return cache.css(...(list as StyleObject[]), ...extras)
-        staticClass ??= cache.css(...(list as StyleObject[]))
-        return staticClass
+        const hasExtras = extras.some(Boolean)
+        if (hasExtras && !cache.hasLayers) return getMerged(props, theme, extras)
+        const own = getOwn(getPlan(props, theme), props, theme)
+        if (!hasExtras) return own
+        // The override class takes the label of the component, so that it can be told from the others;
+        // one sheet entry given alone is used as it is.
+        const overrides = cache.cssWith(
+          { layer: 'overrides', label: label || undefined },
+          ...extras
+        )
+        return [own, overrides].filter(Boolean).join(' ')
       },
     }
   }
@@ -223,6 +368,10 @@ export function createLazyEngine<T extends object = Theme>(options: EngineOption
     setTheme,
     createThemeView,
     themeClass,
+    themeId,
+    findThemeIds,
+    when,
+    whenScheme: createSchemeKey,
     createSheet,
     createStyler,
   }

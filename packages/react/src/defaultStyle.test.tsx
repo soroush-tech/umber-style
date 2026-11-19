@@ -14,7 +14,7 @@ const other = { palette: { primary: '#ff0000', onPrimary: '#000000' }, space: [0
 /** A default style over an in-memory sheet, like a fresh module would be. */
 function setup() {
   const sheet = createMemorySheet()
-  const cache = createCache({ prefix: 'd', sheet })
+  const cache = createCache({ hasLayers: false, hasPruning: false, prefix: 'd', sheet })
   const style = createDefaultStyle()
   style.configure({ prefix: 'd', cache })
   const ruleOf = (className: string) =>
@@ -105,7 +105,7 @@ describe('the default style', () => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined)
     expect(() => render(<Probe />)).toThrow(NO_THEME_MESSAGE)
 
-    const cache = createCache({ prefix: 'e', sheet: createMemorySheet() })
+    const cache = createCache({ hasLayers: false, prefix: 'e', sheet: createMemorySheet() })
     const configured = createDefaultStyle()
     configured.configure({ cache, theme: light })
     const Reader = () => <i>{configured.useTheme().palette.primary}</i>
@@ -122,7 +122,7 @@ describe('the default style', () => {
   it('shares the engine it is configured with', () => {
     const engine = createLazyEngine({
       prefix: 's',
-      cache: createCache({ prefix: 's', sheet: createMemorySheet() }),
+      cache: createCache({ hasLayers: false, prefix: 's', sheet: createMemorySheet() }),
     })
     const first = createDefaultStyle()
     first.configure({ engine, theme: light })
@@ -135,7 +135,7 @@ describe('the default style', () => {
   })
 
   it('has a sheet, useStyle, apply and themeClass', () => {
-    const { StyleSheet, useStyle, apply, themeClass, getEngine, ruleOf } = setup()
+    const { StyleSheet, useStyle, apply, themeClass, when, whenScheme, getEngine, ruleOf } = setup()
     getEngine().setTheme(light)
     const sheet = StyleSheet.create((theme) => ({ box: { color: theme.palette.primary } }))
     const Box = () => <div {...apply(useStyle(sheet).box)}>box</div>
@@ -143,13 +143,15 @@ describe('the default style', () => {
     const { className } = screen.getByText('box')
     expect(ruleOf(className)).toBe(`.${className}{color:var(--d-palette-primary);}`)
     expect(apply()).toEqual({ className: undefined })
-    expect(themeClass(light, 'dark')).toMatch(/^d-theme-/)
+    expect(themeClass(light, 'dark')).toMatch(/^d-theme-[a-z0-9]+ d-boundary d-scheme-dark$/)
+    expect(when(light)).toBe(`@theme ${getEngine().themeId(light)}`)
+    expect(whenScheme('light')).toBe('@scheme light')
   })
 })
 
 describe('createStyle', () => {
   it('gives a lazy engine the theme, and keeps the theme of an engine that has one', () => {
-    const cache = createCache({ prefix: 'c', sheet: createMemorySheet() })
+    const cache = createCache({ hasLayers: false, prefix: 'c', sheet: createMemorySheet() })
     const engine = createLazyEngine<typeof light>({ cache })
     const style = createStyle(light, { engine })
     expect(engine.baseTheme).toBe(light)

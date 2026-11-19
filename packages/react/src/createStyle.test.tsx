@@ -23,7 +23,10 @@ const baseTheme = {
 /** A style with its own in-memory sheet, so that a test can read the rules. */
 function setup(prefix = 't') {
   const sheet = createMemorySheet()
-  const style = createStyle(baseTheme, { prefix, cache: createCache({ prefix, sheet }) })
+  const style = createStyle(baseTheme, {
+    prefix,
+    cache: createCache({ hasLayers: false, hasPruning: false, prefix, sheet }),
+  })
   const ruleOf = (className: string) =>
     sheet.rules.find((rule) => rule.startsWith(`.${className}{`))
   return { ...style, sheet, ruleOf }
@@ -98,7 +101,11 @@ describe('styled', () => {
 
   it('keeps the forwarding rule of the component it flattens', () => {
     const { styled } = setup()
-    const Base = styled('div', { shouldForwardProp: (prop) => prop !== 'tone' })({ color: 'red' })
+    const Base = styled('div', { shouldForwardProp: (prop) => prop !== 'tone' })<{ tone?: string }>(
+      {
+        color: 'red',
+      }
+    )
     const Fancy = styled(Base)({ margin: 4 })
     const { container } = render(<Fancy tone="x" data-x="y" title="t" />)
     const element = container.firstElementChild as HTMLElement
@@ -111,7 +118,7 @@ describe('styled', () => {
     const { styled } = setup()
     const Button = styled('button')({ color: 'red' })
     const { container } = render(
-      <Button as="a" href="#top">
+      <Button as="a" {...{ href: '#top' }}>
         x
       </Button>
     )
@@ -121,7 +128,7 @@ describe('styled', () => {
 
   it('forwards every prop to a tag, but `as`, `theme` and `className`', () => {
     const { styled } = setup()
-    const Box = styled('div')({ color: 'red' })
+    const Box = styled('div')<{ tone?: string; theme?: object }>({ color: 'red' })
     const { container } = render(<Box tone="big" theme={{}} data-x="1" id="a" />)
     const element = container.firstElementChild as HTMLElement
     expect(element.getAttributeNames().sort()).toEqual(['class', 'data-x', 'id', 'tone'])
@@ -173,7 +180,7 @@ describe('styled', () => {
 
 describe('styled, the class of a style with no function', () => {
   it('is made once, and made again when a className is given', () => {
-    const cache = createCache({ prefix: 't', sheet: createMemorySheet() })
+    const cache = createCache({ hasLayers: false, prefix: 't', sheet: createMemorySheet() })
     const spy = vi.spyOn(cache, 'css')
     const { styled } = createStyle(baseTheme, { prefix: 't', cache })
     const Box = styled('div')({ color: 'red' })
@@ -189,8 +196,8 @@ describe('styled, the class of a style with no function', () => {
   })
 
   it('is made on every render when a style is a function', () => {
-    const cache = createCache({ prefix: 't', sheet: createMemorySheet() })
-    const spy = vi.spyOn(cache, 'css')
+    const cache = createCache({ hasLayers: false, prefix: 't', sheet: createMemorySheet() })
+    const spy = vi.spyOn(cache, 'cssWith')
     const { styled } = createStyle(baseTheme, { prefix: 't', cache })
     const Box = styled('div')<{ $on?: boolean }>(({ $on }) => ({ color: $on ? 'red' : 'blue' }))
     const { rerender } = render(<Box data-testid="box" />)
@@ -235,7 +242,7 @@ describe('ThemeProvider', () => {
     )
     const element = container.firstElementChild as HTMLElement
     expect(element.tagName).toBe('SECTION')
-    expect(element.className).toMatch(/^t-theme-[a-z0-9]+ t-scope mine$/)
+    expect(element.className).toMatch(/^t-theme-[a-z0-9]+ t-boundary t-scheme-dark t-scope mine$/)
     expect(sheet.rules.find((rule) => rule.includes('color-scheme'))).toMatch(
       /color-scheme:dark;\}$/
     )
@@ -336,6 +343,9 @@ describe('StyleSheet, useStyle and apply', () => {
     const first = readSheet(useStyle, sheet)
     expect(readSheet(useStyle, sheet)).toBe(first)
     expect(Object.keys(first)).toEqual(['box', 'text'])
+    // Resolving writes nothing: a rule is written when its entry is first used.
+    expect(rules.rules).toHaveLength(0)
+    expect(first.box.className).not.toBe(first.text.className)
     expect(rules.rules).toHaveLength(2)
   })
 
@@ -343,7 +353,7 @@ describe('StyleSheet, useStyle and apply', () => {
     const { StyleSheet, useStyle, ruleOf } = setup()
     const sheet = StyleSheet.create((theme) => ({ box: { color: theme.palette.primary } }))
     const { box } = readSheet(useStyle, sheet)
-    expect(ruleOf(box)).toBe(`.${box}{color:var(--t-palette-primary);}`)
+    expect(ruleOf(box.className)).toBe(`.${box}{color:var(--t-palette-primary);}`)
   })
 
   it('apply makes one class from its entries, and none from nothing', () => {
@@ -366,7 +376,7 @@ describe('createStyle', () => {
   })
 
   it('takes its prefix from a given cache, then from the default', () => {
-    const cache = createCache({ prefix: 'given', sheet: createMemorySheet() })
+    const cache = createCache({ hasLayers: false, prefix: 'given', sheet: createMemorySheet() })
     const given = createStyle(baseTheme, { cache })
     expect(given.cache).toBe(cache)
     expect(given.themeClass({})).toMatch(/^given-theme-/)
@@ -375,10 +385,11 @@ describe('createStyle', () => {
 
   it('leaves raw keys without variables', () => {
     const { sheet, StyleSheet, useStyle } = setup()
-    readSheet(
+    const { box } = readSheet(
       useStyle,
       StyleSheet.create((theme) => ({ box: { width: theme.breakpoints.md } }))
     )
+    expect(box.className).toMatch(/^t-/)
     expect(sheet.rules.join('')).toContain('width:768px;')
   })
 })

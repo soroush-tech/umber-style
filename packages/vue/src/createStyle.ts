@@ -1,5 +1,13 @@
 import { computed, inject, type ComputedRef, type InjectionKey } from 'vue'
-import { createEngine, type Engine, NO_THEME_MESSAGE, type SheetStyles } from '@umber-style/core'
+import {
+  createEngine,
+  type Engine,
+  isThemedSheet,
+  NO_THEME_MESSAGE,
+  type ObjectSheet,
+  type SheetEntries,
+  type WebStyleObject,
+} from '@umber-style/core'
 import { createStyled } from './styled'
 import { createThemeProvider } from './ThemeProvider'
 import type { Sheet, Style, StyleOptions } from './types'
@@ -21,19 +29,30 @@ export function bindEngine<T extends object>(engine: Engine<T>): Style<T> {
   // The real theme of the nearest provider, as references for tokens and real raw values.
   const useThemeView = () => engine.createThemeView(useTheme().value)
 
-  const create = <S extends SheetStyles>(styles: S | ((theme: T) => S)): Sheet<S> =>
-    engine.createSheet(styles)
+  function create<K extends string>(styles: ObjectSheet<K>): SheetEntries<K>
+  function create<K extends string>(
+    styles: (theme: T) => Record<K, WebStyleObject>
+  ): Sheet<Record<K, WebStyleObject>>
+  function create(
+    styles: ObjectSheet<string> | ((theme: T) => Record<string, WebStyleObject>)
+  ): unknown {
+    return engine.createSheet(styles as never)
+  }
 
   return {
     engine,
     cache: engine.cache,
     styled: createStyled(engine, useThemeView),
     StyleSheet: { create },
-    useStyle: (sheet) => sheet.resolve(sheet.isDynamic ? useThemeView() : undefined),
+    // An object sheet is its own entries: it reads no theme.
+    useStyle: ((sheet: object) =>
+      isThemedSheet(sheet) ? sheet.resolve(useThemeView()) : sheet) as Style<T>['useStyle'],
     apply: (...entries) => ({ class: engine.css(...entries) || undefined }),
     ThemeProvider: createThemeProvider(engine, key),
     useTheme,
     themeClass: engine.themeClass,
+    when: engine.when,
+    whenScheme: engine.whenScheme,
   }
 }
 

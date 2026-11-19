@@ -1,7 +1,18 @@
 {
   "name": "umber-style",
-  "private": true,
   "version": "0.1.0",
+  "description": "UmberStyle in one package: the engine at the root, and the React, React Native and Vue bindings as subpaths.",
+  "keywords": [
+    "styling",
+    "theme",
+    "design-tokens",
+    "css-variables",
+    "react",
+    "react-native",
+    "vue",
+    "ssr",
+    "typescript"
+  ],
   "license": "MIT",
   "author": "Masoud Soroush <masoud@soroush.tech>",
   "homepage": "https://umber-style.soroush.design",
@@ -15,21 +26,98 @@
   },
   "type": "module",
   "sideEffects": false,
+  "files": [
+    "dist"
+  ],
   "exports": {
     ".": "./src/index.ts",
     "./react": {
+      "react-server": {
+        "types": "./src/shared.server.ts",
+        "default": "./src/react.server.ts"
+      },
+      "types": "./src/shared.ts",
       "react-native": "./src/react-native.ts",
-      "react-server": "./src/react.server.ts",
       "default": "./src/react.ts"
     },
     "./react-native": "./src/react-native.ts",
     "./vue": "./src/vue.ts"
   },
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      ".": {
+        "import": {
+          "types": "./dist/index.d.mts",
+          "default": "./dist/index.mjs"
+        },
+        "require": {
+          "types": "./dist/index.d.cts",
+          "default": "./dist/index.cjs"
+        }
+      },
+      "./react": {
+        "react-server": {
+          "import": {
+            "types": "./dist/shared.server.d.mts",
+            "default": "./dist/react.server.mjs"
+          },
+          "require": {
+            "types": "./dist/shared.server.d.cts",
+            "default": "./dist/react.server.cjs"
+          }
+        },
+        "react-native": {
+          "import": {
+            "types": "./dist/shared.d.mts",
+            "default": "./dist/react-native.mjs"
+          },
+          "require": {
+            "types": "./dist/shared.d.cts",
+            "default": "./dist/react-native.cjs"
+          }
+        },
+        "import": {
+          "types": "./dist/shared.d.mts",
+          "default": "./dist/react.mjs"
+        },
+        "require": {
+          "types": "./dist/shared.d.cts",
+          "default": "./dist/react.cjs"
+        }
+      },
+      "./react-native": {
+        "import": {
+          "types": "./dist/react-native.d.mts",
+          "default": "./dist/react-native.mjs"
+        },
+        "require": {
+          "types": "./dist/react-native.d.cts",
+          "default": "./dist/react-native.cjs"
+        }
+      },
+      "./vue": {
+        "import": {
+          "types": "./dist/vue.d.mts",
+          "default": "./dist/vue.mjs"
+        },
+        "require": {
+          "types": "./dist/vue.d.cts",
+          "default": "./dist/vue.cjs"
+        }
+      }
+    },
+    "main": "./dist/index.cjs",
+    "module": "./dist/index.mjs",
+    "types": "./dist/index.d.mts"
+  },
   "scripts": {
+    "build": "tsdown",
     "lint": "oxlint --deny-warnings",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.native.json && tsc --noEmit -p tsconfig.server.json",
     "test": "vitest run",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "prepublishOnly": "pnpm build"
   },
   "dependencies": {
     "@umber-style/core": "workspace:*",
@@ -60,6 +148,7 @@
     "oxlint": "^1.93.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
+    "tsdown": "^0.23.7",
     "typescript": "~7.0.2",
     "vitest": "^5.1.0",
     "vue": "^3.5.45"

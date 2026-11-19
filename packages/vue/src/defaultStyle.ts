@@ -1,12 +1,13 @@
 import {
   type BindingOptions,
+  createDeferredRecord,
   createLazyEngine,
-  type SheetStyles,
   type Theme,
+  type WebStyleObject,
 } from '@umber-style/core'
 import { defineComponent, h, type ComputedRef } from 'vue'
 import { bindEngine } from './createStyle'
-import type { Sheet, Style } from './types'
+import type { Style } from './types'
 
 export interface DefaultStyleOptions extends BindingOptions<Theme> {
   /** The base theme, for an app that has no provider at all. */
@@ -35,13 +36,17 @@ export function createDefaultStyle() {
 
   const styled: Style<Theme>['styled'] = (tag, options) => getStyle().styled(tag, options)
 
+  // An object sheet is made on first read, so a module can create one before `configure` is called.
   const StyleSheet: Style<Theme>['StyleSheet'] = {
-    create: (styles) => getStyle().StyleSheet.create(styles),
+    create: ((styles: Record<string, WebStyleObject> | ((theme: Theme) => never)) =>
+      typeof styles === 'function'
+        ? getStyle().StyleSheet.create(styles)
+        : createDeferredRecord(styles, () =>
+            getStyle().StyleSheet.create(styles)
+          )) as Style<Theme>['StyleSheet']['create'],
   }
 
-  function useStyle<S extends SheetStyles>(sheet: Sheet<S>) {
-    return getStyle().useStyle(sheet)
-  }
+  const useStyle = ((sheet: never) => getStyle().useStyle(sheet)) as Style<Theme>['useStyle']
 
   function useTheme(): ComputedRef<Theme> {
     return getStyle().useTheme()
@@ -66,6 +71,8 @@ export function createDefaultStyle() {
     useTheme,
     ThemeProvider,
     apply: ((...entries) => getStyle().apply(...entries)) as Style<Theme>['apply'],
+    when: ((theme, colorScheme) => getStyle().when(theme, colorScheme)) as Style<Theme>['when'],
+    whenScheme: ((scheme) => getStyle().whenScheme(scheme)) as Style<Theme>['whenScheme'],
     themeClass: ((theme, colorScheme) =>
       getStyle().themeClass(theme, colorScheme)) as Style<Theme>['themeClass'],
   }

@@ -12,9 +12,11 @@ export const {
   ThemeProvider,
   apply,
   themeClass,
+  when,
+  whenScheme,
 } = defaults
 
-export { alpha } from '@umber-style/core'
+export { add, alpha, at, divide, multiply, negate, subtract } from '@umber-style/core'
 export * from './createStyle.server'
 export * from './defaultStyle.server'
 export * from './types'

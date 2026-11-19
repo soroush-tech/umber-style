@@ -64,6 +64,7 @@ describe('styled on React Native', () => {
 
   it('throws for a string tag when it is created', () => {
     const { styled } = createStyle(baseTheme)
+    expect(() => styled('div')).toThrow(TypeError)
     expect(() => styled('div')).toThrow(
       'styled needs a component on React Native, not the tag "div".'
     )
@@ -111,7 +112,7 @@ describe('useStyle on React Native', () => {
 
   it('apply returns a style array without the empty entries', () => {
     const { apply } = createStyle(baseTheme)
-    expect(apply({ a: 1 }, null, undefined, false, { b: 2 })).toEqual({
+    expect(apply({ a: 1 } as never, null, undefined, false, { b: 2 } as never)).toEqual({
       style: [{ a: 1 }, { b: 2 }],
     })
   })

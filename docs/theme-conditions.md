@@ -1,0 +1,139 @@
+# Theme conditions
+
+After this page you can write a style that applies only in one theme or one colour scheme: a border only in dark, a shadow only in light, a rule for a specific brand.
+
+Most differences between themes are tokens, and a token needs no condition: the variable changes and the style follows. Use a condition when there is no token to carry the difference.
+
+## `when` and `whenScheme`
+
+Two functions make style keys. They come from the engine, from every binding, and from `createStyle`:
+
+- `when(theme, colorScheme?)` is a key for "the nearest theme is this theme".
+- `whenScheme('light' | 'dark')` is a key for "the nearest colour scheme is this one".
+
+The value under a key is a nested style. It may hold selectors and at-rules. In a web style object a key from `when()` is a computed key, so it is written with `at(key, style)`, which spreads `{ [key]: style }` and keeps the style checked: see [Typed styles](typed-styles.md). On React Native, and in a shared style outside its `web` part, the computed key is written directly (see below).
+
+```tsx
+import { at, createStyle } from '@umber-style/react'
+
+const lightTheme = {
+  palette: { primary: '#1b5fd1', surface: '#ffffff' },
+  space: [0, 4, 8, 16],
+}
+const darkTheme = { palette: { primary: '#8ab4ff', surface: '#101114' } }
+
+const { styled, ThemeProvider, when, whenScheme } = createStyle(lightTheme, { prefix: 'umber' })
+
+const Card = styled('div', { name: 'Card' })({
+  border: 'none',
+  ...at(when(darkTheme, 'dark'), { border: '1px solid white', '&:hover': { borderColor: 'red' } }),
+  ...at(whenScheme('dark'), { boxShadow: 'none' }),
+})
+
+const App = () => (
+  <ThemeProvider theme={lightTheme} colorScheme="light">
+    <Card />
+    <ThemeProvider theme={darkTheme} colorScheme="dark">
+      <Card />
+    </ThemeProvider>
+  </ThemeProvider>
+)
+```
+
+The markup has one class for both cards. The rules decide which applies:
+
+```html
+<div class="umber-theme-45dnwr umber-boundary umber-scheme-light umber-scope">
+  <div class="umber-card-root-c8wvsy"></div>
+  <div class="umber-theme-8yk78z umber-boundary umber-scheme-dark umber-scope">
+    <div class="umber-card-root-c8wvsy"></div>
+  </div>
+</div>
+```
+
+```css
+@layer umber-components {
+  .umber-card-root-c8wvsy {
+    border: none;
+  }
+}
+@layer umber-components {
+  @scope (.umber-theme-8yk78z) to (.umber-boundary) {
+    .umber-card-root-c8wvsy {
+      border: 1px solid white;
+    }
+    .umber-card-root-c8wvsy:hover {
+      border-color: red;
+    }
+  }
+}
+@layer umber-components {
+  @scope (.umber-scheme-dark) to (.umber-scheme-light,.umber-scheme-dark) {
+    .umber-card-root-c8wvsy {
+      box-shadow: none;
+    }
+  }
+}
+@layer umber-components {
+  @media (prefers-color-scheme: dark) {
+    .umber-card-root-c8wvsy:where(
+      :not(.umber-scheme-light, .umber-scheme-dark, .umber-scheme-light *, .umber-scheme-dark *)
+    ) {
+      box-shadow: none;
+    }
+  }
+}
+```
+
+The first rule is the base style. The scoped rule beats it: it has the same specificity and a scoped rule wins over an unscoped one before source order is looked at. The guarded media rule has no specificity.
+
+## What "nearest" means
+
+`when(theme)` applies where the nearest theme element above is `theme`. `themeClass(theme)` adds the `umber-boundary` class to every theme element, and the rule is an `@scope` that starts at the theme's class and ends at the next boundary. So a nested theme cuts the outer one off: in a page with themes A, then B inside it, then A inside B, a `when(A)` rule applies below the first A, not below B, and again below the second A.
+
+Pass the same `colorScheme` to `when` that you give the provider. `when(darkTheme, 'dark')` and `when(darkTheme)` are different theme classes, and only the one that the provider rendered matches.
+
+`whenScheme('dark')` applies where the nearest theme that was given a `colorScheme` has that scheme. With no such theme above, the system preference decides: that is the `@media (prefers-color-scheme: dark)` rule, guarded so that it does not apply below a theme that has a scheme of its own. A theme with no `colorScheme`, or with `'light dark'`, is not a scheme boundary.
+
+## Without `@scope`
+
+Pass `hasScope: false` (to `createStyle`, `createEngine` or `createCache`) to write the plain form instead:
+
+```css
+@layer umber-components {
+  :where(.umber-theme-l0twti) .umber-oko3jm {
+    border: 1px solid white;
+  }
+}
+```
+
+It matches below any element with that theme class, nested themes included, so it is wrong for nested themes: a `when(A)` rule would also apply inside B when B is inside A. There is no detection at run time: choose the option.
+
+## React Native
+
+On React Native there are no classes. A condition is matched when the component renders:
+
+- `when(theme)` applies where the nearest provider was given that theme object. The comparison is by identity: the same object, not an equal one. With no provider above, the base theme counts.
+- `whenScheme(scheme)` applies where the nearest provider with a `colorScheme` has it; with none above, the platform's colour scheme at render time.
+
+The matching parts are merged over the rest of the style, in order, on each render. A component that has a condition key reads the provider context; one without does not.
+
+```tsx
+const Card = styled(View)({
+  padding: 8,
+  [when(dark)]: { padding: 4 },
+  [whenScheme('dark')]: { opacity: 0.5 },
+})
+```
+
+`colorScheme` of `when(theme, colorScheme)` is not used on React Native. The same source, with `when` and `whenScheme` at the top of a shared style, matches the nearest provider on React Native and compiles to the scoped rules on the web: see [Style sheets and the style prop](style-sheets.md).
+
+## Limits
+
+- A conditional style applies to the descendants of the theme element, not to the element that carries the theme class. On a root provider this is the whole page below `<html>`.
+- A condition inside a `::before` selector cannot take the guard that `whenScheme` needs for the system preference.
+- Call `when(theme)` after the base theme is known (`createStyle(theme)` or `configure({ theme })`). It makes the theme class like `themeClass` does, and if there is no base theme yet, the theme you pass becomes the base theme.
+- `@scope` needs a browser that supports it. One that does not drops those rules and keeps the rest, so the style falls back to the base style. The versions are to be confirmed: see [Browser and platform support](browser-support.md).
+- The "nearest theme" behaviour is checked in a test with jsdom, which evaluates `@scope`, inside a layer too: a card under A, then B, then A gets the conditional style below the first A, not below B, and again below the second A (`packages/core/src/createEngine.conditions.test.ts`). `whenScheme` and the system-preference rule are checked as rule text only. No real browser was used.
+- Typing: a computed key made by `when()` written directly in a web style object is a type error, because TypeScript types a computed key as `string`: use `at()`, as above. The style inside `at()` is checked like any style. See [Typed styles](typed-styles.md).
+- On React Native the types accept the condition keys and do not check what is inside them.

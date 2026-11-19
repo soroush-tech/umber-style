@@ -1,5 +1,5 @@
 import { createCache, createMemorySheet } from './cache'
-import { createEngine } from './createEngine'
+import { createEngine, createLazyEngine } from './createEngine'
 import { isSheetEntry } from './sheetEntry'
 
 const theme = {
@@ -8,9 +8,12 @@ const theme = {
   breakpoints: { md: 768 },
 }
 
-function setup(prefix = 'e') {
+function setup(prefix = 'e', hasBaseClass = true) {
   const sheet = createMemorySheet()
-  const engine = createEngine(theme, { prefix, cache: createCache({ prefix, sheet }) })
+  const engine = createEngine(theme, {
+    prefix,
+    cache: createCache({ hasLayers: false, hasPruning: false, hasBaseClass, prefix, sheet }),
+  })
   const ruleOf = (className: string) =>
     sheet.rules.find((rule) => rule.startsWith(`.${className}{`))
   return { engine, sheet, ruleOf }
@@ -31,22 +34,50 @@ describe('createEngine', () => {
     expect(createEngine(theme).cache.prefix).toBe('css')
     const own = createEngine(theme, { prefix: 'my', suffix: '-s', hasLabels: false })
     expect(own.css({ label: 'x', color: 'red' })).toMatch(/^my-[a-z0-9]+-s$/)
-    const cache = createCache({ prefix: 'given', sheet: createMemorySheet() })
+    const cache = createCache({ hasLayers: false, prefix: 'given', sheet: createMemorySheet() })
     const shared = createEngine(theme, { cache })
     expect(shared.cache).toBe(cache)
     expect(shared.themeClass({})).toMatch(/^given-theme-/)
   })
 
+  it('takes the prefix of a given cache for the variables too', () => {
+    const cache = createCache({ hasLayers: false, prefix: 'given', sheet: createMemorySheet() })
+    const engine = createEngine(theme, { cache })
+    expect(engine.themeClass({})).toMatch(/^given-theme-/)
+    expect(String(engine.refs.palette.primary)).toMatch(/^var\(--given-/)
+    const same = createEngine(theme, { cache, prefix: 'given' })
+    expect(String(same.refs.palette.primary)).toMatch(/^var\(--given-/)
+  })
+
+  it('throws a TypeError that names both prefixes when a prefix differs from the cache', () => {
+    const cache = createCache({ hasLayers: false, prefix: 'given', sheet: createMemorySheet() })
+    expect(() => createEngine(theme, { cache, prefix: 'other' })).toThrow(TypeError)
+    expect(() => createEngine(theme, { cache, prefix: 'other' })).toThrow(/"other".*"given"/)
+    expect(() => createLazyEngine({ cache, prefix: 'other' })).toThrow(TypeError)
+  })
+
   it('makes one class for a theme object and color scheme, once', () => {
     const { engine, sheet } = setup()
     const partial = { palette: { primary: '#ff0000' } }
-    const first = engine.themeClass(partial)
-    expect(engine.themeClass(partial)).toBe(first)
-    const dark = engine.themeClass(partial, 'dark')
+    const first = engine.themeId(partial)
+    expect(engine.themeId(partial)).toBe(first)
+    const dark = engine.themeId(partial, 'dark')
     expect(dark).not.toBe(first)
-    expect(engine.themeClass(partial, 'dark')).toBe(dark)
+    expect(engine.themeId(partial, 'dark')).toBe(dark)
     expect(sheet.rules.filter((rule) => rule.startsWith('.e-theme-'))).toHaveLength(2)
     expect(sheet.rules).toContain(`.${first}{--e-palette-primary:#ff0000;}`)
+  })
+
+  it('finds the classes already made for a theme object, and makes none', () => {
+    const { engine, sheet } = setup()
+    const partial = { palette: { primary: '#ff0000' } }
+    expect(engine.findThemeIds(partial)).toEqual([])
+    expect(sheet.rules).toHaveLength(0)
+    const light = engine.themeId(partial, 'light')
+    const none = engine.themeId(partial)
+    expect(engine.findThemeIds(partial)).toEqual([light, none])
+    expect(engine.findThemeIds({ palette: { primary: '#ff0000' } })).toEqual([])
+    expect(sheet.rules).toHaveLength(2)
   })
 
   it('makes the classes of a sheet on first use, and only once', () => {
@@ -59,7 +90,7 @@ describe('createEngine', () => {
     expect(created.resolve()).toEqual({ box })
     expect(make).toHaveBeenCalledTimes(1)
     expect(ruleOf(box.className)).toBe(`.${box.className}{color:var(--e-palette-primary);}`)
-    expect(engine.createSheet({ a: { margin: 1 } }).resolve().a.className).toMatch(/^e-/)
+    expect(engine.createSheet({ a: { margin: 1 } }).a.className).toMatch(/^e-/)
   })
 })
 
@@ -105,7 +136,7 @@ describe('createStyler', () => {
   })
 
   it('keeps object styles next to function styles', () => {
-    const { engine, ruleOf } = setup()
+    const { engine, ruleOf } = setup('e', false)
     const styler = engine.createStyler({}, [{ margin: 4 }, () => ({ color: 'red' })])
     const className = styler.getClassName({})
     expect(ruleOf(className)).toBe(`.${className}{margin:4px;color:red;}`)
@@ -129,9 +160,7 @@ describe('createStyler', () => {
 describe('sheet entries in classes', () => {
   it('merges entries and class names in order, with a later one winning', () => {
     const { engine, ruleOf } = setup()
-    const { a, b } = engine
-      .createSheet({ a: { color: 'red', margin: 1 }, b: { color: 'blue' } })
-      .resolve()
+    const { a, b } = engine.createSheet({ a: { color: 'red', margin: 1 }, b: { color: 'blue' } })
     const merged = engine.css(a, b)
     expect(ruleOf(merged)).toBe(`.${merged}{margin:1px;color:blue;}`)
     expect(engine.css(a.className, b)).toBe(merged)
@@ -139,7 +168,7 @@ describe('sheet entries in classes', () => {
 
   it('puts entries after the styles of a styler and before a class name', () => {
     const { engine, ruleOf } = setup()
-    const { a } = engine.createSheet({ a: { color: 'green' } }).resolve()
+    const { a } = engine.createSheet({ a: { color: 'green' } })
     const styler = engine.createStyler({}, [{ color: 'red', margin: 4 }])
     const className = styler.getClassName({}, [a, false, 'external'])
     const [external, engineClass] = className.split(' ')

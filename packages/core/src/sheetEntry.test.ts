@@ -13,6 +13,11 @@ describe('createSheetEntry', () => {
     expect(Object.keys(merged)).toEqual(['--umber-entry-a', '--umber-entry-b'])
     expect(flattenStyle(merged).map(String)).toEqual(['a', 'b'])
   })
+
+  it('holds nothing a plain element would write: every enumerable value is null', () => {
+    expect(Object.values(createSheetEntry('a'))).toEqual([null])
+    expect(Object.getOwnPropertySymbols(createSheetEntry('a'))).toHaveLength(1)
+  })
 })
 
 describe('isSheetEntry', () => {

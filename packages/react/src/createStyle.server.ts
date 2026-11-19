@@ -5,8 +5,12 @@ import {
   type ColorScheme,
   type DeepPartial,
   type Engine,
+  isThemedSheet,
+  type ObjectSheet,
+  type SheetEntries,
   type SheetEntry,
   type SheetStyles,
+  type WebStyleObject,
 } from '@umber-style/core'
 import { createServerOnlyContext, readServerContext, type CacheFunction } from './serverContext'
 import { createStyled } from './styled.server'
@@ -17,7 +21,6 @@ export type { StyleOptions } from './types'
 
 /** A sheet on the server: it makes its class names on first use. */
 interface ServerSheet<S extends SheetStyles> extends SheetDefinition<S, SheetEntry> {
-  isDynamic: boolean
   resolve(theme?: unknown): { [K in keyof S]: SheetEntry }
 }
 
@@ -27,6 +30,8 @@ export function bindEngine<T extends object>(
   cache?: CacheFunction
 ): ServerStyle<T> {
   const root = createServerOnlyContext<DeepPartial<T> | undefined>(undefined, cache)
+  // Whether the stamp of the cache options was sent in this request.
+  const stamp = createServerOnlyContext<boolean>(false, cache)
 
   // The root theme over the base theme, made once for each root.
   const merged = new WeakMap<object, T>()
@@ -52,13 +57,21 @@ export function bindEngine<T extends object>(
   const themeClass = (partial: DeepPartial<T>, colorScheme?: ColorScheme) =>
     engine.themeClass(partial, colorScheme)
 
-  const useStyle = <S extends SheetStyles>(sheet: SheetDefinition<S, SheetEntry>) => {
-    const { isDynamic, resolve } = sheet as ServerSheet<S>
-    return resolve(isDynamic ? engine.createThemeView(readTheme()) : undefined)
-  }
+  // An object sheet is its own entries: it reads no theme, so it works with none.
+  const useStyle = ((sheet: object) =>
+    isThemedSheet(sheet)
+      ? sheet.resolve(engine.createThemeView(readTheme()))
+      : sheet) as ServerStyle<T>['useStyle']
 
-  const create = <S extends SheetStyles>(styles: S | ((theme: T) => S)): ServerSheet<S> =>
-    engine.createSheet(styles)
+  function create<K extends string>(styles: ObjectSheet<K>): SheetEntries<K>
+  function create<K extends string>(
+    styles: (theme: T) => Record<K, WebStyleObject>
+  ): ServerSheet<Record<K, WebStyleObject>>
+  function create(
+    styles: ObjectSheet<string> | ((theme: T) => Record<string, WebStyleObject>)
+  ): unknown {
+    return engine.createSheet(styles as never)
+  }
 
   return {
     engine,
@@ -67,9 +80,11 @@ export function bindEngine<T extends object>(
     StyleSheet: { create },
     useStyle,
     apply: (...entries) => ({ className: engine.css(...entries) || undefined }),
-    ThemeProvider: createThemeProvider(engine, root),
+    ThemeProvider: createThemeProvider(engine, root, stamp),
     readTheme,
     themeClass,
+    when: engine.when,
+    whenScheme: engine.whenScheme,
   }
 }
 

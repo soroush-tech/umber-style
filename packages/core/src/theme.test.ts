@@ -4,7 +4,7 @@ import { createThemeClass } from './theme'
 describe('createThemeClass', () => {
   it('gives the same declarations the same class and one rule', () => {
     const sheet = createMemorySheet()
-    const cache = createCache({ prefix: 'ds', sheet })
+    const cache = createCache({ hasLayers: false, hasPruning: false, prefix: 'ds', sheet })
     const first = createThemeClass(cache, { '--a': 'b', '--c': 'd' })
     const second = createThemeClass(cache, { '--a': 'b', '--c': 'd' })
     expect(second).toBe(first)
@@ -14,7 +14,7 @@ describe('createThemeClass', () => {
   })
 
   it('gives different declarations a different class', () => {
-    const cache = createCache({ sheet: createMemorySheet() })
+    const cache = createCache({ hasLayers: false, sheet: createMemorySheet() })
     expect(createThemeClass(cache, { '--a': 'b' })).not.toBe(
       createThemeClass(cache, { '--a': 'c' })
     )
@@ -23,7 +23,7 @@ describe('createThemeClass', () => {
   it('sets color-scheme in the rule', () => {
     const sheet = createMemorySheet()
     const className = createThemeClass(
-      createCache({ sheet }),
+      createCache({ hasLayers: false, hasPruning: false, sheet }),
       { '--a': 'b' },
       { colorScheme: 'dark' }
     )
@@ -34,7 +34,7 @@ describe('createThemeClass', () => {
 describe('createThemeClass for a theme with no variable', () => {
   it('returns a class and inserts no rule, as a theme of raw values only declares nothing', () => {
     const sheet = createMemorySheet()
-    const cache = createCache({ prefix: 't', sheet })
+    const cache = createCache({ hasLayers: false, prefix: 't', sheet })
     const className = createThemeClass(cache, {})
     expect(className).toMatch(/^t-theme-/)
     expect(sheet.rules).toEqual([])

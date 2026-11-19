@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react'
-import { createCache, createEngine, createMemorySheet } from '@umber-style/core'
+import { at, createCache, createEngine, createMemorySheet } from '@umber-style/core'
 import { bindEngine } from './createStyle'
 
 const theme = {
@@ -17,7 +17,7 @@ describe('the client build makes the classes of the server build', () => {
     const { styled, ThemeProvider } = bindEngine(engine)
     const Box = styled('div', { name: 'Box' })(({ theme: view }) => ({
       color: view.palette.primary,
-      [`@media (width >= ${view.breakpoints[0]})`]: { padding: view.space[1] },
+      ...at(`@media (width >= ${view.breakpoints[0]})`, { padding: view.space[1] }),
     }))
     render(
       <ThemeProvider theme={theme}>

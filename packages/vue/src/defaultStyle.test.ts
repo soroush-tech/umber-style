@@ -7,12 +7,20 @@ import {
 } from '@umber-style/core'
 import { createDefaultStyle } from './defaultStyle'
 
+// The shape of the theme that these tests give the default style.
+declare module '@umber-style/core' {
+  interface Theme {
+    palette: { primary: string }
+    space: { small: number }
+  }
+}
+
 const light = { palette: { primary: '#0000ff' }, space: { small: 4 } }
 
 function setup() {
   const sheet = createMemorySheet()
   const style = createDefaultStyle()
-  style.configure({ prefix: 'd', cache: createCache({ prefix: 'd', sheet }) })
+  style.configure({ prefix: 'd', cache: createCache({ hasLayers: false, prefix: 'd', sheet }) })
   const ruleOf = (className: string) =>
     sheet.rules.find((rule) => rule.startsWith(`.${className}{`))
   return { ...style, sheet, ruleOf }
@@ -35,7 +43,9 @@ describe('the default style', () => {
     expect(getEngine().baseTheme).toBe(light)
     const button = root.querySelector('button') as HTMLElement
     expect(ruleOf(button.className)).toBe(`.${button.className}{color:var(--d-palette-primary);}`)
-    expect((root.firstElementChild as HTMLElement).className).toMatch(/^d-theme-\w+ d-scope mine$/)
+    expect((root.firstElementChild as HTMLElement).className).toMatch(
+      /^d-theme-\w+ d-boundary d-scope mine$/
+    )
   })
 
   it('throws one clear error for a function style before any theme', () => {
@@ -66,7 +76,7 @@ describe('the default style', () => {
   it('shares the engine it is configured with', () => {
     const engine = createLazyEngine({
       prefix: 's',
-      cache: createCache({ prefix: 's', sheet: createMemorySheet() }),
+      cache: createCache({ hasLayers: false, prefix: 's', sheet: createMemorySheet() }),
     })
     const first = createDefaultStyle()
     first.configure({ engine, theme: light })
@@ -80,7 +90,7 @@ describe('the default style', () => {
   })
 
   it('has a sheet, useStyle, apply and themeClass', () => {
-    const { StyleSheet, useStyle, apply, themeClass, getEngine, ruleOf } = setup()
+    const { StyleSheet, useStyle, apply, themeClass, when, whenScheme, getEngine, ruleOf } = setup()
     getEngine().setTheme(light)
     const classes = useStyle(
       StyleSheet.create((theme) => ({ box: { color: theme.palette.primary } }))
@@ -89,6 +99,8 @@ describe('the default style', () => {
       `.${classes.box.className}{color:var(--d-palette-primary);}`
     )
     expect(apply(classes.box)).toEqual({ class: classes.box.className })
-    expect(themeClass(light, 'dark')).toMatch(/^d-theme-/)
+    expect(themeClass(light, 'dark')).toMatch(/^d-theme-[a-z0-9]+ d-boundary d-scheme-dark$/)
+    expect(when(light)).toBe(`@theme ${getEngine().themeId(light)}`)
+    expect(whenScheme('light')).toBe('@scheme light')
   })
 })

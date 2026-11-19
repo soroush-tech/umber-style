@@ -21,7 +21,7 @@ describe('createStyle on the server', () => {
       ])
     )
     const html = await renderToString(app)
-    expect(html).toMatch(/^<div class="vs-theme-\w+ vs-scope">/)
+    expect(html).toMatch(/^<div class="vs-theme-\w+ vs-boundary vs-scope">/)
     expect(html).not.toContain('style=')
     expect(html.match(/vs-button-root-\w+/g)).toHaveLength(2)
     const { css } = cache.extract()

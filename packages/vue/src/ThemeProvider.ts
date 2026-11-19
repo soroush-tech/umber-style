@@ -35,11 +35,15 @@ export function createThemeProvider<T extends object>(
           return base === undefined ? (theme as T) : mergeDeep<T>(base, theme)
         })
       )
-      // The class is read in render: the outermost provider gives the engine its base theme here.
+      // The outermost provider gives the engine its base theme here, in render.
       return () => {
-        const scope = engine.themeClass(props.theme as DeepPartial<T>, props.colorScheme)
-        // A root provider renders no element: the app puts the class on an ancestor.
-        if (props.isRoot) return h(Fragment, null, slots.default?.())
+        const theme = props.theme as DeepPartial<T>
+        // A root provider renders no element and makes no rule: the app puts the class on an ancestor.
+        if (props.isRoot) {
+          if (!engine.hasTheme) engine.setTheme(theme as T)
+          return h(Fragment, null, slots.default?.())
+        }
+        const scope = engine.themeClass(theme, props.colorScheme)
         return h(props.as, { class: [scope, engine.scopeClass()] }, slots.default?.())
       }
     },

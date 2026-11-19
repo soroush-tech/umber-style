@@ -59,6 +59,22 @@ describe('compileRules', () => {
     expect(compileRules('.a', { span: { color: 'red' } })).toEqual(['.a span{color:red;}'])
   })
 
+  it('treats a key that starts with a colon as the element itself, like a key that starts with &', () => {
+    expect(
+      compileRules('.a', {
+        ':hover': { color: 'red' },
+        ':is(.b, .c):focus, :first-child': { top: 1 },
+        '::before': { content: '""' },
+        'span :hover': { color: 'blue' },
+      })
+    ).toEqual([
+      '.a:hover{color:red;}',
+      '.a:is(.b, .c):focus,.a:first-child{top:1px;}',
+      '.a::before{content:"";}',
+      '.a span :hover{color:blue;}',
+    ])
+  })
+
   it('crosses nested comma lists with a comma list parent', () => {
     expect(
       compileRules('.a', { '&:hover, &:focus': { '& > span, em': { color: 'red' } } })
@@ -110,6 +126,36 @@ describe('mergeStyles', () => {
     mergeStyles([first, second])
     expect(first).toEqual({ '&:hover': { color: 'red' } })
     expect(second).toEqual({ '&:hover': { color: 'blue' } })
+  })
+})
+
+describe('the platform parts of a style written for both platforms', () => {
+  it('merges the web part over the rest and drops the native part', () => {
+    const merged = mergeStyles([
+      {
+        padding: 8,
+        color: 'red',
+        web: { color: 'blue', '&:hover': { opacity: 0.8 } },
+        native: { elevation: 2 },
+      },
+    ])
+    expect(merged).toEqual({ padding: 8, color: 'blue', '&:hover': { opacity: 0.8 } })
+    expect(Object.keys(merged)).toEqual(['padding', 'color', '&:hover'])
+  })
+
+  it('merges a web part into nested keys of the rest', () => {
+    const merged = mergeStyles([{ '&:hover': { color: 'red' }, web: { '&:hover': { margin: 1 } } }])
+    expect(merged).toEqual({ '&:hover': { color: 'red', margin: 1 } })
+  })
+
+  it('drops a part that is not an object', () => {
+    expect(mergeStyles([{ padding: 8, web: undefined }])).toEqual({ padding: 8 })
+    expect(mergeStyles([{ padding: 8, web: false, native: null }])).toEqual({ padding: 8 })
+  })
+
+  it('leaves a style without parts as it is', () => {
+    const style = { padding: 8 }
+    expect(mergeStyles([style])).toEqual(style)
   })
 })
 

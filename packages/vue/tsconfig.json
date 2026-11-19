@@ -9,8 +9,12 @@
     "noEmit": true,
     "strict": true,
     "skipLibCheck": true,
-    "types": ["vitest/globals"]
+    "types": ["vitest/globals", "node"]
   },
-  "include": ["src"],
-  "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx"]
+  "include": ["src", "bench"],
+  "exclude": [
+    // It declares the `Theme` of the default style for the whole program, which no other test uses:
+    // tsconfig.defaultStyle.json.
+    "src/defaultStyle.test.ts"
+  ]
 }

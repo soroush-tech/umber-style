@@ -87,6 +87,9 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
   (vitest). A file that needs another environment says so with a `// @vitest-environment node`
   comment, or uses a `*.server.test.ts(x)` suffix in `@umber-style/react` (run with the `react-server`
   condition).
+- **Which tier a test belongs in:** the lowest that can see the thing (`docs/testing.md`). Text of a rule, class names, what is inserted: a `*.test.ts(x)` unit test. What a browser's cascade or layout decides (which rule wins, a computed value, a transition): a `*.browser.test.ts(x)` in `core` or `react`, run by `pnpm test:browser`, outside coverage. What a framework does with the engine on a built page (first HTML, hydration, navigation, no script): an end-to-end test in `e2e/` on an app in `fixtures/`, run by `pnpm test:e2e`. A test that documents behaviour the engine does not have yet is marked as a known failure (`known` in `e2e/fixtures.ts`, `it.fails` in vitest) with a reason that starts with KNOWN; one that starts to pass fails the run.
+- **Fixtures are not packages:** fixture apps live in `fixtures/`, never in `packages/`: they are not registered with Codecov, not in the package matrix, and need no `LICENSE`.
+- **Benchmarks:** a benchmark lives next to what it measures, in `packages/<pkg>/bench/*.bench.ts(x)`; the helpers, the runner and `bench:compare` are in `bench/` (a workspace package outside `packages/`). `pnpm bench` runs them all, `pnpm bench:compare <a.json> <b.json>` compares two runs, `pnpm bench:gate --base <dir> --head <dir>` is the CI gate (interleaved rounds, median ratio; what it gates is in `bench/src/gate-config.ts`), and `pnpm test` never runs them (`docs/benchmarks.md`).
 - **100% coverage:** every package keeps 100% statements, branches, functions and lines, with no
   coverage-ignore comments. `pnpm test:coverage` fails below it.
 - **Lint and format:** `pnpm lint` runs `oxlint --deny-warnings` - any warning fails. Formatting is not
@@ -95,11 +98,26 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
   the pre-commit hook enforce it.
 - **Packages:** everything under `packages/` is a workspace package. `packages/packages.md` is the
   **standard** for packages - read it first, and follow it when creating or changing any package
-  (structure, exports, publishing, registration chores). Every package is `private` until it is
-  published; a publishable package must declare a license and ship a `LICENSE` file.
+  (structure, exports, publishing, registration chores). The five packages are publishable and built with
+  tsdown (`pnpm build`); they consume source inside the workspace and `publishConfig` swaps in `dist` only
+  when a tarball is made, so release with `pnpm` through the workflow, never `npm publish`. A publishable
+  package must declare a license, ship a `LICENSE` file, and have `release-notes/<version>.md`;
+  `eslint-config` stays `private`.
+- **Releasing:** `.github/workflows/cd-packages.yml` is dispatched by hand with a `package` and a
+  `channel` (`alpha` from a branch whose `ci-ok` passed, `rc` and `stable` from `main`), and publishes by
+  npm Trusted Publishing. `package.json` always holds the target version, never a prerelease.
+  `docs/releasing.md` is the guide; `pnpm smoke:packed` proves the packed tarballs work from outside the
+  workspace and runs in CI.
 - **Generated config:** `.codecov.yml`, the "Affected area" lists of the issue forms and the allowlist
   of `label-area.yml` are written by `pnpm gen:publish-options` from the folders under `packages/`.
   Run it after adding or removing a package; the pre-commit hook and CI run it with `--check`.
+- **Documentation:** all documentation lives in `docs/` at the repository root, organised by topic and
+  written once for every platform: `docs/README.md` is the index. A feature's documentation goes
+  there, in the page for its topic - never in a package README, which stays a short stub (what the
+  package is, an install line, one import example, a link to `docs/`). Every code
+  example is verified against the code (compiled, run, or copied from a passing test), and every page
+  with limits ends with a "Limits" section that says what is not checked or not observed. The pages
+  follow the same rules as the code: no library names, ASCII punctuation only, no inline styles.
 - **Issue artifacts:** any epic, task, RFC, bug report, user story, feature request or
   documentation-feedback item you draft - whether as a file or for GitHub - must follow the matching
   template in `.github/ISSUE_TEMPLATE/` (`4.epic.yml`, `6.task.yml`, `3.rfc.yml`, `1.bug_report.yml`,
@@ -116,6 +134,8 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 | Umbrella         | `packages/umber-style`                                    | Re-exports core and the bindings as subpaths. Its tests prove one source runs on every one |
 | Lint config      | `packages/eslint-config`                                  | Private oxlint base and React layers, shared by every package                              |
 | Package standard | `packages/packages.md`                                    | Structure, exports, publishing, 100% coverage, licensing, linting                          |
+| Releasing        | `docs/releasing.md`, `.github/workflows/cd-packages.yml`  | Channels, the order of the packages, installing a prerelease, verifying a tarball          |
+| Documentation    | `docs/`                                                   | One set of pages by topic for every platform, written once; the index is `docs/README.md`  |
 
 ## Quick checklist before pushing
 
@@ -123,3 +143,4 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 2. `pnpm lint`
 3. `pnpm typecheck`
 4. `pnpm test:coverage` - verify 100% on all touched files
+5. `pnpm build` - and `pnpm smoke:packed` when a package's exports, build or dependencies changed

@@ -1,0 +1,31 @@
+{
+  "name": "@umber-fixtures/shared",
+  "private": true,
+  "version": "0.1.0",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    "./themes": "./src/themes.ts",
+    "./style": "./src/style.ts",
+    "./components": "./src/components.tsx",
+    "./interactive": "./src/interactive.tsx",
+    "./pages": "./src/pages.tsx",
+    "./shell": "./src/shell.tsx",
+    "./bootScript": "./src/bootScript.ts"
+  },
+  "dependencies": {
+    "@umber-style/core": "workspace:*",
+    "@umber-style/react": "workspace:*"
+  },
+  "peerDependencies": {
+    "react": "^19.2.8"
+  },
+  "devDependencies": {
+    "@types/react": "^19.3.0",
+    "react": "^19.3.1",
+    "typescript": "~7.0.2"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  }
+}

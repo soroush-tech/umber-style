@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.json",
+  "include": ["src"],
+  "exclude": ["src/**/vitest.*.ts", "src/serverTypes.test.tsx"],
+  "files": [
+    "src/augmentation.test.tsx",
+    "src/defaultStyle.test.tsx",
+    "src/defaultStyle.server.test.tsx",
+    "src/defaultStyle.ssr.test.tsx",
+    "src/index.test.ts",
+    "src/index.server.test.ts"
+  ]
+}

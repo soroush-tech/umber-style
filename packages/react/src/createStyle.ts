@@ -3,25 +3,37 @@ import {
   createEngine,
   type DeepPartial,
   type Engine,
+  isThemedSheet,
+  type ObjectSheet,
+  type SheetEntries,
   type SheetEntry,
   type SheetStyles,
+  type WebStyleObject,
 } from '@umber-style/core'
+import { createStampElement, createStyleElements } from './styleElements'
 import { createStyled } from './styled'
 import { createThemeProvider } from './ThemeProvider'
 import { createThemeValue } from './ThemeValue'
-import type { SheetDefinition, StyleOptions, WebStyle } from './types'
+import type { ServerStyleOptions, SheetDefinition, StyleOptions, WebStyle } from './types'
 
 export type { StyleOptions } from './types'
 
 /** A sheet on the web: it makes its class names on first use. */
 interface WebSheet<S extends SheetStyles> extends SheetDefinition<S, SheetEntry> {
-  isDynamic: boolean
   resolve(theme?: unknown): { [K in keyof S]: SheetEntry }
 }
 
 /** Makes the React styling over an engine: `styled`, sheets, the theme provider and `useTheme`. */
-export function bindEngine<T extends object>(engine: Engine<T>): WebStyle<T> {
+export function bindEngine<T extends object>(
+  engine: Engine<T>,
+  { hasServerStyleElements = true }: ServerStyleOptions = {}
+): WebStyle<T> {
   const { ThemeValueProvider, useTheme, useThemeValue } = createThemeValue(engine)
+
+  // Where there is no document (a server render), the style of a class is sent as style elements.
+  const hasStyleElements = () => hasServerStyleElements && typeof document === 'undefined'
+  const renderStyleElements = (className: string) =>
+    hasStyleElements() ? createStyleElements(engine.cache, className) : []
 
   // The real theme of the nearest provider, as references for tokens and real raw values.
   const useThemeView = () => engine.createThemeView(useTheme())
@@ -29,29 +41,52 @@ export function bindEngine<T extends object>(engine: Engine<T>): WebStyle<T> {
   const themeClass = (partial: DeepPartial<T>, colorScheme?: ColorScheme) =>
     engine.themeClass(partial, colorScheme)
 
-  const useStyle = <S extends SheetStyles>(sheet: SheetDefinition<S, SheetEntry>) => {
+  // The context is read first, for every sheet, so that the hooks of a component never change; an object
+  // sheet is its own entries and uses no theme.
+  const useStyle = ((sheet: object) => {
     const real = useThemeValue()
-    const { isDynamic, resolve } = sheet as WebSheet<S>
-    return resolve(isDynamic && real !== undefined ? engine.createThemeView(real) : undefined)
-  }
+    if (!isThemedSheet(sheet)) return sheet
+    return sheet.resolve(real !== undefined ? engine.createThemeView(real) : undefined)
+  }) as WebStyle<T>['useStyle']
 
-  const create = <S extends SheetStyles>(styles: S | ((theme: T) => S)): WebSheet<S> =>
-    engine.createSheet(styles)
+  function create<K extends string>(styles: ObjectSheet<K>): SheetEntries<K>
+  function create<K extends string>(
+    styles: (theme: T) => Record<K, WebStyleObject>
+  ): WebSheet<Record<K, WebStyleObject>>
+  function create(
+    styles: ObjectSheet<string> | ((theme: T) => Record<string, WebStyleObject>)
+  ): unknown {
+    return engine.createSheet(styles as never)
+  }
 
   return {
     engine,
     cache: engine.cache,
-    styled: createStyled(engine, useThemeView),
+    styled: createStyled(engine, useThemeView, renderStyleElements),
     StyleSheet: { create },
     useStyle,
     apply: (...entries) => ({ className: engine.css(...entries) || undefined }),
     ThemeProvider: createThemeProvider({
+      getServerStyle: () =>
+        hasStyleElements()
+          ? {
+              createStyleElements: renderStyleElements,
+              createStamp: () => createStampElement(engine.cache),
+              findThemeIds: engine.findThemeIds,
+              themeId: engine.themeId,
+            }
+          : undefined,
+      learnTheme: (theme) => {
+        if (!engine.hasTheme) engine.setTheme(theme as T)
+      },
       themeClass,
       scopeClass: engine.scopeClass,
       ThemeValueProvider,
     }),
     useTheme,
     themeClass,
+    when: engine.when,
+    whenScheme: engine.whenScheme,
   }
 }
 
@@ -62,5 +97,5 @@ export function createStyle<T extends object>(
 ): WebStyle<T> {
   const engine = options.engine ?? createEngine(theme, options)
   if (!engine.hasTheme) engine.setTheme(theme)
-  return bindEngine(engine)
+  return bindEngine(engine, options)
 }

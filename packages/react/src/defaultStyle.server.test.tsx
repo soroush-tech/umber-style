@@ -1,8 +1,8 @@
 import { createCache, createMemorySheet, NO_THEME_MESSAGE } from '@umber-style/core'
 import { createDefaultStyle } from './defaultStyle.server'
-import { findAll, resolveTree } from './resolveTree'
+import { findAll, resolveTree } from './vitest.resolveTree'
 
-const theme = { palette: { primary: '#0000ff' }, space: [0, 4] }
+const theme = { palette: { primary: '#0000ff', onPrimary: '#ffffff' }, space: [0, 4] }
 
 function setup() {
   const style = createDefaultStyle()
@@ -33,11 +33,14 @@ describe('the default style for server components', () => {
   })
 
   it('has a sheet, useStyle, apply and themeClass, and the base theme of configure', () => {
-    const { configure, StyleSheet, useStyle, apply, themeClass, readTheme } = createDefaultStyle()
+    const { configure, StyleSheet, useStyle, apply, themeClass, when, whenScheme, readTheme } =
+      createDefaultStyle()
     configure({ theme })
     const classes = useStyle(StyleSheet.create((view) => ({ box: { padding: view.space[1] } })))
     expect(apply(classes.box).className).toMatch(/^css-/)
-    expect(themeClass(theme)).toMatch(/^css-theme-/)
+    expect(themeClass(theme)).toMatch(/^css-theme-[a-z0-9]+ css-boundary$/)
+    expect(when(theme)).toMatch(/^@theme css-theme-/)
+    expect(whenScheme('dark')).toBe('@scheme dark')
     expect(readTheme()).toBe(theme)
   })
 

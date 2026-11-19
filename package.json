@@ -7,13 +7,23 @@
   "scripts": {
     "prepare": "husky",
     "gen:publish-options": "node scripts/gen-publish-options.mjs",
+    "build": "pnpm --filter \"./packages/*\" build",
+    "smoke:packed": "pnpm build && node scripts/smoke-packed.mjs",
+    "check:release-notes": "node scripts/check-release-notes.mjs",
+    "deprecate-alpha": "node scripts/deprecate-alpha.mjs",
     "lint": "pnpm -r lint",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
     "test:coverage": "pnpm -r test:coverage",
     "format": "oxfmt",
     "format:check": "oxfmt --check",
-    "check:typography": "aiwg --all"
+    "check:typography": "aiwg --all",
+    "test:e2e": "pnpm --filter @umber-fixtures/e2e test:e2e",
+    "test:e2e:dev": "pnpm --filter @umber-fixtures/e2e test:e2e:dev",
+    "test:browser": "pnpm -r --if-present test:browser",
+    "bench": "node bench/bin/run.mjs",
+    "bench:compare": "node bench/bin/compare.mjs",
+    "bench:gate": "node bench/bin/gate.mjs"
   },
   "devDependencies": {
     "ai-watermark-guard": "^0.2.0",

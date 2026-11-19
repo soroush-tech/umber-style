@@ -1,0 +1,27 @@
+{
+  "name": "@umber-fixtures/spa",
+  "private": true,
+  "version": "0.1.0",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --port 4204 --strictPort",
+    "build": "vite build",
+    "start": "vite preview --port 4104 --strictPort",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@umber-fixtures/shared": "workspace:*",
+    "@umber-style/core": "workspace:*",
+    "@umber-style/react": "workspace:*",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "6.3.0",
+    "typescript": "~7.0.2",
+    "vite": "8.3.8"
+  }
+}

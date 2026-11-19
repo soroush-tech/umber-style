@@ -28,7 +28,7 @@ export function createStyled<T>(engine: Engine<T>, useThemeView: () => T): Style
           // the styles. No style attribute is ever rendered; a string is an error.
           const className = styler.getClassName(
             attrs,
-            [...flattenStyle(attrs.style), normalizeClass(attrs.class)],
+            [...flattenStyle(attrs.style, engine.cache.findEntry), normalizeClass(attrs.class)],
             styler.isDynamic ? useThemeView() : undefined
           )
           const element = (attrs.as as string | Component | undefined) ?? baseTag

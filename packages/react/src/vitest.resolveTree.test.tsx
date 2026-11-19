@@ -1,5 +1,5 @@
 import { Fragment } from 'react'
-import { findAll, resolveTree } from './resolveTree'
+import { findAll, resolveTree } from './vitest.resolveTree'
 
 const Name = ({ name }: { name: string }) => <b>{name}</b>
 const Later = async ({ children }: { children?: React.ReactNode }) => {

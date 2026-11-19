@@ -17,7 +17,10 @@ const baseTheme = { palette: { primary: '#0000ff' }, space: [0, 4, 8] }
 
 function setup() {
   const sheet = createMemorySheet()
-  const style = createStyle(baseTheme, { prefix: 's', cache: createCache({ prefix: 's', sheet }) })
+  const style = createStyle(baseTheme, {
+    prefix: 's',
+    cache: createCache({ hasLayers: false, prefix: 's', sheet }),
+  })
   const ruleOf = (className: string) =>
     sheet.rules.find((rule) => rule.startsWith(`.${className}{`))
   const entries = style.StyleSheet.create((theme) => ({

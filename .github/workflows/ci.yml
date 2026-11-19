@@ -24,6 +24,8 @@ jobs:
       command: ${{ steps.detect-package-manager.outputs.command }}
       runner: ${{ steps.detect-package-manager.outputs.runner }}
       packages: ${{ steps.discover.outputs.packages }}
+      playwright_version: ${{ steps.detect-playwright.outputs.version }}
+      fixtures: ${{ steps.discover-fixtures.outputs.fixtures }}
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v7
@@ -80,6 +82,40 @@ jobs:
           ')
           echo "packages=$MATRIX" >> "$GITHUB_OUTPUT"
 
+      # The Playwright cache key needs the version; whichever package declares playwright is the
+      # one whose browser tier runs it. The e2e package declares @playwright/test, pinned to the
+      # same version, so one browser download serves both tiers.
+      - name: Read Playwright version from packages
+        id: detect-playwright
+        run: |
+          VERSION=$(node -e '
+            const { readdirSync, readFileSync, existsSync } = require("node:fs")
+            for (const dir of readdirSync("packages")) {
+              const manifest = `packages/${dir}/package.json`
+              if (!existsSync(manifest)) continue
+              const pkg = JSON.parse(readFileSync(manifest, "utf8"))
+              const version = pkg.devDependencies?.playwright ?? pkg.dependencies?.playwright
+              if (version) { console.log(version.replace(/^\^/, "")); break }
+            }
+          ')
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      # One e2e row per fixture app under fixtures/. `shared` holds the components every fixture
+      # renders, not an app. Fixtures live outside packages/, so they are not in the package matrix.
+      - name: Discover fixture matrix
+        id: discover-fixtures
+        run: |
+          MATRIX=$(node -e '
+            const { readdirSync, existsSync } = require("node:fs")
+            const rows = readdirSync("fixtures", { withFileTypes: true })
+              .filter((entry) => entry.isDirectory() && entry.name !== "shared")
+              .filter((entry) => existsSync(`fixtures/${entry.name}/package.json`))
+              .map((entry) => ({ fixture: entry.name }))
+              .sort((a, b) => a.fixture.localeCompare(b.fixture))
+            console.log(JSON.stringify({ include: rows }))
+          ')
+          echo "fixtures=$MATRIX" >> "$GITHUB_OUTPUT"
+
   # Format + lint + typecheck the whole workspace once (cheap, recursive).
   lint:
     needs: prepare
@@ -119,6 +155,11 @@ jobs:
       # tracked text file. ASCII punctuation is the house rule.
       - name: Check typography
         run: ${{ needs.prepare.outputs.runner }} run check:typography
+
+      # Every publishable package has a release-notes file for its current version, so a version
+      # bump cannot reach main without its notes (cd-packages.yml refuses to publish without them).
+      - name: Check release notes
+        run: ${{ needs.prepare.outputs.runner }} run check:release-notes
 
   # One row per package: install, run its `test:coverage`, upload its lcov under its
   # own Codecov flag. Packages are alike, so they are a matrix rather than a job each.
@@ -166,10 +207,292 @@ jobs:
           flags: ${{ matrix.flag }}
           name: ${{ matrix.flag }}
 
+  # What a pull request must prove about publishing: the five packages build, and the packed
+  # tarballs work together from outside the workspace (import, require, the export conditions, a
+  # server render, the declarations under two module resolutions). The smoke test installs from npm.
+  build:
+    needs: [prepare, lint]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 15
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Setup pnpm, Node and dependencies
+        uses: ./.github/actions/setup
+        with:
+          node_version: ${{ needs.prepare.outputs.node_version }}
+          manager: ${{ needs.prepare.outputs.manager }}
+          command: ${{ needs.prepare.outputs.command }}
+
+      - name: Build the packages
+        run: ${{ needs.prepare.outputs.runner }} run build
+
+      - name: Smoke-test the packed packages
+        run: node scripts/smoke-packed.mjs
+
+  # Tier 1 of docs/testing.md: the engine's own output in real headless Chromium, in the packages that
+  # have a `test:browser` script. The default test and coverage runs above need no browser.
+  browser:
+    needs: [prepare, lint]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - filter: '@umber-style/core'
+          - filter: '@umber-style/react'
+    env:
+      PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/ms-playwright
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Setup pnpm, Node and dependencies
+        uses: ./.github/actions/setup
+        with:
+          node_version: ${{ needs.prepare.outputs.node_version }}
+          manager: ${{ needs.prepare.outputs.manager }}
+          command: ${{ needs.prepare.outputs.command }}
+
+      # After the install, which touches nothing on this path.
+      - name: Restore cache - Playwright binaries
+        uses: actions/cache/restore@v6
+        id: playwright-cache
+        with:
+          path: ${{ github.workspace }}/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ needs.prepare.outputs.playwright_version }}
+
+      # Only Chromium is needed - the browser tier runs headless Chromium.
+      - name: Install Playwright browsers
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: pnpm --filter ${{ matrix.filter }} exec playwright install --with-deps chromium
+
+      # On a cache hit the binaries are restored, but Linux system libs live outside the cache.
+      # A stalled package mirror once held this step for ten minutes and failed the job: each
+      # attempt stops after three minutes, and the third failure fails the step. timeout stops
+      # pnpm, not the apt-get it started as root, which keeps apt's lock and failed every attempt
+      # after the first: a failed attempt stops it too, lets dpkg finish what it began, and the next
+      # apt waits for a lock still held rather than failing at once.
+      - name: Install Playwright system deps
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        env:
+          FILTER: ${{ matrix.filter }}
+        run: |
+          echo 'DPkg::Lock::Timeout "120";' | sudo tee /etc/apt/apt.conf.d/90-lock-timeout > /dev/null
+          for attempt in 1 2 3; do
+            timeout 180 pnpm --filter "$FILTER" exec playwright install-deps chromium && exit 0
+            echo "::warning::Playwright system deps, attempt $attempt of 3 failed"
+            sudo pkill -x apt-get || true
+            sudo dpkg --configure -a || true
+          done
+          exit 1
+
+      - name: Save cache - Playwright binaries
+        if: always() && steps.playwright-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: ${{ github.workspace }}/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ needs.prepare.outputs.playwright_version }}
+
+      - name: Run real-browser tests
+        run: ${{ needs.prepare.outputs.runner }} --filter ${{ matrix.filter }} test:browser
+
+  # Tier 2 of docs/testing.md: one row per fixture app. Each is built, served as in production, and
+  # driven by Playwright Test. A test marked as a known failure is an expected failure: it does not
+  # fail the run, but one that starts to pass does, so the mark gets removed.
+  e2e:
+    needs: [prepare, lint]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.prepare.outputs.fixtures) }}
+    env:
+      PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/ms-playwright
+      E2E_FIXTURE: ${{ matrix.fixture }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Setup pnpm, Node and dependencies
+        uses: ./.github/actions/setup
+        with:
+          node_version: ${{ needs.prepare.outputs.node_version }}
+          manager: ${{ needs.prepare.outputs.manager }}
+          command: ${{ needs.prepare.outputs.command }}
+
+      # Same pinned browser location and key as the browser job, so both tiers share one download.
+      - name: Restore cache - Playwright binaries
+        uses: actions/cache/restore@v6
+        id: playwright-cache
+        with:
+          path: ${{ github.workspace }}/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ needs.prepare.outputs.playwright_version }}
+
+      - name: Install Playwright browsers
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: pnpm --filter @umber-fixtures/e2e exec playwright install --with-deps chromium
+
+      # Same attempts as the browser job.
+      - name: Install Playwright system deps
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: |
+          echo 'DPkg::Lock::Timeout "120";' | sudo tee /etc/apt/apt.conf.d/90-lock-timeout > /dev/null
+          for attempt in 1 2 3; do
+            timeout 180 pnpm --filter @umber-fixtures/e2e exec playwright install-deps chromium && exit 0
+            echo "::warning::Playwright system deps, attempt $attempt of 3 failed"
+            sudo pkill -x apt-get || true
+            sudo dpkg --configure -a || true
+          done
+          exit 1
+
+      - name: Save cache - Playwright binaries
+        if: always() && steps.playwright-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: ${{ github.workspace }}/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ needs.prepare.outputs.playwright_version }}
+
+      # The Playwright config builds and serves the fixture named by E2E_FIXTURE.
+      - name: Run end-to-end tests
+        run: ${{ needs.prepare.outputs.runner }} run test:e2e
+        env:
+          CI: true
+
+  # The development tier of docs/testing.md: the fixtures that have a development server, each started with
+  # its own `dev` script and driven by Playwright Test (hydration, strict mode, hot replacement, the
+  # development checker, navigation). The rows are the fixtures with a `devPort` in e2e/fixtures.ts.
+  e2e-dev:
+    needs: [prepare, lint]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        fixture: [vike-ssg, next-app, spa]
+    env:
+      PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/ms-playwright
+      E2E_FIXTURE: ${{ matrix.fixture }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Setup pnpm, Node and dependencies
+        uses: ./.github/actions/setup
+        with:
+          node_version: ${{ needs.prepare.outputs.node_version }}
+          manager: ${{ needs.prepare.outputs.manager }}
+          command: ${{ needs.prepare.outputs.command }}
+
+      # Same pinned browser location and key as the browser job, so both tiers share one download.
+      - name: Restore cache - Playwright binaries
+        uses: actions/cache/restore@v6
+        id: playwright-cache
+        with:
+          path: ${{ github.workspace }}/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ needs.prepare.outputs.playwright_version }}
+
+      - name: Install Playwright browsers
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: pnpm --filter @umber-fixtures/e2e exec playwright install --with-deps chromium
+
+      # Same attempts as the browser job.
+      - name: Install Playwright system deps
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: |
+          echo 'DPkg::Lock::Timeout "120";' | sudo tee /etc/apt/apt.conf.d/90-lock-timeout > /dev/null
+          for attempt in 1 2 3; do
+            timeout 180 pnpm --filter @umber-fixtures/e2e exec playwright install-deps chromium && exit 0
+            echo "::warning::Playwright system deps, attempt $attempt of 3 failed"
+            sudo pkill -x apt-get || true
+            sudo dpkg --configure -a || true
+          done
+          exit 1
+
+      - name: Save cache - Playwright binaries
+        if: always() && steps.playwright-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: ${{ github.workspace }}/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ needs.prepare.outputs.playwright_version }}
+
+      # The Playwright config starts the development server of the fixture named by E2E_FIXTURE.
+      - name: Run end-to-end tests against development servers
+        run: ${{ needs.prepare.outputs.runner }} run test:e2e:dev
+        env:
+          CI: true
+
+  # The benchmark gate of docs/benchmarks.md: the head of the pull request against its base, measured
+  # in interleaved rounds on this one machine, compared by the median ratio of each case. The base is
+  # the pull request's base commit, or the commit before a push to main, checked out beside the head;
+  # a base with no benchmark suite passes with a notice. The comparison table goes to the job summary.
+  bench:
+    needs: [prepare, lint]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 20
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Checkout the base
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.base.sha || github.event.before }}
+          path: base
+          persist-credentials: false
+
+      - name: Setup pnpm, Node and dependencies
+        uses: ./.github/actions/setup
+        with:
+          node_version: ${{ needs.prepare.outputs.node_version }}
+          manager: ${{ needs.prepare.outputs.manager }}
+          command: ${{ needs.prepare.outputs.command }}
+
+      # The base installs by itself, in its own folder: it is its own workspace.
+      - name: Setup the base's dependencies
+        uses: ./.github/actions/setup
+        with:
+          node_version: ${{ needs.prepare.outputs.node_version }}
+          manager: ${{ needs.prepare.outputs.manager }}
+          command: ${{ needs.prepare.outputs.command }}
+          directory: base
+
+      - name: Run the benchmark gate
+        run: ${{ needs.prepare.outputs.runner }} run bench:gate --base base --head .
+
+      - name: Write the comparison to the job summary
+        if: always()
+        run: |
+          if [ -f bench/results/gate/gate.md ]; then
+            cat bench/results/gate/gate.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+
   ci-ok:
     name: ci-ok
     if: always()
-    needs: [prepare, lint, packages]
+    needs: [prepare, lint, packages, build, browser, e2e, e2e-dev, bench]
     runs-on: ubuntu-latest
     permissions: {}
     timeout-minutes: 5
