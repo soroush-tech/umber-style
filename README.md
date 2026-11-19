@@ -6,6 +6,7 @@
 
 <p align="center">
   <a href="https://github.com/soroush-tech/umber-style/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/soroush-tech/umber-style/ci.yml?branch=main" alt="Build status"></a>
+  <a href="https://codecov.io/gh/soroush-tech/umber-style"><img src="https://codecov.io/gh/soroush-tech/umber-style/graph/badge.svg" alt="Coverage"></a>
   <a href="https://github.com/soroush-tech/umber-style/blob/main/LICENSE"><img src="https://img.shields.io/github/license/soroush-tech/umber-style" alt="License"></a>
 </p>
 
