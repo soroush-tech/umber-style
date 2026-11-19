@@ -39,6 +39,8 @@ e2e/reports
 .next
 next-env.d.ts
 *.tsbuildinfo
+# `next dev` writes this file into the app that it runs
+fixtures/next-app/AGENTS.md
 
 # Benchmarks: what a run measured
 bench/results

@@ -2,6 +2,7 @@ import { CatalogPage, HomePage, SettingsPage } from '@umber-fixtures/shared/page
 import { Shell } from '@umber-fixtures/shared/shell'
 import { darkClass, lightClass, ThemeProvider } from '@umber-fixtures/shared/style'
 import { STORAGE_KEY, lightTheme } from '@umber-fixtures/shared/themes'
+import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { Link, usePath } from './router'
 
@@ -28,4 +29,8 @@ function App() {
   )
 }
 
-createRoot(document.getElementById('root')!).render(<App />)
+createRoot(document.getElementById('root')!).render(
+  <StrictMode>
+    <App />
+  </StrictMode>
+)

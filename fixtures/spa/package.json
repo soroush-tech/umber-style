@@ -5,6 +5,7 @@
   "license": "MIT",
   "type": "module",
   "scripts": {
+    "dev": "vite --port 4204 --strictPort",
     "build": "vite build",
     "start": "vite preview --port 4104 --strictPort",
     "typecheck": "tsc --noEmit"

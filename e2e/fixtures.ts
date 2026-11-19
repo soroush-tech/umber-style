@@ -20,6 +20,8 @@ export interface FixtureConfig {
   known: Readonly<Record<string, string>>
   /** The spec file that only this fixture runs, besides the shared ones. */
   only?: string
+  /** The port of the development server, for the fixtures that the development tier runs. */
+  devPort?: number
 }
 
 const routes = { home: '/', catalog: '/catalog', settings: '/settings' }
@@ -35,6 +37,7 @@ export const fixtures: readonly FixtureConfig[] = [
     sharesProcess: true,
     scenarios: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'],
     known: {},
+    devPort: 4201,
   },
   {
     name: 'next-app',
@@ -47,6 +50,7 @@ export const fixtures: readonly FixtureConfig[] = [
     scenarios: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'],
     only: 'next-app.spec.ts',
     known: {},
+    devPort: 4202,
   },
   {
     name: 'next-pages',
@@ -70,6 +74,7 @@ export const fixtures: readonly FixtureConfig[] = [
     scenarios: ['A', 'B', 'C', 'D', 'G', 'H'],
     known: {},
     only: 'spa.spec.ts',
+    devPort: 4204,
   },
   {
     name: 'vue-ssr',

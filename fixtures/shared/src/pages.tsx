@@ -12,8 +12,11 @@ import {
   Panel,
   ProductGrid,
 } from './components'
-import { ThemeProvider } from './style'
+import { StyleSheet, ThemeProvider } from './style'
 import { brandTheme } from './themes'
+
+/** A sheet entry on the home page: the development tests edit it while a server runs. */
+const homeSheet = StyleSheet.create({ note: { marginTop: 6 } })
 
 /** The pages are server-safe: no hook. `extra` is where a fixture puts its own interactive part. */
 export function HomePage({ extra }: { extra?: ReactNode }) {
@@ -22,6 +25,9 @@ export function HomePage({ extra }: { extra?: ReactNode }) {
       <Hero data-testid="hero">
         <Heading>Home</Heading>
         <Muted>The first page</Muted>
+        <Muted data-testid="home-note" style={homeSheet.note}>
+          A note from a sheet
+        </Muted>
       </Hero>
       <Flex gap={3} data-testid="home-row">
         <Card data-testid="home-card">

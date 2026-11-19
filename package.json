@@ -15,6 +15,7 @@
     "format:check": "oxfmt --check",
     "check:typography": "aiwg --all",
     "test:e2e": "pnpm --filter @umber-fixtures/e2e test:e2e",
+    "test:e2e:dev": "pnpm --filter @umber-fixtures/e2e test:e2e:dev",
     "test:browser": "pnpm -r --if-present test:browser",
     "bench": "node bench/bin/run.mjs",
     "bench:compare": "node bench/bin/compare.mjs"

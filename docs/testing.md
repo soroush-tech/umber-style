@@ -19,6 +19,7 @@ pnpm test:coverage        # tier 1, every package; fails below 100%
 pnpm test:browser         # tier 2, in core and react
 pnpm test:e2e             # tier 3, every fixture; builds each one first
 E2E_FIXTURE=next-app pnpm test:e2e     # one fixture (a comma-separated list works)
+pnpm test:e2e:dev         # tier 3 against development servers; see "Tier 3 in development"
 ```
 
 Tiers 2 and 3 need Chromium, which Playwright installs once: `pnpm --filter @umber-style/core exec playwright install chromium`. The version of `playwright` in the packages and of `@playwright/test` in `e2e` is the same exact version, so one download serves both. Tier 2 has its own `vitest.browser.config.ts`: `pnpm test` and `pnpm test:coverage` never open a browser. In CI the `browser` job runs tier 2 for `core` and `react`, and the `e2e` job runs one matrix row for each folder of `fixtures/`; a new fixture appears in the matrix with no change to the workflow.
@@ -77,6 +78,27 @@ What `collectUnusedRules` leaves out, because such a rule cannot be used at load
 A test that documents behaviour the engine does not have yet is marked as a known failure through the `known` map of its fixture in `e2e/fixtures.ts`, with a reason that starts with the word KNOWN. Playwright reports it as an expected failure; when it starts to pass the run fails and the mark is removed. **There are none today**: every `known` map is empty. The three groups that were there are fixed: a page carrying the rules of other pages (`extractPageStyles` reads the page), a client component unstyled in the first HTML (the client build renders style elements on a server), and the dark theme class of the browser lacking variables that server components use (the browser reads the rules of the page and completes the classes it made).
 
 `findMissingStyles` is the checker of `@umber-style/core`, the one that the development mode runs. The end-to-end helper carries no copy of it: it sends the compiled text of that file into the page.
+
+## Tier 3 in development
+
+The scenarios above run each fixture as a production build. The development tier starts three of them with their development servers instead: `vike-ssg` (Vike's development server), `next-app` (`next dev`, App Router) and `spa` (the Vite development server). The fixtures that have one say so with a `devPort` in `e2e/fixtures.ts` (the production port plus 100), and a `dev` script in their `package.json`. The specs are in `e2e/dev-tests/`, and the configuration is `e2e/playwright.dev.config.ts`, so `pnpm test:e2e` is unchanged and does not run them.
+
+```sh
+pnpm test:e2e:dev                      # the three development servers
+E2E_FIXTURE=spa pnpm test:e2e:dev      # one fixture (a comma-separated list works)
+```
+
+The tier runs one test at a time, because the hot replacement tests write files that all three fixtures share, and a global setup loads every page of every server once first, so that a test meets a server that has compiled and optimized what it needs. Every test fails on a console error, an uncaught error, any message that mentions hydration, and any warning of the engine's own development checker (`[umber] ...`).
+
+| Spec                      | What it asserts                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `hydration.spec.ts`       | Each page loads with no hydration message or error, in four ways: light, dark stored, light stored, and the system's dark preference                                                                                                                                                                                                                                                                                                                                                           |
+| `strict-mode.spec.ts`     | The app renders under React strict mode (the fiber of the app root has the strict bits). A known element of each page has one rule for each of its classes and no class twice, no rule appears twice in the engine's sheets, a second round trip through the pages writes no rule, and no second watch on `<head>` starts                                                                                                                                                                      |
+| `hot-replacement.spec.ts` | A value is edited in a source file while the server runs, for a `styled()` component and for a `StyleSheet.create` entry: the element gets the new computed value, its old class is gone, `window` keeps its marker and the document keeps its start time (no reload), and `findMissingStyles` finds nothing. Each file is put back after the test, written again until the page shows its old value without a reload (a development server that has just handled one write can miss the next) |
+| `dev-checks.spec.ts`      | On a healthy page the development checker (`hasDevChecks`, on in development) and `findMissingStyles` report nothing, and the checker is on: a class that no rule names is warned about once. A fake clock that keeps running moves past the checker's wait at once                                                                                                                                                                                                                            |
+| `navigation.spec.ts`      | Every pair of pages, followed in the browser, has the computed styles of the target loaded directly and no missing style; a theme that was switched is the theme that the next page shows                                                                                                                                                                                                                                                                                                      |
+
+The tests change `fixtures/shared/src/components.tsx` and `fixtures/shared/src/pages.tsx` for a moment. If a run is killed while one is edited, `git checkout` those two files. `next dev` also writes an `AGENTS.md` into `fixtures/next-app`; git ignores it.
 
 ## What is not covered
 

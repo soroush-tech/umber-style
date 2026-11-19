@@ -340,10 +340,77 @@ jobs:
         env:
           CI: true
 
+  # The development tier of docs/testing.md: the fixtures that have a development server, each started with
+  # its own `dev` script and driven by Playwright Test (hydration, strict mode, hot replacement, the
+  # development checker, navigation). The rows are the fixtures with a `devPort` in e2e/fixtures.ts.
+  e2e-dev:
+    needs: [prepare, lint]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        fixture: [vike-ssg, next-app, spa]
+    env:
+      PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/ms-playwright
+      E2E_FIXTURE: ${{ matrix.fixture }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Setup pnpm, Node and dependencies
+        uses: ./.github/actions/setup
+        with:
+          node_version: ${{ needs.prepare.outputs.node_version }}
+          manager: ${{ needs.prepare.outputs.manager }}
+          command: ${{ needs.prepare.outputs.command }}
+
+      # Same pinned browser location and key as the browser job, so both tiers share one download.
+      - name: Restore cache - Playwright binaries
+        uses: actions/cache/restore@v6
+        id: playwright-cache
+        with:
+          path: ${{ github.workspace }}/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ needs.prepare.outputs.playwright_version }}
+
+      - name: Install Playwright browsers
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: pnpm --filter @umber-fixtures/e2e exec playwright install --with-deps chromium
+
+      # Same attempts as the browser job.
+      - name: Install Playwright system deps
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: |
+          echo 'DPkg::Lock::Timeout "120";' | sudo tee /etc/apt/apt.conf.d/90-lock-timeout > /dev/null
+          for attempt in 1 2 3; do
+            timeout 180 pnpm --filter @umber-fixtures/e2e exec playwright install-deps chromium && exit 0
+            echo "::warning::Playwright system deps, attempt $attempt of 3 failed"
+            sudo pkill -x apt-get || true
+            sudo dpkg --configure -a || true
+          done
+          exit 1
+
+      - name: Save cache - Playwright binaries
+        if: always() && steps.playwright-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: ${{ github.workspace }}/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ needs.prepare.outputs.playwright_version }}
+
+      # The Playwright config starts the development server of the fixture named by E2E_FIXTURE.
+      - name: Run end-to-end tests against development servers
+        run: ${{ needs.prepare.outputs.runner }} run test:e2e:dev
+        env:
+          CI: true
+
   ci-ok:
     name: ci-ok
     if: always()
-    needs: [prepare, lint, packages, browser, e2e]
+    needs: [prepare, lint, packages, browser, e2e, e2e-dev]
     runs-on: ubuntu-latest
     permissions: {}
     timeout-minutes: 5
