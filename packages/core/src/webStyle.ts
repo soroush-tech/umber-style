@@ -1,4 +1,5 @@
 import type * as CSS from 'csstype'
+import type { AlphaColor } from './alpha'
 
 /** A property's value: what the CSS typings allow, or a list of those (fallbacks, tried in order), or nothing. */
 type WebValue<V> = V | readonly V[] | null | undefined | false
@@ -23,11 +24,39 @@ type DisplayValue =
 
 type CssProperties = CSS.Properties<string | number>
 
-/** Every CSS property, by its camelCase name, with its value type. */
+/** The properties whose value is a color, and so also take the result of `alpha()`. */
+type ColorProperty =
+  | 'accentColor'
+  | 'background'
+  | 'backgroundColor'
+  | 'borderBlockColor'
+  | 'borderBlockEndColor'
+  | 'borderBlockStartColor'
+  | 'borderBottomColor'
+  | 'borderColor'
+  | 'borderInlineColor'
+  | 'borderInlineEndColor'
+  | 'borderInlineStartColor'
+  | 'borderLeftColor'
+  | 'borderRightColor'
+  | 'borderTopColor'
+  | 'caretColor'
+  | 'color'
+  | 'columnRuleColor'
+  | 'fill'
+  | 'floodColor'
+  | 'lightingColor'
+  | 'outlineColor'
+  | 'stopColor'
+  | 'stroke'
+  | 'textDecorationColor'
+  | 'textEmphasisColor'
+
+/** Every CSS property, by its camelCase name, with its value type; a color property also takes `alpha()`. */
 export type WebProperties = {
   [K in keyof CssProperties]?: K extends 'display'
     ? WebValue<DisplayValue>
-    : WebValue<NonNullable<CssProperties[K]>>
+    : WebValue<NonNullable<CssProperties[K]> | (K extends ColorProperty ? AlphaColor : never)>
 }
 
 /** What a nested key holds: a style of its own, or nothing (so `isOpen && { ... }` works). */
@@ -41,7 +70,7 @@ type WebNested = WebStyleObject | null | undefined | false
 export type WebStyleObject = WebProperties & {
   /** Part of the class name, for a readable class in the developer tools. */
   label?: string
-  [key: `--${string}`]: string | number | null | undefined | false
+  [key: `--${string}`]: string | number | AlphaColor | null | undefined | false
   [key: `${string}&${string}`]: WebNested
   [key: `:${string}`]: WebNested
   [key: `@${string}`]: WebNested

@@ -51,7 +51,8 @@ describe('the entries of umber-style', () => {
         expect(binding).toHaveProperty(name)
       }
     }
-    expect(react.alpha('red', 1)).toBe('color-mix(in srgb, red 100%, transparent)')
+    expect(String(react.alpha('red', 0.5))).toBe('color-mix(in srgb, red 50%, transparent)')
+    expect(react.alpha('red', 1)).toBe('red')
     expect(reactNative.alpha('#fff', 1)).toBe('rgba(255, 255, 255, 1)')
   })
 

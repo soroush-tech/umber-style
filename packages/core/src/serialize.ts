@@ -1,10 +1,13 @@
+import { isAlphaColor, type AlphaColor } from './alpha'
+
 export type StyleValue =
   | string
   | number
+  | AlphaColor
   | null
   | undefined
   | false
-  | readonly (string | number)[]
+  | readonly (string | number | AlphaColor)[]
   | StyleObject
 
 export interface StyleObject {
@@ -48,9 +51,11 @@ const UNITLESS = new Set([
 
 const propertyNames = new Map<string, string>()
 
-/** Whether `value` is a nested style object, not an array or a plain value. */
+/** Whether `value` is a nested style object, not an array, an `alpha()` result or a plain value. */
 function isStyleObject(value: StyleValue): value is StyleObject {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
+  return (
+    typeof value === 'object' && value !== null && !Array.isArray(value) && !isAlphaColor(value)
+  )
 }
 
 /** The CSS name of a style key: kebab-case, custom properties as written. */
@@ -124,30 +129,57 @@ export function mergeStyles(styles: readonly StyleObject[]): StyleObject {
 }
 
 /** The rules of the nested style `value` under `key`: an at-rule wraps them, any other key is a selector inside `selector`. */
-function compileNested(selector: string, key: string, value: StyleObject): string[] {
-  if (!key.startsWith('@')) return compileRules(resolveSelector(selector, key), value)
-  return compileRules(selector, value).map((rule) => `${key}{${rule}}`)
+function compileNested(
+  selector: string,
+  key: string,
+  value: StyleObject,
+  hasColorFallbacks: boolean
+): string[] {
+  if (!key.startsWith('@')) {
+    return compileRules(resolveSelector(selector, key), value, hasColorFallbacks)
+  }
+  return compileRules(selector, value, hasColorFallbacks).map((rule) => `${key}{${rule}}`)
+}
+
+/** One item of a property's value: a value, or an `alpha()` result, which is two declarations (the fallback, then the mix) or just the mix. */
+type DeclaredItem = string | number | AlphaColor
+
+/** The declarations of one item: a custom property takes any text, so a fallback would always win there, and is not written. */
+function toItemDeclarations(
+  key: string,
+  name: string,
+  item: DeclaredItem,
+  hasColorFallbacks: boolean
+): string {
+  if (!isAlphaColor(item)) return `${name}:${toValue(key, item)};`
+  const hasFallback = hasColorFallbacks && !key.startsWith('--')
+  return `${hasFallback ? `${name}:${item.fallback};` : ''}${name}:${item.value};`
 }
 
 /** The declarations of one property: one for a value, one for each item of a fallback list. */
 function toDeclarations(
   key: string,
-  value: string | number | readonly (string | number)[]
+  value: DeclaredItem | readonly DeclaredItem[],
+  hasColorFallbacks: boolean
 ): string {
   const name = toPropertyName(key)
-  const items = typeof value === 'object' ? value : [value]
-  return items.map((item) => `${name}:${toValue(key, item)};`).join('')
+  const items = Array.isArray(value) ? (value as readonly DeclaredItem[]) : [value as DeclaredItem]
+  return items.map((item) => toItemDeclarations(key, name, item, hasColorFallbacks)).join('')
 }
 
-/** The flat CSS rules of `style` for `selector`. */
-export function compileRules(selector: string, style: StyleObject): string[] {
+/** The flat CSS rules of `style` for `selector`; without `hasColorFallbacks` an `alpha()` result is written as its mix alone. */
+export function compileRules(
+  selector: string,
+  style: StyleObject,
+  hasColorFallbacks = true
+): string[] {
   let declarations = ''
   const nested: string[] = []
 
   for (const [key, value] of Object.entries(style)) {
     if (key === 'label' || value === null || value === undefined || value === false) continue
-    if (isStyleObject(value)) nested.push(...compileNested(selector, key, value))
-    else declarations += toDeclarations(key, value)
+    if (isStyleObject(value)) nested.push(...compileNested(selector, key, value, hasColorFallbacks))
+    else declarations += toDeclarations(key, value, hasColorFallbacks)
   }
 
   return declarations ? [`${selector}{${declarations}}`, ...nested] : nested

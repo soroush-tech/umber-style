@@ -19,6 +19,12 @@ export interface CacheOptions {
    * `markUsed`), appending more as rules come in. Default true. Without it, a theme class declares every token.
    */
   hasPruning?: boolean
+  /**
+   * Whether a property whose value is `alpha()` gets two declarations, the fallback first (rgba() for a
+   * literal colour, else the colour itself) and then the color-mix() value, for a browser without
+   * color-mix(). Default true. Without it only the color-mix() value is written.
+   */
+  hasColorFallbacks?: boolean
   /** Where rules go. Default: a DOM sheet when `document` exists, otherwise an in-memory one. */
   sheet?: Sheet
 }
@@ -57,7 +63,11 @@ export interface Cache {
   css(...values: ClassValue[]): string
   /** `css`, with the layer of the class given: `overrides` for what a component is given from outside. */
   cssIn(layer: ClassLayer, ...values: ClassValue[]): string
-  /** Inserts `rules` once under `id`, each wrapped in `layer` when there is one; returns whether it inserted them. */
+  /**
+   * Inserts `rules` once under `id`; returns whether it inserted them. With a `layer` (and layers on)
+   * each rule is wrapped in it. Without one the rules are written as they are, outside every layer:
+   * the place of an at-rule that is not a layer's to hold, such as `@property`.
+   */
   insertOnce(id: string, rules: readonly string[], layer?: RuleLayer): boolean
   /** The rules this cache inserted under `id` (a class name), or none: for a style element that a server component renders. */
   getRules(id: string): readonly string[]
@@ -77,7 +87,14 @@ export interface Cache {
     declarations: Readonly<Record<string, string>>,
     colorScheme?: string
   ): void
-  /** `getRules` with every declaration of a theme class, used or not: for a style element that is sent before the rules that use the class. */
+  /**
+   * Gives the cache the `@property` rule of each registered variable, by variable name (`createTokens`
+   * makes them), replacing those it had. A rule is written once, outside every layer, when its variable
+   * is first used (at once for a variable that is used already, or when there is no pruning); a rule
+   * that is the same as a written one, or that a server render sent, is not written again.
+   */
+  registerProperties(rules: Readonly<Record<string, string>>): void
+  /** `getRules` with every declaration of a theme class, used or not, after the `@property` rules of the registered variables it declares: for a style element that is sent before the rules that use the class. */
   getFullRules(id: string): readonly string[]
   /** The CSS inserted so far and the ids it covers (class names, then the used variables), for a server render or a static page. */
   extract(): { css: string; ids: string[] }
@@ -188,6 +205,7 @@ export function createCache(options: CacheOptions = {}): Cache {
     hasLabels = true,
     hasLayers = true,
     hasPruning = true,
+    hasColorFallbacks = true,
   } = options
   if (!PREFIX_PATTERN.test(prefix)) {
     throw new Error(`Invalid cache prefix "${prefix}": use lowercase letters, digits and hyphens.`)
@@ -203,6 +221,9 @@ export function createCache(options: CacheOptions = {}): Cache {
   const registered = new Map<string, StyleObject>()
 
   const insertedRules = new Map<string, readonly string[]>()
+  // The `@property` rule of each registered variable, and the variables of each theme class.
+  let propertyRules: Readonly<Record<string, string>> = {}
+  const themeNames = new Map<string, readonly string[]>()
 
   const layerOrder = hasLayers
     ? `@layer ${RULE_LAYERS.map((layer) => `${prefix}-${layer}`).join(',')};`
@@ -248,6 +269,20 @@ export function createCache(options: CacheOptions = {}): Cache {
     insertedRules.set(className, entry.rules)
   }
 
+  /** Writes the `@property` rule of the variable `name`, once; the rule of the same text is never written twice, a changed one is written after it and wins. */
+  const writeProperty = (name: string): void => {
+    const rule = propertyRules[name]
+    if (rule === undefined) return
+    if (insertOnce(`@property:${name}:${hashString(rule)}`, [rule])) insertedRules.set(name, [rule])
+  }
+
+  const registerProperties = (rules: Readonly<Record<string, string>>): void => {
+    propertyRules = rules
+    for (const name of Object.keys(rules)) {
+      if (!hasPruning || used.has(name)) writeProperty(name)
+    }
+  }
+
   const markUsed = (names: Iterable<string>): void => {
     if (!hasPruning) return
     const queue = [...names]
@@ -264,6 +299,7 @@ export function createCache(options: CacheOptions = {}): Cache {
       }
     }
     if (fresh.length === 0) return
+    fresh.forEach(writeProperty)
     for (const [className, entry] of themes) {
       writeTheme(
         className,
@@ -279,6 +315,7 @@ export function createCache(options: CacheOptions = {}): Cache {
     colorScheme?: string
   ): void => {
     const schemeText = colorScheme ? `color-scheme:${colorScheme};` : ''
+    themeNames.set(className, Object.keys(declarations))
     const body = toDeclarationText(Object.entries(declarations)) + schemeText
     if (!hasPruning) {
       insertOnce(className, body ? [`.${className}{${body}}`] : [], 'theme')
@@ -327,9 +364,10 @@ export function createCache(options: CacheOptions = {}): Cache {
 
   const getFullRules = (id: string): readonly string[] => {
     const entry = themes.get(id)
-    if (entry === undefined) return insertedRules.get(id) ?? []
+    const properties = (themeNames.get(id) ?? []).flatMap((name) => propertyRules[name] ?? [])
+    if (entry === undefined) return [...properties, ...(insertedRules.get(id) ?? [])]
     const body = toDeclarationText(Object.entries(entry.declarations)) + entry.schemeText
-    return body ? wrapInLayer([`.${id}{${body}}`], 'theme') : []
+    return [...properties, ...(body ? wrapInLayer([`.${id}{${body}}`], 'theme') : [])]
   }
 
   const cssIn = (layer: ClassLayer, ...values: ClassValue[]): string => {
@@ -337,14 +375,14 @@ export function createCache(options: CacheOptions = {}): Cache {
     if (styles.length === 0) return rawClasses.join(' ')
 
     const merged = mergeStyles(styles)
-    const rules = compileRules('&', merged)
+    const rules = compileRules('&', merged, hasColorFallbacks)
     if (rules.length === 0) return rawClasses.join(' ')
     const label = hasLabels ? readLabel(merged) : ''
     // The layer is part of the hash, so that the same styles in two layers are two classes.
     const hash = hashString((hasLayers && layer === 'overrides' ? layer : '') + rules.join(''))
     const className = [prefix, label, hash].filter(Boolean).join('-') + suffix
     registered.set(className, merged)
-    insertOnce(className, compileRules(`.${className}`, merged), layer)
+    insertOnce(className, compileRules(`.${className}`, merged, hasColorFallbacks), layer)
     return [...rawClasses, className].join(' ')
   }
 
@@ -359,6 +397,7 @@ export function createCache(options: CacheOptions = {}): Cache {
     usedVariables: used,
     markUsed,
     insertTheme,
+    registerProperties,
     insertOnce,
     getRules: (id) => insertedRules.get(id) ?? [],
     getFullRules,

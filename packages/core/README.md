@@ -189,3 +189,137 @@ In the server-components build each `<style href precedence>` is sent before the
 render, so a provider cannot know which variables they use. It sends every variable of its theme
 class, as before (`cache.getFullRules`). Pruning is on in that engine's cache, but only the classic
 server render and the browser are smaller.
+
+## Color fallbacks
+
+`alpha(color, opacity)` returns the color at an opacity (0 to 1). A browser without `color-mix()`
+would drop the declaration and leave the property unset, so the engine writes two declarations when
+the result is the whole value of a property: a fallback first, then the `color-mix()` value. A browser
+that does not know `color-mix()` keeps the first.
+
+```ts
+styled('div')(({ theme }) => ({
+  background: alpha(theme.palette.primary, 0.1),
+  borderColor: alpha('#1b5fd1', 0.5),
+}))
+```
+
+```css
+background: var(--css-palette-primary);
+background: color-mix(in srgb, var(--css-palette-primary) 10%, transparent);
+border-color: rgba(27, 95, 209, 0.5);
+border-color: color-mix(in srgb, #1b5fd1 50%, transparent);
+```
+
+- The fallback of a literal the engine can read (`#rgb`, `#rgba`, `#rrggbb`, `#rrggbbaa`, `rgb()` and
+  `rgba()` with numbers, comma or space syntax) is that color with the opacity applied, as
+  `rgba(r, g, b, a)`; an alpha the color already has is multiplied. The fallback of anything else (a
+  token reference, a named color, `hsl()`) is the color itself at full opacity: a solid color is
+  better than none.
+- `opacity` outside 0 to 1 (or `NaN`) throws a `RangeError`; `1` returns the color itself, `0` returns
+  `transparent`.
+- The result for a value between 0 and 1 is a small frozen object (`AlphaColor`, with `fallback` and
+  `value`), not a string, so that the serializer can tell it from text. As text (`String(x)`, a
+  template literal) it is the `color-mix()` form, so `` `1px solid ${alpha(c, 0.5)}` `` is valid CSS. A
+  fallback is only written when the result is the whole value of a property (or an item of a list);
+  inside a longer string there is none. In a custom property (`'--tint': alpha(...)`) there is none
+  either, because a custom property takes any text and a fallback would always win. `1` and `0` give
+  plain strings. The arithmetic helpers throw a `TypeError` for an `AlphaColor`.
+- `alpha` knows no engine, so the switch is in the serializer: `hasColorFallbacks: false` (an option of
+  the engine and of `createCache`, default `true`) makes it write the `color-mix()` value alone, as
+  before. A cache that is given to the engine keeps its own setting.
+- A token that appears only inside `alpha()` is used: it is in both declarations, so the theme class
+  declares it.
+- On React Native `alpha` returns an `rgba()` string for `#rgb` and `#rrggbb` and the color unchanged
+  for anything else; it is not affected.
+
+## Animating tokens
+
+A CSS variable has no type, so the browser cannot interpolate it. Registering a token writes an
+`@property` rule that gives its variable a type; then the variable itself can be transitioned.
+
+```ts
+const { styled } = createStyle(theme, {
+  registered: { palette: true, 'space.1': '<length>', 'palette.mode': '*' },
+})
+```
+
+`registered` is keyed by dotted theme path like `modes` (the most specific path wins; a top-level key
+such as `palette` covers everything under it). The value is `true`, to infer the syntax from the base
+theme value, or one of `'<color>'`, `'<length>'`, `'<number>'`, `'<percentage>'`,
+`'<length-percentage>'`, `'<angle>'`, `'<time>'` and `'*'`. Only `variable` and `reference` tokens have
+a variable; the others are skipped. A key that matches no token is ignored.
+
+| Base value                                                    | Inferred syntax |
+| ------------------------------------------------------------- | --------------- |
+| a number under a length key (`space`, `sizes`, ...), or `8px` | `<length>`      |
+| any other number, or a numeric string                         | `<number>`      |
+| `50%`                                                         | `<percentage>`  |
+| `150ms`, `1s`                                                 | `<time>`        |
+| `45deg`, `0.5turn`                                            | `<angle>`       |
+| `#hex`, `rgb()`, `rgba()`, `hsl()`, `hsla()`, `transparent`   | `<color>`       |
+| anything else                                                 | a `TypeError`   |
+
+Named colors (`red`) are not recognized in inference; give `'<color>'` for them. A token that cannot
+be inferred, a syntax that is not in the list, a value that is not of its syntax, and a value that
+cannot be an initial value (see below) all throw a `TypeError` that names the theme path when the
+engine is created. Register such a token as `'*'`, or not at all.
+
+```css
+@property --css-palette-primary {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #0b57d0;
+}
+```
+
+- The initial value is the base theme value, with `px` as a theme class declares it. A non-universal
+  syntax needs an initial value that does not depend on the element, so `var()`, `env()`, `attr()`,
+  `currentcolor`, font-relative units (`em`, `rem`, `ch`, ...) and viewport units are rejected. The
+  universal syntax `*` has no initial value. A reference token registers its base value, not the
+  `var(--x, fallback)` text.
+- `inherits` is always `true`. A nested theme sets the variable on its wrapper and everything inside
+  must see it; with `false` a descendant would get the initial value. The cost: every registered
+  variable is an inherited property that the browser treats as typed, and a change to one on a wrapper
+  restyles the subtree like any inherited property. Register the tokens you animate, not the whole
+  theme, on a large page.
+- The rule is written once, outside every cascade layer: `@property` is a registry of the document,
+  not a style that cascades, so a layer has nothing to order, and its use inside `@layer` is not
+  something the engine relies on. It comes after the layer order statement; its position among the
+  other rules does not matter. In the server-components build it is sent in the element of the theme
+  class (every registered variable that theme declares), after the order statement and before the rule.
+- With pruning, a registered token that nothing uses has no rule; the first rule that uses it brings
+  it. A classic server render marks the rules it sent in `data-ids`, and the browser writes none
+  again. If `setTheme` gives a base theme with another value, the new rule is appended and, being
+  last, wins.
+
+What is true about animating a switch of theme class:
+
+- `transition: 'background-color 200ms'` on a component whose `background-color` is `var(--x)`
+  animates when a different theme class applies above it and changes `--x`: the computed value of the
+  real property changes. This does not need registration (by reasoning from the specification, not
+  checked in a browser here).
+- What registration adds is a variable that can be transitioned itself: put
+  `transition: '--css-palette-primary 200ms'` on the element that a theme class is on, and every
+  descendant sees the interpolated value, also where it is used in a place with no interpolation of its
+  own (inside a gradient, a `calc()`, a shadow).
+- Verified here: the rule text and where it is written, in tests. jsdom accepts `@property` in
+  `insertRule`, keeps it as a property rule, and computes a registered `<color>` variable (it comes back
+  as `rgb(...)`, and a descendant gets the initial value when `inherits` is `false`), so the nested
+  theme test fails for `inherits: false`. jsdom runs no transitions: nothing about the animation itself
+  is verified.
+- A nested theme that gives a registered token a value of another type (`10px` for a `<color>`) is a
+  declaration the browser ignores, so the value of an outer theme shows through.
+
+## Supported browsers
+
+What the engine writes needs custom properties, and cascade layers (Chrome 99, Firefox 97, Safari
+15.4, all of 2022) unless `hasLayers: false`. `color-mix()` (Chrome 111, Firefox 113, Safari 16.2) is
+optional: with color fallbacks (the default) a browser without it shows the fallback color.
+`@property` (Chrome 85, Safari 16.4, Firefox 128) is only written for registered tokens, and a browser
+that does not know it ignores the rule: the token works, it only does not animate.
+
+So with the defaults the floor is a 2022 browser. With `hasLayers: false` the floor is a browser with
+custom properties and `display: contents` (the scope wrapper), and colors degrade to their fallbacks.
+That second claim rests on the specifications and on the output of the engine; it was not run in an old
+browser.

@@ -1,3 +1,5 @@
+import { createPropertyRule, type RegisteredSyntax } from './registered'
+
 /** How a token is written: a variable, the real value in the rules, a variable with a fallback, or a real value that is never written. */
 export type TokenMode = 'variable' | 'inline' | 'reference' | 'raw'
 
@@ -13,6 +15,14 @@ export interface TokenOptions {
    * The most specific path wins, and an entry beats `rawKeys`. Default mode: `variable`.
    */
   modes?: Readonly<Record<string, TokenMode>>
+  /**
+   * The tokens that are registered custom properties (an `@property` rule), by dotted theme path, found
+   * like `modes` (the most specific path wins; a top-level key registers everything under it). `true`
+   * infers the syntax from the base theme value, otherwise it is one of the syntaxes. A registered
+   * variable has a type, so a `transition` on it animates a theme switch. Only variable and reference
+   * tokens have a variable to register.
+   */
+  registered?: Readonly<Record<string, RegisteredSyntax | true>>
 }
 
 export type DeepPartial<T> = T extends (...args: never[]) => unknown
@@ -30,6 +40,8 @@ export interface Tokens<T> {
   createView(realTheme: T): T
   /** The names of the variables of the base theme under these dotted paths (a top-level key or a deeper path). */
   findNames(paths: readonly string[]): string[]
+  /** The `@property` rule of each registered variable of the base theme, by variable name. */
+  registrations: Readonly<Record<string, string>>
 }
 
 const DEFAULT_RAW_KEYS = ['breakpoints', 'components']
@@ -60,6 +72,19 @@ interface Declared {
   name: string
   path: string
   value: string
+  /** The value in the theme: a number stays a number. */
+  source: string | number
+  /** Whether the value is a number of a length key, which `value` writes in px. */
+  isLength: boolean
+}
+
+/** The value of the longest dotted path in `entries` that `path` starts with, or undefined. */
+function findByPath<V>(entries: ReadonlyMap<string, V>, path: readonly string[]): V | undefined {
+  for (let length = path.length; length > 0; length--) {
+    const value = entries.get(path.slice(0, length).join('.'))
+    if (value !== undefined) return value
+  }
+  return undefined
 }
 
 /** The dotted paths above each key of `modes`: 'a.b.c' gives 'a' and 'a.b'. */
@@ -79,6 +104,7 @@ function collectParents(modes: ReadonlyMap<string, TokenMode>): Set<string> {
 export function createTokens<T extends object>(theme: T, options: TokenOptions = {}): Tokens<T> {
   const { prefix = '', rawKeys = DEFAULT_RAW_KEYS, lengthKeys = DEFAULT_LENGTH_KEYS } = options
   const modes = new Map(Object.entries(options.modes ?? {}))
+  const registered = new Map(Object.entries(options.registered ?? {}))
   const parents = collectParents(modes)
 
   const toName = (path: readonly string[]) =>
@@ -86,10 +112,8 @@ export function createTokens<T extends object>(theme: T, options: TokenOptions =
 
   /** The mode of the token at `path`: the longest path in `modes`, else `rawKeys`, else variable. */
   const readMode = (path: readonly string[]): TokenMode => {
-    for (let length = path.length; length > 0; length--) {
-      const mode = modes.get(path.slice(0, length).join('.'))
-      if (mode !== undefined) return mode
-    }
+    const mode = findByPath(modes, path)
+    if (mode !== undefined) return mode
     return rawKeys.includes(path[0]) ? 'raw' : 'variable'
   }
 
@@ -99,11 +123,13 @@ export function createTokens<T extends object>(theme: T, options: TokenOptions =
     return (mode === 'raw' || mode === 'inline') && !parents.has(path.join('.'))
   }
 
+  /** Whether `value` is a number under a length key: it is a length, written in px unless it is 0. */
+  const isLengthValue = (path: readonly string[], value: string | number): boolean =>
+    typeof value === 'number' && lengthKeys.includes(path[0])
+
   /** The value a variable at `path` holds: a number under a length key is in px. */
-  const toDeclared = (path: readonly string[], value: string | number): string => {
-    const isLength = typeof value === 'number' && value !== 0 && lengthKeys.includes(path[0])
-    return isLength ? `${value}px` : String(value)
-  }
+  const toDeclared = (path: readonly string[], value: string | number): string =>
+    isLengthValue(path, value) && value !== 0 ? `${value}px` : String(value)
 
   const collect = (node: unknown, path: string[], found: Declared[]): void => {
     if (path.length > 0 && isKept(path)) return
@@ -114,7 +140,13 @@ export function createTokens<T extends object>(theme: T, options: TokenOptions =
     } else if (isLeaf(node)) {
       const mode = readMode(path)
       if (mode === 'variable' || mode === 'reference') {
-        found.push({ name: toName(path), path: path.join('.'), value: toDeclared(path, node) })
+        found.push({
+          name: toName(path),
+          path: path.join('.'),
+          value: toDeclared(path, node),
+          source: node,
+          isLength: isLengthValue(path, node),
+        })
       }
     }
   }
@@ -131,6 +163,14 @@ export function createTokens<T extends object>(theme: T, options: TokenOptions =
   // The fallback of a reference is the value in the base theme.
   const baseTokens = list(theme)
   const baseDeclarations = Object.fromEntries(baseTokens.map(({ name, value }) => [name, value]))
+
+  // The `@property` rule of each registered variable of the base theme.
+  const registrations: Record<string, string> = {}
+  for (const token of baseTokens) {
+    const syntax = findByPath(registered, token.path.split('.'))
+    if (syntax === undefined) continue
+    registrations[token.name] = createPropertyRule(token, syntax)
+  }
 
   const toRef = (path: readonly string[], node: string | number): string | number => {
     const mode = readMode(path)
@@ -157,6 +197,7 @@ export function createTokens<T extends object>(theme: T, options: TokenOptions =
   return {
     refs: toRefs(theme, []) as T,
     declare,
+    registrations,
     createView: (realTheme) => toRefs(realTheme, []) as T,
     findNames: (wanted) =>
       baseTokens

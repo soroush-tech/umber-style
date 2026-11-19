@@ -22,7 +22,7 @@ describe('the entry of @umber-style/react', () => {
     ]) {
       expect(entry).toHaveProperty(name)
     }
-    expect(entry.alpha('red', 0.5)).toBe('color-mix(in srgb, red 50%, transparent)')
+    expect(String(entry.alpha('red', 0.5))).toBe('color-mix(in srgb, red 50%, transparent)')
     expect(entry.multiply('var(--x)', 2)).toBe('calc(var(--x) * 2)')
   })
 

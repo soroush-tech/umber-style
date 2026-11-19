@@ -2,6 +2,7 @@
 import { expectTypeOf } from 'vitest'
 import {
   add,
+  alpha,
   createCache,
   createLazyEngine,
   createMemorySheet,
@@ -9,6 +10,8 @@ import {
   multiply,
   negate,
   subtract,
+  type AlphaColor,
+  type Operand,
   type StyleFunction,
   type StyleObject,
   type WebStyleObject,
@@ -123,5 +126,41 @@ describe('the arithmetic helpers in a web style', () => {
     }
     expectTypeOf(style.marginLeft).not.toBeAny()
     expect(style.padding).toBe('calc(var(--u-space-2) * 2)')
+  })
+})
+
+describe('alpha in a web style', () => {
+  it('is accepted by a color property, in a list, in a nested style and in a custom property', () => {
+    const base = 'var(--u-palette-primary)'
+    const style: WebStyleObject = {
+      background: alpha(base, 0.1),
+      color: [alpha(base, 0.5), 'red'],
+      borderTopColor: alpha('#fff', 0.2),
+      '--tint': alpha(base, 0.3),
+      '&:hover': { backgroundColor: alpha(base, 0.2) },
+      border: `1px solid ${alpha(base, 0.5)}`,
+    }
+    const { engine, sheet } = setup()
+    expect(engine.css(style)).toMatch(/^w-/)
+    expect(sheet.rules.join('')).toContain('--tint:color-mix(in srgb, var(--u-palette-primary) 30%')
+  })
+
+  it('is typed as a color: accepted where a color goes, not as a length or an operand', () => {
+    expectTypeOf(alpha).returns.toEqualTypeOf<AlphaColor | string>()
+    expectTypeOf<AlphaColor>().toExtend<NonNullable<WebStyleObject['background']>>()
+    expectTypeOf<AlphaColor>().toExtend<NonNullable<WebStyleObject['--any']>>()
+    expectTypeOf<AlphaColor>().not.toExtend<NonNullable<WebStyleObject['padding']>>()
+    expectTypeOf<AlphaColor>().not.toExtend<NonNullable<WebStyleObject['display']>>()
+    expectTypeOf<AlphaColor>().not.toExtend<Operand>()
+    expectTypeOf<AlphaColor>().not.toBeAny()
+  })
+
+  it('compiles in a style function against the theme', () => {
+    const { engine } = setup()
+    const fn: StyleFunction<{ palette: { primary: string } }, object> = ({ theme }) => ({
+      background: alpha(theme.palette.primary, 0.1),
+    })
+    expect(typeof fn).toBe('function')
+    expect(engine.createStyler({}, [fn])).toBeDefined()
   })
 })

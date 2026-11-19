@@ -1,3 +1,5 @@
+import { isAlphaColor } from './alpha'
+
 /** A value of arithmetic on tokens: a CSS value (a reference such as `var(--space-2)`, a length) or a number. */
 export type Operand = string | number
 
@@ -32,6 +34,11 @@ function assertFinite(name: string, what: string, value: unknown): asserts value
 
 /** Throws unless `value` is a string or a finite number. */
 function assertOperand(name: string, value: unknown): asserts value is Operand {
+  if (isAlphaColor(value)) {
+    throw new TypeError(
+      `${name}(): an alpha() color is not a length or a number, so it cannot be an operand`
+    )
+  }
   if (typeof value !== 'string') assertFinite(name, 'a value', value)
 }
 

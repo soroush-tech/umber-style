@@ -89,11 +89,13 @@ function createLabel({ name, slot = 'root' }: StylerOptions): string {
 
 /** Makes an engine that has no theme yet: it takes one from `setTheme`, or from the first `themeClass`. It needs no framework. */
 export function createLazyEngine<T extends object = Theme>(options: EngineOptions = {}): Engine<T> {
-  const { cache: given, suffix, hasLabels, hasLayers, hasPruning, alwaysDeclare = [] } = options
-  const { rawKeys, lengthKeys, modes } = options
+  const { cache: given, suffix, hasLabels, hasLayers, hasPruning, hasColorFallbacks } = options
+  const { alwaysDeclare = [] } = options
+  const { rawKeys, lengthKeys, modes, registered } = options
   const prefix = options.prefix ?? given?.prefix ?? 'css'
-  const cache = given ?? createCache({ prefix, suffix, hasLabels, hasLayers, hasPruning })
-  const tokenOptions = { prefix, rawKeys, lengthKeys, modes }
+  const cache =
+    given ?? createCache({ prefix, suffix, hasLabels, hasLayers, hasPruning, hasColorFallbacks })
+  const tokenOptions = { prefix, rawKeys, lengthKeys, modes, registered }
   let baseTheme: T | undefined
   let tokens: Tokens<T> | undefined
   // Counts the base themes, so that a sheet made from a function is made again for a new one.
@@ -109,6 +111,8 @@ export function createLazyEngine<T extends object = Theme>(options: EngineOption
     baseTheme = theme
     tokens = createTokens(theme, tokenOptions)
     views = new WeakMap()
+    // A registered variable gets its @property rule when a rule first uses it.
+    cache.registerProperties(tokens.registrations)
     // Variables that code outside the engine reads are always declared.
     cache.markUsed(tokens.findNames(alwaysDeclare))
     version++
