@@ -105,7 +105,7 @@ describe('the layers of a cache', () => {
       ids: [name, 'u-layers'],
     })
     expect(createStyleTag(cache)).toBe(
-      `<style data-style="u" data-ids="${name} u-layers">${ORDER}@layer u-components{.${name}{color:red;}}</style>`
+      `<style data-style="u" data-options="${cache.fingerprint}">${ORDER}@layer u-components{.${name}{color:red;}}</style>`
     )
   })
 
@@ -115,7 +115,7 @@ describe('the layers of a cache', () => {
     document.head.innerHTML = createStyleTag(server)
 
     const sheet = createMemorySheet()
-    const client = createCache({ prefix: 'u', sheet })
+    const client = createCache({ prefix: 'u', hasPruning: false, sheet })
     expect(client.css({ color: 'red' })).toBe(name)
     expect(sheet.rules).toEqual([])
     client.css({ color: 'blue' })

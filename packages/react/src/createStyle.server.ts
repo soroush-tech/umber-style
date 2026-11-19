@@ -30,6 +30,8 @@ export function bindEngine<T extends object>(
   cache?: CacheFunction
 ): ServerStyle<T> {
   const root = createServerOnlyContext<DeepPartial<T> | undefined>(undefined, cache)
+  // Whether the stamp of the cache options was sent in this request.
+  const stamp = createServerOnlyContext<boolean>(false, cache)
 
   // The root theme over the base theme, made once for each root.
   const merged = new WeakMap<object, T>()
@@ -78,7 +80,7 @@ export function bindEngine<T extends object>(
     StyleSheet: { create },
     useStyle,
     apply: (...entries) => ({ className: engine.css(...entries) || undefined }),
-    ThemeProvider: createThemeProvider(engine, root),
+    ThemeProvider: createThemeProvider(engine, root, stamp),
     readTheme,
     themeClass,
     when: engine.when,

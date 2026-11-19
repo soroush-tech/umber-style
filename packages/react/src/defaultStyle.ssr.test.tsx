@@ -20,7 +20,7 @@ describe('the default style on the server', () => {
         </ThemeProvider>
       </ThemeProvider>
     )
-    expect(html.match(/ds-button-root-\w+/g)).toHaveLength(2)
+    expect(html.match(/class="ds-button-root-\w+"/g)).toHaveLength(2)
     const { css } = getEngine().cache.extract()
     expect(css.match(/\.ds-theme-\w+\{/g)).toHaveLength(2)
     expect(css).toMatch(/\.ds-button-root-\w+\{color:var\(--ds-palette-primary\);\}/)

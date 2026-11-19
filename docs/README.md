@@ -47,4 +47,4 @@ The CSS and HTML that these pages show as output come from real runs, with the p
 
 Every code example was compiled with the repository's TypeScript and run against the packages, or copied from a passing test. Where a statement rests on reasoning only, or on something that no test in the repository runs, the page says so in its "Limits" section.
 
-Three things have never been run: the server components build in a real bundler, the React Native binding in a real app, and the transitions of registered tokens in a browser. Each page that depends on one of them says it.
+One thing has never been run: the React Native binding in a real app. The server components build runs in the Next.js App Router fixture, and the transitions of registered tokens run in a browser: `registered.browser.test.ts` checks that `@property` is accepted and a registered colour computes to a colour, that a colour transition on an element that uses the token is half way between both ends after a theme class change, that the token itself transitions on the element that carries the theme class, and that without registration the colour jumps. The page that depends on the first says it.

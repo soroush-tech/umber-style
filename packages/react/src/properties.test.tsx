@@ -59,7 +59,13 @@ describe('registered properties and a classic server render', () => {
           ...(cache ? { cache } : {}),
         })
       )
-    const server = make(createCache({ prefix: 'h', sheet: createMemorySheet() }))
+    // The cache that an engine is given does not know the token options of that engine: it is given the
+    // signature that the engine makes for its own cache, so that the stamp of the server is the same.
+    const signature = make().cache.fingerprint.split(';').at(-1)?.slice(2)
+    document.head.innerHTML = ''
+    const server = make(
+      createCache({ prefix: 'h', tokenSignature: signature, sheet: createMemorySheet() })
+    )
     const Box = server.styled('div')(({ theme: view }) => ({ color: view.palette.primary }))
     const { container } = render(
       <server.ThemeProvider theme={theme}>

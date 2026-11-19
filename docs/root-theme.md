@@ -39,7 +39,7 @@ This renders a whole page to a string with no React on the client. The page hold
 
 ```tsx
 import { renderToStaticMarkup } from 'react-dom/server'
-import { createStyleTag } from '@umber-style/core'
+import { extractPageStyles } from '@umber-style/core'
 import { createStyle } from '@umber-style/react'
 
 const lightTheme = {
@@ -70,27 +70,27 @@ const body = renderToStaticMarkup(
   </ThemeProvider>
 )
 
+// The themes that no element of the body has (the one on <html>, the one it can switch to) go in `themes`.
+const { tag } = extractPageStyles(cache, body, { themes: [light, dark] })
+
 const choose = `document.documentElement.className = localStorage.getItem('theme') === 'dark' ? ${JSON.stringify(dark)} : ${JSON.stringify(light)}`
 
 const html = [
   '<!doctype html>',
   `<html class="${light}">`,
-  `<head>${createStyleTag(cache)}<script>${choose}</script></head>`,
+  `<head>${tag}<script>${choose}</script></head>`,
   `<body>${body}</body>`,
   '</html>',
 ].join('')
 ```
 
-`createStyleTag(cache)` is called after the render, so it holds every rule the page used. The output is one document (shown formatted):
+`extractPageStyles` is called after the render and reads the finished markup, so it holds the rules of this page and of the themes you name, and nothing else. The output is one document (shown formatted):
 
 ```html
 <!doctype html>
 <html class="umber-theme-s44g65 umber-boundary umber-scheme-light">
   <head>
-    <style
-      data-style="umber"
-      data-ids="umber-theme-s44g65 umber-layers umber-theme-tk7v2e umber-page-root-1h3tp5s --umber-palette-surface --umber-palette-text --umber-space-3"
-    >
+    <style data-style="umber" data-options="p=umber;x=;l=1;y=1;r=1;b=1;s=1;f=1;t=">
       @layer umber-theme, umber-global, umber-components, umber-overrides;
       @layer umber-theme {
         .umber-theme-s44g65 {
@@ -129,7 +129,7 @@ const html = [
 </html>
 ```
 
-The `data-ids` attribute lists what the style element already holds. It matters if a browser cache is created later on the same page: see [Server rendering](server-rendering.md).
+The `data-options` attribute is the stamp of the options of the cache. A browser cache created later on the same page compares it with its own: see [Server rendering](server-rendering.md).
 
 The head script runs while the document is still being parsed, before the body is painted, so the page has the stored theme from its first frame. The script is an inline script: a strict content security policy needs a nonce or a hash for it. See [No inline styles](no-inline-styles.md).
 
@@ -162,10 +162,34 @@ section.className = themeClass(brand)
 
 The same works for any element, in any binding, since the class is plain: `getEngine().themeClass(...)` on the default style, or `themeClass` from `createStyle`.
 
+## Registering the themes the page offers
+
+A theme that you switch to with a class on `<html>` is known to the engine of the browser only if the code of the browser asked for its class. Nothing renders a provider for it, so without that the engine would not know the theme exists, and a token that is first used after a navigation (a page with a component that no earlier page showed) would have no value under it.
+
+The call is `themeClass(theme, colorScheme)`, the same one the build makes. Put it in the module that both the server and the browser import, or in the client entry, for every theme the page offers:
+
+```ts
+// style.ts, imported by the server and by the client entry
+export const lightClass = themeClass(lightTheme, 'light')
+export const darkClass = themeClass(darkTheme, 'dark')
+```
+
+A registered theme class is completed as rules arrive: when a rule first uses a variable, the variable is appended to every registered class that declares it, whether the rule came from a component that rendered in the browser or from a style element that the server or the framework added to the page (the engine reads those too). End-to-end scenario H runs this in every fixture: land on a page, switch to dark, navigate in the browser to a page with a component that uses a token that no earlier page used, and check with `findMissingStyles` and the computed colour that it has its value.
+
+## Client-only apps
+
+A client-only app has no server HTML. Before the engine runs, the page holds only `index.html`, so the file must carry what the first paint needs, as static CSS and a script:
+
+- a `<style>` with the background of each scheme: `html { background-color }`, an `html[data-scheme='dark']` rule, and a `prefers-color-scheme: dark` rule for `html:not([data-scheme])`, so that the page has the right background with no script and before the engine's rules exist;
+- a small inline script in the head that reads the stored choice and sets `data-scheme` on `<html>`, before the first paint.
+
+The `spa` fixture does exactly this (`fixtures/spa/index.html`), and end-to-end tests check that the static background of each scheme is in `index.html`, that the script is before the body, that the page background is right with scripting disabled for both schemes, and that the stored scheme is on `<html>` before the body exists. The engine then puts the theme class on `<html>` from its entry, before the first render. These pages are not styled until script runs, so where a good Lighthouse score matters, prerender the shell (the app frame and its first route) with a classic server render as above: the first paint then has all its CSS in the HTML.
+
 ## Limits
 
 - "No flash" is reasoned from the order of events (the script runs before the first paint). It was not observed in a browser.
 - The switch was checked in jsdom, which resolves custom properties from classes on an ancestor. A real browser was not used.
 - The inline script needs a content security policy nonce or hash. The engine has no option to produce one.
 - With `isRoot`, the provider renders no `umber-scope` wrapper, no theme class and makes no theme rule. If the class is not on an ancestor, or `themeClass` was not called for it, the variables are not declared and styles that use them have no values.
+- Scenario H was run on Chromium only, on the fixtures' own theme switch (a class on `<html>`).
 - The server components build handles `isRoot` too: it sends the `<style>` of the theme classes that `themeClass` already made for its theme object, and makes none; see [Server rendering](server-rendering.md).

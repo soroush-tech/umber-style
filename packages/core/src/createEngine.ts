@@ -1,3 +1,4 @@
+import { hashString } from './hash'
 import { createLazyRecord } from './lazyRecord'
 import { createCache, type Cache, type ClassValue } from './cache'
 import {
@@ -118,10 +119,18 @@ function createLabel({ name, slot = 'root' }: StylerOptions): string {
   return name ? `${toKebabCase(name)}-${toKebabCase(slot)}` : ''
 }
 
+/** A short text for the token options of an engine, or '' when it has none of its own: they are part of what the server and the browser must agree on. */
+function createTokenSignature(values: readonly unknown[]): string {
+  const isDefault = values.every(
+    (value) => value === undefined || (Array.isArray(value) && value.length === 0)
+  )
+  return isDefault ? '' : hashString(JSON.stringify(values))
+}
+
 /** Makes an engine that has no theme yet: it takes one from `setTheme`, or from the first `themeClass`. It needs no framework. */
 export function createLazyEngine<T extends object = Theme>(options: EngineOptions = {}): Engine<T> {
   const { cache: given, suffix, hasLabels, hasLayers, hasPruning, hasColorFallbacks } = options
-  const { hasScope, hasBaseClass } = options
+  const { hasScope, hasBaseClass, hasDevChecks } = options
   const { alwaysDeclare = [] } = options
   const { rawKeys, lengthKeys, modes, registered } = options
   if (given && options.prefix !== undefined && options.prefix !== given.prefix) {
@@ -141,6 +150,8 @@ export function createLazyEngine<T extends object = Theme>(options: EngineOption
       hasColorFallbacks,
       hasScope,
       hasBaseClass,
+      hasDevChecks,
+      tokenSignature: createTokenSignature([rawKeys, lengthKeys, modes, registered, alwaysDeclare]),
     })
   const tokenOptions = { prefix, rawKeys, lengthKeys, modes, registered }
   let baseTheme: T | undefined

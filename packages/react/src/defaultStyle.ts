@@ -16,7 +16,7 @@ export function createDefaultStyle() {
     if (!bound) {
       const engine = pending.engine ?? createLazyEngine<Theme>(pending)
       if (pending.theme) engine.setTheme(pending.theme)
-      bound = bindEngine(engine)
+      bound = bindEngine(engine, pending)
     }
     return bound
   }

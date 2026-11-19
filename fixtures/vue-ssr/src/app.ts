@@ -3,6 +3,7 @@ import { defineComponent, h, onMounted, ref, type VNode } from 'vue'
 import {
   Badge,
   Button,
+  Callout,
   Card,
   Flex,
   Heading,
@@ -55,6 +56,7 @@ const CatalogPage = () =>
 const SettingsPage = () =>
   h(Page, { 'data-testid': 'page-settings' }, () => [
     h(Heading, null, text('Settings')),
+    h(Callout, { 'data-testid': 'callout' }, text('Uses the accent colour')),
     h(Flex, { direction: 'column', gap: 3 }, () => [
       h(Panel, { 'data-testid': 'panel' }, () => [
         h(Muted, null, text('Account')),

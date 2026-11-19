@@ -17,3 +17,16 @@ export function createStyleElements(cache: Cache, className: string | undefined)
       return [createElement('style', props, [cache.layerOrder, ...rules].join(''))]
     })
 }
+
+/**
+ * The element that carries the options of the cache, for the browser to compare with its own: a `<meta>`
+ * named `<prefix>-options`, which React moves to the head. It is not a style element, because a server
+ * render merges the style elements of one precedence into one and keeps the attributes of none of them.
+ */
+export function createStampElement(cache: Cache): ReactElement {
+  return createElement('meta', {
+    key: `${cache.prefix}-options`,
+    name: `${cache.prefix}-options`,
+    content: cache.fingerprint,
+  })
+}

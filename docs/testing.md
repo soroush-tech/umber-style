@@ -47,25 +47,26 @@ Each fixture is a private workspace member of `fixtures/`, built with its framew
 
 | Fixture      | Framework and build                                                                 | How the CSS reaches the page                                                      |
 | ------------ | ----------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
-| `vike-ssg`   | Vike with React; every page prerendered, then client routing                        | `createStyleTag(cache)` in the render hook                                        |
-| `next-app`   | Next.js, App Router, Turbopack; server components and client components in one page | The server build: `<style href precedence>` for each class                        |
-| `next-pages` | Next.js, Pages Router; rendered on each request                                     | `cache.extract()` in the custom document                                          |
+| `vike-ssg`   | Vike with React; every page prerendered, then client routing                        | `extractPageStyles(cache, html, { themes })` in the render hook                   |
+| `next-app`   | Next.js, App Router, Turbopack; server components and client components in one page | `<style href precedence>` for each class, from both builds                        |
+| `next-pages` | Next.js, Pages Router; rendered on each request                                     | `extractPageStyles` in the custom document                                        |
 | `spa`        | Vite and React, client only                                                         | The browser's cache; `index.html` holds the static background and the boot script |
-| `vue-ssr`    | Vite and Vue; a small Node server renders each request                              | `createStyleTag(cache)` after `renderToString`                                    |
+| `vue-ssr`    | Vite and Vue; a small Node server renders each request                              | `extractPageStyles(...).tag` after `renderToString`                               |
 
 ### The scenarios
 
 Each is a spec file in `e2e/tests/`. A fixture lists the scenarios that apply to it in `e2e/fixtures.ts`.
 
-| Letter | What it asserts                                                                                                                                                                                        |
-| ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| A      | A direct load of each page: no console error or hydration warning, every element with an engine class has a rule that names it, every `var(--umber-*)` a matched rule uses has a value on that element |
-| B      | The computed styles of a page loaded directly equal those after loading another page and following the link, for every pair                                                                            |
-| C      | The same with the dark scheme: loaded directly with dark stored, against switching to dark and then navigating                                                                                         |
-| D      | The engine's rule count is stable after hydration and does not grow when going back to a visited page                                                                                                  |
-| E      | On landing, no engine rule is unused: the measure is taken with the protocol's rule usage tracking                                                                                                     |
-| F      | With scripting disabled the page has the same computed styles as with script                                                                                                                           |
-| G      | A Lighthouse run of the production build: score, blocking time, unused CSS and JavaScript, transfer size, written to `e2e/reports/`                                                                    |
+| Letter | What it asserts                                                                                                                                                                                                                              |
+| ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A      | A direct load of each page: no console error or hydration warning, every element with an engine class has a rule that names it, every `var(--umber-*)` a matched rule uses has a value on that element                                       |
+| B      | The computed styles of a page loaded directly equal those after loading another page and following the link, for every pair                                                                                                                  |
+| C      | The same with the dark scheme: loaded directly with dark stored, against switching to dark and then navigating                                                                                                                               |
+| D      | The engine's rule count is stable after hydration and does not grow when going back to a visited page                                                                                                                                        |
+| E      | On landing, no engine rule is unused: the measure is taken with the protocol's rule usage tracking                                                                                                                                           |
+| F      | With scripting disabled the page has the same computed styles as with script                                                                                                                                                                 |
+| H      | The theme on `<html>` is switched, then the app navigates in the browser to a page with a component that uses a token no earlier page used: `findMissingStyles` finds nothing, and the computed colour is the value of the theme switched to |
+| G      | A Lighthouse run of the production build: score, blocking time, unused CSS and JavaScript, transfer size, written to `e2e/reports/`                                                                                                          |
 
 The helpers are in `e2e/helpers/`: `collectComputedStyles` and `expectSameStyles` (a readable diff), `collectUnusedRules`, `collectEngineRuleCount`, `checkEngineClasses`, and a console watcher that fails any test on an error or a hydration warning.
 
@@ -73,11 +74,9 @@ What `collectUnusedRules` leaves out, because such a rule cannot be used at load
 
 ### Known failures
 
-A test that documents the behaviour the engine should have, and fails today, is marked with `test.fail` through the `known` map of its fixture, with a reason that starts with the word KNOWN. Playwright reports it as an expected failure. When the engine is fixed the test passes, Playwright reports that as a failure, and the mark is removed. The current list is the `known` map of each fixture in `e2e/fixtures.ts`; the causes are:
+A test that documents behaviour the engine does not have yet is marked as a known failure through the `known` map of its fixture in `e2e/fixtures.ts`, with a reason that starts with the word KNOWN. Playwright reports it as an expected failure; when it starts to pass the run fails and the mark is removed. **There are none today**: every `known` map is empty. The three groups that were there are fixed: a page carrying the rules of other pages (`extractPageStyles` reads the page), a client component unstyled in the first HTML (the client build renders style elements on a server), and the dark theme class of the browser lacking variables that server components use (the browser reads the rules of the page and completes the classes it made).
 
-- A style cache that lives as long as the server process: a page extracted after others carries their rules (scenario E for `vike-ssg` and `next-pages`).
-- A client component renders on the server into an in-memory sheet that nothing sends, so it is unstyled in the first HTML unless a server component happened to send the same classes (scenario F for `next-app`).
-- The theme class of the other scheme is made by the client engine, which keeps only the variables that its own components use, so a server component's rule that uses another variable has no value under that class (scenario C for `next-app`).
+`findMissingStyles` is the checker of `@umber-style/core`, the one that the development mode runs. The end-to-end helper carries no copy of it: it sends the compiled text of that file into the page.
 
 ## What is not covered
 

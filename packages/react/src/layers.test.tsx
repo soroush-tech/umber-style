@@ -184,8 +184,8 @@ describe('the layers in the browser sheet', () => {
     const Box = server.styled('div')({ color: 'red' })
     render(<Box style={{ margin: 1 }} />).unmount()
     const tag = createStyleTag(server.cache)
-    expect(tag).toContain('data-ids="')
-    expect(tag).toContain('h-layers')
+    expect(tag).toContain(`data-options="${server.cache.fingerprint}"`)
+    expect(tag).toContain('@layer h-theme,h-global,h-components,h-overrides;')
     document.head.innerHTML = tag
     const element = document.querySelector('style[data-style="h"]') as HTMLStyleElement
     const before = element.sheet?.cssRules.length

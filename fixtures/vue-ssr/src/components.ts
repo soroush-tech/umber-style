@@ -93,6 +93,12 @@ export const Panel = styled('div', { name: 'Panel' })(({ theme }: Attrs) => ({
   width: 320,
 }))
 
+export const Callout = styled('aside', { name: 'Callout' })(({ theme }: Attrs) => ({
+  borderTop: `3px solid ${theme.palette.accent}`,
+  color: theme.palette.accent,
+  paddingTop: theme.space[2],
+}))
+
 export const NavBar = styled('nav', { name: 'NavBar' })(({ theme }: Attrs) => ({
   display: 'flex',
   gap: theme.space[3],

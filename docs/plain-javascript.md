@@ -63,7 +63,7 @@ An entry writes its rule when it is first used, not when it is made. Using it is
 
 ## Getting the CSS out
 
-`createStyleTag(engine.cache)` is a `<style>` element as a string, with every rule inserted so far:
+`createStyleTag(engine.cache)` is a `<style>` element as a string, with every rule inserted so far, whatever page inserted it. A process that renders more than one page uses `extractPageStyles` instead (see [Server rendering](server-rendering.md)):
 
 ```ts
 import { createStyleTag } from '@umber-style/core'
@@ -72,10 +72,7 @@ const tag = createStyleTag(engine.cache)
 ```
 
 ```html
-<style
-  data-style="umber"
-  data-ids="umber-sarboa umber-layers umber-theme-jg3s2a umber-theme-l0twti umber-1ntlncu --umber-palette-primary --umber-space-2"
->
+<style data-style="umber" data-options="p=umber;x=;l=1;y=1;r=1;b=1;s=1;f=1;t=">
   @layer umber-theme, umber-global, umber-components, umber-overrides;
   @layer umber-components {
     .umber-sarboa {
@@ -111,7 +108,7 @@ const tag = createStyleTag(engine.cache)
 </style>
 ```
 
-`cache.extract()` returns the same as `{ css, ids }`. `data-ids` is what a cache made later in a browser reads, so that it does not insert these rules again. See [Server rendering](server-rendering.md).
+`cache.extract()` returns the same as `{ css, ids }`. `data-options` is the stamp of the options of the cache: a cache made later in a browser compares it with its own and throws one error that names the options that differ. The browser finds out which rules are already there by reading them, not from a list. See [Server rendering](server-rendering.md).
 
 ## A cache of your own
 

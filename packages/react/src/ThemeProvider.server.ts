@@ -1,7 +1,7 @@
 import { createElement, Fragment, type ReactElement } from 'react'
 import type { DeepPartial, Engine } from '@umber-style/core'
 import type { ServerOnlyContext } from './serverContext'
-import { createStyleElements } from './styleElements'
+import { createStampElement, createStyleElements } from './styleElements'
 import type { WebThemeProviderProps } from './types'
 
 /**
@@ -10,11 +10,13 @@ import type { WebThemeProviderProps } from './types'
  * them. A client component that calls `useTheme()` needs a `ThemeProvider` imported in a client file.
  * The first provider of a request also gives the root theme that function styles read. A root provider
  * (`isRoot`) renders no element and makes no rule: it sends the style of the theme classes that the app
- * already made for its theme with `themeClass`, which is the class it put on an ancestor.
+ * already made for its theme with `themeClass`, which is the class it put on an ancestor. The first
+ * provider of a request also renders the stamp of the cache options (a `<meta>`), once.
  */
 export function createThemeProvider<T extends object>(
   engine: Engine<T>,
-  root: ServerOnlyContext<DeepPartial<T> | undefined>
+  root: ServerOnlyContext<DeepPartial<T> | undefined>,
+  stamp: ServerOnlyContext<boolean>
 ) {
   return function ThemeProvider({
     theme,
@@ -25,11 +27,15 @@ export function createThemeProvider<T extends object>(
     children,
   }: WebThemeProviderProps<T>): ReactElement {
     const provided = createElement(root.Provider, { value: theme }, children)
+    // One stamp for the request, from the first provider that renders.
+    const slot = stamp.slot()
+    const stamped = slot.isSet ? [] : [createStampElement(engine.cache)]
+    slot.isSet = true
     // A root provider renders no element: the app puts the class on an ancestor, and the rules it made are sent.
     if (isRoot) {
       if (!engine.hasTheme) engine.setTheme(theme as T)
       const made = createStyleElements(engine.cache, engine.findThemeIds(theme).join(' '))
-      return createElement(Fragment, null, ...made, provided)
+      return createElement(Fragment, null, ...stamped, ...made, provided)
     }
     const scope = engine.themeClass(theme, colorScheme)
     // The rules are keyed by the theme class alone; the markers have none.
@@ -39,6 +45,7 @@ export function createThemeProvider<T extends object>(
     return createElement(
       Fragment,
       null,
+      ...stamped,
       ...styles,
       ...createStyleElements(engine.cache, scoped),
       createElement(as, props, provided)

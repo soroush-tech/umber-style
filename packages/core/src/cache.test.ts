@@ -95,16 +95,17 @@ describe('createCache', () => {
     expect(cache.extract()).toEqual({ css: `.${name}{color:red;}p{x:y;}`, ids: [name, 'other'] })
   })
 
-  it('treats ids from a server-rendered style element as inserted', () => {
+  it('treats the classes that the rules of a server-rendered style element name as inserted', () => {
     const element = document.createElement('style')
     element.setAttribute('data-style', 'css')
-    element.setAttribute('data-ids', 'one  two')
+    element.textContent = '.css-one{color:red;}.css-two:hover{color:blue;}'
     document.head.appendChild(element)
     const sheet = createMemorySheet()
     const cache = createCache({ hasLayers: false, sheet })
-    expect(cache.insertOnce('one', ['a{}'])).toBe(false)
-    expect(cache.insertOnce('three', ['b{}'])).toBe(true)
-    expect(cache.extract().ids).toEqual(['one', 'two', 'three'])
+    expect(cache.insertOnce('css-one', ['a{}'])).toBe(false)
+    expect(cache.insertOnce('css-two', ['a{}'])).toBe(false)
+    expect(cache.insertOnce('css-three', ['b{}'])).toBe(true)
+    expect(cache.extract().ids).toEqual(['css-one', 'css-two', 'css-three'])
   })
 
   it('uses a DOM sheet by default where there is a document', () => {

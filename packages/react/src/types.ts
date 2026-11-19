@@ -31,9 +31,22 @@ export type {
   WebStyleObject,
 } from '@umber-style/core'
 
-export type StyleOptions<T = never> = BindingOptions<T>
+/** What only the client build of the React binding takes: it can render the style of its classes on a server. */
+export interface ServerStyleOptions {
+  /**
+   * Whether, where there is no `document` (the server render of a client component), a styled element and a
+   * theme provider render the `<style href precedence>` elements of their classes, as the server components
+   * build does. React moves them to the head and renders each `href` once, so the first HTML of a page
+   * is styled whichever build rendered a component. In the browser the client build inserts into its sheet
+   * and renders none, whatever this is. Default true. Set it to false when a classic server render
+   * puts the CSS of the page into one style element of its own (`extractPageStyles`, `createStyleTag`).
+   */
+  hasServerStyleElements?: boolean
+}
 
-export interface DefaultStyleOptions extends BindingOptions<Theme> {
+export interface StyleOptions<T = never> extends BindingOptions<T>, ServerStyleOptions {}
+
+export interface DefaultStyleOptions extends BindingOptions<Theme>, ServerStyleOptions {
   /** The base theme, for an app that has no provider at all. */
   theme?: Theme
 }

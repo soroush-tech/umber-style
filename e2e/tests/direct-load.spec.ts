@@ -1,4 +1,4 @@
-import { checkEngineClasses } from '../helpers/rules'
+import { countEngineElements, findMissingStyles } from '../helpers/rules'
 import { loadPage, PAGE_NAMES } from '../helpers/navigation'
 import { scenario, test, expect } from '../helpers/test'
 
@@ -11,9 +11,11 @@ for (const name of PAGE_NAMES) {
     scenario('A', fixture, info)
     await loadPage(page, fixture, name)
     // The whole document, so that the theme class on <html> is looked at too.
-    const findings = await checkEngineClasses(page, 'html')
-    expect(findings.checked, 'elements with an engine class').toBeGreaterThan(5)
-    expect(findings.withoutRule, 'engine classes with no rule').toEqual([])
-    expect(findings.emptyVariables, 'variables with no value').toEqual([])
+    expect(await countEngineElements(page), 'elements with an engine class').toBeGreaterThan(5)
+    const problems = await findMissingStyles(page)
+    expect(
+      problems.map((problem) => problem.message),
+      'engine classes with no rule, variables with no value'
+    ).toEqual([])
   })
 }

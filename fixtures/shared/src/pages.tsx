@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import {
   Badge,
   Button,
+  Callout,
   Card,
   Flex,
   Heading,
@@ -63,6 +64,7 @@ export function SettingsPage() {
   return (
     <Page data-testid="page-settings">
       <Heading>Settings</Heading>
+      <Callout data-testid="callout">Uses the accent colour</Callout>
       <Flex direction="column" gap={3}>
         <Panel data-testid="panel">
           <Muted>Account</Muted>

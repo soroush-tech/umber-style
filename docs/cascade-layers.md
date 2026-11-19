@@ -47,7 +47,7 @@ The base and the props class are in the same layer, `components`, with no sub-la
 The order is kept in every place the rules go:
 
 - The browser sheet: rules are appended in the order the classes are first made, and the base is made before the props class every time.
-- The CSS a server or a build extracts, and what a browser reads back from it: the same order, and a client that finds a class name in `data-ids` does not write it again, so it never writes a props class ahead of a base that came from the server.
+- The CSS a server or a build extracts, and what a browser reads back from it: the same order, and a client that finds a rule for the class in the page does not write it again, so it never writes a props class ahead of a base that came from the server.
 - The server components build, where each class is its own `<style href precedence>` element: an element renders its base before its props class, so React meets the base first and keeps hoisted styles of one precedence in the order it first met them. Two components can make the same props result with different bases (always with `hasLabels: false`, and for components with no name); the class name of a props class therefore includes its base, so two components never share a props class, and each is written after its own base.
 - Theme classes are in the `theme` layer, under the components. Pruning rewrites a theme rule in place, or adds another, but never touches a component rule, so it cannot change this order.
 - Without layers, the same: the base is written before its props class. What is given from outside is merged into one class, so there is nothing to order.

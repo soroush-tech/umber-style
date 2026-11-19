@@ -104,6 +104,13 @@ export const Panel = styled('div', { name: 'Panel' })(({ theme }) => ({
   width: 320,
 }))
 
+/** Settings only, and the only component that uses the accent colour: a token that no other page uses. */
+export const Callout = styled('aside', { name: 'Callout' })(({ theme }) => ({
+  borderTop: `3px solid ${theme.palette.accent}`,
+  color: theme.palette.accent,
+  paddingTop: theme.space[2],
+}))
+
 /** The bar with the links. */
 export const NavBar = styled('nav', { name: 'NavBar' })(({ theme }) => ({
   display: 'flex',

@@ -6,18 +6,20 @@ afterEach(() => {
 })
 
 describe('createStyleTag', () => {
-  it('writes the css and the ids of a cache into one style element', () => {
+  it('writes the css of a cache into one style element, stamped with its options', () => {
     const cache = createCache({ hasLayers: false, prefix: 'u', sheet: createMemorySheet() })
     const name = cache.css({ color: 'red' })
     cache.insertOnce('base', ['body{margin:0;}'])
     expect(createStyleTag(cache)).toBe(
-      `<style data-style="u" data-ids="${name} base">.${name}{color:red;}body{margin:0;}</style>`
+      `<style data-style="u" data-options="${cache.fingerprint}">.${name}{color:red;}body{margin:0;}</style>`
     )
   })
 
   it('writes an empty element for an empty cache', () => {
     const cache = createCache({ hasLayers: false, prefix: 'u', sheet: createMemorySheet() })
-    expect(createStyleTag(cache)).toBe('<style data-style="u" data-ids=""></style>')
+    expect(createStyleTag(cache)).toBe(
+      `<style data-style="u" data-options="${cache.fingerprint}"></style>`
+    )
   })
 
   it('makes a cache in the browser skip what the markup holds', () => {

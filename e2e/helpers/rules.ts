@@ -1,7 +1,16 @@
+import { readFileSync } from 'node:fs'
+import { stripTypeScriptTypes } from 'node:module'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import type { CDPSession, Page } from '@playwright/test'
 
+const here = dirname(fileURLToPath(import.meta.url))
+
+/** The prefix that the fixtures give the engine. */
+const ENGINE_PREFIX = 'umber'
+
 /** The style elements of the engine: the cache's own element, or the elements a server component renders. */
-export const ENGINE_STYLE_SELECTOR = 'style[data-style="umber"], style[data-precedence="umber"]'
+export const ENGINE_STYLE_SELECTOR = `style[data-style="${ENGINE_PREFIX}"], style[data-precedence="${ENGINE_PREFIX}"]`
 
 /** The number of rules in the engine's style sheets, counted at the top level of each sheet. */
 export async function collectEngineRuleCount(page: Page): Promise<number> {
@@ -188,70 +197,59 @@ async function ignoreReason(
   return undefined
 }
 
-export interface EngineClassFindings {
-  /** Elements that carry an engine class that no rule of the engine's sheets names. */
-  withoutRule: string[]
-  /** `var(--umber-*)` references of a matched rule that compute to an empty value on the element. */
-  emptyVariables: string[]
-  /** How many elements with an engine class were looked at. */
-  checked: number
+/** The compiled text of the core's checker: the one file that the development mode runs too. */
+let checkerSource: string | undefined
+function readCheckerSource(): string {
+  if (checkerSource === undefined) {
+    const file = join(here, '..', '..', 'packages', 'core', 'src', 'findMissingStyles.ts')
+    checkerSource = stripTypeScriptTypes(readFileSync(file, 'utf8'))
+  }
+  return checkerSource
+}
+
+export interface MissingStyle {
+  kind: 'class-without-rule' | 'variable-without-value'
+  name: string
+  element: string
+  message: string
+  key: string
 }
 
 /**
- * Every element under `root` with an engine class has at least one rule in the engine's sheets that
- * names the class, and every `var(--umber-*)` that its matching rules use has a value on it.
+ * `findMissingStyles` of `@umber-style/core`, run in the page on the elements under `root`: every
+ * engine class has a rule, and every variable that a matched rule uses has a value. The function is
+ * not imported into the page: its source is sent to it, so the test and the development warning
+ * share one implementation.
  */
-export async function checkEngineClasses(page: Page, root: string): Promise<EngineClassFindings> {
+export async function findMissingStyles(
+  page: Page,
+  root: string = 'html'
+): Promise<MissingStyle[]> {
+  await page.addScriptTag({
+    type: 'module',
+    content: `${readCheckerSource()}
+window.__findMissingStyles = findMissingStyles`,
+  })
+  await page.waitForFunction(() => '__findMissingStyles' in window)
+  return page.evaluate((selector) => {
+    const start = document.querySelector(selector)
+    if (!start) throw new Error(`No element matches ${selector}`)
+    const check = (window as unknown as { __findMissingStyles: (root: Element) => MissingStyle[] })
+      .__findMissingStyles
+    return check(start)
+  }, root)
+}
+
+/** How many elements under `root` (the root included) carry a class of the engine. */
+export async function countEngineElements(page: Page, root: string = 'html'): Promise<number> {
   return page.evaluate(
-    ({ rootSelector, selector }) => {
-      const rules: CSSStyleRule[] = []
-      const collect = (list: CSSRuleList) => {
-        for (const rule of list) {
-          if (rule instanceof CSSStyleRule) rules.push(rule)
-          else if ('cssRules' in rule) collect((rule as CSSGroupingRule).cssRules)
-        }
-      }
-      for (const element of document.querySelectorAll<HTMLStyleElement>(selector)) {
-        if (element.sheet) collect(element.sheet.cssRules)
-      }
-      // Marker classes that have no rule of their own.
-      const markers = /^umber-(boundary|scheme-(light|dark))$/
-      const findings = { withoutRule: [] as string[], emptyVariables: [] as string[], checked: 0 }
-      const start = document.querySelector(rootSelector)
-      if (!start) throw new Error(`No element matches ${rootSelector}`)
-      const stateful = /:(hover|focus|active|focus-visible|focus-within)\b/
-      for (const element of [start, ...start.querySelectorAll('*')]) {
-        const classes = [...element.classList].filter(
-          (name) => name.startsWith('umber-') && !markers.test(name)
-        )
-        if (classes.length === 0) continue
-        findings.checked += 1
-        const label = `${element.tagName.toLowerCase()}[${element.getAttribute('data-testid') ?? ''}]`
-        for (const name of classes) {
-          const named = rules.some((rule) =>
-            new RegExp(`\\.${name}(?![\\w-])`).test(rule.selectorText)
-          )
-          if (!named) findings.withoutRule.push(`${label} .${name}`)
-        }
-        const computed = getComputedStyle(element)
-        for (const rule of rules) {
-          if (stateful.test(rule.selectorText)) continue
-          let matches = false
-          try {
-            matches = element.matches(rule.selectorText)
-          } catch {
-            matches = false
-          }
-          if (!matches) continue
-          for (const [, variable] of rule.cssText.matchAll(/var\((--umber-[\w-]+)/g)) {
-            if (computed.getPropertyValue(variable).trim() === '') {
-              findings.emptyVariables.push(`${label} ${variable} in ${rule.selectorText}`)
-            }
-          }
-        }
-      }
-      return findings
+    ({ selector, prefix }) => {
+      const start = document.querySelector(selector)
+      if (!start) throw new Error(`No element matches ${selector}`)
+      return [start, ...start.querySelectorAll('*')].filter((element) =>
+        [...element.classList].some((name) => name.startsWith(`${prefix}-`))
+      ).length
     },
-    { rootSelector: root, selector: ENGINE_STYLE_SELECTOR }
+    { selector: root, prefix: ENGINE_PREFIX }
   )
 }

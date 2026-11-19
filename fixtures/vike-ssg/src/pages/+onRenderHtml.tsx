@@ -1,12 +1,12 @@
 import { bootScript } from '@umber-fixtures/shared/bootScript'
 import { darkClass, lightClass, style } from '@umber-fixtures/shared/style'
-import { createStyleTag } from '@umber-style/core'
+import { extractPageStyles } from '@umber-style/core'
 import { renderToString } from 'react-dom/server'
 import { dangerouslySkipEscape, escapeInject } from 'vike/server'
 import type { OnRenderHtmlAsync } from 'vike/types'
 import { PageShell } from './PageShell'
 
-// The approach of docs/server-rendering.md: render, then ask the cache for what it holds.
+// The approach of docs/server-rendering.md: render, then ask the cache for the CSS of this page.
 export const onRenderHtml: OnRenderHtmlAsync = async (pageContext) => {
   const { Page } = pageContext
   const html = renderToString(
@@ -14,7 +14,10 @@ export const onRenderHtml: OnRenderHtmlAsync = async (pageContext) => {
       <Page />
     </PageShell>
   )
-  const styleTag = createStyleTag(style.cache)
+  // The themes of <html> and the one it can switch to are not in the markup of the page.
+  const { tag: styleTag } = extractPageStyles(style.cache, html, {
+    themes: [lightClass, darkClass],
+  })
   return escapeInject`<!doctype html>
 <html lang="en" class="${lightClass}">
   <head>

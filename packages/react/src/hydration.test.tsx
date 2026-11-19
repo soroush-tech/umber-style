@@ -9,7 +9,7 @@ afterEach(() => {
 })
 
 describe('what a classic server render leaves for the client', () => {
-  it('is a style element with the ids, and the client cache inserts none of them again', () => {
+  it('is a style element with the options, and the client cache inserts none of its rules again', () => {
     const server = bindEngine(
       createEngine(theme, {
         prefix: 'h',
@@ -23,7 +23,7 @@ describe('what a classic server render leaves for the client', () => {
       </server.ThemeProvider>
     )
     const tag = createStyleTag(server.cache)
-    expect(tag).toContain('data-ids="')
+    expect(tag).toContain(`data-options="${server.cache.fingerprint}"`)
     container.remove()
 
     document.head.innerHTML = tag

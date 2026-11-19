@@ -1,6 +1,6 @@
 import { collectComputedStyles } from '../helpers/computedStyles'
 import { loadPage, navigateInBrowser, writeReport } from '../helpers/navigation'
-import { ENGINE_STYLE_SELECTOR, checkEngineClasses } from '../helpers/rules'
+import { ENGINE_STYLE_SELECTOR, findMissingStyles } from '../helpers/rules'
 import { test, expect } from '../helpers/test'
 
 // Checks that only make sense for Next.js with the App Router: server components and client
@@ -26,10 +26,6 @@ test('(i) a client component is styled in the first HTML, with scripting disable
   browser,
   fixture,
 }, info) => {
-  info.fail(
-    true,
-    'KNOWN: a client component is unstyled in the first HTML (its rules are not sent)'
-  )
   const context = await browser.newContext({
     javaScriptEnabled: false,
     baseURL: `http://localhost:${fixture.port}`,
@@ -120,9 +116,11 @@ test('(v) client-side navigation between routes keeps everything styled', async 
   await loadPage(page, fixture, 'home')
   for (const name of ['catalog', 'settings', 'home'] as const) {
     await navigateInBrowser(page, name)
-    const findings = await checkEngineClasses(page, 'html')
-    expect(findings.withoutRule, `${name}: classes with no rule`).toEqual([])
-    expect(findings.emptyVariables, `${name}: variables with no value`).toEqual([])
+    const problems = await findMissingStyles(page)
+    expect(
+      problems.map((problem) => problem.message),
+      `${name}: classes with no rule, variables with no value`
+    ).toEqual([])
     const styles = await collectComputedStyles(page)
     expect(styles[`page-${name}`].paddingLeft, `${name}: the page frame is styled`).not.toBe('0px')
   }

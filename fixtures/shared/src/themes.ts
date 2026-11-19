@@ -9,6 +9,7 @@ export const lightTheme = {
     primary: '#8a4b2a',
     onPrimary: '#ffffff',
     border: '#d8cfc8',
+    accent: '#b3261e',
   },
   space: [0, 4, 8, 16, 24, 32],
   radii: [0, 4, 8],
@@ -26,6 +27,7 @@ export const darkTheme = {
     primary: '#e0a07a',
     onPrimary: '#1a0f08',
     border: '#3a3d45',
+    accent: '#ff8a80',
   },
 }
 

@@ -22,9 +22,6 @@ export interface FixtureConfig {
   only?: string
 }
 
-const KNOWN_SHARED_CACHE =
-  'KNOWN: the engine has one cache per process and extraction returns all of it, so a page carries the rules of the other pages'
-
 const routes = { home: '/', catalog: '/catalog', settings: '/settings' }
 
 export const fixtures: readonly FixtureConfig[] = [
@@ -36,15 +33,8 @@ export const fixtures: readonly FixtureConfig[] = [
     hasHtml: true,
     hasClientNavigation: true,
     sharesProcess: true,
-    scenarios: ['A', 'B', 'C', 'D', 'E', 'F', 'G'],
-    // Pages are prerendered in one process, one after the other: each page carries the rules of the ones
-    // rendered before it, and the first one (catalog) carries none that it does not use.
-    known: {
-      'E:home':
-        'KNOWN: the engine has one cache per process and extraction returns all of it, so a prerendered page carries the rules of the other pages',
-      'E:settings':
-        'KNOWN: the engine has one cache per process and extraction returns all of it, so a prerendered page carries the rules of the other pages',
-    },
+    scenarios: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'],
+    known: {},
   },
   {
     name: 'next-app',
@@ -54,21 +44,9 @@ export const fixtures: readonly FixtureConfig[] = [
     hasHtml: true,
     hasClientNavigation: true,
     sharesProcess: false,
-    scenarios: ['A', 'B', 'C', 'D', 'E', 'F', 'G'],
+    scenarios: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'],
     only: 'next-app.spec.ts',
-    known: {
-      // The server HTML of the root layout sends the rule of the light theme class only. The dark class
-      // is made by the client engine, which prunes its variables to the ones client components use: a
-      // server component's rule that uses another variable has no value under the dark class.
-      'C:catalog:home':
-        'KNOWN: the dark theme class holds only the variables that client components use',
-      'C:settings:home':
-        'KNOWN: the dark theme class holds only the variables that client components use',
-      // A client component renders on the server into an in-memory sheet that nothing sends.
-      'F:home': 'KNOWN: a client component is unstyled in the first HTML (its rules are not sent)',
-      'F:settings':
-        'KNOWN: a client component is unstyled in the first HTML (its rules are not sent)',
-    },
+    known: {},
   },
   {
     name: 'next-pages',
@@ -78,14 +56,8 @@ export const fixtures: readonly FixtureConfig[] = [
     hasHtml: true,
     hasClientNavigation: true,
     sharesProcess: true,
-    scenarios: ['A', 'B', 'C', 'D', 'E', 'F', 'G'],
-    // One server process renders every request into the same cache, and the custom document extracts all
-    // of it: once every page has been requested, each page carries the rules of the other two.
-    known: {
-      'E:home': KNOWN_SHARED_CACHE,
-      'E:catalog': KNOWN_SHARED_CACHE,
-      'E:settings': KNOWN_SHARED_CACHE,
-    },
+    scenarios: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'],
+    known: {},
   },
   {
     name: 'spa',
@@ -95,7 +67,7 @@ export const fixtures: readonly FixtureConfig[] = [
     hasHtml: false,
     hasClientNavigation: true,
     sharesProcess: false,
-    scenarios: ['A', 'B', 'C', 'D', 'G'],
+    scenarios: ['A', 'B', 'C', 'D', 'G', 'H'],
     known: {},
     only: 'spa.spec.ts',
   },
@@ -107,7 +79,7 @@ export const fixtures: readonly FixtureConfig[] = [
     hasHtml: true,
     hasClientNavigation: true,
     sharesProcess: true,
-    scenarios: ['A', 'B', 'C', 'D', 'F'],
+    scenarios: ['A', 'B', 'C', 'D', 'F', 'H'],
     known: {},
   },
 ]

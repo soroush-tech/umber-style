@@ -208,10 +208,10 @@ describe('a page extracted on the server and hydrated', () => {
     return { server, lightName, darkName, card }
   }
 
-  it('marks the used variables in the ids', () => {
+  it('lists the used variables after the classes in the ids of extract, and stamps the options in the tag', () => {
     const { server, lightName, darkName, card } = serverPage()
     expect(server.extract().ids).toEqual([lightName, darkName, card, '--u-a'])
-    expect(createStyleTag(server)).toContain('--u-a">')
+    expect(createStyleTag(server)).toContain(`data-options="${server.fingerprint}"`)
   })
 
   it('sends nothing again, and adds only the variable that is new, to each class that has it', () => {

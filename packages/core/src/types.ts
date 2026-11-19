@@ -20,6 +20,8 @@ export interface EngineOptions extends TokenOptions {
   hasPruning?: boolean
   /** Whether a component's styles are split by position into a base class (made once) and a props class (made for each render). Default true; used when the engine makes its cache. */
   hasBaseClass?: boolean
+  /** Whether the cache checks the page in the browser and warns once for each problem found (`findMissingStyles`). Default: on in development (`process.env.NODE_ENV` is `development`), off otherwise; used when the engine makes its cache. */
+  hasDevChecks?: boolean
   /** Theme paths (dotted, or top-level keys) whose variables are always declared, for code outside the engine that reads them. */
   alwaysDeclare?: readonly string[]
   /** The cache to use; one is made when not given. */

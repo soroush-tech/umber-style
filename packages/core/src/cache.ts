@@ -1,4 +1,7 @@
 import { hashString } from './hash'
+import { createDevChecker, isDevelopment } from './devChecks'
+import { createFingerprint, describeFingerprintDifferences } from './fingerprint'
+import { scanStyleText, type StyleFindings } from './scanStyleText'
 import {
   createSheetEntry,
   isSheetEntry,
@@ -46,8 +49,25 @@ export interface CacheOptions {
    * holds the option; the engine's `createStyler` reads it.
    */
   hasBaseClass?: boolean
+  /**
+   * Whether the cache checks the page while it runs in a browser, and warns once for each problem found
+   * (an engine class that has no rule, a variable that has no value): `findMissingStyles`, throttled,
+   * after the first render and when rules are inserted. Default: on in development (`process.env.NODE_ENV`
+   * is not `production`), off in production, and off where there is no `document`.
+   */
+  hasDevChecks?: boolean
+  /** A short text that stands for the token options (modes, raw and length keys, registered tokens), for the stamp that the server writes and the browser compares. The engine gives it; '' when none. */
+  tokenSignature?: string
   /** Where rules go. Default: a DOM sheet when `document` exists, otherwise an in-memory one. */
   sheet?: Sheet
+}
+
+/** What `extractPage` is told besides the classes of the page. */
+export interface PageExtractOptions {
+  /** Theme classes to include although no element has them (the themes the page offers for switching). */
+  themes?: Iterable<string>
+  /** Keys of the `<style href precedence>` elements that the document carries already: their rules are left out. */
+  carried?: ReadonlySet<string>
 }
 
 export interface Sheet {
@@ -146,8 +166,23 @@ export interface Cache {
   registerProperties(rules: Readonly<Record<string, string>>): void
   /** `getRules` with every declaration of a theme class, used or not, after the `@property` rules of the registered variables it declares: for a style element that is sent before the rules that use the class. */
   getFullRules(id: string): readonly string[]
-  /** The CSS inserted so far and the ids it covers (class names, then the used variables), for a server render or a static page. */
+  /** The CSS inserted so far and the ids it covers (class names, then the used variables): all of the cache, whatever page asked for it. See `extractPage` for one page. */
   extract(): { css: string; ids: string[] }
+  /**
+   * The CSS that one page needs, decided from the class names it holds and not from what the cache holds:
+   * the layer order statement; the `@property` rules of the variables in use; each theme class (of the
+   * page, and `options.themes`) with only the variables the page's rules use (all that they refer to,
+   * through the values of the themes too, and the variables marked with `markUsed`) and its color-scheme;
+   * and the rules of the classes, in an order that depends on the classes only: a props class after its
+   * base class, the rest by name. Names the cache made no rules for are ignored. It reads the cache and
+   * changes nothing, so pages rendered at once, or in any order, get the same CSS.
+   */
+  extractPage(
+    classNames: Iterable<string>,
+    options?: PageExtractOptions
+  ): { css: string; ids: string[] }
+  /** The options that change the CSS or the class names, as a short text: the server stamps it on its style output and the browser compares it with its own. */
+  readonly fingerprint: string
 }
 
 /** The start of every variable name, and of the ids that mark a used variable. */
@@ -212,11 +247,17 @@ export function createDomSheet(key: string, container: Node = document.head): Sh
   }
 }
 
-/** The ids a server render marked as inserted, from its style element. */
-function readInsertedIds(prefix: string): string[] {
-  if (typeof document === 'undefined') return []
-  const element = document.querySelector<HTMLElement>(`style[data-style="${prefix}"]`)
-  return (element?.dataset.ids ?? '').split(/\s+/).filter(Boolean)
+/** The selector of the style elements that hold engine rules: the cache's own, and the ones React hoists for the same prefix. */
+function createStyleSelector(prefix: string): string {
+  return `style[data-style="${prefix}"], style[data-precedence="${prefix}"]`
+}
+
+/** The stamp of the options that the server wrote: on a style element, or on the `<meta>` that a server component renders. */
+function readServerStamp(prefix: string): string | undefined {
+  const element = document.querySelector<HTMLElement>(
+    `style[data-style="${prefix}"][data-options], meta[name="${prefix}-options"]`
+  )
+  return element?.dataset.options ?? element?.getAttribute('content') ?? undefined
 }
 
 /** The class names in `value`, a class string or a sheet entry. */
@@ -272,11 +313,34 @@ export function createCache(options: CacheOptions = {}): Cache {
   if (!PREFIX_PATTERN.test(prefix)) {
     throw new Error(`Invalid cache prefix "${prefix}": use lowercase letters, digits and hyphens.`)
   }
-  const hydratedIds = readInsertedIds(prefix)
-  const insertedIds = new Set<string>(hydratedIds.filter((id) => !id.startsWith(VARIABLE_START)))
-  // A server render marks the variables it declared, and declared no more than those.
-  const hydratedUsed = new Set<string>(hydratedIds.filter((id) => id.startsWith(VARIABLE_START)))
-  const used = new Set<string>(hydratedUsed)
+  const fingerprint = createFingerprint({
+    prefix,
+    suffix,
+    hasLabels,
+    hasLayers,
+    hasPruning,
+    hasBaseClass,
+    hasScope,
+    hasColorFallbacks,
+    tokens: options.tokenSignature ?? '',
+  })
+  const hasDocument = typeof document !== 'undefined'
+  if (hasDocument) {
+    const stamp = readServerStamp(prefix)
+    const difference = stamp === undefined ? '' : describeFingerprintDifferences(stamp, fingerprint)
+    if (difference !== '') throw new Error(difference)
+  }
+  const { hasDevChecks = hasDocument && isDevelopment() } = options
+  const checkLater = hasDevChecks ? createDevChecker(prefix) : undefined
+  // The ids of what is written, or was found on the page: class names, the layer order, `@property` rules.
+  const insertedIds = new Set<string>()
+  const used = new Set<string>()
+  // The variables that were marked from outside the engine's own rules: always part of a page's themes.
+  const pinned = new Set<string>()
+  // The theme classes that the page has rules for, and the variables each of them declares there.
+  const pageThemes = new Map<string, Set<string>>()
+  // The class a props class was made after (its base class), by class name.
+  const afters = new Map<string, string>()
   const sheet =
     options.sheet ??
     (typeof document === 'undefined' ? createMemorySheet() : createDomSheet(prefix))
@@ -304,6 +368,7 @@ export function createCache(options: CacheOptions = {}): Cache {
       sheet.insert(layerOrder)
     }
     for (const rule of layered) sheet.insert(rule)
+    if (layered.length > 0) checkLater?.()
   }
 
   // Pruning: each registered theme class, with what it declares and what of that is written.
@@ -368,7 +433,7 @@ export function createCache(options: CacheOptions = {}): Cache {
       writeTheme(
         className,
         entry,
-        fresh.filter((name) => entry.declarations[name] !== undefined)
+        fresh.filter((name) => entry.declarations[name] !== undefined && !entry.written.has(name))
       )
     }
   }
@@ -386,11 +451,12 @@ export function createCache(options: CacheOptions = {}): Cache {
       return
     }
     if (themes.has(className)) return
-    // A theme class that the server sent has its color-scheme, and the variables that were used then.
-    const isSent = insertedIds.has(className)
+    // A theme class that the page has a rule for has its color-scheme, and the variables of that rule.
+    const sent = pageThemes.get(className)
+    const isSent = sent !== undefined
     insertedIds.add(className)
     const names = Object.keys(declarations)
-    const written = new Set(isSent ? names.filter((name) => hydratedUsed.has(name)) : [])
+    const written = new Set(isSent ? names.filter((name) => sent.has(name)) : [])
     const entry: ThemeEntry = {
       declarations,
       schemeText,
@@ -459,6 +525,7 @@ export function createCache(options: CacheOptions = {}): Cache {
     if (rules.length === 0) return rawClasses.join(' ')
     const className = nameClass(layer, merged, rules, after)
     registered.set(className, merged)
+    if (after !== '') afters.set(className, after)
     insertOnce(className, compileRules(`.${className}`, merged, hasColorFallbacks, scoping), layer)
     return [...rawClasses, className].join(' ')
   }
@@ -490,6 +557,120 @@ export function createCache(options: CacheOptions = {}): Cache {
     return entry
   }
 
+  /** Takes in what rules on the page say: the classes, the layer order, the `@property` rules and the themes that are written, and the variables the rules use. */
+  const absorb = (found: StyleFindings): void => {
+    if (found.hasLayerOrder) insertedIds.add(layerOrderId)
+    for (const name of found.classes) insertedIds.add(name)
+    for (const [name, rule] of found.properties) {
+      insertedIds.add(`@property:${name}:${hashString(rule)}`)
+    }
+    for (const [className, names] of found.themes) {
+      insertedIds.add(className)
+      const known = pageThemes.get(className) ?? new Set<string>()
+      for (const name of names) known.add(name)
+      pageThemes.set(className, known)
+      const entry = themes.get(className)
+      if (entry === undefined) continue
+      entry.isSent = true
+      for (const name of names) entry.written.add(name)
+    }
+    markUsed(found.variables)
+  }
+
+  if (hasDocument) {
+    // The page is read once here, and again for every style element that arrives later.
+    const selector = createStyleSelector(prefix)
+    const scanned = new WeakSet<Element>()
+    const scan = (element: Element): void => {
+      if (scanned.has(element)) return
+      scanned.add(element)
+      absorb(scanStyleText(prefix, element.textContent as string))
+    }
+    for (const element of document.querySelectorAll(selector)) scan(element)
+    // Rules reach the page without a call to the engine: streamed content, a route that a framework
+    // fetches. A watch on the children of <head> notices the elements React hoists there.
+    new MutationObserver((records) => {
+      for (const { addedNodes } of records) {
+        for (const node of addedNodes) {
+          if (node instanceof Element && node.matches(selector)) scan(node)
+        }
+      }
+      checkLater?.()
+    }).observe(document.head, { childList: true })
+    checkLater?.()
+  }
+
+  /** What orders the classes of a page: a props class is right after its base class (its `after`), the rest by name. */
+  const sortKey = (id: string): string =>
+    `${afters.get(id) ?? id}|${afters.has(id) ? '1' : '0'}${id}`
+
+  /** The variables that the theme class `id` declares. */
+  const readNames = (id: string): readonly string[] => themeNames.get(id) as readonly string[]
+
+  /** The rules that the cache wrote under `id`, a class or a theme class it made. */
+  const readRules = (id: string): readonly string[] => insertedRules.get(id) as readonly string[]
+
+  /** The variables a page needs declared: those its rules refer to, those marked from outside, and what the values of the themes in play refer to. */
+  const collectPageVariables = (classIds: readonly string[], themeIds: readonly string[]) => {
+    const names = new Set(pinned)
+    for (const id of classIds) {
+      for (const rule of readRules(id)) {
+        for (const name of scanVariables(rule, VARIABLE_START)) names.add(name)
+      }
+    }
+    const queue = [...names]
+    for (let index = 0; index < queue.length; index++) {
+      for (const id of themeIds) {
+        const value = themes.get(id)?.declarations[queue[index]]
+        if (value === undefined) continue
+        for (const name of scanVariables(value, VARIABLE_START)) {
+          if (!names.has(name)) queue.push(name)
+          names.add(name)
+        }
+      }
+    }
+    return names
+  }
+
+  /** The rule of a theme class for a page: with pruning, only the variables in `names`, and its color-scheme. */
+  const createPageThemeRules = (id: string, names: ReadonlySet<string>): readonly string[] => {
+    const entry = themes.get(id)
+    if (entry === undefined) return readRules(id)
+    const wanted = Object.keys(entry.declarations).filter((name) => names.has(name))
+    const body =
+      toDeclarationText(wanted.map((name) => [name, entry.declarations[name]])) + entry.schemeText
+    return body === '' ? [] : wrapInLayer([`.${id}{${body}}`], 'theme')
+  }
+
+  const extractPage = (classNames: Iterable<string>, pageOptions: PageExtractOptions = {}) => {
+    const { themes: offered = [], carried = new Set<string>() } = pageOptions
+    const wanted = new Set([...classNames, ...offered])
+    const themeIds = [...wanted].filter((name) => themeNames.has(name)).sort()
+    const classIds = [...wanted]
+      .filter((name) => name.startsWith(`${prefix}-`) && !themeNames.has(name))
+      .filter((name) => insertedRules.has(name))
+      .sort((first, second) => (sortKey(first) < sortKey(second) ? -1 : 1))
+    const names = hasPruning ? collectPageVariables(classIds, themeIds) : new Set<string>()
+    // A carried theme element holds the `@property` rules of the variables its theme declares.
+    const covered = new Set(themeIds.filter((id) => carried.has(id)).flatMap(readNames))
+    const declared = hasPruning ? names : themeIds.flatMap(readNames)
+    const properties = [...new Set(declared)]
+      .filter((name) => propertyRules[name] !== undefined && !covered.has(name))
+      .sort()
+    const newThemes = themeIds.filter((id) => !carried.has(id))
+    const newClasses = classIds.filter((id) => !carried.has(id))
+    const themeRules = newThemes.flatMap((id) => createPageThemeRules(id, names))
+    const classRules = newClasses.flatMap(readRules)
+    const hasLayered = themeRules.length + classRules.length > 0
+    const css = [
+      hasLayers && hasLayered ? layerOrder : '',
+      ...properties.map((name) => propertyRules[name]),
+      ...themeRules,
+      ...classRules,
+    ].join('')
+    return { css, ids: [...newThemes, ...newClasses] }
+  }
+
   return {
     prefix,
     hasLayers,
@@ -504,12 +685,18 @@ export function createCache(options: CacheOptions = {}): Cache {
     hasScope,
     hasPruning,
     usedVariables: used,
-    markUsed,
+    markUsed: (names) => {
+      const list = [...names]
+      for (const name of list) pinned.add(name)
+      markUsed(list)
+    },
     insertTheme,
     registerProperties,
     insertOnce,
     getRules: (id) => insertedRules.get(id) ?? [],
     getFullRules,
     extract: () => ({ css: sheet.rules.join(''), ids: [...insertedIds, ...used] }),
+    extractPage,
+    fingerprint,
   }
 }
