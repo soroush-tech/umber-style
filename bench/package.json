@@ -11,7 +11,7 @@
   },
   "scripts": {
     "lint": "oxlint --deny-warnings",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "pnpm --filter @umber-style/core build && tsc --noEmit",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage"
   },
