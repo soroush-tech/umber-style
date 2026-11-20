@@ -6,7 +6,7 @@ import { createStyle } from './createStyle'
 /** The doc comment of `shouldForwardProp` in the types, which says what is not forwarded. */
 function readForwardComment(): string {
   const source = readFileSync(join(import.meta.dirname, 'types.ts'), 'utf8')
-  return /\/\*\* Whether a prop is forwarded[^\n]*\*\//.exec(source)?.[0] ?? ''
+  return /\/\*\*\s*\*? ?Whether a prop is forwarded[\s\S]*?\*\//.exec(source)?.[0] ?? ''
 }
 
 describe('what styled does not forward', () => {

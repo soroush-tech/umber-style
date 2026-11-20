@@ -27,6 +27,7 @@ jobs:
             react
             react-native
             server
+            styled
             umber-style
             vue
             # gen:issue-areas end

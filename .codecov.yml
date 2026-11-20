@@ -21,6 +21,7 @@ coverage:
           - react
           - react-native
           - server
+          - styled
           - umber-style
           - vue
           # gen:codecov-patch-flags end
@@ -54,6 +55,9 @@ flag_management:
     - name: server
       paths:
         - packages/server/
+    - name: styled
+      paths:
+        - packages/styled/
     - name: umber-style
       paths:
         - packages/umber-style/
@@ -99,6 +103,10 @@ component_management:
       name: server
       paths:
         - packages/server/**
+    - component_id: styled
+      name: styled
+      paths:
+        - packages/styled/**
     - component_id: umber-style
       name: umber-style
       paths:

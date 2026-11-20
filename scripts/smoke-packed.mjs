@@ -39,6 +39,7 @@ const PACKAGES = [
   { dir: 'server', name: '@umber-style/server' },
   { dir: 'css', name: '@umber-style/css' },
   { dir: 'react', name: '@umber-style/react' },
+  { dir: 'styled', name: '@umber-style/styled' },
   { dir: 'react-native', name: '@umber-style/react-native' },
   { dir: 'vue', name: '@umber-style/vue' },
   { dir: 'umber-style', name: 'umber-style' },
@@ -71,6 +72,7 @@ const ENTRIES = {
     'Global',
     'keyframes',
   ],
+  '@umber-style/styled': ['default'],
   '@umber-style/react-native': [
     'createStyle',
     'styled',
@@ -302,6 +304,7 @@ const same = (a, b, what) => { if (a !== b) throw new Error('two copies: ' + wha
 same(mods['umber-style'].createEngine, mods['@umber-style/core'].createEngine, 'umber-style and core')
 same(mods['@umber-style/react'].at, mods['@umber-style/core'].at, 'react and core')
 same(mods['umber-style/react'].styled, mods['@umber-style/react'].styled, 'umber-style/react and react')
+same(mods['@umber-style/styled'].default, mods['@umber-style/react'].styled, '@umber-style/styled and react')
 same(mods['umber-style/react-native'].styled, mods['@umber-style/react-native'].styled, 'umber-style/react-native')
 same(mods['umber-style/vue'].styled, mods['@umber-style/vue'].styled, 'umber-style/vue')
 // The plain layer: a class name from a style, its rule in the cache, and a separate instance.
@@ -369,6 +372,8 @@ const [, , expected] = process.argv
 const names = async (specifier) => Object.keys(await import(specifier))
 const react = await names('@umber-style/react')
 const shared = await names('umber-style/react')
+const styledDefault = (await import('@umber-style/styled')).default
+if (styledDefault !== (await import('@umber-style/react')).styled) throw new Error('@umber-style/styled is not the styled of @umber-style/react')
 if (expected === 'server') {
   for (const keys of [react, shared]) {
     if (!keys.includes('readTheme') || keys.includes('useTheme')) throw new Error('not the server build: ' + keys)
@@ -388,6 +393,7 @@ const keys = (specifier) => Object.keys(require(specifier))
 const expected = process.argv[2]
 const react = keys('@umber-style/react')
 const shared = keys('umber-style/react')
+if (require('@umber-style/styled').default !== require('@umber-style/react').styled) throw new Error('@umber-style/styled is not the styled of @umber-style/react')
 if (expected === 'server') {
   for (const names of [react, shared]) {
     if (!names.includes('readTheme') || names.includes('useTheme')) throw new Error('not the server build: ' + names)
@@ -425,6 +431,8 @@ import type { Theme } from '@umber-style/core'
 import { css, cx } from '@umber-style/css'
 import createCssInstance from '@umber-style/css/create-instance'
 import { createStyle } from '@umber-style/react'
+import styled from '@umber-style/styled'
+import type { StyledOptions } from '@umber-style/styled'
 import { createStyle as createNative } from '@umber-style/react-native'
 import { createStyle as createVue } from '@umber-style/vue'
 import { createEngine as createUmbrellaEngine } from 'umber-style'
@@ -455,6 +463,9 @@ export const Box = web.styled('div', { name: 'Box' })(({ theme: view }) => {
   return { color: primary, padding: view.space[1], opacity: missing ? 1 : 0.5 }
 })
 export const color: string = web.useTheme().palette.primary
+const styledOptions: StyledOptions = { name: 'Card', target: 'card' }
+export const Card = styled('section', styledOptions)({ padding: 4 })
+export const Label = styled.span<{ tone?: string }>(({ tone }) => ({ color: tone }))
 
 const native = createNative(theme)
 export const nativeColor: string = native.useTheme().palette.primary
@@ -471,6 +482,7 @@ export const umbrellaVue = createUmbrellaVue(theme).useTheme().value.palette.pri
 `
   const server = `
 import * as web from '@umber-style/react'
+import styled from '@umber-style/styled'
 import { createStyle } from 'umber-style/react'
 
 const theme = { palette: { primary: '#1b5fd1' } }
@@ -478,6 +490,7 @@ export const read: () => object = web.readTheme
 // @ts-expect-error the server build has no hook
 export const hook = web.useTheme
 export const shared: { palette: { primary: string } } = createStyle(theme).readTheme()
+export const ServerBox = styled.div({ padding: 4 })
 `
   const ts = join(consumer, 'ts')
   mkdirSync(ts)

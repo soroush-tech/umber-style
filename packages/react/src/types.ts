@@ -3,6 +3,7 @@ import type {
   Context,
   ElementType,
   FunctionComponent,
+  JSX,
   ReactElement,
   ReactNode,
 } from 'react'
@@ -70,8 +71,19 @@ export interface DefaultStyleOptions extends BindingOptions<Theme>, ServerStyleO
 }
 
 export interface StyledOptions extends StylerOptions {
-  /** Whether a prop is forwarded to a string tag. Default: every prop but `as`, `theme`, `className` and `style`, which the component handles itself. */
+  /**
+   * Whether a prop is forwarded to a string tag. It replaces the default, which forwards the attributes
+   * of HTML and SVG (by their React names), `data-*`, `aria-*`, event handlers and React's own props, and
+   * every prop to a custom element (a tag with a hyphen). `as`, `theme`, `className` and `style` are the
+   * component's own and are never forwarded. A component tag receives every prop but those four.
+   */
   shouldForwardProp?: (prop: string) => boolean
+  /**
+   * A class name of your own that the element always has, after the engine's classes: a stable name
+   * that a parent's selector or a test can find. It is not a style and has no rule. A component that
+   * wraps this one keeps it, and adds its own.
+   */
+  target?: string
 }
 
 /** What a styled component keeps, so that styling it again flattens into one element. */
@@ -81,15 +93,17 @@ export interface StyledStatics {
   /** The tag or component that is finally rendered. */
   _tag: ElementType
   _shouldForwardProp?: (prop: string) => boolean
+  /** The `target` classes of the component and of the components it wraps. */
+  _target?: string
 }
 
 /**
  * What the `style` prop of a styled component takes on the web: sheet entries and plain style
  * objects, in arrays, with falsy values dropped. Nothing is rendered as a style attribute: all of it
  * is merged, in order, into the one class of the element, after its own styles and before
- * `className`. A value that changes often (an animated or measured number) makes a new class for
- * each value, so give such a value to a class as a CSS custom property, or drive it another way. A
- * string is an error.
+ * `className`. In the browser, a class made with a plain object is removed once no element uses it, so
+ * a value that changes often leaves no class behind; each new value still writes a rule. A string is
+ * an error.
  */
 export type StyleProp =
   | SheetEntry
@@ -104,10 +118,21 @@ export type StyledComponent<C extends ElementType, P extends object> = FunctionC
 > &
   StyledStatics
 
-export type Styled<T> = <C extends ElementType>(
+/** What `styled(tag, options)` returns: it takes the styles and makes the component. */
+export type StyledFactory<T, C extends ElementType> = <P extends object = object>(
+  ...styles: StyleInput<T, P>[]
+) => StyledComponent<C, P>
+
+/** The shorthand of each HTML and SVG tag: `styled.div(...styles)` is `styled('div')(...styles)`. */
+export type StyledTags<T> = {
+  readonly [K in keyof JSX.IntrinsicElements]: StyledFactory<T, K>
+}
+
+export type Styled<T> = (<C extends ElementType>(
   tag: C,
   options?: StyledOptions
-) => <P extends object = object>(...styles: StyleInput<T, P>[]) => StyledComponent<C, P>
+) => StyledFactory<T, C>) &
+  StyledTags<T>
 
 /** A set of named styles; `E` is what one of them becomes: a class name on the web, a style object on React Native. */
 export interface SheetDefinition<S extends SheetStyles, E> {

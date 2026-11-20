@@ -104,6 +104,17 @@ The component has two classes: its own (`umber-card-root-1l5hymm`) and one overr
 
 Here three things were given (two entries and an object), so they are merged into one new class, which keeps the label of the component. When exactly **one** sheet entry is given, and nothing else that needs merging (no plain object, no second entry, no engine class in `className`), the entry's own class is the override class: no second class is made, and the same entry given to ten components is one rule. Class names that are not the engine's do not count: they pass through.
 
+### How long a class of `style` lives
+
+| Given in `style`                               | Result                                                             |
+| ---------------------------------------------- | ------------------------------------------------------------------ |
+| a `StyleSheet.create` entry or a `css()` value | its own cached class, permanent, shared by every user              |
+| a plain object, `{ width: x }`                 | a class for that value, removed when no element uses it            |
+| a list of both                                 | one merged class, removed when unused; the entry's own class stays |
+| anything on a plain element                    | the framework's own `style` attribute; the engine is not involved  |
+
+In the browser, an element that is given a plain object counts the class it renders, and the class is removed from the sheet one macrotask after the last element lets it go: a value that changes leaves no class behind. Two elements with the same value share the class. On a server nothing is removed. See "A value that changes" in [No inline styles](no-inline-styles.md) for what it costs.
+
 The `style` prop is only for components made by `styled()`. On a plain element, `style` is the platform's own prop: a sheet entry there is not turned into a class (and writes no style attribute, see [No inline styles](no-inline-styles.md)), and the types reject it. Use `apply` for a plain element.
 
 ## `apply`
@@ -260,6 +271,8 @@ A sheet entry in the `style` prop only works on a component made by `styled()`. 
 - A length with a unit (`'10px'`) and a shorthand with several values type-check in shared code, because the platform's own types accept any string there. React Native warns about them in development; the web writes what you give.
 - An object sheet cannot use tokens, and on React Native it drops `when()` and `whenScheme()` keys. Both need a function sheet and `useStyle`.
 - The rule that one entry given alone is the override class holds with layers; without layers it is merged.
+- A class made from a plain object is removed only in the browser and only by a sheet that can remove rules. Each new value of such an object writes one rule and later removes one: slower than a style attribute.
+- The override class is in the `overrides` layer, so an `!important` rule of the app, or CSS outside the engine's layers, wins over it. A style attribute would win over every normal rule.
 - A shared source that uses `useStyle` or function sheets resolves them with the platform's own rules: on the web, entries are classes, on React Native they are registered objects.
 - The `host.native.ts` file was compiled in the React Native package, against the real `react-native` types, apart from the shared source that imports `./host`.
 - The shared source was run on the web in a test, and its React Native half is covered by the repository's test of one source on both platforms (`packages/umber-style/src/sharedSource.test.tsx`), which uses a stand-in for the platform.

@@ -112,7 +112,7 @@ export interface Sheet {
   /**
    * Removes the rule at `index` of `rules`: the rules after it move down by one, in `rules` and in what
    * the sheet holds. A sheet without it keeps every rule: global rules that are released then stay, and
-   * count as written.
+   * count as written, and every class is permanent (see `Cache.cssHeld`).
    */
   remove?(index: number): void
 }
@@ -152,6 +152,18 @@ export interface ClassOptions {
   after?: string
 }
 
+/** A class that elements hold while they use it (see `Cache.cssHeld`). */
+export interface HeldClass {
+  /** The class names, as `cssWith` returns them. */
+  readonly className: string
+  /**
+   * Counts one element that uses the class, and returns the function that lets it go (once; a second
+   * call does nothing). The same function for every element while the class lives. Undefined when the
+   * class is not held: it stays for good.
+   */
+  readonly hold: (() => () => void) | undefined
+}
+
 export interface Cache {
   readonly prefix: string
   /** Whether rules go into cascade layers. */
@@ -174,6 +186,22 @@ export interface Cache {
    * of the entry for that layer is used, and written if it was not.
    */
   cssWith(options: ClassOptions, ...values: ClassValue[]): string
+  /**
+   * `cssWith` for a class that lives only while elements use it: what a styled component is given as a
+   * plain object in `style`, so that a value that changes leaves no class behind. The class is written
+   * now, as `cssWith` writes it, and `hold` counts each element that uses it. When the count falls to
+   * zero, the class is removed after one macrotask (a `setTimeout` of 0), unless it is held again
+   * before: its rules leave the sheet, and the class is forgotten (`registered`, `extract`), so the same
+   * styles later write it again. A class that is not held within that delay is removed too, so a render
+   * that never commits leaves nothing; `hold` writes the class again when it was removed meanwhile.
+   *
+   * A class that a server render left on the page is taken over: it is not removed before it was held,
+   * and at the last release its rules are deleted from the page, unless they cannot all be found there
+   * (then they stay). Permanent, with no `hold`: the class of one sheet entry given alone, a class that
+   * `cssWith` or an entry made (one that `cssWith` makes later becomes permanent), and every class when
+   * the sheet has no `remove`.
+   */
+  cssHeld(options: Omit<ClassOptions, 'after'>, ...values: ClassValue[]): HeldClass
   /** The entry of a style: its class names are worked out now and their rules are written when the entry is first used, in the layer of how it is used. */
   createEntry(style: WebStyleObject): SheetEntry
   /** The entry that `createEntry` made, by the class name it has when used on its own, for a framework that merged entries into one object. */
@@ -538,11 +566,17 @@ export function createCache(options: CacheOptions = {}): Cache {
     }
   }
 
-  /** Writes `layered` after the layer order statement, and reports them under `name`. */
-  const insertLayered = (name: string, layered: readonly string[]): void => {
+  /** Writes `layered` after the layer order statement, and reports them under `name`; with `indexes`, the place of each rule that the sheet took is added to it. */
+  const insertLayered = (name: string, layered: readonly string[], indexes?: number[]): void => {
     if (layered.length === 0) return
     insertLayerOrder()
-    for (const rule of layered) sheet.insert(rule)
+    if (indexes) {
+      for (const rule of layered) {
+        const index = sheet.rules.length
+        sheet.insert(rule)
+        if (sheet.rules.length > index) indexes.push(index)
+      }
+    } else for (const rule of layered) sheet.insert(rule)
     onInsert?.(name, layered.join(''))
     checkLater?.(layered)
   }
@@ -638,15 +672,20 @@ export function createCache(options: CacheOptions = {}): Cache {
     insertedRules.set(name, [rule])
   }
 
-  /** Inserts the rules of a class once, after the `@keyframes` rules of the animations they use. */
-  const insertClass = (className: string, rules: readonly string[], layer: ClassLayer): void => {
+  /** Inserts the rules of a class once, after the `@keyframes` rules of the animations they use; with `indexes`, the places of its rules are added to it. */
+  const insertClass = (
+    className: string,
+    rules: readonly string[],
+    layer: ClassLayer,
+    indexes?: number[]
+  ): void => {
     if (insertedIds.has(className)) return
     const names = findAnimationNames(rules)
     if (names.length > 0) {
       animations.set(className, names)
       names.forEach(writeKeyframes)
     }
-    insertOnce(className, rules, layer)
+    insertOnce(className, rules, layer, indexes)
   }
 
   const insertKeyframes = (name: string): void => {
@@ -762,12 +801,17 @@ export function createCache(options: CacheOptions = {}): Cache {
     )
   }
 
-  function insertOnce(id: string, rules: readonly string[], layer?: RuleLayer): boolean {
+  function insertOnce(
+    id: string,
+    rules: readonly string[],
+    layer?: RuleLayer,
+    indexes?: number[]
+  ): boolean {
     if (insertedIds.has(id)) return false
     insertedIds.add(id)
     const layered = wrapInLayer(rules, layer)
     insertedRules.set(id, layered)
-    insertLayered(id, layered)
+    insertLayered(id, layered, indexes)
     if (hasPruning) markUsed(rules.flatMap((rule) => scanVariables(rule, VARIABLE_START)))
     return true
   }
@@ -785,6 +829,20 @@ export function createCache(options: CacheOptions = {}): Cache {
   const globals = new Map<string, GlobalEntry>()
   // The global rules of the page by their text, each with the browser's object of the rule when it can be told.
   const pageGlobals = new Map<string, (CSSRule | undefined)[]>()
+
+  /** A class that elements hold (see `cssHeld`): how many, and where its rules are. */
+  interface HeldEntry {
+    count: number
+    /** Where each rule this cache wrote is in the sheet; none when the rules are the page's. */
+    indexes: number[]
+    /** How many rules the class has, when they are the page's (a server render): none were written. */
+    pageRules: number | undefined
+    /** The `hold` of the class, the same function while the class lives, so that a binding can compare it. */
+    hold: () => () => void
+  }
+  const held = new Map<string, HeldEntry>()
+  // The held classes to remove after the delay, if nothing holds them then.
+  const releasing = new Set<string>()
 
   const compileGlobal = (styles: GlobalStyleObject): GlobalRules => {
     const flat = compileGlobalRules(styles, hasColorFallbacks, scoping, hasValueRepair)
@@ -824,7 +882,7 @@ export function createCache(options: CacheOptions = {}): Cache {
   /** Removes the rule at `index` of the sheet, and moves down every place the cache keeps that is after it. */
   const removeAt = (remove: (index: number) => void, index: number): void => {
     remove(index)
-    for (const entry of globals.values()) {
+    for (const entry of [...globals.values(), ...held.values()]) {
       entry.indexes = entry.indexes.map((at) => (at > index ? at - 1 : at))
     }
     for (const entry of themes.values()) {
@@ -883,24 +941,139 @@ export function createCache(options: CacheOptions = {}): Cache {
     return [prefix, label, hash].filter(Boolean).join('-') + suffix
   }
 
+  /** The merged style of `styles` (the label last) and the name of its class; undefined when it has no rule. */
+  const prepareClass = (
+    layer: ClassLayer,
+    label: string | undefined,
+    after: string,
+    styles: readonly StyleObject[]
+  ): { merged: StyleObject; className: string } | undefined => {
+    if (styles.length === 0) return undefined
+    const merged = mergeStyles(label ? [...styles, { label }] : styles)
+    const rules = compileRules('&', merged, hasColorFallbacks, scoping, hasValueRepair)
+    if (rules.length === 0) return undefined
+    return { merged, className: nameClass(layer, merged, rules, after) }
+  }
+
+  /** The rules of the class `className` with the style `merged`. */
+  const compileClass = (className: string, merged: StyleObject): readonly string[] =>
+    compileRules(`.${className}`, merged, hasColorFallbacks, scoping, hasValueRepair)
+
   const cssWith = (options: ClassOptions, ...values: ClassValue[]): string => {
     const { layer = 'components', label, after = '' } = options
     const { styles, rawClasses, sole } = sortClassValues(values, registered)
     if (sole && after === '') return [...rawClasses, sole.use(layer)].filter(Boolean).join(' ')
-    if (styles.length === 0) return rawClasses.join(' ')
-
-    const merged = mergeStyles(label ? [...styles, { label }] : styles)
-    const rules = compileRules('&', merged, hasColorFallbacks, scoping, hasValueRepair)
-    if (rules.length === 0) return rawClasses.join(' ')
-    const className = nameClass(layer, merged, rules, after)
+    const prepared = prepareClass(layer, label, after, styles)
+    if (prepared === undefined) return rawClasses.join(' ')
+    const { merged, className } = prepared
+    // A held class that is made here for good is held no more.
+    if (held.size > 0) held.delete(className)
     registered.set(className, merged)
     if (after !== '') afters.set(className, after)
-    insertClass(
-      className,
-      compileRules(`.${className}`, merged, hasColorFallbacks, scoping, hasValueRepair),
-      layer
-    )
+    insertClass(className, compileClass(className, merged), layer)
     return [...rawClasses, className].join(' ')
+  }
+
+  /**
+   * Registers and writes the held class `className`, or takes it over from the page when the page has
+   * it. A class written by this cache is removed after the delay unless it is held by then.
+   */
+  const writeHeld = (className: string, merged: StyleObject, layer: ClassLayer): HeldEntry => {
+    const rules = compileClass(className, merged)
+    const isPage = insertedIds.has(className)
+    const entry: HeldEntry = {
+      count: 0,
+      indexes: [],
+      pageRules: isPage ? rules.length : undefined,
+      hold: () => {
+        let holder = held.get(className)
+        if (holder === undefined) {
+          // Made permanent meanwhile, or removed before this element held it.
+          if (registered.has(className)) return () => undefined
+          holder = writeHeld(className, merged, layer)
+        }
+        const current = holder
+        current.count++
+        let isReleased = false
+        return () => {
+          if (isReleased) return
+          isReleased = true
+          current.count--
+          if (current.count === 0) scheduleRelease(className)
+        }
+      },
+    }
+    held.set(className, entry)
+    registered.set(className, merged)
+    insertClass(className, rules, layer, entry.indexes)
+    if (!isPage) scheduleRelease(className)
+    return entry
+  }
+
+  /** The rules of the page (the style elements of the engine) that name the class `className`, when there are `count` of them; else undefined. */
+  const findPageRules = (className: string, count: number): CSSRule[] | undefined => {
+    const pattern = new RegExp(`\\.${className.replace(/[^\w-]/g, '\\$&')}(?![\\w-])`)
+    const found: CSSRule[] = []
+    for (const element of document.querySelectorAll<HTMLStyleElement>(
+      createStyleSelector(prefix)
+    )) {
+      for (const rule of element.sheet?.cssRules ?? []) {
+        if (pattern.test(rule.cssText)) found.push(rule)
+      }
+    }
+    return found.length === count ? found : undefined
+  }
+
+  /** Removes a held class that nothing holds: its rules from the sheet, or from the page when they are the page's and can all be found; then the class is forgotten. Rules that cannot be found stay, and the class is permanent. */
+  const removeHeld = (className: string, entry: HeldEntry): void => {
+    held.delete(className)
+    if (entry.pageRules === undefined) {
+      for (let at = entry.indexes.length - 1; at >= 0; at--) {
+        removeAt(sheet.remove as (index: number) => void, entry.indexes[at])
+      }
+    } else {
+      const rules = findPageRules(className, entry.pageRules)
+      if (rules === undefined) return
+      rules.forEach(deleteCssRule)
+    }
+    registered.delete(className)
+    insertedIds.delete(className)
+    insertedRules.delete(className)
+    animations.delete(className)
+  }
+
+  /** Removes each held class that waits for its removal and that nothing holds any more. */
+  const flushReleases = (): void => {
+    for (const className of releasing) {
+      const entry = held.get(className)
+      if (entry?.count === 0) removeHeld(className, entry)
+    }
+    releasing.clear()
+  }
+
+  /** Marks `className` for removal after the delay: one macrotask, so that a class let go and held again in the same task (a commit, a value that comes straight back) stays. */
+  const scheduleRelease = (className: string): void => {
+    releasing.add(className)
+    if (releasing.size === 1) setTimeout(flushReleases, 0)
+  }
+
+  const cssHeld = (options: Omit<ClassOptions, 'after'>, ...values: ClassValue[]): HeldClass => {
+    const { layer = 'components', label } = options
+    const { styles, rawClasses, sole } = sortClassValues(values, registered)
+    if (sole || sheet.remove === undefined) {
+      return { className: cssWith(options, ...values), hold: undefined }
+    }
+    const prepared = prepareClass(layer, label, '', styles)
+    if (prepared === undefined) return { className: rawClasses.join(' '), hold: undefined }
+    const { merged, className: name } = prepared
+    const className = [...rawClasses, name].join(' ')
+    let entry = held.get(name)
+    if (entry === undefined) {
+      // A class that is registered and not held is permanent.
+      if (registered.has(name)) return { className, hold: undefined }
+      entry = writeHeld(name, merged, layer)
+    }
+    return { className, hold: entry.hold }
   }
 
   const cssIn = (layer: ClassLayer, ...values: ClassValue[]): string =>
@@ -918,13 +1091,11 @@ export function createCache(options: CacheOptions = {}): Cache {
       style: merged,
       use(role) {
         const name = nameFor(role)
+        // The class of an entry is permanent, also when the same style was held.
+        if (held.size > 0) held.delete(name)
         if (name !== '' && !registered.has(name)) {
           registered.set(name, merged)
-          insertClass(
-            name,
-            compileRules(`.${name}`, merged, hasColorFallbacks, scoping, hasValueRepair),
-            role
-          )
+          insertClass(name, compileClass(name, merged), role)
         }
         return name
       },
@@ -1104,6 +1275,7 @@ export function createCache(options: CacheOptions = {}): Cache {
     css: (...values) => cssIn('components', ...values),
     cssIn,
     cssWith,
+    cssHeld,
     createEntry,
     findEntry: (className) => entries.get(className),
     hasBaseClass,

@@ -32,6 +32,7 @@ on:
           - react
           - react-native
           - server
+          - styled
           - umber-style
           - vue
         # gen:publish-options end

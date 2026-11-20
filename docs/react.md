@@ -25,6 +25,16 @@ configure({ prefix: 'umber', theme: lightTheme })
 
 `configure` takes the options of `createStyle` and a `theme`. It throws if the default style has already been used.
 
+**`@umber-style/styled`** has the `styled` of the default style as its default export, for code that imports it that way. It is the same function, so `configure` from `@umber-style/react` sets it up, and under the `react-server` condition it is the `styled` of the server build:
+
+```tsx
+import styled from '@umber-style/styled'
+
+const Card = styled.div({ padding: 16, borderRadius: 8 })
+```
+
+Its types are `Styled`, `StyledComponent`, `StyledFactory`, `StyledOptions`, `StyledStatics`, `StyledTags` and `StyleProp`, the same as in `@umber-style/react`.
+
 ## What the binding exports
 
 | Name                                                       | What it is                                                                             |
@@ -41,7 +51,7 @@ configure({ prefix: 'umber', theme: lightTheme })
 | `when`, `whenScheme`                                       | Keys for [theme conditions](theme-conditions.md)                                       |
 | `add`, `alpha`, `divide`, `multiply`, `negate`, `subtract` | The helpers of [Tokens](tokens.md)                                                     |
 
-Types: `StyleOptions`, `DefaultStyleOptions`, `StyledOptions`, `StyledStatics`, `StyleProp`, `StyledComponent`, `Styled`, `SheetDefinition`, `ThemeProviderProps`, `WebThemeProviderProps`, `ThemeScopeProps`, `Style`, `WebStyle`, `ServerStyle`, and `ThemeInput` (the type of `theme`).
+Types: `StyleOptions`, `DefaultStyleOptions`, `StyledOptions`, `StyledStatics`, `StyleProp`, `StyledComponent`, `Styled`, `StyledFactory`, `StyledTags`, `SheetDefinition`, `ThemeProviderProps`, `WebThemeProviderProps`, `ThemeScopeProps`, `Style`, `WebStyle`, `ServerStyle`, and `ThemeInput` (the type of `theme`).
 
 `createStyle` returns a `WebStyle`: `styled`, `StyleSheet`, `useStyle`, `apply`, `ThemeProvider`, `ThemeScope`, `ThemeContext`, `useTheme`, `useThemeClass`, `themeClass`, `when`, `whenScheme`, and `engine` and `cache`, the engine and its cache. The default style creates its `ThemeContext` before its engine, so the direct import exists before `configure`. The direct imports have no `engine` or `cache`: use `getEngine()` and `getEngine().cache`. `WebStyleObject` and the other style types (`WebProperties`, `WebNested`, `NestedKey`, `StyleObject`, `AlphaColor`, `SheetEntry`) are re-exported from this package as types, in both builds, and `at` and `alpha` and the arithmetic helpers are exported as values. See [Typed styles](typed-styles.md).
 
@@ -62,8 +72,9 @@ The outermost provider (none above it) renders no element: its theme is declared
 
 ## `styled` in React
 
-- Every prop except `as`, `theme`, `className` and `style` is forwarded to a string tag unless `shouldForwardProp` says otherwise. For a component tag, all but those four are passed on.
-- `style` is typed `StyleProp`: sheet entries and web style objects in arrays, with falsy values dropped. It never renders an attribute: see [No inline styles](no-inline-styles.md).
+- A string tag receives the attributes of HTML and SVG by their React names, `data-*`, `aria-*`, event handlers and React's own props; `shouldForwardProp` replaces that default. A custom element and a component tag receive every prop. `as`, `theme`, `className` and `style` are never passed on. See [Writing styles](writing-styles.md).
+- `styled.div(...)` and the other HTML and SVG tags are shorthands for `styled('div')(...)`, typed as the tag, in both builds. `target` adds a class of your own to the element.
+- `style` is typed `StyleProp`: sheet entries and web style objects in arrays, with falsy values dropped. It never renders an attribute: see [No inline styles](no-inline-styles.md). In the browser, an element given a plain object counts the class that the object made, from the commit that shows it to the one that drops it (an insertion effect in a child that renders nothing, only for such an element), and the class is removed when no element uses it. A component that is never given a plain object has no such child and no extra hook.
 - A component that has only object styles reads no context. One with a function style reads the view of the nearest provider's theme through a hook. The view stays the same object while only the values of tokens change, so such a component renders again only when a value that is not a token changes (a breakpoint, an `inline` token, a function in the theme).
 
 ## Sharing one engine with another binding
@@ -95,3 +106,4 @@ The package has a second build for server components, picked by the `react-serve
 - The value of `ThemeContext` is `undefined` with no provider above, where `useTheme()` returns the base theme.
 - Under a nested provider the DOM has one more element; a portal without `ThemeScope` sees the outer theme. See [Themes](themes.md).
 - The default style is a module singleton. Two copies of the package in one app are two engines.
+- An element that is given a plain object in `style` renders a second child next to it, which renders nothing: the element's own state is kept when the object comes and goes (checked in jsdom), but the component's root is then a fragment.

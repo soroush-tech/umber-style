@@ -126,12 +126,12 @@ describe('styled', () => {
     expect(container.querySelector('button')).toBeNull()
   })
 
-  it('forwards every prop to a tag, but `as`, `theme` and `className`', () => {
+  it('forwards the attributes of HTML to a tag, but not `as`, `theme` or a prop of its own', () => {
     const { styled } = setup()
     const Box = styled('div')<{ tone?: string; theme?: object }>({ color: 'red' })
     const { container } = render(<Box tone="big" theme={{}} data-x="1" id="a" />)
     const element = container.firstElementChild as HTMLElement
-    expect(element.getAttributeNames().sort()).toEqual(['class', 'data-x', 'id', 'tone'])
+    expect(element.getAttributeNames().sort()).toEqual(['class', 'data-x', 'id'])
   })
 
   it('uses shouldForwardProp for a tag', () => {

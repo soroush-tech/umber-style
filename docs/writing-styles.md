@@ -1,6 +1,6 @@
 # Writing styles
 
-After this page you can make styled components with `styled`: label them, compute styles from props and the theme, control which props reach the element, change the element, and build on another styled component.
+After this page you can make styled components with `styled`: label them, compute styles from props and the theme, control which props reach the element, give the element a class of your own, change the element, and build on another styled component.
 
 The examples use the React binding. Vue's `styled` takes attributes instead of props and `class` instead of `className`: see [Vue](vue.md). React Native's `styled` takes components only: see [React Native](react-native.md).
 
@@ -67,13 +67,25 @@ The provider is the outermost one: it renders no element, and its theme is decla
 
 ## Options
 
-`styled(tag, options)` takes these options on every platform. `shouldForwardProp` is the only one the React Native binding uses; it ignores `name` and `slot`.
+`styled(tag, options)` takes these options. `shouldForwardProp` is the only one the React Native binding uses; it ignores `name` and `slot`, and `target` is web only.
 
 | Option              | Type                        | Default   | Effect                                                               |
 | ------------------- | --------------------------- | --------- | -------------------------------------------------------------------- |
 | `name`              | `string`                    | none      | The component's name. With it, the class is labelled `<name>-<slot>` |
 | `slot`              | `string`                    | `root`    | The part of the component this style is for. Used in the label       |
 | `shouldForwardProp` | `(prop: string) => boolean` | see below | Decides which props reach a string tag                               |
+| `target`            | `string`                    | none      | A class of your own that the element always has: see below           |
+
+## Tag shorthands
+
+`styled.div(...styles)` is `styled('div')(...styles)`, for every HTML and SVG tag, typed as the tag (`styled.button` takes the props of a `button`). They take no options: write `styled('div', options)` for those. The shorthands are made when they are first read, not up front, and exist in the client build, the server components build, Vue, and the default style (`import { styled } from '@umber-style/react'`).
+
+```tsx
+const Box = styled.div<{ tone?: string }>(({ tone }) => ({ color: tone }))
+const Icon = styled.svg({ fill: 'red' })
+```
+
+`@umber-style/styled` has the same `styled` of the default style as its default export, for code that imports it that way: `import styled from '@umber-style/styled'`. Under the `react-server` condition it is the `styled` of the server build.
 
 ## Name and slot labels
 
@@ -119,11 +131,41 @@ Give a function the type of your props with the type argument, as `Badge` does: 
 
 ## Which props reach the element
 
-For a string tag such as `'span'`, every prop is forwarded to the element except `as`, `theme`, `className` and `style`. These four are the component's own. For a component (a tag that is not a string), nothing is filtered: everything but the four is passed on.
+`as`, `theme`, `className` and `style` are the component's own and never reach the element. Of the other props, a string tag such as `'span'` receives by default only:
 
-`shouldForwardProp` replaces that default for string tags. Without it in `Badge`, `tone="primary"` would be rendered as an attribute on the `span`. With `(prop) => prop !== 'tone'` it is not.
+- the attributes of HTML and SVG, by the names React gives them (`id`, `title`, `type`, `disabled`, `tabIndex`, `htmlFor`, `viewBox`, `strokeWidth`, `xlinkHref` and the rest);
+- `data-*` and `aria-*` attributes, and event handlers (`onClick`, `onPointerDownCapture`: `on` followed by a capital letter);
+- React's own props: `children`, `ref`, `key`, `dangerouslySetInnerHTML`, `defaultValue`, `defaultChecked`, `suppressHydrationWarning`, `suppressContentEditableWarning`.
+
+So a prop that only the styles read stays off the element:
+
+```tsx
+const Button = styled('button')<{ variant?: string; isActive?: boolean }>({ color: 'red' })
+const go = () => undefined
+
+const App = () => (
+  <Button variant="filled" isActive type="submit" data-test="b" aria-label="go" onClick={go} />
+)
+```
+
+renders `<button type="submit" data-test="b" aria-label="go" class="...">` with the click handler, and neither `variant` nor `isActive`. A custom element (a tag with a hyphen, `'my-element'`) receives every prop, because its attributes are its own. A component (a tag that is not a string) receives every prop but the four.
+
+`shouldForwardProp` replaces that default for string tags: with it, a prop reaches the element exactly when it returns `true`. In `Badge` above, `(prop) => prop !== 'tone'` keeps `tone` off and forwards everything else, an unknown attribute included.
+
+The list of HTML and SVG attributes adds about 3 KB to the React binding, minified (1.7 KB gzipped). The Vue binding has no default filter: see [Vue](vue.md).
 
 The filter is applied to the element that is finally rendered: if you change the element with `as`, a filter is only used when the new element is a string.
+
+## `target`
+
+`target` gives the element a class of your own, after the engine's classes: a stable name that a parent's selector, a test or a tool can find, whatever the hash of the styles is. It is not a style and has no rule. A component that wraps another keeps the wrapped component's `target` and adds its own:
+
+```tsx
+const Card = styled('div', { name: 'Card', target: 'card' })({ color: 'red' })
+const WideCard = styled(Card, { target: 'wide' })({ width: '100%' })
+```
+
+`<Card className="mine" />` renders `<div class="umber-card-root-... mine card">`, and `<WideCard />` renders `<div class="umber-card-root-... card wide">`.
 
 ## `as`
 
@@ -181,6 +223,7 @@ A `className` you give a styled component is kept, and any class the engine made
 ## Limits
 
 - A key built at run time (a media query made from a breakpoint, for example) written directly in a web style object is a type error: write it with `at(key, style)`. See [Typed styles](typed-styles.md).
-- `shouldForwardProp` is the only filter. There is no allow-list of valid HTML attributes: by default every other prop is forwarded to a string tag, valid or not.
+- The default filter knows the attributes of HTML and SVG under their React names. A lowercase or hyphenated spelling (`tabindex`, `stroke-width`) and an attribute that is not in the specifications (a vendor attribute, a new one) do not reach the element unless `shouldForwardProp` lets them, and a prop of your own that has the name of an attribute (`color`, `size`, `label`, `width`) does reach it.
+- The shorthands are typed for the tags of React's JSX types (React) and Vue's (Vue). At run time any name that starts with a lowercase letter is made into a tag, except `then`.
 - A function style that reads props runs on every render of its component. Keep it cheap. One that reads only `theme` runs once for each theme object.
 - Style functions must be pure: the base keeps the first result of a function that read no prop, for a theme. A function that reads a prop only inside something it returns (a callback) is not seen reading it.

@@ -60,7 +60,7 @@ An engine makes its own cache from the options that are shared with the cache. I
 | `hasScope`          | `boolean` | `true`                                                         | Whether conditional rules use `@scope`                                                                                                     |
 | `sheet`             | `Sheet`   | a DOM sheet when `document` exists, otherwise an in-memory one | Where rules go                                                                                                                             |
 
-A `Sheet` has `insert(rule)`, a readonly `rules` list, and optionally `replace(index, rule)`. `createMemorySheet()` and `createDomSheet(key, container = document.head)` make the two sheets that the package has.
+A `Sheet` has `insert(rule)`, a readonly `rules` list, and optionally `replace(index, rule)` and `remove(index)`. Without `remove`, released global rules stay, and so does every class made from a plain object in `style` (see [No inline styles](no-inline-styles.md)). `createMemorySheet()` and `createDomSheet(key, container = document.head)` make the two sheets that the package has.
 
 ## Binding options
 
@@ -74,11 +74,12 @@ A `Sheet` has `insert(rule)`, a readonly `rules` list, and optionally `replace(i
 
 ## `styled` options
 
-| Name                | Type                        | Default                                                                         | Effect                                                                                                     |
-| ------------------- | --------------------------- | ------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| `name`              | `string`                    | none                                                                            | With `slot`, the label of the class: `name-slot` in kebab-case. Ignored on React Native                    |
-| `slot`              | `string`                    | `'root'`                                                                        | The part of the component this style is for. Ignored on React Native                                       |
-| `shouldForwardProp` | `(prop: string) => boolean` | forwards every prop but `as`, `theme`, `className` (`class` on Vue) and `style` | Which props reach a string tag. On React Native it applies to every component and `className` is forwarded |
+| Name                | Type                        | Default                                                                                                                                                                                                              | Effect                                                                                                                                     |
+| ------------------- | --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `name`              | `string`                    | none                                                                                                                                                                                                                 | With `slot`, the label of the class: `name-slot` in kebab-case. Ignored on React Native                                                    |
+| `slot`              | `string`                    | `'root'`                                                                                                                                                                                                             | The part of the component this style is for. Ignored on React Native                                                                       |
+| `shouldForwardProp` | `(prop: string) => boolean` | React: the attributes of HTML and SVG, `data-*`, `aria-*`, event handlers and React's own props (every prop to a custom element); Vue: every attribute. Never `as`, `theme`, `className` (`class` on Vue) or `style` | Which props reach a string tag; given, it replaces the default. On React Native it applies to every component and `className` is forwarded |
+| `target`            | `string`                    | none                                                                                                                                                                                                                 | A class of your own on the element, after the engine's classes; a wrapping component keeps it and adds its own. Web only (React and Vue)   |
 
 ## `ThemeProvider` props
 

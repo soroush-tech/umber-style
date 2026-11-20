@@ -1,6 +1,7 @@
 import { hashString } from './hash'
 import { createLazyRecord } from './lazyRecord'
-import { createCache, type Cache, type ClassValue, type GlobalRules } from './cache'
+import { createCache, type Cache, type ClassValue, type GlobalRules, type HeldClass } from './cache'
+import { isSheetEntry } from './sheetEntry'
 import { readGlobalStyles, type GlobalInput } from './globalStyles'
 import {
   createSchemeKey,
@@ -67,6 +68,17 @@ export interface Styler {
     extra?: ClassValue | readonly ClassValue[],
     theme?: unknown
   ): string
+  /**
+   * `getClassName` for an element that can count the classes it uses (a styled component in the
+   * browser): when what comes in has a plain style object, the class it makes (the override class;
+   * without layers, the one merged class) is made with `Cache.cssHeld`, and `hold` counts the element
+   * that uses it. Otherwise it is `getClassName`, with no `hold`.
+   */
+  getHeldClass(
+    props: Record<string, unknown>,
+    extra?: ClassValue | readonly ClassValue[],
+    theme?: unknown
+  ): HeldClass
 }
 
 export interface Engine<T> {
@@ -152,6 +164,11 @@ export interface Engine<T> {
 /** `text` in kebab-case: ButtonBase gives button-base. */
 function toKebabCase(text: string): string {
   return text.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase()
+}
+
+/** Whether `value`, given to a styled component from outside, is a plain style object: not a sheet entry, not a class name. */
+function isPlainStyle(value: ClassValue): boolean {
+  return typeof value === 'object' && value !== null && !isSheetEntry(value)
 }
 
 /** The label of a styled component: `name-slot`, or '' without a name. */
@@ -400,22 +417,37 @@ export function createLazyEngine<T extends object = Theme>(options: EngineOption
       extras: readonly ClassValue[]
     ) => cache.css(...resolveAll(list, props, theme), ...extras)
 
+    const getClassName: Styler['getClassName'] = (props, extra, theme) => {
+      const extras = Array.isArray(extra) ? extra : [extra]
+      const hasExtras = extras.some(Boolean)
+      if (hasExtras && !cache.hasLayers) return getMerged(props, theme, extras)
+      const own = getOwn(getPlan(props, theme), props, theme)
+      if (!hasExtras) return own
+      // The override class takes the label of the component, so that it can be told from the others;
+      // one sheet entry given alone is used as it is.
+      const overrides = cache.cssWith({ layer: 'overrides', label: label || undefined }, ...extras)
+      return [own, overrides].filter(Boolean).join(' ')
+    }
+
     return {
       styles: list,
       isDynamic: hasFunction,
-      getClassName(props, extra, theme) {
-        const extras = Array.isArray(extra) ? extra : [extra]
-        const hasExtras = extras.some(Boolean)
-        if (hasExtras && !cache.hasLayers) return getMerged(props, theme, extras)
+      getClassName,
+      getHeldClass(props, extra, theme) {
+        const extras: readonly ClassValue[] = Array.isArray(extra) ? extra : [extra]
+        if (!extras.some(isPlainStyle)) {
+          return { className: getClassName(props, extras, theme), hold: undefined }
+        }
+        if (!cache.hasLayers) return cache.cssHeld({}, ...resolveAll(list, props, theme), ...extras)
         const own = getOwn(getPlan(props, theme), props, theme)
-        if (!hasExtras) return own
-        // The override class takes the label of the component, so that it can be told from the others;
-        // one sheet entry given alone is used as it is.
-        const overrides = cache.cssWith(
+        const overrides = cache.cssHeld(
           { layer: 'overrides', label: label || undefined },
           ...extras
         )
-        return [own, overrides].filter(Boolean).join(' ')
+        return {
+          className: [own, overrides.className].filter(Boolean).join(' '),
+          hold: overrides.hold,
+        }
       },
     }
   }

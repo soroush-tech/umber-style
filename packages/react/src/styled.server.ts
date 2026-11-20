@@ -1,5 +1,5 @@
 import { createElement, Fragment, type ElementType } from 'react'
-import type { Engine, StyleInput } from '@umber-style/core'
+import { withTagShorthands, type Engine, type StyleInput } from '@umber-style/core'
 import { createStyleElements } from './styleElements'
 import { prepareStyled } from './styledParts'
 import type { Styled, StyledOptions } from './types'
@@ -28,5 +28,5 @@ export function createStyled<T>(engine: Engine<T>, readTheme: () => T): Styled<T
 
       return Object.assign(Styled, statics)
     }
-  return styled as unknown as Styled<T>
+  return withTagShorthands(styled) as unknown as Styled<T>
 }

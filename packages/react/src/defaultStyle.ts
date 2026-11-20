@@ -3,6 +3,7 @@ import {
   createLazyEngine,
   globalStyles,
   keyframes,
+  withTagShorthands,
   type Theme,
   type WebStyleObject,
 } from '@umber-style/core'
@@ -39,7 +40,9 @@ export function createDefaultStyle() {
     pending = options
   }
 
-  const styled = ((tag, options) => getStyle().styled(tag, options)) as Styled<Theme>
+  // `styled.div` and the other tags are made on use, through the engine's own `styled`.
+  const styled = withTagShorthands(((tag, options) =>
+    getStyle().styled(tag, options)) as Styled<Theme>)
 
   // An object sheet is made on first read, so a module can create one before `configure` is called.
   const StyleSheet: WebStyle<Theme>['StyleSheet'] = {

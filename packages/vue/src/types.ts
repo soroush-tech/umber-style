@@ -1,4 +1,4 @@
-import type { Component, ComputedRef, FunctionalComponent } from 'vue'
+import type { Component, ComputedRef, FunctionalComponent, IntrinsicElementAttributes } from 'vue'
 import type {
   BindingOptions,
   ColorScheme,
@@ -41,6 +41,12 @@ export type StyleOptions<T = never> = BindingOptions<T>
 export interface StyledOptions extends StylerOptions {
   /** Whether an attribute is forwarded to a string tag. Default: every attribute but `as`, `theme`, `class` and `style`, which the component handles itself. */
   shouldForwardProp?: (prop: string) => boolean
+  /**
+   * A class name of your own that the element always has, after the engine's classes: a stable name
+   * that a parent's selector or a test can find. It is not a style and has no rule. A component that
+   * wraps this one keeps it, and adds its own.
+   */
+  target?: string
 }
 
 /** What a styled component keeps, so that styling it again flattens into one element. */
@@ -50,14 +56,22 @@ export interface StyledStatics {
   /** The tag or component that is finally rendered. */
   _tag: string | Component
   _shouldForwardProp?: (prop: string) => boolean
+  /** The `target` classes of the component and of the components it wraps. */
+  _target?: string
 }
 
 export type StyledComponent = FunctionalComponent<Record<string, unknown>> & StyledStatics
 
-export type Styled<T> = (
-  tag: string | Component,
-  options?: StyledOptions
-) => (...styles: StyleInput<T, Record<string, unknown>>[]) => StyledComponent
+/** What `styled(tag, options)` returns: it takes the styles and makes the component. */
+export type StyledFactory<T> = (
+  ...styles: StyleInput<T, Record<string, unknown>>[]
+) => StyledComponent
+
+/** The shorthand of each HTML and SVG tag: `styled.div(...styles)` is `styled('div')(...styles)`. */
+export type StyledTags<T> = { readonly [K in keyof IntrinsicElementAttributes]: StyledFactory<T> }
+
+export type Styled<T> = ((tag: string | Component, options?: StyledOptions) => StyledFactory<T>) &
+  StyledTags<T>
 
 /** A set of named styles made from a function of the theme: it has no entries until `useStyle` resolves it. */
 export interface Sheet<S extends SheetStyles> {
