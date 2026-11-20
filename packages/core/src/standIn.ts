@@ -3,12 +3,21 @@ const BRAND = Symbol.for('umber-style.stand-in')
 /**
  * A stand-in for the theme at `path` (a dotted path, '' for the theme itself): any key read from it is
  * a stand-in one level down, a call is a stand-in for `path(arguments)` (a helper of the theme such as
- * `breakpoints.up('md')`), a symbol reads as undefined, listing its keys throws, and as text it is its path. `keyframes` and
+ * `breakpoints.up('md')`), a symbol reads as undefined, listing its keys throws, calling it with a function throws, and as text it is its path. `keyframes` and
  * `globalStyles` name the styles of a function of the theme with it, so that the name does not depend on
  * the theme's values.
  */
 export function createStandIn(path: string): object {
-  const call = (...values: unknown[]) => createStandIn(`${path}(${values.map(String).join(',')})`)
+  const call = (...values: unknown[]) => {
+    // A function given to a helper of the theme can close over values that its text does not show, and two
+    // such calls would then get one name.
+    if (values.some((value) => typeof value === 'function' && !isStandIn(value))) {
+      throw new TypeError(
+        `A function of the theme given to keyframes() or globalStyles() cannot pass a function to "${path}": its name is made before the theme is known. Read each token by its key.`
+      )
+    }
+    return createStandIn(`${path}(${values.map(String).join(',')})`)
+  }
   return new Proxy(call, {
     get: (_target, key) => {
       if (key === Symbol.toPrimitive) return () => path

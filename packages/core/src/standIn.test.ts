@@ -73,3 +73,17 @@ describe('listing the keys of a stand-in', () => {
     expect(() => ({ ...theme.palette })).toThrow(TypeError)
   })
 })
+
+describe('a function given to a helper of a stand-in', () => {
+  it('throws, because what it closes over is not in its text', () => {
+    const theme = createStandIn('') as unknown as {
+      space: { map(fn: (value: number) => number): number[] }
+      breakpoints: { up(key: unknown): string }
+    }
+
+    expect(() => theme.space.map((value) => value * 2)).toThrow(
+      /cannot pass a function to "space.map"/
+    )
+    expect(String(theme.breakpoints.up(theme.space))).toBe('breakpoints.up(space)')
+  })
+})
