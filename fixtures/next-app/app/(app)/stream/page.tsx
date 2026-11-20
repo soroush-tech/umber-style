@@ -1,5 +1,5 @@
 import { Card, Heading, Muted, Page } from '@umber-fixtures/shared/components'
-import { styled } from '@umber-fixtures/shared/style'
+import { Global, styled } from '@umber-fixtures/shared/style'
 import { Suspense } from 'react'
 
 export const dynamic = 'force-dynamic'
@@ -24,6 +24,8 @@ async function Slow() {
 export default function StreamPage() {
   return (
     <Page data-testid="page-stream">
+      {/* A global rule of this page only, written by a server component. */}
+      <Global styles={{ '[data-testid="page-stream"] h1': { textDecorationLine: 'underline' } }} />
       <Heading>Streaming</Heading>
       <Suspense fallback={<Muted data-testid="fallback">Loading</Muted>}>
         <Slow />

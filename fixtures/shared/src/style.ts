@@ -5,7 +5,8 @@ import { darkTheme, lightTheme } from './themes'
 // same class names: the prefix and the themes are the same.
 export const style = createStyle(lightTheme, { prefix: 'umber' })
 
-export const { styled, ThemeProvider, themeClass, StyleSheet } = style
+export const { styled, ThemeProvider, themeClass, StyleSheet, Global, keyframes, globalStyles } =
+  style
 
 // The classes of the root theme, for <html>. Asking for them makes their rules, so this runs at start-up.
 export const lightClass = themeClass(lightTheme, 'light')

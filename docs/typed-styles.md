@@ -69,6 +69,28 @@ What is not checked:
 
 A `style` prop of a styled component is checked like a style.
 
+### Steps and global styles
+
+The steps of `keyframes` are flat web properties: a misspelt key and a nested style in a step are type errors. The key of a step is any string (`from`, `'50%'`), so a key that is not a step compiles and throws when `keyframes` runs. In `globalStyles` a key is any string (a selector or an at-rule), and the style under a selector is checked as a web style is; the descriptors of `@font-face`, `@page`, `@counter-style` and `@font-palette-values` are typed by `csstype`.
+
+```ts
+import { globalStyles, keyframes } from '@umber-style/core'
+
+// @ts-expect-error a misspelt key
+keyframes({ from: { opacty: 0 } })
+
+// @ts-expect-error a step is flat
+keyframes({ from: { opacity: 0, '&:hover': { opacity: 1 } } })
+
+// Not caught: a step key that is not an offset is any string; it throws when called.
+keyframes({ middle: { opacity: 0 } })
+
+// @ts-expect-error a misspelt key under a selector
+globalStyles({ body: { backgroudColor: 'red' } })
+```
+
+In the shared types of `umber-style/react` an `animation` key is not in the shared part of a style, because React Native has none: put it in `web`.
+
 ### Keys built at run time
 
 A key made from a value, such as a media query from a breakpoint or the key of `when()`, is a computed key. TypeScript gives every computed key in an object literal the type `string`, whatever its template literal type, and checks it against every index signature of `WebStyleObject`. The custom property signature (`--name`) takes no style, so `{ [`@media (min-width: ${bp})`]: { gap: 16 } }` is rejected, though it works at run time. No type can accept the key and still reject a style given to a custom property (the reproduction is in the limits below), so use `at(key, style)`:

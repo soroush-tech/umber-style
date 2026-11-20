@@ -161,6 +161,10 @@ const class1 = engine.css({ color: engine.refs.palette.primary }) // 'umber-n8nc
 | `scopeClass()`                                    | The class of the `display: contents` wrapper a provider renders, made once                                 |
 | `createSheet(styles)`                             | The entries of an object of styles, or a sheet for a function of the theme, as above                       |
 | `createStyler(options, styles, inherited?)`       | What every web `styled` shares: the label, the style list, the base and props classes and the class memo   |
+| `keyframes(steps, options?)`                      | Registers an animation and returns its name; the same as `keyframes` of the core, typed by the theme       |
+| `insertKeyframes(name)`                           | Writes the `@keyframes` rule of a name now, for a use the engine cannot see in a class                     |
+| `insertGlobal(styles, theme?)`                    | Writes global styles into the `global` layer and returns the function that releases them                   |
+| `resolveGlobal(styles, theme?)`                   | The sets of rules of global styles, `{ id, rules, animations }`, without writing them                      |
 
 ## Everything `@umber-style/core` exports
 
@@ -179,11 +183,12 @@ const class1 = engine.css({ color: engine.refs.palette.primary }) // 'umber-n8nc
 | `createThemeClass`, `toDeclarationText`                                                                                                                                         | Make a theme class from declarations                                                                                                                    |
 | `createTokens`                                                                                                                                                                  | Turn a theme into references and declarations                                                                                                           |
 | `mergeDeep`, `hashString`                                                                                                                                                       | Merge a partial theme over a theme, and the hash that class names use                                                                                   |
+| `keyframes`, `globalStyles`                                                                                                                                                     | An animation's name, and a handle of global styles: see [Animations and global styles](animations-and-global-styles.md)                                 |
 
-Types include `Engine`, `EngineOptions`, `BindingOptions`, `Cache`, `CacheOptions`, `Sheet`, `SheetEntry`, `Styler`, `StylerOptions`, `Theme`, `ThemeKey`, `SchemeKey`, `SchemeName`, `ColorScheme`, `TokenMode`, `TokenOptions`, `Tokens`, `DeepPartial`, `RegisteredSyntax`, `AlphaColor`, `WebStyleObject`, `WebProperties`, `WebNested`, `NestedKey`, `StyleObject`, `StyleInput`, `StyleFunction`, `StyleResult`, `SheetStyles`, `SheetInput`, `SheetEntries`, `ThemedSheet`, `ObjectSheet` and `ClassOptions`. Every option is in [Options reference](options.md).
+Types include `Engine`, `EngineOptions`, `BindingOptions`, `Cache`, `CacheOptions`, `Sheet`, `SheetEntry`, `Styler`, `StylerOptions`, `Theme`, `ThemeKey`, `SchemeKey`, `SchemeName`, `ColorScheme`, `TokenMode`, `TokenOptions`, `Tokens`, `DeepPartial`, `RegisteredSyntax`, `AlphaColor`, `WebStyleObject`, `WebProperties`, `WebNested`, `NestedKey`, `StyleObject`, `StyleInput`, `StyleFunction`, `StyleResult`, `SheetStyles`, `SheetInput`, `SheetEntries`, `ThemedSheet`, `ObjectSheet`, `ClassOptions`, `KeyframesInput`, `KeyframesOptions`, `KeyframesStep`, `KeyframesSteps`, `GlobalStyles`, `GlobalStylesInput`, `GlobalInput`, `GlobalStyleObject`, `GlobalStyleValue`, `AtRuleDescriptors` and `GlobalRules`. Every option is in [Options reference](options.md).
 
 ## Limits
 
 - `engine.css` returns a class name but does not put it anywhere: apply it to an element yourself.
-- Classes are never removed from a cache.
+- Classes are never removed from a cache. Global rules are, when the function that `insertGlobal` returned is called and nothing else holds them.
 - The core was run in Node and in jsdom. It was not run in a worker or in a real browser by the tests.

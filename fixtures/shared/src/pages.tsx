@@ -11,6 +11,8 @@ import {
   Page,
   Panel,
   ProductGrid,
+  Pulse,
+  Spinner,
 } from './components'
 import { StyleSheet, ThemeProvider } from './style'
 import { brandTheme } from './themes'
@@ -28,6 +30,10 @@ export function HomePage({ extra }: { extra?: ReactNode }) {
         <Muted data-testid="home-note" style={homeSheet.note}>
           A note from a sheet
         </Muted>
+        <Flex gap={2} data-testid="animations">
+          <Spinner data-testid="spinner" />
+          <Pulse data-testid="pulse" />
+        </Flex>
       </Hero>
       <Flex gap={3} data-testid="home-row">
         <Card data-testid="home-card">

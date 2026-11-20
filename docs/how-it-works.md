@@ -7,7 +7,7 @@ After this page you can follow a style object to the CSS it becomes, say what a 
 A style is a plain object. The engine turns it into CSS rules when a component first uses it:
 
 - A key is a CSS property in camelCase. It is written in kebab-case (`backgroundColor` becomes `background-color`, `msTransform` becomes `-ms-transform`). A key that starts with `--` is a custom property and is written as it is.
-- A number is a length in pixels (`padding: 8` becomes `padding:8px`), except `0`, custom properties, and properties that take no unit (`opacity`, `zIndex`, `lineHeight`, `flex`, `fontWeight` and the others in the serializer's list).
+- A number is a length in pixels (`padding: 8` becomes `padding:8px`), except `0`, custom properties, and properties that take no unit (`opacity`, `zIndex`, `lineHeight`, `flex`, `fontWeight` and the others in the serializer's list). A number for `animationDuration`, `animationDelay`, `transitionDuration` or `transitionDelay` is a time in milliseconds, `0` too (`transitionDuration: 150` becomes `transition-duration:150ms`).
 - An array is a list of fallbacks: `display: ['block', 'grid']` writes `display:block;display:grid;`.
 - `null`, `undefined` and `false` are skipped, so `isOpen && { ... }` works.
 - A nested object is a nested rule. A key with `&` is a selector where `&` stands for the parent (`'&:hover'`, `'& > p'`). A key that starts with `:` and has no `&` is the element itself (`':hover'` is `'&:hover'`). Any other key without `&` is a descendant selector. A key that starts with `@` wraps the rules in an at-rule (`@media`, `@supports`). A key such as `when(theme)` is a theme condition: see [Theme conditions](theme-conditions.md).
@@ -56,6 +56,8 @@ A cache turns a style into a class name and inserts the rules once. The class na
 Several styles merge into one class: later keys win, nested objects merge key by key. `cache.css(a, b)` is one class for both.
 
 Classes that the cache made can be passed back in. They are resolved to their styles and merged, so `engine.css(sheetEntry, { opacity: 0.9 })` is one class, not two.
+
+Two kinds of rule are not a class. A `@keyframes` rule is written once, the first time a class names its animation (`keyframes` returns the name, and the cache finds it in `animation` and `animation-name`). A global rule (`Global`, `engine.insertGlobal`) is written for a selector such as `body`, counted, and removed when nothing holds it any more. See [Animations and global styles](animations-and-global-styles.md).
 
 ## A base class and a props class
 
@@ -207,7 +209,7 @@ The web bindings (`@umber-style/react`, `@umber-style/vue`) use this model. Reac
 ## Limits
 
 - The explanation of one class for every theme holds for the `variable` and `reference` token modes. In `inline` mode the real value is written into the rule, so a theme that changes it makes another class. See [Tokens](tokens.md).
-- Classes are never removed from the cache or from the style sheet while the page lives. A style that is built from many different values (a measured number, for example) adds one class and its rules for each value. See [No inline styles](no-inline-styles.md).
+- Classes and `@keyframes` rules are never removed from the cache or from the style sheet while the page lives; only global rules are. A style that is built from many different values (a measured number, for example) adds one class and its rules for each value. See [No inline styles](no-inline-styles.md).
 - The base of a component is only as good as the test that a function reads no prop. A prop that is read inside a function that the style returns, or later (a callback), is not seen; a style that reads module state that changes is not pure, and the base would keep its first result for a theme. Style functions are expected to be pure functions of their props and the theme.
 - The first call of a style function for a theme object runs with the wrapped props; later calls for that theme use the plain props. A theme object that is made again on every render (an inline `theme={{ ... }}` on a provider) is a new theme object each time, so each render works the base out again.
 - The serializer's list of properties that take no unit is fixed in the code. A unitless number for a property that is not in the list gets `px`; write it as a string.

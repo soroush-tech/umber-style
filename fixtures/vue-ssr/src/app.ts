@@ -2,10 +2,12 @@ import { brandTheme, lightTheme, STORAGE_KEY } from '@umber-fixtures/shared/them
 import { defineComponent, h, onMounted, ref, type VNode } from 'vue'
 import {
   Badge,
+  baseStyles,
   Button,
   Callout,
   Card,
   Flex,
+  frameStyles,
   Heading,
   Hero,
   Muted,
@@ -13,8 +15,10 @@ import {
   Page,
   Panel,
   ProductGrid,
+  Pulse,
+  Spinner,
 } from './components'
-import { darkClass, lightClass, ThemeProvider } from './style'
+import { darkClass, Global, lightClass, ThemeProvider } from './style'
 
 const text = (value: string) => () => value
 
@@ -23,6 +27,10 @@ const HomePage = () =>
     h(Hero, { 'data-testid': 'hero' }, () => [
       h(Heading, null, text('Home')),
       h(Muted, null, text('The first page')),
+      h(Flex, { gap: 2, 'data-testid': 'animations' }, () => [
+        h(Spinner, { 'data-testid': 'spinner' }),
+        h(Pulse, { 'data-testid': 'pulse' }),
+      ]),
     ]),
     h(Flex, { gap: 3, 'data-testid': 'home-row' }, () =>
       h(Card, { 'data-testid': 'home-card' }, () =>
@@ -82,6 +90,8 @@ export const createApp = (initialPath: string) =>
   defineComponent({
     setup() {
       const path = ref(initialPath)
+      // The global styles of the frame are on at first, also in the first HTML.
+      const isFrameOn = ref(true)
       onMounted(() => {
         document.documentElement.dataset.hydrated = 'true'
         window.addEventListener('popstate', () => (path.value = window.location.pathname))
@@ -103,7 +113,9 @@ export const createApp = (initialPath: string) =>
       const link = (href: string, label: string, id: string) =>
         h('a', { href, 'data-testid': id, onClick: go(href) }, label)
       return () =>
-        h(ThemeProvider, { theme: lightTheme, colorScheme: 'light', isRoot: true }, () =>
+        h(ThemeProvider, { theme: lightTheme, colorScheme: 'light', isRoot: true }, () => [
+          h(Global, { styles: baseStyles }),
+          isFrameOn.value ? h(Global, { styles: frameStyles }) : null,
           h('div', { id: 'app-root', 'data-testid': 'app-root' }, [
             h(NavBar, { 'data-testid': 'nav' }, () => [
               link('/', 'Home', 'link-home'),
@@ -114,9 +126,18 @@ export const createApp = (initialPath: string) =>
                 { variant: 'outline', 'data-testid': 'theme-switch', onClick: toggle },
                 text('Switch theme')
               ),
+              h(
+                Button,
+                {
+                  variant: 'outline',
+                  'data-testid': 'frame-switch',
+                  onClick: () => (isFrameOn.value = !isFrameOn.value),
+                },
+                text('Switch frame')
+              ),
             ]),
             (pages[path.value] ?? HomePage)(),
-          ])
-        )
+          ]),
+        ])
     },
   })

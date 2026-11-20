@@ -23,6 +23,33 @@ export async function collectEngineRuleCount(page: Page): Promise<number> {
   }, ENGINE_STYLE_SELECTOR)
 }
 
+export interface KeyframesAndGlobals {
+  /** The name of each `@keyframes` rule of the engine's style elements, once for each rule. */
+  keyframes: string[]
+  /** The text of each rule in the global layer of the engine's style elements, once for each rule, as the browser writes it. */
+  globals: string[]
+}
+
+/** The `@keyframes` rules and the rules of the global layer that the browser parsed from the engine's style elements. */
+export async function collectKeyframesAndGlobals(page: Page): Promise<KeyframesAndGlobals> {
+  return page.evaluate(
+    ({ selector, layer }) => {
+      const keyframes: string[] = []
+      const globals: string[] = []
+      for (const element of document.querySelectorAll<HTMLStyleElement>(selector)) {
+        for (const rule of element.sheet?.cssRules ?? []) {
+          if (rule instanceof CSSKeyframesRule) keyframes.push(rule.name)
+          if (rule instanceof CSSLayerBlockRule && rule.name === layer) {
+            for (const inner of rule.cssRules) globals.push(inner.cssText)
+          }
+        }
+      }
+      return { keyframes, globals }
+    },
+    { selector: ENGINE_STYLE_SELECTOR, layer: `${ENGINE_PREFIX}-global` }
+  )
+}
+
 /** The number of engine style elements in the document. */
 export async function countEngineStyleElements(page: Page): Promise<number> {
   return page.evaluate(
@@ -58,8 +85,17 @@ export interface RuleUsageReport {
  * - `themeClass`: a theme class rule (`.umber-theme-*`) is offered for switching: the theme that is not
  *   applied at load is not used at load, and is meant to be there.
  * - `layerOrder`: the `@layer a, b, c;` statement has no selector.
+ * - `keyframes`: a step of a `@keyframes` rule is used by an animation, not matched to an element.
+ * - `fontFace`: a `@font-face` rule declares a font, it matches no element.
  */
-export type IgnoreReason = 'state' | 'media' | 'property' | 'themeClass' | 'layerOrder'
+export type IgnoreReason =
+  | 'state'
+  | 'media'
+  | 'property'
+  | 'themeClass'
+  | 'layerOrder'
+  | 'keyframes'
+  | 'fontFace'
 
 interface Entry {
   styleSheetId: string
@@ -93,7 +129,15 @@ export async function collectUnusedRules(
     unused: [],
     bytesTotal: 0,
     bytesUnused: 0,
-    ignored: { state: 0, media: 0, property: 0, themeClass: 0, layerOrder: 0 },
+    ignored: {
+      state: 0,
+      media: 0,
+      property: 0,
+      themeClass: 0,
+      layerOrder: 0,
+      keyframes: 0,
+      fontFace: 0,
+    },
   }
   const viewportMatches = (query: string) =>
     page.evaluate((text) => matchMedia(text).matches, query).catch(() => true)
@@ -189,6 +233,8 @@ async function ignoreReason(
     return 'property'
   }
   if (/^\s*@layer\s[^{]*;?\s*$/.test(ruleText)) return 'layerOrder'
+  if (/(^|\s)@keyframes\s/.test(around)) return 'keyframes'
+  if (/^\s*@font-face\b/.test(ruleText)) return 'fontFace'
   const selector = ruleText.slice(0, ruleText.indexOf('{'))
   if (/\.umber-theme-[a-z0-9]+\b/.test(selector) && !/\s/.test(selector.trim())) return 'themeClass'
   if (STATE_PATTERN.test(selector)) return 'state'

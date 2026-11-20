@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Button } from './components'
+import { Button, FrameStyles } from './components'
 import { darkClass, lightClass } from './style'
 import { STORAGE_KEY } from './themes'
 
@@ -30,6 +30,19 @@ export function ThemeSwitch() {
     <Button variant="outline" data-testid="theme-switch" onClick={toggle}>
       Switch theme
     </Button>
+  )
+}
+
+/** Mounts and unmounts the global styles of the frame: they are on at first, also in the first HTML. */
+export function FrameSwitch() {
+  const [isOn, setOn] = useState(true)
+  return (
+    <>
+      {isOn && <FrameStyles />}
+      <Button variant="outline" data-testid="frame-switch" onClick={() => setOn(!isOn)}>
+        Switch frame
+      </Button>
+    </>
   )
 }
 

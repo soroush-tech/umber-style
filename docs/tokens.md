@@ -231,6 +231,7 @@ const id = engine.themeId(theme)
 With the defaults, the theme class of `id` is `.umber-theme-1342wv{--umber-palette-primary:#1b5fd1;}`: one variable, not the whole theme. With `hasPruning: false` it declares all of them: `--umber-palette-primary`, `--umber-palette-text`, `--umber-space-0` to `--umber-space-3`, `--umber-z-index-modal` and `--umber-transitions-duration-short`.
 
 - A token whose value refers to another variable (`var(--umber-palette-blue)`, or a value that contains one) makes that variable used too, to any depth.
+- The variables of a global rule and of a `@keyframes` rule are used as those of a class are, when the rule is written; on a server they count for every page. See [Animations and global styles](animations-and-global-styles.md).
 - `alwaysDeclare` lists theme paths (a top-level key or a dotted path) whose variables are always declared, for code outside the engine that reads them, such as an app stylesheet. A variable that only such code uses must be listed, or it is not declared:
 
   ```ts
@@ -256,7 +257,7 @@ In the server components build each `<style href precedence>` is sent before the
 
 ## Animating tokens
 
-A CSS variable has no type, so the browser cannot interpolate it. Registering a token writes an `@property` rule that gives its variable a type, and then the variable itself can be transitioned.
+A CSS variable has no type, so the browser cannot interpolate it. Registering a token writes an `@property` rule that gives its variable a type, and then the variable itself can be transitioned. (To animate a component with steps of your own, see `keyframes` in [Animations and global styles](animations-and-global-styles.md): a token in a step is a variable, and a property that uses it is interpolated without registration.)
 
 ```ts
 import { createCache, createEngine, createMemorySheet } from '@umber-style/core'

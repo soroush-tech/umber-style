@@ -1,6 +1,10 @@
 import { collectComputedStyles } from '../helpers/computedStyles'
-import { loadPage, navigateInBrowser, writeReport } from '../helpers/navigation'
-import { ENGINE_STYLE_SELECTOR, findMissingStyles } from '../helpers/rules'
+import { loadPage, navigateInBrowser, waitForHydrated, writeReport } from '../helpers/navigation'
+import {
+  collectKeyframesAndGlobals,
+  ENGINE_STYLE_SELECTOR,
+  findMissingStyles,
+} from '../helpers/rules'
 import { test, expect } from '../helpers/test'
 
 // Checks that only make sense for Next.js with the App Router: server components and client
@@ -124,4 +128,23 @@ test('(v) client-side navigation between routes keeps everything styled', async 
     const styles = await collectComputedStyles(page)
     expect(styles[`page-${name}`].paddingLeft, `${name}: the page frame is styled`).not.toBe('0px')
   }
+})
+
+test('(vi) a global rule that a server component wrote stays after a navigation away from its page', async ({
+  page,
+}) => {
+  await page.goto('/stream')
+  await page.getByTestId('late').waitFor()
+  await waitForHydrated(page)
+  const heading = page.locator('[data-testid="page-stream"] h1')
+  await expect(heading).toHaveCSS('text-decoration-line', 'underline')
+  const countStreamRules = async () =>
+    (await collectKeyframesAndGlobals(page)).globals.filter((text) =>
+      text.startsWith('[data-testid="page-stream"] h1')
+    ).length
+  expect(await countStreamRules(), 'the global rule of the stream page').toBe(1)
+  // Nothing unmounts in the browser: the rule came as a style element, which React keeps for the
+  // life of the document. It matches nothing on the next page.
+  await navigateInBrowser(page, 'home')
+  expect(await countStreamRules(), 'the global rule of the stream page, on home').toBe(1)
 })

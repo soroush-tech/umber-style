@@ -1,5 +1,5 @@
 import { at } from '@umber-style/react'
-import { omitProps, styled } from './style'
+import { Global, globalStyles, keyframes, omitProps, styled } from './style'
 
 export type ButtonProps = { variant?: 'primary' | 'secondary' | 'outline' }
 
@@ -97,6 +97,40 @@ export const ProductGrid = styled('div', { name: 'ProductGrid' })(({ theme }) =>
   gap: theme.space[3],
 }))
 
+// The animations of the home page. They move `transform` and `outline-color` only: the end-to-end
+// tests compare other properties between loads, which a running animation would make differ.
+const spin = keyframes({ to: { transform: 'rotate(1turn)' } }, { label: 'spin' })
+
+const pulse = keyframes(
+  (theme) => ({
+    '0%, 100%': { transform: 'scale(1)', outlineColor: theme.palette.onPrimary },
+    '50%': { transform: 'scale(1.25)', outlineColor: theme.palette.border },
+  }),
+  { label: 'pulse' }
+)
+
+/** Home only: turns for ever, its animation named inside the `animation` shorthand. */
+export const Spinner = styled('span', { name: 'Spinner' })(({ theme }) => ({
+  display: 'inline-block',
+  width: 16,
+  height: 16,
+  border: `2px dashed ${theme.palette.onPrimary}`,
+  borderRadius: '50%',
+  animation: `${spin} 1s linear infinite`,
+}))
+
+/** Home only: beats for ever, its animation named in `animationName`, with a step that reads tokens. */
+export const Pulse = styled('span', { name: 'Pulse' })(({ theme }) => ({
+  display: 'inline-block',
+  width: 16,
+  height: 16,
+  outline: `2px solid ${theme.palette.onPrimary}`,
+  animationName: pulse,
+  animationDuration: 1500,
+  animationTimingFunction: 'ease-in-out',
+  animationIterationCount: 'infinite',
+}))
+
 /** Settings only. */
 export const Panel = styled('div', { name: 'Panel' })(({ theme }) => ({
   borderLeft: `4px solid ${theme.palette.primary}`,
@@ -120,3 +154,36 @@ export const NavBar = styled('nav', { name: 'NavBar' })(({ theme }) => ({
   backgroundColor: theme.palette.surface,
   '& a': { color: theme.palette.primary },
 }))
+
+// Global styles. This file exports components only, so that React's fast refresh replaces it in place
+// when the development tests edit it: each handle is written by a component of its own.
+
+const baseStyles = globalStyles((theme) => ({
+  // Two faces of a font that the system has: a list, written as one `@font-face` rule each.
+  '@font-face': [
+    { fontFamily: 'Umber Fixture Sans', src: 'local("Arial")', fontWeight: 400 },
+    { fontFamily: 'Umber Fixture Sans', src: 'local("Arial Bold")', fontWeight: 700 },
+  ],
+  body: {
+    margin: 0,
+    backgroundColor: theme.palette.background,
+    color: theme.palette.text,
+    fontFamily: '"Umber Fixture Sans", sans-serif',
+  },
+  '#app-root': { minHeight: '100vh' },
+  [`@media (min-width: ${theme.breakpoints[0]})`]: { body: { lineHeight: 1.5 } },
+}))
+
+/** The base styles of every page: the shell renders it. */
+export function BaseStyles() {
+  return <Global styles={baseStyles} />
+}
+
+const frameStyles = globalStyles((theme) => ({
+  body: { borderTop: `4px solid ${theme.palette.primary}` },
+}))
+
+/** A frame at the top of the page, in the primary colour, for as long as this is mounted. */
+export function FrameStyles() {
+  return <Global styles={frameStyles} />
+}

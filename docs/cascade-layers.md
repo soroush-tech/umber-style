@@ -10,18 +10,20 @@ Every rule the engine writes is in a CSS cascade layer. The layers are named aft
 @layer umber-theme, umber-global, umber-components, umber-overrides;
 ```
 
-| Layer                 | What goes in it                                                                                                                   |
-| --------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| `<prefix>-theme`      | The theme classes (the token variables) and the `display: contents` rule of the `<prefix>-scope` class                            |
-| `<prefix>-global`     | Reserved for global styles. Nothing is written there yet                                                                          |
-| `<prefix>-components` | The own styles of a `styled` component (its base class and its props class), and sheet entries used on their own (`css`, `apply`) |
-| `<prefix>-overrides`  | What a component is given from outside: its `style` prop, and engine classes in its `className`                                   |
+| Layer                 | What goes in it                                                                                                                      |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `<prefix>-theme`      | The theme classes (the token variables) and the `display: contents` rule of the `<prefix>-scope` class                               |
+| `<prefix>-global`     | Global styles: the rules of `Global` and `engine.insertGlobal` (see [Animations and global styles](animations-and-global-styles.md)) |
+| `<prefix>-components` | The own styles of a `styled` component (its base class and its props class), and sheet entries used on their own (`css`, `apply`)    |
+| `<prefix>-overrides`  | What a component is given from outside: its `style` prop, and engine classes in its `className`                                      |
 
 A later layer beats an earlier one whatever the specificity. So a property that you give a component through `style` beats the same property in any rule of the component, its `&:hover` rule included. A worked example with output is in [Style sheets and the style prop](style-sheets.md).
 
 Inside one layer, the usual cascade applies: specificity, then source order.
 
-`@property` rules (see [Tokens](tokens.md)) are written outside every layer, because `@property` is a registry of the document, not a style that cascades.
+`@property` rules (see [Tokens](tokens.md)) are written outside every layer, because `@property` is a registry of the document, not a style that cascades. So are the `@keyframes` rules of `keyframes`, which are looked up by name.
+
+A global rule is in the `global` layer, so a class of a component beats it whatever the specificity: `html body main p#styled` in a global rule loses to a class (a real-browser test, `global.browser.test.ts`, checks it). A global rule beats only what is in the `theme` layer: the theme classes, and the `display: contents` of a provider's wrapper, so a global rule that sets `display` on every `div` would give the wrapper a box.
 
 ## Up to three classes per element
 
@@ -67,6 +69,8 @@ Unlayered CSS always beats layered CSS, whatever its specificity. That makes it 
 
 The order of layers is fixed by the first place each name is declared in the document, across all style sheets, and a later statement never reorders it. The engine's own statement does not help you here: it comes first in the engine's sheet, but a sheet that your app adds after it would put `reset` after `umber-overrides`, which gives the reset the highest priority. So your statement must be in a `<style>` or `<link>` that comes before the engine's `<style>` in the document. The same holds for the server components build, where every `<style href precedence>` starts with the statement.
 
+A reset written with `Global` needs none of this: its rules go into `<prefix>-global`, which is already under the components. See [Animations and global styles](animations-and-global-styles.md).
+
 ## Turning layers off
 
 Pass `hasLayers: false` (to `createCache`, `createEngine`, `createStyle` or `configure`) to write no `@layer` and give each element one merged class:
@@ -93,6 +97,6 @@ Without layers an element that is given something from outside has one merged cl
 ## Limits
 
 - Layers need a browser that supports `@layer`; one that does not drops every rule. The versions are to be confirmed: see [Browser and platform support](browser-support.md).
-- The `global` layer is declared and empty. Nothing in the engine writes to it.
+- With `hasLayers: false`, global rules are written outside every layer in the order they are inserted, so a global rule written after a class beats it at equal specificity. That follows from the order of the rules; it was not run in a browser.
 - That a reset placed before the engine's `<style>` ends up under the engine's layers follows the specification's rule for layer order. It was not tried in a browser.
 - Whether a rule beats another in a real browser is the browser's cascade; the tests check the rule text, the layer each rule is in, and the classes on the element. The cases of "The base and the props class in one layer" were also checked in a real browser, with the rules the engine writes put in a page by hand (in one layer, in separate `<style>` elements as the server build sends them, and with a props class shared by two bases to see what the salt prevents), with `:focus` standing in for `:hover` (same specificity). The engine was not run in that browser, and the server build was not rendered by React there.

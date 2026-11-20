@@ -156,6 +156,24 @@ Wrapping a component that has a base class keeps that base. The wrapper's styles
 - the wrapped component has none (it is all base) and the wrapper's styles start with a function that reads props: the element carries the base class of the wrapped component as it is, and the wrapper's styles are the props part;
 - the wrapped component has none and the wrapper's styles start with plain objects: the plain objects are added to the base, which is then a new, larger class under the wrapper's label. The declarations of the wrapped component are written again in it. The other choice, keeping the base of the wrapped component and adding the objects as a second fixed class, would write fewer declarations once, but it would put them in the props part, so that they would be repeated in every distinct props class. A wrapper without any props-dependent style also keeps the single class it always had.
 
+## Animations and styles outside a class
+
+A style names an animation that `keyframes` made, inside the `animation` shorthand or as `animationName`; the `@keyframes` rule is written once, with the first class that uses it. Styles for `body`, a reset or a `@font-face` are not a component's: write them with `globalStyles` and render them with `Global`. Both are in [Animations and global styles](animations-and-global-styles.md).
+
+```tsx
+const { styled, keyframes } = createStyle(theme, { prefix: 'umber' })
+
+const pulse = keyframes({ '0%, 100%': { opacity: 1 }, '50%': { opacity: 0.4 } }, { label: 'pulse' })
+
+const Dot = styled('span', { name: 'Dot' })({
+  animationName: pulse,
+  animationDuration: 800,
+  animationIterationCount: 'infinite',
+})
+```
+
+A number for `animationDuration` (and `animationDelay`, `transitionDuration`, `transitionDelay`) is in milliseconds: `800` is `800ms`.
+
 ## Merging with `className` and `style`
 
 A `className` you give a styled component is kept, and any class the engine made in it is merged into the component's overrides. The `style` prop takes sheet entries and objects and turns them into a class. Both are covered in [Style sheets and the style prop](style-sheets.md) and [Cascade layers and overrides](cascade-layers.md).
