@@ -18,6 +18,8 @@ import type {
   ThemeProviderProps,
   ThemeScopeProps,
 } from './types'
+import { DEFAULT_REM_BASE } from './units'
+import { useMediaMatch, type MediaQueryOptions } from './windowState'
 
 export interface DefaultStyleOptions extends StyleOptions<Theme> {
   /** The base theme, for an app that has no provider at all. */
@@ -79,6 +81,11 @@ export function createDefaultStyle() {
     return getStyle().useThemeClass()
   }
 
+  /** Whether the media query `query` matches the window; a `rem` or `em` length in it is the `remBase` of `configure`. */
+  function useMediaQuery(query: string, options: MediaQueryOptions = {}): boolean {
+    return useMediaMatch(query, options, settings.remBase ?? DEFAULT_REM_BASE)
+  }
+
   return {
     configure,
     styled,
@@ -88,6 +95,7 @@ export function createDefaultStyle() {
     ThemeProvider,
     ThemeScope,
     useThemeClass,
+    useMediaQuery,
     ThemeContext,
     apply: ((...entries) => getStyle().apply(...entries)) as NativeStyle<Theme>['apply'],
     // The style is made on first use, so a module can call it before `configure`.

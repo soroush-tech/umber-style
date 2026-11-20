@@ -1,4 +1,5 @@
 import { readCondition } from '@umber-style/core'
+import { isMediaKey, readMediaQuery } from './mediaQuery'
 
 /** A length or `auto`: one value of a CSS shorthand. */
 const SHORTHAND_ITEM = String.raw`(?:-?(?:\d+(?:\.\d*)?|\.\d+)(?:%|[a-z]*)|auto)`
@@ -71,10 +72,13 @@ export function warnAboutValues(style: Record<string, unknown>, name?: string): 
   }
 }
 
-/** Why the web-only key `key` is dropped, or undefined when dropping it is not a mistake (`label`, a condition key). */
+/** Why the web-only key `key` is dropped, or undefined when dropping it is not a mistake (`label`, a condition key, a media query that is evaluated). */
 function describeDropped(key: string): string | undefined {
   if (key === 'label' || readCondition(key) !== undefined) return undefined
-  if (key.startsWith('@media')) return 'media queries are not evaluated on React Native yet'
+  if (isMediaKey(key)) {
+    const { problem } = readMediaQuery(key)
+    return problem === undefined ? undefined : `React Native does not evaluate ${problem}`
+  }
   if (key.startsWith('@')) return 'React Native has no at-rules'
   if (key.startsWith('--')) return 'React Native has no custom properties'
   if (ANIMATION_KEY.test(key)) return 'animations do not run on React Native yet'
@@ -84,7 +88,8 @@ function describeDropped(key: string): string | undefined {
 /**
  * In development, warns (once for each distinct message) that the web-only key `key`, written outside
  * the `web` part of a style, is dropped: a selector, an at-rule, a custom property, or an `animation*` or
- * `transition*` key. `label` and a `when()` or `whenScheme()` key that does not match are not mistakes.
+ * `transition*` key, or a media query with something the binding does not evaluate. `label`, a `when()` or
+ * `whenScheme()` key that does not match, and a media query that does not match are not mistakes.
  */
 export function warnAboutDroppedKey(key: string, name: string | undefined): void {
   if (!isDevelopment()) return
@@ -93,5 +98,14 @@ export function warnAboutDroppedKey(key: string, name: string | undefined): void
   warnOnce(
     `"${key}" is dropped: ${reason}. A key for the web only goes in the web part of a shared style.`,
     name
+  )
+}
+
+/** In development, warns (once for each query) that `useMediaQuery(query)` is always false: the binding does not evaluate `problem` in it. */
+export function warnAboutQuery(query: string, problem: string): void {
+  if (!isDevelopment()) return
+  warnOnce(
+    `useMediaQuery("${query}") is false: React Native does not evaluate ${problem}.`,
+    undefined
   )
 }

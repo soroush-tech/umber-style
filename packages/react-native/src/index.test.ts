@@ -9,6 +9,7 @@ describe('the entry of @umber-style/react-native', () => {
       'ThemeProvider',
       'ThemeScope',
       'useThemeClass',
+      'useMediaQuery',
       'ThemeContext',
       'useTheme',
       'StyleSheet',

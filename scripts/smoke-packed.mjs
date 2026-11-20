@@ -244,6 +244,8 @@ try {
     [
       'exports.Appearance = { getColorScheme: () => "light", addChangeListener: () => ({ remove() {} }) }',
       'exports.StyleSheet = { create: (styles) => styles, flatten: (style) => style, hairlineWidth: 1 }',
+      'exports.Dimensions = { get: () => ({ width: 400, height: 800, scale: 1, fontScale: 1 }), addEventListener: () => ({ remove() {} }) }',
+      'exports.AccessibilityInfo = { isReduceMotionEnabled: () => Promise.resolve(false), addEventListener: () => ({ remove() {} }) }',
       '',
     ].join('\n')
   )
@@ -255,6 +257,8 @@ try {
       'export interface ImageStyle extends ViewStyle { resizeMode?: string }',
       'export const Appearance: { getColorScheme(): "light" | "dark" | null | undefined; addChangeListener(listener: (preferences: { colorScheme: "light" | "dark" | null | undefined }) => void): { remove(): void } }',
       'export const StyleSheet: { create<T>(styles: T): T; flatten<T>(style: T): T; hairlineWidth: number }',
+      'export const Dimensions: { get(dimension: string): { width: number; height: number; scale: number; fontScale: number }; addEventListener(type: "change", handler: Function): { remove(): void } }',
+      'export const AccessibilityInfo: { isReduceMotionEnabled(): Promise<boolean>; addEventListener(eventName: "reduceMotionChanged", handler: (isEnabled: boolean) => void): { remove(): void } }',
       '',
     ].join('\n')
   )

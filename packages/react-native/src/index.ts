@@ -11,6 +11,7 @@ export const {
   ThemeProvider,
   ThemeScope,
   useThemeClass,
+  useMediaQuery,
   ThemeContext,
   apply,
   css,
@@ -30,3 +31,4 @@ export * from './defaultStyle'
 export * from './nativeStyle'
 export type { NativeLength, NativeTheme } from './nativeTheme'
 export * from './types'
+export type { MediaQueryOptions } from './windowState'

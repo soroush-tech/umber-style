@@ -22,8 +22,9 @@ import type { NativeObjectSheet, NativeSheetStyles, NativeStyleObject } from './
 import { DEFAULT_LENGTH_KEYS, toNativeTheme, type NativeTheme } from './nativeTheme'
 import { createStyled } from './styled'
 import { platformStyleSheet } from './platform'
-import { hasConditions, toNativeStyle } from './toNativeStyle'
+import { collectKeys, toNativeStyle, type StyleKeys } from './toNativeStyle'
 import { DEFAULT_REM_BASE } from './units'
+import { readMediaKey, readWindowState, useMediaKey } from './windowState'
 
 export type { StyleOptions } from './types'
 
@@ -32,16 +33,30 @@ interface NativeSheet<S extends NativeSheetStyles, T> extends SheetDefinition<
   S,
   NativeStyleObject
 > {
+  /** The sheet of `theme`, registered once for each theme object. */
+  prepare(theme: T): RegisteredSheet<S>
+  /** The entries for `theme`, the providers of `condition` and the window now. */
   resolve(theme: T, condition?: NativeCondition): { [K in keyof S]: NativeStyleObject }
 }
 
-/** The entries of a sheet as registered with the platform, and its sources, for the entries that depend on a condition. */
+/** The entries of a sheet as registered with the platform, and its sources, for the entries that depend on a condition or the window. */
 interface RegisteredSheet<S extends NativeSheetStyles> {
   entries: { [K in keyof S]: NativeStyleObject }
   source: S
+  /** The condition and media keys of each entry. */
+  keys: Record<string, StyleKeys>
   /** Whether an entry has a condition key, so that the entries depend on the providers. */
   isConditional: boolean
+  /** The media queries of the entries, each once. */
+  queries: readonly string[]
+  /** Whether an entry has a `whenScheme()` key. */
+  hasScheme: boolean
+  /** The entries for each set of matching queries, with the ones that depend on the window only registered for it. */
+  byWindow?: Map<string, { [K in keyof S]: NativeStyleObject }>
 }
+
+const NO_QUERIES: readonly string[] = []
+const NO_KEYS: StyleKeys = { conditional: false, scheme: false, queries: [] }
 
 /** The name of the sheet entry `key` in the development warnings. */
 const toEntryName = (key: string) => `sheet entry "${key}"`
@@ -55,21 +70,63 @@ function register<S extends NativeSheetStyles>(source: S, remBase: number): Regi
   const entries = platformStyleSheet.create(Object.fromEntries(pairs)) as {
     [K in keyof S]: NativeStyleObject
   }
-  return { entries, source, isConditional: Object.values(source).some(hasConditions) }
+  // The keys of all the entries together, then of each one when there are any.
+  let all: StyleKeys | undefined
+  for (const key in source) all = collectKeys(source[key], all)
+  const keys: Record<string, StyleKeys> = {}
+  if (all !== undefined) for (const key in source) keys[key] = collectKeys(source[key]) ?? NO_KEYS
+  return {
+    entries,
+    source,
+    keys,
+    isConditional: all?.conditional ?? false,
+    queries: all?.queries ?? NO_QUERIES,
+    hasScheme: all?.scheme ?? false,
+  }
 }
 
-/** The entries of `sheet`, with the ones that have a `when()` or `whenScheme()` key resolved against `condition` (not registered: they change with the providers). */
+/** The entries of `sheet` for the key of a render, with the ones that depend on the window only resolved and registered once for each set of matching queries. */
+function readWindowEntries<S extends NativeSheetStyles>(
+  sheet: RegisteredSheet<S>,
+  key: string,
+  remBase: number
+): { [K in keyof S]: NativeStyleObject } {
+  const windowKey = key.slice(0, sheet.queries.length)
+  sheet.byWindow ??= new Map()
+  let found = sheet.byWindow.get(windowKey)
+  if (found === undefined) {
+    const state = readWindowState()
+    const pairs = Object.entries(sheet.source).flatMap(([name, style]) =>
+      sheet.keys[name].queries.length > 0 && !sheet.keys[name].conditional
+        ? [[name, toNativeStyle(style, undefined, { remBase, name: toEntryName(name) }, state)]]
+        : []
+    )
+    found = { ...sheet.entries, ...platformStyleSheet.create(Object.fromEntries(pairs)) }
+    sheet.byWindow.set(windowKey, found)
+  }
+  return found
+}
+
+/**
+ * The entries of `sheet` for the key of a render: the ones that depend on the window only as registered
+ * for the matching queries, and the ones that have a `when()` or `whenScheme()` key resolved against
+ * `condition` and the window (not registered: they change with the providers).
+ */
 function resolveEntries<S extends NativeSheetStyles>(
   sheet: RegisteredSheet<S>,
   condition: NativeCondition | undefined,
+  key: string,
   remBase: number
 ): { [K in keyof S]: NativeStyleObject } {
-  if (!sheet.isConditional) return sheet.entries
-  const pairs = Object.entries(sheet.source).map(([key, style]) => [
-    key,
-    hasConditions(style)
-      ? toNativeStyle(style, condition, { remBase, name: toEntryName(key) })
-      : sheet.entries[key],
+  const hasQueries = sheet.queries.length > 0
+  const entries = hasQueries ? readWindowEntries(sheet, key, remBase) : sheet.entries
+  if (!sheet.isConditional) return entries
+  const state = hasQueries ? readWindowState() : undefined
+  const pairs = Object.entries(sheet.source).map(([name, style]) => [
+    name,
+    sheet.keys[name].conditional
+      ? toNativeStyle(style, condition, { remBase, name: toEntryName(name) }, state)
+      : entries[name],
   ])
   return Object.fromEntries(pairs) as { [K in keyof S]: NativeStyleObject }
 }
@@ -155,25 +212,39 @@ export function bindHolder<T extends object>(
       })
     }
     const byTheme = new WeakMap<object, RegisteredSheet<Record<string, NativeStyleObject>>>()
+    const prepare = (current: NativeTheme<T>) => {
+      let sheet = byTheme.get(current)
+      if (!sheet) {
+        sheet = register(styles(current), remBase)
+        byTheme.set(current, sheet)
+      }
+      return sheet
+    }
     return {
+      prepare,
       resolve(current: NativeTheme<T>, condition?: NativeCondition) {
-        let sheet = byTheme.get(current)
-        if (!sheet) {
-          sheet = register(styles(current), remBase)
-          byTheme.set(current, sheet)
-        }
-        return resolveEntries(sheet, condition, remBase)
+        const sheet = prepare(current)
+        return resolveEntries(
+          sheet,
+          condition,
+          readMediaKey(sheet.queries, false, remBase),
+          remBase
+        )
       },
     }
   }
 
-  // The contexts are read first, for every sheet, so that the hooks of a component never change; an
-  // object sheet is its own registered styles and uses no theme.
+  // The contexts and the window are read first, for every sheet, so that the hooks of a component never
+  // change; an object sheet is its own registered styles, uses no theme and watches nothing.
   const useStyle = ((sheet: object) => {
     const theme = useTheme()
     const condition = useCondition()
-    if (!isThemedSheet(sheet)) return sheet
-    return (sheet as NativeSheet<NativeSheetStyles, NativeTheme<T>>).resolve(theme, condition)
+    const prepared = isThemedSheet(sheet)
+      ? (sheet as unknown as NativeSheet<NativeSheetStyles, NativeTheme<T>>).prepare(theme)
+      : undefined
+    const watchesScheme = !!prepared?.hasScheme && condition.colorScheme === undefined
+    const key = useMediaKey(prepared?.queries ?? NO_QUERIES, watchesScheme, remBase)
+    return prepared === undefined ? sheet : resolveEntries(prepared, condition, key, remBase)
   }) as NativeStyle<T>['useStyle']
 
   return {

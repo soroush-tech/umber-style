@@ -1,21 +1,32 @@
 import { readCondition } from '@umber-style/core'
 import { matchesCondition, type NativeCondition } from './conditions'
+import { isMediaKey, readMediaQuery, type WindowState } from './mediaQuery'
 import type { NativeStyleObject } from './nativeStyle'
 import { convertValues, DEFAULT_REM_BASE } from './units'
 import { warnAboutDroppedKey, warnAboutValues } from './warnStyle'
 
 /** What turning a style into a native style needs besides the style. */
 export interface NativeSettings {
-  /** The font size that `1rem` is. */
+  /** The font size that `1rem` is; a `rem` or `em` length in a media query is this too. */
   readonly remBase: number
   /** The component or sheet entry the style belongs to, for the development warnings; undefined when it is not known. */
   readonly name?: string
 }
 
+/** What a style depends on besides itself, at any depth of its `native` part and of its condition and media parts. */
+export interface StyleKeys {
+  /** Whether it has a `when()` or `whenScheme()` key: then it depends on the providers above. */
+  conditional: boolean
+  /** Whether it has a `whenScheme()` key, which the system color scheme decides when no provider does. */
+  scheme: boolean
+  /** Its media query keys, each once, in the order they are met. */
+  queries: string[]
+}
+
 const DEFAULT_SETTINGS: NativeSettings = { remBase: DEFAULT_REM_BASE }
 
 /** Whether `value` is a plain object: the `native` part of a style. */
-function isNested(value: unknown): boolean {
+function isNested(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
@@ -27,11 +38,40 @@ function isWebOnlyKey(name: string): boolean {
   return name === 'label' || name.includes('&') || /^(?::|@|--|animation|transition)/.test(name)
 }
 
-/** Whether `style`, or its native part, has a `when()` or `whenScheme()` key: then the result depends on the providers above. */
-export function hasConditions(style: Record<string, unknown>): boolean {
-  const { native } = style
-  const keys = [...Object.keys(style), ...(isNested(native) ? Object.keys(native as object) : [])]
-  return keys.some((key) => readCondition(key) !== undefined)
+/**
+ * The condition and media keys of `style`, added to `into` (see `StyleKeys`); undefined when there are
+ * none and no `into`, so that a style without them costs no object.
+ */
+export function collectKeys(
+  style: Record<string, unknown>,
+  into?: StyleKeys
+): StyleKeys | undefined {
+  let found = into
+  for (const key in style) {
+    const value = style[key]
+    if (!isNested(value)) continue
+    if (key === 'native') {
+      found = collectKeys(value, found)
+      continue
+    }
+    const isMedia = isMediaKey(key)
+    const condition = isMedia ? undefined : readCondition(key)
+    if (!isMedia && condition === undefined) continue
+    found ??= { conditional: false, scheme: false, queries: [] }
+    if (condition === undefined) {
+      if (!found.queries.includes(key)) found.queries.push(key)
+    } else {
+      found.conditional = true
+      found.scheme ||= condition.kind === 'scheme'
+    }
+    found = collectKeys(value, found)
+  }
+  return found
+}
+
+/** Whether the key `key` of a part is a media query that holds for `state`; with no `state` none does. */
+function matchesMedia(key: string, state: WindowState | undefined, remBase: number): boolean {
+  return state !== undefined && isMediaKey(key) && readMediaQuery(key).matches(state, remBase)
 }
 
 /**
@@ -39,17 +79,20 @@ export function hasConditions(style: Record<string, unknown>): boolean {
  * at-rules, custom properties, and the `animation*` and `transition*` properties, each dropped whole. Objects and arrays under any other key are kept
  * (`shadowOffset`, `transform`). A style written for both platforms has a `native` part, which is merged
  * over the rest, and a `web` part, which is dropped. A `when()` or `whenScheme()` key is a part that
- * applies when it matches `condition` (the nearest provider): it is merged over the rest, in order; with no
- * `condition` it is dropped. A string that is a length or a number becomes a number (`convertValues`).
+ * applies when it matches `condition` (the nearest provider), and a media query key one that applies when
+ * it holds for `state` (the window): the parts that apply are merged over the plain keys, in the order
+ * they are written, as the web writes them after the base rule; with no `condition` or `state` they are
+ * dropped. A string that is a length or a number becomes a number (`convertValues`).
  * In development a dropped key that is a mistake, and a value that is not converted, are warned about.
  */
 export function toNativeStyle(
   style: Record<string, unknown>,
   condition?: NativeCondition,
-  settings: NativeSettings = DEFAULT_SETTINGS
+  settings: NativeSettings = DEFAULT_SETTINGS,
+  state?: WindowState
 ): NativeStyleObject {
   const { web: _web, native, ...rest } = style
-  const merged = isNested(native) ? { ...rest, ...(native as Record<string, unknown>) } : rest
+  const merged = isNested(native) ? { ...rest, ...native } : rest
   const resolved = Object.fromEntries(
     Object.entries(merged).filter(([key]) => {
       if (!isWebOnlyKey(key)) return true
@@ -58,10 +101,15 @@ export function toNativeStyle(
     })
   )
   const matching = Object.entries(merged).filter(
-    ([key, part]) => isNested(part) && matchesCondition(key, condition)
+    ([key, part]) =>
+      isNested(part) &&
+      (matchesCondition(key, condition) || matchesMedia(key, state, settings.remBase))
   )
   for (const [, part] of matching)
-    Object.assign(resolved, toNativeStyle(part as Record<string, unknown>, condition, settings))
+    Object.assign(
+      resolved,
+      toNativeStyle(part as Record<string, unknown>, condition, settings, state)
+    )
   convertValues(resolved, settings.remBase)
   warnAboutValues(resolved, settings.name)
   return resolved as NativeStyleObject

@@ -127,7 +127,7 @@ describe('the warning about a dropped key', () => {
     const style = {
       padding: 8,
       '&:hover': { opacity: 0.8 },
-      native: { '@media (min-width: 40em)': { padding: 16 } },
+      native: { '@media (hover: hover)': { padding: 16 }, '@media (min-width: 40em)': {} },
       '@scheme dark': { '--accent': 'red', transition: 'opacity 200ms' },
     }
     const condition = { theme: undefined, colorScheme: 'dark' as const }
@@ -135,7 +135,7 @@ describe('the warning about a dropped key', () => {
     toNativeStyle(style, condition, { remBase: 16, name: 'Dropping' })
     expect(warn.mock.calls.map(([text]) => String(text).split(' is dropped')[0])).toEqual([
       '@umber-style/react-native: Dropping: "&:hover"',
-      '@umber-style/react-native: Dropping: "@media (min-width: 40em)"',
+      '@umber-style/react-native: Dropping: "@media (hover: hover)"',
       '@umber-style/react-native: Dropping: "--accent"',
       '@umber-style/react-native: Dropping: "transition"',
     ])

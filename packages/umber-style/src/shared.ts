@@ -10,6 +10,12 @@ import type { SharedStyleBase } from './sharedCommon'
 export * from './sharedCommon'
 export type { ThemeScopeProps }
 
+/** The options of `useMediaQuery`, the same on both platforms. */
+export interface MediaQueryOptions {
+  /** The answer where it cannot be known yet: a server render on the web. Default false. */
+  defaultMatches?: boolean
+}
+
 /** The styling of one theme shape, with the names that both platforms have. */
 export interface SharedStyle<T> extends SharedStyleBase<T> {
   /** The real theme values, in a component: of the nearest provider, else the base theme, else an empty object. */
@@ -26,6 +32,8 @@ export declare const useTheme: SharedStyle<Theme>['useTheme']
 export declare const ThemeContext: SharedStyle<Theme>['ThemeContext']
 export declare const ThemeScope: SharedStyle<Theme>['ThemeScope']
 export declare const useThemeClass: SharedStyle<Theme>['useThemeClass']
+/** Whether the media query matches: the window on React Native, `matchMedia` on the web, where a server render gives `defaultMatches`, false when it is not given. */
+export declare function useMediaQuery(query: string, options?: MediaQueryOptions): boolean
 export declare function createStyle<T extends object>(
   theme: T,
   options?: StyleOptions<T>

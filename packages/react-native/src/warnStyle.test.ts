@@ -1,5 +1,5 @@
 import { afterEach, vi } from 'vitest'
-import { warnAboutDroppedKey, warnAboutValues } from './warnStyle'
+import { warnAboutDroppedKey, warnAboutQuery, warnAboutValues } from './warnStyle'
 
 const NODE_ENV = process.env.NODE_ENV
 
@@ -140,7 +140,8 @@ describe('warnAboutDroppedKey', () => {
       '&:hover',
       ':focus',
       'a &',
-      '@media (min-width: 40em)',
+      '@media (hover: hover)',
+      '@media print',
       '@supports (display: grid)',
       '--accent',
       'animation',
@@ -155,7 +156,8 @@ describe('warnAboutDroppedKey', () => {
       `@umber-style/react-native: Button: "&:hover" is dropped: React Native has no selectors. ${hint}`,
       `@umber-style/react-native: Button: ":focus" is dropped: React Native has no selectors. ${hint}`,
       `@umber-style/react-native: Button: "a &" is dropped: React Native has no selectors. ${hint}`,
-      `@umber-style/react-native: Button: "@media (min-width: 40em)" is dropped: media queries are not evaluated on React Native yet. ${hint}`,
+      `@umber-style/react-native: Button: "@media (hover: hover)" is dropped: React Native does not evaluate the media feature "hover". ${hint}`,
+      `@umber-style/react-native: Button: "@media print" is dropped: React Native does not evaluate the media type "print". ${hint}`,
       `@umber-style/react-native: Button: "@supports (display: grid)" is dropped: React Native has no at-rules. ${hint}`,
       `@umber-style/react-native: Button: "--accent" is dropped: React Native has no custom properties. ${hint}`,
       `@umber-style/react-native: Button: "animation" is dropped: animations do not run on React Native yet. ${hint}`,
@@ -164,13 +166,15 @@ describe('warnAboutDroppedKey', () => {
     ])
   })
 
-  it('says nothing about the label or a condition key, and nothing in production', () => {
+  it('says nothing about the label, a condition key or a media query it evaluates, and nothing in production', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     warnAboutDroppedKey('label', 'Quiet')
+    warnAboutDroppedKey('@media (min-width: 40em)', 'Quiet')
     warnAboutDroppedKey('@theme n0', 'Quiet')
     warnAboutDroppedKey('@scheme dark', 'Quiet')
     process.env.NODE_ENV = 'production'
     warnAboutDroppedKey('&:active', 'Quiet')
+    warnAboutQuery('(hover: hover)', 'the media feature "hover"')
     expect(warn).not.toHaveBeenCalled()
   })
 })

@@ -64,10 +64,10 @@ The components receive these `style` props:
 | `styled` options                 | `shouldForwardProp` is used, and `name` names the component in the development warnings. `slot` is accepted and ignored: there are no class names                                                                                                                                                                                                                                                  |
 | Forwarded props                  | Every prop but `as`, `theme` and `style`. `style` is rebuilt: the styles, then yours                                                                                                                                                                                                                                                                                                               |
 | Style functions                  | Receive the real theme, with its lengths as numbers: `theme.space[2]` is `8`, also when the theme says `'8px'`. They run on each render                                                                                                                                                                                                                                                            |
-| Object styles                    | Registered once with the platform `StyleSheet`, when the component is made                                                                                                                                                                                                                                                                                                                         |
+| Object styles                    | Registered once with the platform `StyleSheet`, when the component is made; one with media query keys, once for each set of matching queries                                                                                                                                                                                                                                                       |
 | `StyleSheet`                     | The platform's `StyleSheet`, with a `create` that resolves a function of the theme and registers the styles                                                                                                                                                                                                                                                                                        |
-| `StyleSheet.create(object)`      | The registered styles themselves, usable at once, with no hook and no theme. Registered with the platform once, when the first key is read. A `when()` or `whenScheme()` key is dropped: use a function, which is resolved against the providers                                                                                                                                                   |
-| `useStyle(sheet)`                | Returns style objects. Sheets made from a function are registered once for each theme object; an object sheet is returned as it is                                                                                                                                                                                                                                                                 |
+| `StyleSheet.create(object)`      | The registered styles themselves, usable at once, with no hook and no theme. Registered with the platform once, when the first key is read. A `when()`, `whenScheme()` or `@media` key is dropped: use a function, which is resolved against the providers and the window                                                                                                                          |
+| `useStyle(sheet)`                | Returns style objects. Sheets made from a function are registered once for each theme object and each set of matching media queries; an object sheet is returned as it is                                                                                                                                                                                                                          |
 | Styles before the first function | Each plain object of `styled` is registered once with the platform when the component is made, and the functions run on each render: the split that the web makes into a base class already holds here, so there is nothing to change                                                                                                                                                              |
 | `apply(...entries)`              | Returns `{ style: [...] }`: the entries that are not falsy                                                                                                                                                                                                                                                                                                                                         |
 | `css(...styles)`                 | Returns one native style: each style turned into a native style as a sheet entry is (lengths in `px` and `rem` are numbers, web-only keys dropped), merged in order. As a tag, the template is read as CSS text and turned the same way: `padding-top: 8px` is `{ paddingTop: 8 }`; a shorthand with several values stays a string and is warned about. `styled` does not take a template here yet |
@@ -88,10 +88,10 @@ The outermost provider that renders gives the base theme, as on the web, unless 
 
 A style is a `NativeStyleObject`. When the binding turns a style into a native style it:
 
-- drops the keys that only the web has, each whole: `label`, selectors (a key with `&` or one that starts with `:`), at-rules and custom properties;
+- drops the keys that only the web has, each whole: `label`, selectors (a key with `&` or one that starts with `:`), at-rules other than `@media`, and custom properties;
 - keeps objects and arrays under any other key (`shadowOffset`, `transform`);
 - merges the `native` part of a shared style over the rest and drops the `web` part;
-- merges the parts of `when()` and `whenScheme()` keys that match;
+- merges the parts of `when()` and `whenScheme()` keys that match, and the blocks of `@media` keys that match the window: see [Media queries](#media-queries);
 - turns a length or a number written as text into a number (`padding: '8px'` is `8`): see [Values with CSS units](#values-with-css-units).
 
 In development it warns about what it drops by mistake and about values it cannot convert: see [Development warnings](#development-warnings) and [Typed styles](typed-styles.md).
@@ -168,12 +168,102 @@ A function given to the `theme` prop of a provider receives the theme above as i
 
 What reads the theme (`useTheme()`, the `theme` of a style function, a sheet made from a function, `ThemeContext`) is typed `NativeTheme<T>`: under the default length keys, a length literal type (`` `${number}px` ``, `` `${number}rem` ``, `` `${number}` ``) is `number`, a plain `string` is `string | number` (it may be `'50%'`), and everything else is `T` itself. A key that takes only a number (`borderWidth`, `fontSize`) needs a token typed as a length literal, as `'1px' as const` above, or a number. What takes a theme (`ThemeProvider`, `when`) takes `T`.
 
+## Media queries
+
+A key that starts with `@media` is evaluated by the binding against the window and the system settings, the way the style props of `@soroush.tech/styled-system` and a hand-written responsive style write it. The block of a query that matches is merged into the style; the block of one that does not is left out.
+
+```tsx
+import { Text, View } from 'react-native'
+import { createStyle, useMediaQuery } from '@umber-style/react-native'
+
+const theme = { space: [0, 4, 8, 16] }
+const { styled } = createStyle(theme)
+const tablet = `@media (width >= ${600}px)`
+
+const Row = styled(View)(({ theme }) => ({
+  flexDirection: 'column',
+  gap: theme.space[1],
+  [tablet]: { flexDirection: 'row', gap: theme.space[3] },
+}))
+
+function Toolbar() {
+  const isWide = useMediaQuery('(min-width: 600px)')
+  return <Row>{isWide ? <Text>Save and close</Text> : <Text>Save</Text>}</Row>
+}
+```
+
+In a window 400 wide, `Row` passes `[{ flexDirection: 'column', gap: 4 }]` and the text is `Save`; at 700 it passes `[{ flexDirection: 'row', gap: 16 }]` and the text is `Save and close`.
+
+The native style type has no literal at-rule key, so the key is computed (a template literal, as a key from a breakpoint is), as the key of `when()` is.
+
+### What is evaluated
+
+| Part of a query                                   | Evaluated                                                                                                                                                        |
+| ------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `min-width`, `max-width`, `width`                 | Against the width of the window. `width` is an exact match                                                                                                       |
+| `min-height`, `max-height`, `height`              | Against the height of the window                                                                                                                                 |
+| The range form                                    | `width >= 600px`, `width > 600px`, `<=`, `<`, `=`, the length on either side (`600px <= width`), and both ends (`400px <= width < 800px`); the same for `height` |
+| `orientation: portrait \| landscape`              | Portrait when the height is at least the width, as on the web                                                                                                    |
+| `prefers-color-scheme: light \| dark`             | Against the system color scheme (`Appearance`); no scheme reported counts as light                                                                               |
+| `prefers-reduced-motion: reduce \| no-preference` | Against the system setting (`AccessibilityInfo`); see the first render below                                                                                     |
+| `and`, a comma list                               | `and` joins features; a comma list matches when one of its queries does                                                                                          |
+| `not`, `only`, `screen`, `all`                    | `not` in front negates its query; `only`, `screen` and `all` are accepted and change nothing                                                                     |
+| Lengths                                           | `px` or no unit (one pixel is one density-independent pixel); `rem` and `em` are `remBase` times their number                                                    |
+
+Anything else never matches and is warned about in development, with a message that names it: another feature (`hover`, `pointer`, `resolution`), another media type (`print`), another unit (`vw`, `%`), a feature with no value (`(hover)`), and text that is not a query (`or`, nested parentheses). `@container` and `@supports` keys are dropped as other at-rules are.
+
+A query is read once for each text and remembered, wherever it is written.
+
+### The order
+
+The blocks that match are merged over every plain key of the same style object, in the order the blocks are written: a later block wins over an earlier one, and a plain key wins over none of them, even one written after the block. That is what the web does: the base rule of the object comes first in the style sheet and each nested media rule after it, with the same specificity. `when()` and `whenScheme()` blocks take their turn in the same order.
+
+```tsx
+const style = {
+  padding: 1,
+  '@media (min-width: 600px)': { padding: 2, margin: 2 },
+  margin: 1,
+  '@media (min-width: 500px)': { margin: 3, opacity: 0.5 },
+  opacity: 1,
+}
+```
+
+This style resolves to `{ padding: 1, margin: 1, opacity: 1 }` at a width of 400, to `{ padding: 1, margin: 3, opacity: 0.5 }` at 550, and to `{ padding: 2, margin: 3, opacity: 0.5 }` at 700.
+
+A block in the `native` part of a shared style, a block inside another block, and a block inside a `when()` block are evaluated too. The values inside a block are converted as any value is (`'8px'` is `8`), with the same warnings. Each style given to `styled` is its own entry of the style array, so a later style wins over an earlier one, its media blocks included.
+
+### What is cached and what renders again
+
+- **Object styles of `styled`** with media keys and no condition key: their queries are read when the component is made, and the style is resolved and registered with the platform once for each set of matching queries, then reused.
+- **A function style** runs on each render, as before; its media keys are evaluated against the window of that render. Its queries are read once for each text.
+- **`StyleSheet.create(function)`**: once for each theme object and each set of matching queries. An entry that has a `when()` or `whenScheme()` key is resolved on each render, against the providers and the window.
+- **`StyleSheet.create(object)`** has no hook to read the window: its media blocks are dropped, as its `when()` blocks are. Use a function.
+
+The binding listens to the platform once, for every component: the window size (`Dimensions`), the color scheme (`Appearance`) and reduced motion (`AccessibilityInfo`), while at least one component listens. A component renders again when the set of its matching queries changes, not on every change of the width: a component with a `min-width: 600px` block renders again when the width crosses 600, and not while it moves from 400 to 599. A component whose styles have no media key (and no `whenScheme()` key that the system decides) subscribes to nothing.
+
+`whenScheme()` with no provider that has a `colorScheme` above, and `prefers-color-scheme`, both read the system color scheme, and a change of the system setting renders again the components that use either. Below a provider with a `colorScheme`, `whenScheme()` follows the provider and does not render again; `prefers-color-scheme` follows the system there too, as on the web, where the media query reads the system and `whenScheme()` reads the theme.
+
+### Reduced motion on the first render
+
+The platform answers `isReduceMotionEnabled()` asynchronously. Until it answers, `prefers-reduced-motion` is `no-preference`, the platform's default and what a system with no setting reports; the answer is asked for when the first component that listens mounts, and when it is `reduce` those components render again. Later mounts read the last answer at once.
+
+### `useMediaQuery`
+
+```tsx
+const isWide = useMediaQuery('(min-width: 600px)', { defaultMatches: false })
+```
+
+`useMediaQuery(query, options?)` is for what a style cannot do: render one structure or another. It takes the query as `matchMedia` does, with or without `@media`, uses the same parser and the same subscription as the styles, and renders again only when its answer changes. A query it cannot evaluate is `false`, with a development warning. A `rem` length in it is the `remBase` of `configure` (default 16). `defaultMatches` (default `false`) is the answer of a render to a string; there is no server on React Native, and the option is there so that one call runs on both platforms.
+
+The React binding has the same hook, `useMediaQuery(query, { defaultMatches })`, on `window.matchMedia`. On the server, and in the first render of a hydration, it is `defaultMatches`, so that the HTML of the server and the hydration agree; the browser's answer follows at once. It uses a hook, so it is a client export only: the server-components build does not have it.
+
 ## Development warnings
 
 In development, once for each distinct message, the binding warns with `console.warn`. A message starts with `@umber-style/react-native:` and the name of the component when it is known: the `name` option of `styled`, else the display name or function name of the wrapped component; for a sheet, `sheet entry "card"`. Nothing is warned in production, or where there is no `process`.
 
-- **A key it drops by mistake:** a selector (`&:hover`, `:focus`), an at-rule (`@media ...`, whose message says that media queries are not evaluated on React Native yet), a custom property (`--accent`), and an `animation*` or `transition*` key (animations do not run on React Native yet), written outside the `web` part of a style. For example `Named: "&:hover" is dropped: React Native has no selectors. A key for the web only goes in the web part of a shared style.`
-- **Never warned:** `label`, anything inside the `web` part, and a `when()` or `whenScheme()` key that does not match (a condition, not a web-only key).
+- **A key it drops by mistake:** a selector (`&:hover`, `:focus`), an at-rule (`@supports ...`), a media query with something the binding does not evaluate (the message names it: `React Native does not evaluate the media feature "hover"`), a custom property (`--accent`), and an `animation*` or `transition*` key (animations do not run on React Native yet), written outside the `web` part of a style. For example `Named: "&:hover" is dropped: React Native has no selectors. A key for the web only goes in the web part of a shared style.`
+- **A query `useMediaQuery` cannot evaluate:** `useMediaQuery("(hover: hover)") is false: React Native does not evaluate the media feature "hover".`
+- **Never warned:** `label`, anything inside the `web` part, a `when()` or `whenScheme()` key that does not match (a condition, not a web-only key), and a media query that is evaluated and does not match.
 - **A value it cannot convert:** a shorthand with several values (`padding: '10px 20px'`), `em`, a viewport unit (`vh`, `vw`, `vmin`, `vmax` and their `s`, `l` and `d` forms), a `calc(...)`, `currentColor` in any case, and another CSS unit where no number is taken. The value is passed as it is.
 
 ## Arithmetic and `alpha`
@@ -187,8 +277,8 @@ The package exports `add`, `subtract`, `multiply`, `divide`, `negate` and `alpha
 ## Limits
 
 - **The React Native binding was never run in a real app.** The tests alias the one import of the platform (`react-native`) to a stand-in whose `StyleSheet.create` returns its input and whose `Appearance` is a stub, and they use plain host components that record their props. The styles were compiled against the real `react-native` types.
-- Because of that, `StyleSheet.create` returning ids, `Appearance` changes, and the platform's own handling of an unknown key were not exercised.
-- The color scheme of the platform is read when a component renders. A change of the system setting does not re-render a component by itself.
+- Because of that, `StyleSheet.create` returning ids and the platform's own handling of an unknown key were not exercised. The events of `Dimensions`, `Appearance` and `AccessibilityInfo` were sent by stand-ins: a rotation and a window resize on a device were not observed.
+- The color scheme of the platform is read when a component renders. A change of the system setting renders again the components that read it through `prefers-color-scheme` or a `whenScheme()` key that no provider decides; a style function that reads `Appearance` itself is not rendered again.
 - Sheets made from a function are registered once for each theme object, kept in a `WeakMap`, so they are released with the theme object. A theme object that is re-created on every render registers a new sheet every time.
 - `alpha` cannot mix a colour it cannot read as a literal (a named colour, `hsl()`): it returns that colour unchanged.
 - That a modal's content shows the theme of the nested provider above it was checked with a stand-in modal that renders its children in place, as React Native's does; the platform's `Modal` was not run.
@@ -196,4 +286,11 @@ The package exports `add`, `subtract`, `multiply`, `divide`, `negate` and `alpha
 - `em` and the viewport units are not converted, and a literal `calc(...)` is not computed: each is passed as it is, with a warning.
 - A theme is converted once for each theme object: a `theme` object re-created on every render is converted every time. Only the keys of `lengthKeys` are converted; `NativeTheme<T>` types the default ones, so with another `lengthKeys` the types do not follow.
 - A unitless `lineHeight` is a factor on the web and a number of points on React Native; `lineHeight: '1.5'` becomes `1.5`, which is not what the web shows.
-- Media queries, interaction states and animations are not built on React Native yet; their keys are dropped with a warning. They are separate work: [#41](https://github.com/soroush-tech/umber-style/issues/41), [#42](https://github.com/soroush-tech/umber-style/issues/42) and [#43](https://github.com/soroush-tech/umber-style/issues/43).
+- Interaction states and animations are not built on React Native yet; their keys are dropped with a warning. They are separate work: [#42](https://github.com/soroush-tech/umber-style/issues/42) and [#43](https://github.com/soroush-tech/umber-style/issues/43).
+- Media queries: only the subset in [What is evaluated](#what-is-evaluated); anything else never matches. A query with one part the binding does not evaluate is dropped whole, also when another query of its comma list would match on the web (`print, (min-width: 1px)`).
+- `prefers-reduced-motion` is `no-preference` until the platform answers, so a component that reads it may render once with motion before it renders without.
+- `em` in a query is `remBase` times its number, as `rem` is: on the web a media query's `em` is the browser's initial font size, which `remBase` stands for. A length with no unit is read as pixels; on the web a length with no unit other than `0` makes the query invalid.
+- A media key in an object literal given to `styled` or `StyleSheet.create` must be computed: the native style type has no literal at-rule key.
+- The parsers of `@soroush.tech/styled-system` write the range form, which is evaluated; their output was not run through the React Native binding in a test.
+- A function style's results are not remembered: its blocks are resolved on each render, as the rest of it is. A sheet entry with a `when()` or `whenScheme()` key is resolved on each render too.
+- The resolved styles are kept for each set of matching queries for the life of the component type or of the theme object, with no limit: a component with many queries whose answers change independently keeps one style for each combination it meets.
