@@ -28,6 +28,7 @@ on:
           - all
           - cache
           - core
+          - css
           - react
           - react-native
           - server

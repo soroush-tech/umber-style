@@ -37,6 +37,7 @@ const PACKAGES = [
   { dir: 'core', name: '@umber-style/core' },
   { dir: 'cache', name: '@umber-style/cache' },
   { dir: 'server', name: '@umber-style/server' },
+  { dir: 'css', name: '@umber-style/css' },
   { dir: 'react', name: '@umber-style/react' },
   { dir: 'react-native', name: '@umber-style/react-native' },
   { dir: 'vue', name: '@umber-style/vue' },
@@ -47,6 +48,19 @@ const ENTRIES = {
   '@umber-style/core': ['createEngine', 'createCache', 'extractPageStyles', 'at'],
   '@umber-style/cache': ['default'],
   '@umber-style/server/create-instance': ['default'],
+  '@umber-style/css': [
+    'css',
+    'cx',
+    'keyframes',
+    'injectGlobal',
+    'cache',
+    'sheet',
+    'flush',
+    'hydrate',
+    'getRegisteredStyles',
+    'merge',
+  ],
+  '@umber-style/css/create-instance': [],
   '@umber-style/react': [
     'createStyle',
     'styled',
@@ -290,6 +304,12 @@ same(mods['@umber-style/react'].at, mods['@umber-style/core'].at, 'react and cor
 same(mods['umber-style/react'].styled, mods['@umber-style/react'].styled, 'umber-style/react and react')
 same(mods['umber-style/react-native'].styled, mods['@umber-style/react-native'].styled, 'umber-style/react-native')
 same(mods['umber-style/vue'].styled, mods['@umber-style/vue'].styled, 'umber-style/vue')
+// The plain layer: a class name from a style, its rule in the cache, and a separate instance.
+const plain = mods['@umber-style/css']
+const card = plain.css({ padding: 8 })
+if (!plain.cache.extract().css.includes('.' + card + '{padding:8px;}')) throw new Error('no rule for ' + card)
+const createInstance = mods['@umber-style/css/create-instance'].default
+if (!createInstance({ key: 'plain' }).css({ color: 'red' }).startsWith('plain-')) throw new Error('no class from create-instance')
 // Server rendering of a styled component: a class, and its CSS.
 const React = await load('react')
 const { renderToStaticMarkup } = await load('react-dom/server')
@@ -402,6 +422,8 @@ if (expected === 'server') {
   const typed = `
 import { createEngine } from '@umber-style/core'
 import type { Theme } from '@umber-style/core'
+import { css, cx } from '@umber-style/css'
+import createCssInstance from '@umber-style/css/create-instance'
 import { createStyle } from '@umber-style/react'
 import { createStyle as createNative } from '@umber-style/react-native'
 import { createStyle as createVue } from '@umber-style/vue'
@@ -422,6 +444,8 @@ export const tags: string = createInstance(umberCache).constructStyleTagsFromChu
   createInstance(umberCache).extractCriticalToChunks('<p></p>')
 )
 export const base: Theme | undefined = undefined
+export const plainClass: string = cx(css({ padding: 4 }), false, { open: true })
+export const ownClass: string = createCssInstance({ key: 'typed' }).css\`color: red;\`
 
 const web = createStyle(theme, { prefix: 'smoke' })
 export const Box = web.styled('div', { name: 'Box' })(({ theme: view }) => {
