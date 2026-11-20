@@ -19,7 +19,7 @@ import {
 } from './keyframes'
 import { isStyleFunction, splitLeading } from './styleBase'
 import { isSameView } from './sameView'
-import { createThemeClass, declareRootTheme } from './theme'
+import { createThemeClass, declareRootTheme, toDeclarationText } from './theme'
 import { createTokens, type DeepPartial, type Tokens } from './tokens'
 import type { TemplateValue } from './styleTypes'
 import type { WebStyleObject } from './webStyle'
@@ -87,6 +87,16 @@ export interface Styler {
   ): HeldClass
 }
 
+/** The variables of a theme as text, for a rule that is made elsewhere (the browser part of a provider of the server build). */
+export interface ThemeText {
+  /** Every variable the theme declares, with its real value: `--name:value;` for each. */
+  readonly declarations: string
+  /** The `@property` rules of the registered variables among them, or ''. */
+  readonly properties: string
+  /** The names of the variables, in the order of `declarations`. */
+  readonly names: readonly string[]
+}
+
 export interface Engine<T> {
   cache: Cache
   /** Whether a base theme is known: it is given by `setTheme`, or by the first `themeClass`. */
@@ -123,6 +133,12 @@ export interface Engine<T> {
    * Made once for each theme object and color scheme. With no base theme yet, this theme becomes it.
    */
   declareRoot(theme: T, colorScheme?: ColorScheme): string
+  /**
+   * The variables of `theme` (a whole theme or a partial one) as text, with the `@property` rules of the
+   * registered ones: what a theme class or the root rule of that theme declares, every variable, used or
+   * not. Nothing is written. Made once for each theme object. Throws while there is no base theme.
+   */
+  readThemeText(theme: DeepPartial<T>): ThemeText
   /** A style key for "the nearest theme is this theme": `{ [when(dark)]: { border: ... } }`. Needs `@scope` (see `hasScope`). */
   when(theme: DeepPartial<T>, colorScheme?: ColorScheme): ThemeKey
   /** A style key for "the nearest color scheme is this one": the nearest theme given that `colorScheme`, else the system preference. */
@@ -332,6 +348,22 @@ function createFamilyEngine<T extends object>(
     const [id, declarations] = made
     cache.insertRoot(id, declarations, colorScheme)
     return id
+  }
+  const themeTexts = new WeakMap<object, ThemeText>()
+  const readThemeText = (partial: DeepPartial<T>): ThemeText => {
+    let text = themeTexts.get(partial)
+    if (text === undefined) {
+      const { declare, registrations } = readTokens()
+      const declarations = declare(partial)
+      const names = Object.keys(declarations)
+      text = {
+        declarations: toDeclarationText(Object.entries(declarations)),
+        properties: names.map((name) => registrations[name] ?? '').join(''),
+        names,
+      }
+      themeTexts.set(partial, text)
+    }
+    return text
   }
   const findThemeIds = (partial: DeepPartial<T>) => [...(themeClasses.get(partial)?.values() ?? [])]
   const themeClass = (partial: DeepPartial<T>, colorScheme?: ColorScheme) =>
@@ -549,6 +581,7 @@ function createFamilyEngine<T extends object>(
     themeId,
     findThemeIds,
     declareRoot,
+    readThemeText,
     when,
     whenScheme: createSchemeKey,
     createSheet,

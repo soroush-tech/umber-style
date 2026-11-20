@@ -32,6 +32,14 @@ describe('findMissingStyles', () => {
     expect(findMissingStyles(document.querySelector('p') as Element)).toEqual([])
   })
 
+  it('leaves out the theme class of a theme that declares nothing, which has no rule', () => {
+    addStyle('.u-a{color:red;}')
+    document.body.innerHTML = '<div class="u-theme-0 u-boundary u-scope"><p class="u-a"></p></div>'
+    expect(findMissingStyles().map(({ message }) => message)).toEqual([
+      'div[] has the class u-scope, which no rule names',
+    ])
+  })
+
   it('reads the rules of style elements that React hoisted, too', () => {
     addStyle('.u-a{color:red;}', 'data-precedence')
     document.body.innerHTML = '<p class="u-a"></p>'

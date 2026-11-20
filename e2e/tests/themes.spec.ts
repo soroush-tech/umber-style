@@ -45,3 +45,17 @@ test('H: the navigation first, then dark, then back to light', async ({ page, fi
   await expect(page.locator('html')).toHaveClass(/scheme-light/)
   await expectAccent(page, LIGHT_ACCENT)
 })
+
+test('a nested provider keeps its wrapper after a client-side navigation to its page', async ({
+  page,
+  fixture,
+}, info) => {
+  info.skip(!fixture.hasClientNavigation, `${fixture.name} has no client-side navigation`)
+  await loadPage(page, fixture, 'home')
+  await navigateInBrowser(page, 'settings')
+  const wrapper = await page
+    .getByTestId('brand-card')
+    .evaluate((element) => element.closest('.umber-scope')?.className)
+  expect(wrapper, 'the wrapper of the brand provider').toMatch(/umber-theme-\w+ umber-boundary/)
+  await expect(page.getByTestId('brand-card')).toHaveCSS('background-color', 'rgb(255, 244, 214)')
+})

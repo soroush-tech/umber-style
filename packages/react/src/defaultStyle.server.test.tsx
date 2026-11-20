@@ -1,6 +1,7 @@
 import { createCache, createMemorySheet, EMPTY_THEME } from '@umber-style/core'
 import { createDefaultStyle } from './defaultStyle.server'
 import { findAll, resolveTree } from './vitest.resolveTree'
+import { playScopes } from './vitest.providerScope'
 
 const theme = { palette: { primary: '#0000ff', onPrimary: '#ffffff' }, space: [0, 4] }
 
@@ -19,10 +20,12 @@ describe('the default style for server components', () => {
     }))
     expect(getEngine().hasTheme).toBe(false)
     expect(readTheme()).toBe(EMPTY_THEME)
-    const tree = await resolveTree(
-      <ThemeProvider theme={theme}>
-        <Box />
-      </ThemeProvider>
+    const tree = playScopes(
+      await resolveTree(
+        <ThemeProvider theme={theme}>
+          <Box />
+        </ThemeProvider>
+      )
     )
     expect(getEngine().baseTheme).toBe(theme)
     // The outermost provider renders no element: one style element for its root theme, one for the Box.
@@ -40,8 +43,8 @@ describe('the default style for server components', () => {
     const fade = style.keyframes({ from: { opacity: 0 } }, { label: 'fade' })
     const base = style.globalStyles((view) => ({ body: { color: view.palette.primary } }))
     style.configure({ prefix: 'k', theme })
-    const tree = await resolveTree(
-      <style.Global styles={[base, { i: { animation: `${fade} 1s` } }]} />
+    const tree = playScopes(
+      await resolveTree(<style.Global styles={[base, { i: { animation: `${fade} 1s` } }]} />)
     )
     expect(findAll(tree, 'style').map((element) => element.props.href)).toEqual([
       expect.stringMatching(/^k-global-/),
@@ -56,7 +59,7 @@ describe('the default style for server components', () => {
     const sheet = createMemorySheet()
     style.configure({ prefix: 'late', cache: createCache({ prefix: 'late', sheet }) })
     const Box = style.styled('div')`margin: 0;`
-    const tree = await resolveTree(<Box style={card} />)
+    const tree = playScopes(await resolveTree(<Box style={card} />))
     const [, override] = (findAll(tree, 'div')[0].props.className as string).split(' ')
     expect(override).toMatch(/^late-/)
     expect(sheet.rules).toContain(`@layer late-overrides{.${override}{padding:8px;}}`)

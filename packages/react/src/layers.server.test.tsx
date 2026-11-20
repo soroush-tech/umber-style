@@ -1,6 +1,7 @@
 import { createCache, createEngine, createMemorySheet } from '@umber-style/core'
 import { bindEngine } from './createStyle.server'
 import { findAll, resolveTree, type ResolvedElement } from './vitest.resolveTree'
+import { playScopes } from './vitest.providerScope'
 import type { CacheFunction } from './serverContext'
 
 const theme = { palette: { primary: '#0000ff' } }
@@ -33,7 +34,7 @@ const classOf = (element: ResolvedElement) => element.props.className as string
 describe('the server build with layers', () => {
   it('emits a style element for the component class and one for the override class', async () => {
     const { Button } = setup()
-    const tree = await resolveTree(<Button style={{ background: 'purple' }}>go</Button>)
+    const tree = playScopes(await resolveTree(<Button style={{ background: 'purple' }}>go</Button>))
     const [button] = findAll(tree, 'button')
     const [component, override, ...rest] = classOf(button).split(' ')
     expect(rest).toEqual([])
@@ -52,10 +53,12 @@ describe('the server build with layers', () => {
 
   it('starts the element of a root theme, a theme class and the scope with the order statement', async () => {
     const { ThemeProvider } = setup()
-    const tree = await resolveTree(
-      <ThemeProvider theme={theme}>
-        <ThemeProvider theme={theme}>x</ThemeProvider>
-      </ThemeProvider>
+    const tree = playScopes(
+      await resolveTree(
+        <ThemeProvider theme={theme}>
+          <ThemeProvider theme={theme}>x</ThemeProvider>
+        </ThemeProvider>
+      )
     )
     const styles = findAll(tree, 'style')
     expect(styles).toHaveLength(3)
@@ -68,13 +71,13 @@ describe('the server build with layers', () => {
 
   it('gives the class names that the client build gives (see layers.test.tsx)', async () => {
     const { Button } = setup()
-    const tree = await resolveTree(<Button style={{ background: 'purple' }} />)
+    const tree = playScopes(await resolveTree(<Button style={{ background: 'purple' }} />))
     expect(classOf(findAll(tree, 'button')[0])).toBe(SERVER_CLASSES)
   })
 
   it('has one class and one element for a Button with nothing from outside', async () => {
     const { Button } = setup()
-    const tree = await resolveTree(<Button>plain</Button>)
+    const tree = playScopes(await resolveTree(<Button>plain</Button>))
     expect(classOf(findAll(tree, 'button')[0]).split(' ')).toHaveLength(1)
     expect(findAll(tree, 'style')).toHaveLength(1)
   })
@@ -83,7 +86,7 @@ describe('the server build with layers', () => {
 describe('the server build with hasLayers: false', () => {
   it('emits one element with no order statement and no layer', async () => {
     const { Button } = setup({ hasLayers: false })
-    const tree = await resolveTree(<Button style={{ background: 'purple' }}>go</Button>)
+    const tree = playScopes(await resolveTree(<Button style={{ background: 'purple' }}>go</Button>))
     const styles = findAll(tree, 'style')
     expect(styles).toHaveLength(1)
     expect(String(styles[0].children[0])).not.toContain('@layer')

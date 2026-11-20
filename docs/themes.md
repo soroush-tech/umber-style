@@ -124,7 +124,7 @@ The result:
 <ThemeProvider theme={(outer) => ({ palette: { surface: outer.palette.text } })}>
 ```
 
-The outermost provider calls it with the base theme, or with an empty object when there is none (its result then becomes the base theme). The server components build calls it with the root theme of the request: no context tells a server component which providers are above it.
+The outermost provider calls it with the base theme, or with an empty object when there is none (its result then becomes the base theme). The server components build calls it with the root theme of the request: no context tells a server component which providers are above it. In a request that renders only a part of the page (a client-side navigation in the App Router renders the segment that changed), the root theme of the request is that of the first provider that renders there, over the base theme: see [Server rendering](server-rendering.md#server-components).
 
 ### Portal content: `ThemeScope` and `useThemeClass`
 
@@ -155,7 +155,7 @@ const App = () => (
 
 A provider rendered inside portal content is merged over the providers above it in the tree, and its wrapper declares its whole merged theme (the class of the merged theme, above), so it shows its own theme there too.
 
-Both exist in the React client build and in Vue (where `useThemeClass()` returns a computed ref). The server components build has no portal and has neither. On React Native `ThemeScope` renders its children and `useThemeClass()` returns `undefined`: a modal stays inside the React tree, so its content already reads the theme of the provider above it.
+Both exist in the React client build and in Vue (where `useThemeClass()` returns a computed ref). The server components build has no portal and has neither; in a client component below a nested provider of the server build they give that provider's wrapper, which declares the theme it was given. On React Native `ThemeScope` renders its children and `useThemeClass()` returns `undefined`: a modal stays inside the React tree, so its content already reads the theme of the provider above it.
 
 These cases are checked in a real browser (Chromium) by `packages/react/src/themeProvider.browser.test.tsx`: the computed values below the wrapper of a nested provider, plain elements too; portal content with and without `ThemeScope`; a provider inside portal content under a nested provider.
 
@@ -165,7 +165,7 @@ These cases are checked in a real browser (Chromium) by `packages/react/src/them
 
 ### Two React roots on one page
 
-An engine has one `:root` rule. Two React roots whose outermost providers share an engine (the default style, or one `createStyle`) share it: the theme of the provider that committed last is the one on `:root`, for both. Give both the same theme, which is the usual case (islands of one app). For a root that needs another theme, give its outermost provider the same theme as the other root, and put the theme it needs on a nested provider inside it: that one renders its wrapper.
+Each React root's outermost provider writes to `:root`, so several roots on one page should share a theme. An engine has one `:root` rule. Two React roots whose outermost providers share an engine (the default style, or one `createStyle`) share it: the theme of the provider that committed last is the one on `:root`, for both. Give both the same theme, which is the usual case (islands of one app). For a root that needs another theme, give its outermost provider the same theme as the other root, and put the theme it needs on a nested provider inside it: that one renders its wrapper.
 
 ## What a style function sees as `theme`
 
@@ -269,5 +269,5 @@ The same works with `@umber-style/vue` and `@umber-style/react-native`. The decl
 - A provider inside portal content that has no `colorScheme` of its own declares none: `color-scheme` there comes from `:root`, and `whenScheme` follows the system preference.
 - A theme change of the outermost provider renders no styled component when only token values change. A change of a value that is not a token (a breakpoint, an `inline` token, a function in the theme) makes a new view of the theme, and every styled component with a function style renders again, as it must. What reads `useTheme()` renders again on every change.
 - The `:root` rule is written in an insertion effect in the browser, after the render. Of two React roots, the one that commits last decides, and an unmounted root leaves its theme there until another provider declares one.
-- In the server components build the first provider of a request is the outermost one. A nested provider there declares only the theme it was given: it cannot know the providers between it and the root.
+- In both React builds the outermost provider is the one with no provider of its engine above it in the page, of either build. The server components build cannot see the page, so its provider renders a client component that decides where the tree is whole (see [Server rendering](server-rendering.md#server-components)). A nested provider of the server build declares only the theme it was given: it cannot know the providers between it and the root. A provider of the client build below one of the server build does the same, because the theme of the server provider is not in the context of the client build; its function theme gets the theme of the nearest client provider, or the base theme.
 - `isRoot` keeps working as before: no element, no class, no rule, and the class on `<html>` is yours. See [The root theme and switching](root-theme.md).

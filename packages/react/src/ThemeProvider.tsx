@@ -3,6 +3,7 @@
 import {
   createElement,
   Fragment,
+  use,
   useContext,
   useInsertionEffect,
   useMemo,
@@ -16,7 +17,8 @@ import {
   type Engine,
 } from '@umber-style/core'
 import { useProvidedCache } from './CacheProvider'
-import type { ThemeContexts, ThemeScopeValue } from './ThemeValue'
+import { addMark, getMarksContext, type ThemeScopeValue } from './ProviderScope'
+import { readMarkKey, type ThemeContexts } from './ThemeValue'
 import type { WebThemeProviderProps } from './types'
 
 /** What a provider needs to render the style of its classes, where the build does that (a server render of the client build). */
@@ -51,14 +53,20 @@ export interface ThemeProviderParts<T> {
  *
  * On a server, where the build renders style elements, it sends those of its rules, and the stamp.
  *
+ * Whether a provider is above is read from the marks that both builds write (`ProviderScope`), by the
+ * prefix of the engine's cache: a provider of the server build above makes this one nested too. Its theme
+ * is not in the context of this build, so a provider under it declares only the theme it was given, as the
+ * server build does, and a function theme gets the theme of the nearest provider of this build, or the
+ * base theme.
+ *
  * Under a `CacheProvider` it works with the engine over the cache that the provider gives (the same base
- * theme, the prefix of that cache), sends no style element, and is the outermost one when the nearest
- * provider above it has another engine: its theme is declared on `:root` in that cache, which is the root
- * of the document of that cache (an iframe's).
+ * theme, the prefix of that cache), sends no style element, and is the outermost one when no provider of
+ * that cache is above it: its theme is declared on `:root` in that cache, which is the root of the
+ * document of that cache (an iframe's).
  */
 export function createThemeProvider<T extends object>({
   engine: baseEngine,
-  contexts: { ThemeContext, ViewContext, ScopeContext, EngineContext },
+  contexts: { ThemeContext, ViewContext },
   getServerStyle,
 }: ThemeProviderParts<T>) {
   return function ThemeProvider({
@@ -71,13 +79,15 @@ export function createThemeProvider<T extends object>({
   }: WebThemeProviderProps<T>): ReactElement {
     const cache = useProvidedCache()
     const engine = cache === undefined ? baseEngine : baseEngine.withCache(cache)
-    const above = useContext(EngineContext)
-    // The scope of a provider of another engine (another cache) is not this one's: it starts its own.
-    const scope = useContext(ScopeContext)
-    const ownScope = above === engine ? scope : undefined
+    const MarksContext = getMarksContext()
+    const marks = use(MarksContext)
+    // A provider of another cache is not of this engine: with none of this one above, it starts its own.
+    const key = readMarkKey(baseEngine, cache)
+    const above = marks.get(key)
     const outer = useContext(ThemeContext) ?? engine.baseTheme
-    const isOutermost = ownScope === undefined && !isRoot
-    const isNested = ownScope !== undefined && !isRoot
+    const isOutermost = above === undefined && !isRoot
+    const isNested = above !== undefined && !isRoot
+    const hasServerAbove = above?.hasServerAbove === true
     const given = useMemo(
       () => resolveThemeInput(theme, outer ?? (EMPTY_THEME as T)),
       [theme, outer]
@@ -88,10 +98,16 @@ export function createThemeProvider<T extends object>({
     const wrapper = useMemo((): ThemeScopeValue | undefined => {
       if (!isNested) return undefined
       const own = engine.themeClass(given, colorScheme)
-      const full = engine.themeId(merged as DeepPartial<T>, colorScheme)
-      const names = [own, own.startsWith(`${full} `) ? '' : full, engine.scopeClass(), className]
+      // Under a provider of the server build the merged theme lacks its theme: none is declared.
+      const full = hasServerAbove ? '' : engine.themeId(merged as DeepPartial<T>, colorScheme)
+      const isOwn = full === '' || own.startsWith(`${full} `)
+      const names = [own, isOwn ? '' : full, engine.scopeClass(), className]
       return { as, className: names.filter(Boolean).join(' ') }
-    }, [engine, isNested, given, merged, colorScheme, className, as])
+    }, [engine, isNested, hasServerAbove, given, merged, colorScheme, className, as])
+    const below = useMemo(
+      () => addMark(marks, key, { scope: wrapper ?? above?.scope ?? null, hasServerAbove }),
+      [marks, key, wrapper, above, hasServerAbove]
+    )
     useInsertionEffect(() => {
       if (isOutermost) engine.declareRoot(merged, colorScheme)
     }, [engine, isOutermost, merged, colorScheme])
@@ -99,15 +115,13 @@ export function createThemeProvider<T extends object>({
     const rootId = isOutermost && !hasDocument ? engine.declareRoot(merged, colorScheme) : undefined
 
     const content = (
-      <EngineContext.Provider value={engine}>
+      <MarksContext.Provider value={below}>
         <ThemeContext.Provider value={merged}>
           <ViewContext.Provider value={engine.createThemeView(merged)}>
-            <ScopeContext.Provider value={wrapper ?? ownScope ?? null}>
-              {children}
-            </ScopeContext.Provider>
+            {children}
           </ViewContext.Provider>
         </ThemeContext.Provider>
-      </EngineContext.Provider>
+      </MarksContext.Provider>
     )
     const element = wrapper ? createElement(as, { className: wrapper.className }, content) : content
     // Under a cache provider the app sends the rules of its cache itself.

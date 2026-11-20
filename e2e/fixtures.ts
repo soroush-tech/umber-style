@@ -48,8 +48,11 @@ export const fixtures: readonly FixtureConfig[] = [
     hasClientNavigation: true,
     sharesProcess: false,
     scenarios: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M'],
-    only: 'next-app.spec.ts',
-    known: {},
+    only: 'next-app*.spec.ts',
+    known: {
+      'partial-root-theme':
+        'KNOWN: in a partial render the server does not render the providers of the layouts above, so the root theme of the request (readTheme, the theme a function theme gets) is that of the first provider that renders there, over the base theme',
+    },
     devPort: 4202,
   },
   {

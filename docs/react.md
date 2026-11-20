@@ -69,7 +69,7 @@ Types: `StyleOptions`, `DefaultStyleOptions`, `StyledOptions`, `FilteringStyledO
 | `isRoot`      | `boolean`                           | `false` | Renders no element, no class and no rule: see [The root theme and switching](root-theme.md)                                             |
 | `children`    | `ReactNode`                         | none    | The subtree                                                                                                                             |
 
-The outermost provider (none above it) renders no element: its theme is declared on `:root`. A nested provider renders a wrapper with `display: contents` and its theme classes. See [Themes](themes.md), which also shows `ThemeScope` and `useThemeClass` for portal content.
+The outermost provider (no provider of its engine above it in the page, of either build: a provider that a server component renders counts) renders no element: its theme is declared on `:root`. A nested provider renders a wrapper with `display: contents` and its theme classes. See [Themes](themes.md), which also shows `ThemeScope` and `useThemeClass` for portal content.
 
 `ThemeScope` takes `children` only. `useThemeClass()` returns a `string`, or `undefined` under the outermost provider or none.
 

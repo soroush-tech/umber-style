@@ -7,6 +7,7 @@ import {
 } from '@umber-style/core'
 import { bindEngine, createStyle } from './createStyle.server'
 import { findAll, resolveTree, type ResolvedElement } from './vitest.resolveTree'
+import { playScopes } from './vitest.providerScope'
 import type { CacheFunction } from './serverContext'
 
 const theme = {
@@ -43,10 +44,12 @@ const classOf = (element: ResolvedElement) => element.props.className as string
 describe('the server build of styled', () => {
   it('makes the same class as the client build, and renders its style element', async () => {
     const { Box, ThemeProvider } = setup()
-    const tree = await resolveTree(
-      <ThemeProvider theme={theme}>
-        <Box />
-      </ThemeProvider>
+    const tree = playScopes(
+      await resolveTree(
+        <ThemeProvider theme={theme}>
+          <Box />
+        </ThemeProvider>
+      )
     )
     // The outermost provider renders no element.
     const [box] = findAll(tree, 'div')
@@ -61,12 +64,14 @@ describe('the server build of styled', () => {
 
   it('renders the provider with its class, its style element, and its children in order', async () => {
     const { ThemeProvider, sheet } = setup()
-    const tree = await resolveTree(
-      <ThemeProvider theme={theme}>
-        <ThemeProvider theme={theme} className="mine" as="section">
-          text
+    const tree = playScopes(
+      await resolveTree(
+        <ThemeProvider theme={theme}>
+          <ThemeProvider theme={theme} className="mine" as="section">
+            text
+          </ThemeProvider>
         </ThemeProvider>
-      </ThemeProvider>
+      )
     )
     const [section] = findAll(tree, 'section')
     expect(classOf(section)).toMatch(/^f-theme-\w+ f-boundary f-scope mine$/)
@@ -80,13 +85,15 @@ describe('the server build of styled', () => {
 
   it('has a nested provider with another breakpoint change nothing for the root', async () => {
     const { Box, ThemeProvider } = setup()
-    const tree = await resolveTree(
-      <ThemeProvider theme={theme}>
-        <Box />
-        <ThemeProvider theme={{ breakpoints: ['500px'] }}>
+    const tree = playScopes(
+      await resolveTree(
+        <ThemeProvider theme={theme}>
           <Box />
+          <ThemeProvider theme={{ breakpoints: ['500px'] }}>
+            <Box />
+          </ThemeProvider>
         </ThemeProvider>
-      </ThemeProvider>
+      )
     )
     const boxes = findAll(tree, 'div').filter((element) => classOf(element) === BOX_CLASS)
     expect(boxes).toHaveLength(2)
@@ -101,7 +108,7 @@ describe('the server build of styled', () => {
   it('renders a component with object styles with no theme at all', async () => {
     const style = bindEngine(createLazyEngine({ prefix: 'z' }), requestCache)
     const Plain = style.styled('p')({ color: 'red' })
-    const tree = await resolveTree(<Plain>x</Plain>)
+    const tree = playScopes(await resolveTree(<Plain>x</Plain>))
     expect(findAll(tree, 'p')[0].children).toEqual(['x'])
     expect(findAll(tree, 'style')).toHaveLength(1)
   })
@@ -110,7 +117,7 @@ describe('the server build of styled', () => {
     const style = bindEngine(createEngine(theme, { prefix: 'k', hasLayers: false }), requestCache)
     const { custom } = style.useStyle(style.StyleSheet.create({ custom: { color: 'blue' } }))
     const View = style.styled('div')({ margin: 1 })
-    const tree = await resolveTree(<View style={[custom, { opacity: 0.7 }]} />)
+    const tree = playScopes(await resolveTree(<View style={[custom, { opacity: 0.7 }]} />))
     const [div] = findAll(tree, 'div')
     expect(div.props.style).toBeUndefined()
     const styles = findAll(tree, 'style')
@@ -121,7 +128,7 @@ describe('the server build of styled', () => {
 
   it('reads the base theme without a provider', async () => {
     const { Box } = setup()
-    const tree = await resolveTree(<Box />)
+    const tree = playScopes(await resolveTree(<Box />))
     expect(findAll(tree, 'div').map(classOf)).toEqual([BOX_CLASS])
   })
 
@@ -146,7 +153,7 @@ describe('the server build of styled', () => {
     const Box = style.styled('div')(({ theme: view }) => ({
       color: (view as unknown as { palette?: string }).palette ?? 'red',
     }))
-    const tree = await resolveTree(<Box />)
+    const tree = playScopes(await resolveTree(<Box />))
     expect(classOf(findAll(tree, 'div')[0])).toMatch(/^e-/)
     const dynamic = style.StyleSheet.create((view) => ({
       a: { color: (view as unknown as { palette?: string }).palette ?? 'blue' },

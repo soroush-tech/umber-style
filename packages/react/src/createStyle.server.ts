@@ -85,7 +85,7 @@ export function bindEngine<T extends object>(
     useStyle,
     apply: (...entries) => ({ className: engine.css(...entries) || undefined }),
     css: ((...args: unknown[]) => createCssEntry(engine.cache, args)) as ServerStyle<T>['css'],
-    ThemeProvider: createThemeProvider(engine, { root, stamp, readTheme, mergeRoot }),
+    ThemeProvider: createThemeProvider(engine, { root, stamp, readTheme }),
     readTheme,
     themeClass,
     when: engine.when,

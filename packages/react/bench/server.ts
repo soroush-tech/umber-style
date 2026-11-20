@@ -17,6 +17,23 @@ prepareBuiltPackages({ conditions: ['react-server'] })
 const load = createRequire(import.meta.url)
 
 const core = load('../../core/dist/index.cjs') as typeof Core
+// A bundler of server components does not run a `'use client'` module that a server file imports: the
+// import is a reference to the component, which `resolveTree` leaves as it is (see
+// `src/vitest.clientReferences.ts`). The modules are put in the require cache as references before the
+// server build loads them, so that the work measured is that of a server.
+for (const [file, name] of [
+  ['../dist/ProviderScope.cjs', 'ProviderScope'],
+  ['../dist/GlobalRelease.cjs', 'GlobalRelease'],
+]) {
+  const id = load.resolve(file)
+  const reference = { $$typeof: Symbol.for('react.client.reference'), $$id: name }
+  load.cache[id] = {
+    id,
+    filename: id,
+    loaded: true,
+    exports: { [name]: reference },
+  } as NodeJS.Module
+}
 const { bindEngine } = load('../dist/index.server.cjs') as typeof ServerBinding
 export const { resolveTree } = load('../src/vitest.resolveTree.ts') as typeof ResolveTree
 export const fixtures = createFixtures(load('react') as typeof React, core)

@@ -185,7 +185,8 @@ function findRootProblems(
  * engine's style elements (its own, and the ones React hoists), and every variable of the engine that
  * a rule matching the element uses, without a fallback, has a value on the element. The classes that
  * are markers (`<prefix>-boundary`, `<prefix>-scheme-light` and `-dark`) have no rule of their own and
- * are left out, and so are the rules for `:hover`, `:focus` and the like. `<html>` and `<body>` without
+ * are left out, and so is `<prefix>-theme-0`, the theme class of a theme that declares nothing, which has
+ * no rule by design; and so are the rules for `:hover`, `:focus` and the like. `<html>` and `<body>` without
  * a class of the engine are checked for the global rules that name them (see `root-without-theme`). An
  * empty list means nothing is missing. Where there is no document, or no style element of an engine,
  * the list is empty.
@@ -204,7 +205,12 @@ export function findMissingStyles(
   const named = new Set(
     rules.flatMap(({ rule }) => readClassNames(rule.selectorText, `${prefix}-`))
   )
-  const markers = new Set([`${prefix}-boundary`, `${prefix}-scheme-light`, `${prefix}-scheme-dark`])
+  const markers = new Set([
+    `${prefix}-boundary`,
+    `${prefix}-scheme-light`,
+    `${prefix}-scheme-dark`,
+    `${prefix}-theme-0`,
+  ])
   const problems: StyleProblem[] = []
   const elements = [
     ...((scope as Node).nodeType === 1 ? [scope as Element] : []),

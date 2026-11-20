@@ -1,6 +1,20 @@
 import type { Cache } from './cache'
 import { hashString } from './hash'
 
+/** The selector of the rule of the root theme: the document root, with no specificity. */
+export const ROOT_SELECTOR = ':where(:root)'
+
+/** The rule `selector{body}` of a theme, inside the theme layer of `prefix` when there are layers. */
+export function createThemeRule(
+  prefix: string,
+  hasLayers: boolean,
+  selector: string,
+  body: string
+): string {
+  const rule = `${selector}{${body}}`
+  return hasLayers ? `@layer ${prefix}-theme{${rule}}` : rule
+}
+
 export interface ThemeRuleOptions {
   /** Sets the color-scheme property in the scope. */
   colorScheme?: 'light' | 'dark' | 'light dark'

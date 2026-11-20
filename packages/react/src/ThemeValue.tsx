@@ -2,27 +2,19 @@
 
 import { createContext, createElement, Fragment, use, useContext, type Context } from 'react'
 import { EMPTY_THEME, type Cache, type Engine } from '@umber-style/core'
+import { useProvidedCache } from './CacheProvider'
+import { getMarksContext, type ThemeScopeValue } from './ProviderScope'
 import type { ThemeScopeProps } from './types'
-
-/** The wrapper of a nested provider: its element and its class string, which `ThemeScope` repeats. */
-export interface ThemeScopeValue {
-  readonly as: string
-  readonly className: string
-}
 
 /**
  * The contexts of one style. `ThemeContext` holds the real theme of the nearest provider (its theme
  * merged over the ones above). `ViewContext` holds its view (references for tokens), which stays the same
- * object while only the values of variables change. `ScopeContext` is undefined with no provider above,
- * null under the outermost provider, which renders no element, and the wrapper of the nearest nested one.
- * `EngineContext` holds the engine of the nearest provider: a provider whose engine differs from it (under
- * a `CacheProvider`, the engine of another cache) is the outermost one of its cache.
+ * object while only the values of variables change. Which provider is above, and its wrapper, are in the
+ * marks that both builds share (`ProviderScope`).
  */
 export interface ThemeContexts<T> {
   ThemeContext: Context<T | undefined>
   ViewContext: Context<T | undefined>
-  ScopeContext: Context<ThemeScopeValue | null | undefined>
-  EngineContext: Context<Engine<T> | undefined>
 }
 
 /** Makes the contexts of one style: the default style makes them before it has an engine, so that it can export the theme context. */
@@ -30,18 +22,31 @@ export function createThemeContexts<T>(): ThemeContexts<T> {
   return {
     ThemeContext: createContext<T | undefined>(undefined),
     ViewContext: createContext<T | undefined>(undefined),
-    ScopeContext: createContext<ThemeScopeValue | null | undefined>(undefined),
-    EngineContext: createContext<Engine<T> | undefined>(undefined),
   }
 }
 
+/**
+ * The key of the marks for `engine` under the cache that a `CacheProvider` gives (`cache`): the prefix of
+ * the engine's cache, which a provider of the server build marks too, or the given cache when it is
+ * another one.
+ */
+export function readMarkKey(
+  engine: Pick<Engine<unknown>, 'cache'>,
+  cache: Cache | undefined
+): unknown {
+  return cache === undefined || cache === engine.cache ? engine.cache.prefix : cache
+}
+
 /** What the hooks read where no provider is above: the base theme of the engine, or nothing. */
-export type ThemeHolder<T> = Pick<Engine<T>, 'baseTheme' | 'createThemeView' | 'withCache'>
+export type ThemeHolder<T> = Pick<
+  Engine<T>,
+  'cache' | 'baseTheme' | 'createThemeView' | 'withCache'
+>
 
 /** The hooks of one style, and `ThemeScope`, over its contexts. */
 export function createThemeValue<T extends object>(
   holder: ThemeHolder<T>,
-  { ThemeContext, ViewContext, ScopeContext }: ThemeContexts<T>
+  { ThemeContext, ViewContext }: ThemeContexts<T>
 ) {
   /** The theme where no provider is above: the base theme, or the empty theme. */
   const readOwnTheme = () => holder.baseTheme ?? (EMPTY_THEME as T)
@@ -64,9 +69,15 @@ export function createThemeValue<T extends object>(
     return local.createThemeView(use(ThemeContext) ?? readOwnTheme())
   }
 
+  /** The wrapper of the nearest nested provider of either build: null under the outermost one, undefined with none. */
+  function useScope(): ThemeScopeValue | null | undefined {
+    const marks = use(getMarksContext())
+    return marks.get(readMarkKey(holder, useProvidedCache()))?.scope
+  }
+
   /** The class string of the wrapper of the nearest nested provider; undefined under the outermost one or none. */
   function useThemeClass(): string | undefined {
-    return useContext(ScopeContext)?.className
+    return useScope()?.className
   }
 
   /**
@@ -75,7 +86,7 @@ export function createThemeValue<T extends object>(
    * or none, its children alone.
    */
   function ThemeScope({ children }: ThemeScopeProps) {
-    const scope = useContext(ScopeContext)
+    const scope = useScope()
     if (!scope) return createElement(Fragment, null, children)
     return createElement(scope.as, { className: scope.className }, children)
   }

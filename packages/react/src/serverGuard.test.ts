@@ -64,8 +64,11 @@ describe('the server build', () => {
     ])
   })
 
-  it('reaches one client component, by reference: the browser part of Global', () => {
-    expect([...references.keys()].map(nameOf)).toEqual(['GlobalRelease.ts'])
+  it('reaches two client components, by reference: the browser parts of Global and of ThemeProvider', () => {
+    expect([...references.keys()].map(nameOf).sort()).toEqual([
+      'GlobalRelease.ts',
+      'ProviderScope.tsx',
+    ])
   })
 
   it('calls no hook, makes no context, and imports nothing of the client build', () => {

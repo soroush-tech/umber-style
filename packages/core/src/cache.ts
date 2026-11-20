@@ -14,7 +14,7 @@ import {
   type SheetEntry,
 } from './sheetEntry'
 import { compileRules, mergeStyles, readLabel, type StyleObject } from './serialize'
-import { toDeclarationText } from './theme'
+import { createThemeRule, ROOT_SELECTOR, toDeclarationText } from './theme'
 import { scanVariables } from './variables'
 import type { WebStyleObject } from './webStyle'
 
@@ -464,9 +464,6 @@ function compareCodeUnits(first: string, second: string): number {
   return first < second ? -1 : 1
 }
 
-/** The selector of the rule of the root theme: the document root, with no specificity. */
-const ROOT_SELECTOR = ':where(:root)'
-
 /** A root theme that the cache was given: its variables and its color-scheme declaration. */
 interface RootTheme {
   declarations: Readonly<Record<string, string>>
@@ -633,7 +630,7 @@ export function createCache(options: CacheOptions = {}): Cache {
   const createRootRules = (theme: RootTheme, names: Iterable<string>): readonly string[] => {
     const declared = [...names].map((name): [string, string] => [name, theme.declarations[name]])
     const body = toDeclarationText(declared) + theme.schemeText
-    return body === '' ? [] : wrapInLayer([`${ROOT_SELECTOR}{${body}}`], 'theme')
+    return body === '' ? [] : [createThemeRule(prefix, hasLayers, ROOT_SELECTOR, body)]
   }
 
   /** Writes the rule of the root theme anew with every variable written so far, after removing the one it had where the sheet can; a sheet that cannot keeps it, and the new rule, later, wins. */
@@ -988,7 +985,7 @@ export function createCache(options: CacheOptions = {}): Cache {
     }
     if (entry === undefined) return [...properties, ...(insertedRules.get(id) ?? [])]
     const body = toDeclarationText(Object.entries(entry.declarations)) + entry.schemeText
-    return [...properties, ...(body ? wrapInLayer([`.${id}{${body}}`], 'theme') : [])]
+    return [...properties, ...(body ? [createThemeRule(prefix, hasLayers, `.${id}`, body)] : [])]
   }
 
   /** The name of a class: the layer and `after` are part of the hash, so that the same styles in two layers, or after two classes, are two classes. */

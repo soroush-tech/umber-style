@@ -1,34 +1,47 @@
 import { createElement, type ReactElement } from 'react'
 import { createGlobalMarker, type Cache, type GlobalRules } from '@umber-style/core'
 
+/** A `<style href precedence>` element, as data: what a server component can hand to a client component. */
+export interface StyleText {
+  readonly href: string
+  readonly text: string
+}
+
+/** The `<style href precedence>` element of `style`, in the precedence of the prefix of `cache`. */
+const toElement =
+  (cache: Cache) =>
+  ({ href, text }: StyleText): ReactElement =>
+    createElement('style', { key: href, href, precedence: cache.prefix }, text)
+
 /**
- * The `<style href precedence>` elements of the animations in `names` that `sent` does not hold yet, which
- * it adds them to: the `@keyframes` rule that the cache wrote, with the animation name as `href`, so that
- * React sends an animation that many classes use once. The rule is outside every layer, so the element
- * needs no order statement.
+ * The style elements of the animations in `names` that `sent` does not hold yet, which it adds them to:
+ * the `@keyframes` rule that the cache wrote, with the animation name as `href`, so that React sends an
+ * animation that many classes use once. The rule is outside every layer, so the element needs no order
+ * statement.
  */
-function createKeyframesElements(
+function collectKeyframesTexts(
   cache: Cache,
   names: readonly string[],
   sent: Set<string>
-): ReactElement[] {
-  const elements: ReactElement[] = []
+): StyleText[] {
+  const texts: StyleText[] = []
   for (const name of names) {
     if (sent.has(name)) continue
     sent.add(name)
-    const props = { key: name, href: name, precedence: cache.prefix }
-    elements.push(createElement('style', props, cache.getRules(name).join('')))
+    texts.push({ href: name, text: cache.getRules(name).join('') })
   }
-  return elements
+  return texts
 }
 
 /**
- * The `<style href precedence>` elements for the classes in `className`: React 19 moves them to the
- * head and renders each `href` once. The precedence is the prefix of the cache. Each one starts with the order statement of the layers (none without layers), so that it is right on its own: declaring a layer again does not change the order. A name that the
- * cache made no rules for (a class of someone else) gets none. A theme class comes with every variable it has, used or not: its element is sent before the elements that use them, so it cannot know which are used.
- * A class that uses animations comes after the element of each of them, once.
+ * The style elements, as data, of the classes in `className`: React 19 moves them to the head and renders
+ * each `href` once. Each one starts with the order statement of the layers (none without layers), so
+ * that it is right on its own: declaring a layer again does not change the order. A name that the cache
+ * made no rules for (a class of someone else) gets none. A theme class comes with every variable it has,
+ * used or not: its element is sent before the elements that use them, so it cannot know which are used. A
+ * class that uses animations comes after the element of each of them, once.
  */
-export function createStyleElements(cache: Cache, className: string | undefined): ReactElement[] {
+export function collectStyleTexts(cache: Cache, className: string | undefined): StyleText[] {
   const sent = new Set<string>()
   return (className ?? '')
     .split(/\s+/)
@@ -36,12 +49,16 @@ export function createStyleElements(cache: Cache, className: string | undefined)
     .flatMap((name) => {
       const rules = cache.getFullRules(name)
       if (rules.length === 0) return []
-      const props = { key: name, href: name, precedence: cache.prefix }
       return [
-        ...createKeyframesElements(cache, cache.getAnimations(name), sent),
-        createElement('style', props, [cache.layerOrder, ...rules].join('')),
+        ...collectKeyframesTexts(cache, cache.getAnimations(name), sent),
+        { href: name, text: [cache.layerOrder, ...rules].join('') },
       ]
     })
+}
+
+/** The `<style href precedence>` elements for the classes in `className` (see `collectStyleTexts`); the precedence is the prefix of the cache. */
+export function createStyleElements(cache: Cache, className: string | undefined): ReactElement[] {
+  return collectStyleTexts(cache, className).map(toElement(cache))
 }
 
 /**
@@ -51,15 +68,15 @@ export function createStyleElements(cache: Cache, className: string | undefined)
  */
 export function createGlobalElements(cache: Cache, sets: readonly GlobalRules[]): ReactElement[] {
   const sent = new Set<string>()
-  return sets.flatMap(({ id, rules, animations }) => {
+  const texts = sets.flatMap(({ id, rules, animations }) => {
     if (rules.length === 0 || sent.has(id)) return []
     sent.add(id)
-    const props = { key: id, href: id, precedence: cache.prefix }
     return [
-      ...createKeyframesElements(cache, animations, sent),
-      createElement('style', props, [cache.layerOrder, ...rules].join('')),
+      ...collectKeyframesTexts(cache, animations, sent),
+      { href: id, text: [cache.layerOrder, ...rules].join('') },
     ]
   })
+  return texts.map(toElement(cache))
 }
 
 /**
