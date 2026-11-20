@@ -159,3 +159,8 @@ export const baseStyles = globalStyles((theme: Theme) => ({
 export const frameStyles = globalStyles((theme: Theme) => ({
   body: { borderTop: `4px solid ${theme.palette.primary}` },
 }))
+
+/** A global rule for the bar, outside the page that renders it: the promo page only, as in the React fixtures. */
+export const headerOverride = globalStyles((theme: Theme) => ({
+  '[data-testid="nav"]': { outline: `3px solid ${theme.palette.accent}` },
+}))

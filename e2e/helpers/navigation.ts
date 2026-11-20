@@ -10,8 +10,8 @@ export const PAGE_NAMES: readonly PageName[] = ['home', 'catalog', 'settings']
 /** The key under which the fixtures store the scheme (see fixtures/shared/src/themes.ts). */
 export const STORAGE_KEY = 'umber-fixture-scheme'
 
-/** The test id of the root element of each page. */
-export const pageTestId = (name: PageName) => `page-${name}`
+/** The test id of the root element of each page (and of a page that some fixtures have, such as `promo`). */
+export const pageTestId = (name: string) => `page-${name}`
 
 /** Waits until React has taken the page over (the shell sets `data-hydrated` on <html>). */
 export async function waitForHydrated(page: Page): Promise<void> {
@@ -29,7 +29,7 @@ export async function loadPage(page: Page, fixture: FixtureConfig, name: PageNam
  * Moves to a page with the app's own link, in the browser. It fails when the click made a document
  * load instead of a client-side navigation: a marker on `window` must survive.
  */
-export async function navigateInBrowser(page: Page, name: PageName): Promise<void> {
+export async function navigateInBrowser(page: Page, name: string): Promise<void> {
   await page.evaluate(() => {
     ;(window as unknown as { __stayed: boolean }).__stayed = true
   })

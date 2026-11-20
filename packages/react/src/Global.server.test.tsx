@@ -56,6 +56,31 @@ describe('Global in the server components build', () => {
     expect(engine.cache.extract().ids).toEqual(expect.arrayContaining([set.id, other.id]))
   })
 
+  it('renders the client component that releases the sets in the browser after their elements, with the sets as data', async () => {
+    const { Global, engine } = setup()
+    const styles = [{ body: { margin: 0 } }, { body: {} }, { html: { color: 'red' } }]
+    const tree = await resolveTree(<Global styles={styles} />)
+    const [first, , third] = engine.resolveGlobal(styles)
+    const last = tree.at(-1) as Exclude<(typeof tree)[number], string>
+    expect(last.type).toEqual(expect.objectContaining({ $$id: 'GlobalRelease' }))
+    expect(last.props).toEqual({
+      prefix: 'r',
+      sets: JSON.stringify([
+        [first.id, first.rules],
+        [third.id, third.rules],
+      ]),
+    })
+    expect(tree.slice(0, -1).map((node) => (node as typeof last).type)).toEqual(['style', 'style'])
+    // A server component's Global belongs to its page: an extraction of another page leaves it out.
+    expect(engine.cache.extractPage([]).css).toBe('')
+    expect(engine.cache.extractPage([], { carried: new Set([first.id]) }).css).toBe('')
+  })
+
+  it('renders no client component for styles with no rule', async () => {
+    const { Global } = setup()
+    expect(await resolveTree(<Global styles={{ body: {} }} />)).toEqual([])
+  })
+
   it('renders the animation of a styled component in an element of its own, once for two classes', async () => {
     const { styled, keyframes } = setup()
     const pulse = keyframes({ '50%': { opacity: 0.4 } }, { label: 'pulse' })

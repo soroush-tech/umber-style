@@ -130,7 +130,7 @@ test('(v) client-side navigation between routes keeps everything styled', async 
   }
 })
 
-test('(vi) a global rule that a server component wrote stays after a navigation away from its page', async ({
+test('(vi) a global rule that a server component wrote is gone after a navigation away from its page', async ({
   page,
 }) => {
   await page.goto('/stream')
@@ -143,8 +143,28 @@ test('(vi) a global rule that a server component wrote stays after a navigation 
       text.startsWith('[data-testid="page-stream"] h1')
     ).length
   expect(await countStreamRules(), 'the global rule of the stream page').toBe(1)
-  // Nothing unmounts in the browser: the rule came as a style element, which React keeps for the
-  // life of the document. It matches nothing on the next page.
+  // The rule came as a style element, which React keeps for the life of the document; the client
+  // component that the server's Global renders after it lets the browser's cache take the rule over,
+  // and deletes it from that element's sheet when the page is left. Scenario M's variant (b) is the
+  // same case with a rule that matches the bar of the shell.
   await navigateInBrowser(page, 'home')
-  expect(await countStreamRules(), 'the global rule of the stream page, on home').toBe(1)
+  await expect
+    .poll(countStreamRules, { message: 'the global rule of the stream page, on home' })
+    .toBe(0)
+})
+
+test('(vii) a global rule that the root layout renders in a server component stays on every page', async ({
+  page,
+  fixture,
+}) => {
+  // The base styles of the shell: a server component of the root layout, which never unmounts.
+  await loadPage(page, fixture, 'home')
+  const countLayoutRules = async () =>
+    (await collectKeyframesAndGlobals(page)).globals.filter((text) => text.startsWith('#app-root'))
+      .length
+  expect(await countLayoutRules(), 'the global rule of the layout').toBe(1)
+  for (const name of ['catalog', 'settings', 'home'] as const) {
+    await navigateInBrowser(page, name)
+    expect(await countLayoutRules(), `the global rule of the layout, on ${name}`).toBe(1)
+  }
 })

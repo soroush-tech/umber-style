@@ -1,4 +1,5 @@
-import { CatalogPage, HomePage, SettingsPage } from '@umber-fixtures/shared/pages'
+import { HeaderOverride } from '@umber-fixtures/shared/components'
+import { CatalogPage, HomePage, PromoPage, SettingsPage } from '@umber-fixtures/shared/pages'
 import { Shell } from '@umber-fixtures/shared/shell'
 import { darkClass, lightClass, ThemeProvider } from '@umber-fixtures/shared/style'
 import { STORAGE_KEY, lightTheme } from '@umber-fixtures/shared/themes'
@@ -23,7 +24,7 @@ function App() {
   return (
     <ThemeProvider theme={lightTheme} colorScheme="light" isRoot>
       <Shell Link={Link}>
-        <Page />
+        {path === '/promo' ? <PromoPage override={<HeaderOverride />} /> : <Page />}
       </Shell>
     </ThemeProvider>
   )

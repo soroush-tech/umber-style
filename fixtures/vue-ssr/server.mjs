@@ -10,7 +10,7 @@ const template = readFileSync(join(client, 'index.html'), 'utf8')
 const { render } = await import(pathToFileURL(join(root, 'dist', 'server', 'entry-server.js')).href)
 
 const types = { '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml' }
-const routes = new Set(['/', '/catalog', '/settings'])
+const routes = new Set(['/', '/catalog', '/settings', '/promo'])
 
 createServer(async (request, response) => {
   const path = new URL(request.url, 'http://localhost').pathname

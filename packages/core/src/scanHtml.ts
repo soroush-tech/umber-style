@@ -6,6 +6,35 @@ export interface HtmlTokens {
   classes: Set<string>
   /** The tokens of every `data-href` attribute: the keys of the `<style href precedence>` elements the document already carries. */
   carried: Set<string>
+  /**
+   * The ids of the sets of global rules that the markers of `Global` name: the `content` of a
+   * `<meta name="<prefix>-global">` (React) and the text after the first word of a comment
+   * `<!--<prefix>-global ...-->` (Vue).
+   */
+  rendered: Set<string>
+}
+
+/** The end of the name of a marker of global rules: `<prefix>-global`. */
+const MARKER_END = '-global'
+
+/** What a marker of global rules says: its name, `<prefix>-global`, and the ids of the sets, separated by spaces. */
+export interface GlobalMarker {
+  name: string
+  ids: string
+}
+
+/**
+ * The marker by which a `Global` that renders no style element names its sets in the markup of a server
+ * render, so that `extractPageStyles` puts them in that page only: the sets that have rules, by id. None
+ * when no set has a rule. A binding renders it as `<meta name="<name>" content="<ids>">` (React) or as a
+ * comment `<!--<name> <ids>-->` (Vue).
+ */
+export function createGlobalMarker(
+  prefix: string,
+  sets: readonly { id: string; rules: readonly string[] }[]
+): GlobalMarker | undefined {
+  const ids = sets.filter(({ rules }) => rules.length > 0).map(({ id }) => id)
+  return ids.length === 0 ? undefined : { name: `${prefix}${MARKER_END}`, ids: ids.join(' ') }
 }
 
 /** The elements whose content is text, not markup: nothing in them is an attribute. */
@@ -53,12 +82,22 @@ function readValue(html: string, index: number): { value: string; end: number } 
   return { value: html.slice(index, end), end }
 }
 
-/** Reads the attributes of the tag whose name ended at `index`, adds what matters to `found`, and returns the index after the `>`. */
-function readAttributes(html: string, index: number, found: HtmlTokens): number {
+/** Adds the ids that a marker names to `found`: the tokens of `content` when `name` is that of a marker. */
+function addMarked(found: HtmlTokens, name: string, content: string): void {
+  if (name.endsWith(MARKER_END)) addTokens(found.rendered, content)
+}
+
+/** Reads the attributes of the tag whose name ended at `index`, adds what matters to `found`, and returns the index after the `>`. A `<meta>` (`isMeta`) is read for the marker of global rules too. */
+function readAttributes(html: string, index: number, found: HtmlTokens, isMeta: boolean): number {
   let position = index
+  let metaName = ''
+  let metaContent = ''
   while (position < html.length) {
     const code = codeAt(html, position)
-    if (code === 62) return position + 1
+    if (code === 62) {
+      if (isMeta) addMarked(found, metaName, metaContent)
+      return position + 1
+    }
     if (isSpace(code) || code === 47) {
       position++
       continue
@@ -73,8 +112,18 @@ function readAttributes(html: string, index: number, found: HtmlTokens): number 
     position = end
     if (name === 'class' || name === 'classname') addTokens(found.classes, value)
     else if (name === 'data-href') addTokens(found.carried, value)
+    else if (name === 'name') metaName = value
+    else if (name === 'content') metaContent = value
   }
   return html.length
+}
+
+/** Reads the comment whose text starts at `start` and ends at `end`: a marker of global rules adds the ids it names to `found`. */
+function readComment(html: string, start: number, end: number, found: HtmlTokens): void {
+  if (!isLetter(codeAt(html, start))) return
+  const text = html.slice(start, end)
+  const space = text.indexOf(' ')
+  if (space !== -1) addMarked(found, text.slice(0, space), text.slice(space + 1))
 }
 
 /** The index of the `</name` that closes a raw text element, or the end of the document. */
@@ -95,22 +144,25 @@ function readTagNameEnd(html: string, index: number): number {
 
 /**
  * The class tokens of `html`: the values of the `class` and `className` attributes, in one pass over
- * the markup. Comments and the content of `script`, `style`, `textarea` and `title` are skipped, so
- * a class name inside a script or a text is not taken for a class. Quoted and bare values are read;
- * a class name in any other attribute is not looked at. The pass moves forward only: its time is
- * linear in the length of the document, and there is no pattern to backtrack.
+ * the markup, with the keys of the style elements it carries (`data-href`) and the ids that the markers
+ * of `Global` name. Comments other than a marker and the content of `script`, `style`, `textarea` and
+ * `title` are skipped, so a class name inside a script or a text is not taken for a class. Quoted and
+ * bare values are read; a class name in any other attribute is not looked at. The pass moves forward
+ * only: its time is linear in the length of the document, and there is no pattern to backtrack.
  */
 export function scanHtml(html: string): HtmlTokens {
-  const found: HtmlTokens = { classes: new Set(), carried: new Set() }
+  const found: HtmlTokens = { classes: new Set(), carried: new Set(), rendered: new Set() }
   let at = html.indexOf('<')
   while (at !== -1) {
     if (html.startsWith('<!--', at)) {
       const close = html.indexOf('-->', at + 4)
-      at = close === -1 ? html.length : close + 3
+      const end = close === -1 ? html.length : close
+      readComment(html, at + 4, end, found)
+      at = end + 3
     } else if (isLetter(codeAt(html, at + 1))) {
       const nameEnd = readTagNameEnd(html, at + 1)
       const name = html.slice(at + 1, nameEnd).toLowerCase()
-      at = readAttributes(html, nameEnd, found)
+      at = readAttributes(html, nameEnd, found, name === 'meta')
       if (RAW_TEXT_ELEMENTS.has(name)) at = findClosingTag(html, at, name)
     } else {
       at++

@@ -1,11 +1,26 @@
-import { computed, defineComponent, inject, onUnmounted, watch, type PropType } from 'vue'
-import { EMPTY_THEME, type Engine, type GlobalInput, type GlobalRules } from '@umber-style/core'
+import {
+  Comment,
+  computed,
+  defineComponent,
+  h,
+  inject,
+  onUnmounted,
+  watch,
+  type PropType,
+} from 'vue'
+import {
+  createGlobalMarker,
+  EMPTY_THEME,
+  type Engine,
+  type GlobalInput,
+  type GlobalRules,
+} from '@umber-style/core'
 import { injectCache } from './CacheProvider'
 import type { ThemeKeys } from './ThemeProvider'
 
-/** Writes `sets` into the cache of `engine`, in order, and returns the function that releases them all. */
+/** Writes `sets` into the cache of `engine`, in order, as rules that a component rendered, and returns the function that releases them all. */
 function insertSets<T>(engine: Engine<T>, sets: readonly GlobalRules[]): () => void {
-  const releases = sets.map((set) => engine.cache.insertGlobal(set))
+  const releases = sets.map((set) => engine.cache.insertGlobal(set, { isRendered: true }))
   return () => {
     for (const release of releases) release()
   }
@@ -19,7 +34,10 @@ function insertSets<T>(engine: Engine<T>, sets: readonly GlobalRules[]): () => v
  * or what they read of the theme) the new ones are written first and then the old ones released, so that
  * there is no moment with neither. The cache counts the rules of each set, so two components with equal
  * styles share them, and rules that a server render left in the page are taken over. Where there is no
- * document (a server render) nothing unmounts: the rules are written for good, for `extractPageStyles`.
+ * document (a server render) nothing unmounts: the rules are written for good, for `extractPageStyles`,
+ * and the comment it renders (a component that renders nothing renders a comment) is the marker that
+ * names its sets, `<!--<prefix>-global <ids>-->`, so that the CSS of this page holds them and the CSS of
+ * another page does not. A hydration does not compare the text of a comment.
  * Under a `CacheProvider` the rules go to the cache it gives, through the engine over that cache, with
  * the view of that engine.
  */
@@ -48,7 +66,8 @@ export function createGlobal<T extends object>(
       })
       if (typeof document === 'undefined') {
         insertSets(local, sets.value)
-        return () => null
+        const marker = createGlobalMarker(local.cache.prefix, sets.value)
+        return () => (marker ? h(Comment, `${marker.name} ${marker.ids}`) : null)
       }
       const ids = computed(() => sets.value.map(({ id }) => id).join(' '))
       let release = insertSets(local, sets.value)

@@ -120,7 +120,8 @@ describe('the registry of an app', () => {
     const { html, head } = renderOnServer()
     const output = html + head
     expect(html).not.toContain('<style')
-    expect(html).not.toContain('<meta')
+    // The one element besides: the marker that names the global rules of the page, for an extraction.
+    expect(html).toMatch(/^<meta name="soroush-global" content="soroush-global-\w+"\/><section /)
     const css = /<style data-umber="[^"]+">(.*?)<\/style>/.exec(head)?.[1] as string
     const rules =
       css.match(/@layer [\w-]+\{.*?\}\}|@keyframes [\w-]+\{.*?\}\}|@layer [^{]+;/g) ?? []
@@ -158,7 +159,8 @@ describe('the registry of an app', () => {
         <Page />
       </CacheProvider>
     )
-    expect(again).toBe(html)
+    // The browser renders no marker: it is sent by a server render only, and a hydration skips it.
+    expect(again).toBe(html.replace(/^<meta [^>]*>/, ''))
     expect(written).toEqual([])
   })
 })

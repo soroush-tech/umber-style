@@ -1,5 +1,5 @@
 import { createElement, type ReactElement } from 'react'
-import type { Cache, GlobalRules } from '@umber-style/core'
+import { createGlobalMarker, type Cache, type GlobalRules } from '@umber-style/core'
 
 /**
  * The `<style href precedence>` elements of the animations in `names` that `sent` does not hold yet, which
@@ -60,6 +60,22 @@ export function createGlobalElements(cache: Cache, sets: readonly GlobalRules[])
       createElement('style', props, [cache.layerOrder, ...rules].join('')),
     ]
   })
+}
+
+/**
+ * The marker of global rules that a server render sends in place of their style elements (none is sent
+ * under a cache provider, or without `hasServerStyleElements`): a `<meta name="<prefix>-global">` whose
+ * `content` is the ids of the sets that have rules. React moves it to the head, and `extractPageStyles`
+ * reads it, so that the CSS of this page holds the sets and the CSS of another page does not. Like the
+ * stamp, it is rendered where there is no document only; a hydration skips it. None when no set has rules.
+ */
+export function createGlobalMarkerElements(
+  cache: Cache,
+  sets: readonly GlobalRules[]
+): ReactElement[] {
+  const marker = createGlobalMarker(cache.prefix, sets)
+  if (marker === undefined) return []
+  return [createElement('meta', { key: marker.name, name: marker.name, content: marker.ids })]
 }
 
 /**

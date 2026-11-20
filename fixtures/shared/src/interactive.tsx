@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Button, FrameStyles } from './components'
+import { Button, FrameStyles, HeaderOverride } from './components'
 import { darkClass, lightClass } from './style'
 import { STORAGE_KEY } from './themes'
 
@@ -44,6 +44,11 @@ export function FrameSwitch() {
       </Button>
     </>
   )
+}
+
+/** The global rule of the promo page in a client component: in a framework with server components, `Global` is the client build here. */
+export function ClientHeaderOverride() {
+  return <HeaderOverride />
 }
 
 /** Marks <html> once React has taken the page over: the end-to-end tests wait for it. */

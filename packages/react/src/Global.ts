@@ -13,9 +13,9 @@ import type { GlobalProps } from './types'
 /** What is released while nothing is written. */
 function releaseNothing(): void {}
 
-/** Writes `sets` into the cache of `engine`, in order, and returns the function that releases them all. */
+/** Writes `sets` into the cache of `engine`, in order, as rules that a component rendered, and returns the function that releases them all. */
 function insertSets<T>(engine: Engine<T>, sets: readonly GlobalRules[]): () => void {
-  const releases = sets.map((set) => engine.cache.insertGlobal(set))
+  const releases = sets.map((set) => engine.cache.insertGlobal(set, { isRendered: true }))
   return () => {
     for (const release of releases) release()
   }
@@ -29,14 +29,15 @@ function insertSets<T>(engine: Engine<T>, sets: readonly GlobalRules[]): () => v
  * there is no moment with neither. The cache counts the rules of each set: two elements with equal
  * styles share them, and an effect that runs twice in development writes them back. Rules that a server
  * render sent are taken over, not written again. Where there is no document (a server render) no effect
- * runs and nothing unmounts, so the rules are written for good, during the render, and the style
- * elements that `createGlobalElements` gives are rendered. Under a `CacheProvider` the rules go to the
- * cache it gives, through the engine over that cache, and no style element is rendered.
+ * runs and nothing unmounts, so the rules are written for good, during the render, and the elements that
+ * `createServerElements` gives for the sets are rendered: the style elements of the sets, or the marker
+ * that names them (under a `CacheProvider`, `cache`, and without style elements), so that the CSS
+ * extracted for the page holds them and the CSS of another page does not.
  */
 export function createGlobal<T>(
   engine: Engine<T>,
   useThemeView: (cache?: Cache) => T,
-  createGlobalElements: (sets: readonly GlobalRules[]) => ReactElement[]
+  createServerElements: (sets: readonly GlobalRules[], cache: Cache | undefined) => ReactElement[]
 ) {
   return function Global({ styles }: GlobalProps<T>): ReactElement | null {
     const cache = useProvidedCache()
@@ -59,8 +60,7 @@ export function createGlobal<T>(
     )
     if (typeof document !== 'undefined') return null
     insertSets(local, sets)
-    if (cache !== undefined) return null
-    const elements = createGlobalElements(sets)
+    const elements = createServerElements(sets, cache)
     return elements.length === 0 ? null : createElement(Fragment, null, ...elements)
   }
 }

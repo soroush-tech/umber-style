@@ -187,3 +187,14 @@ const frameStyles = globalStyles((theme) => ({
 export function FrameStyles() {
   return <Global styles={frameStyles} />
 }
+
+// The outline is not among the properties that the other scenarios compare: a rule that is left in the
+// page shows in the tests of the promo page, not as a difference in theirs.
+const headerOverride = globalStyles((theme) => ({
+  '[data-testid="nav"]': { outline: `3px solid ${theme.palette.accent}` },
+}))
+
+/** A global rule for the bar of the shell, outside the page that renders it: the promo page only. */
+export function HeaderOverride() {
+  return <Global styles={headerOverride} />
+}

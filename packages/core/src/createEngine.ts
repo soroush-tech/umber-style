@@ -508,7 +508,8 @@ function createFamilyEngine<T extends object>(
   }
 
   const insertGlobal = (input: GlobalInput<T>, theme?: T): (() => void) => {
-    const releases = resolveGlobal(input, theme).map(cache.insertGlobal)
+    // Rules inserted directly are for the app: they are part of every page.
+    const releases = resolveGlobal(input, theme).map((set) => cache.insertGlobal(set))
     return () => {
       for (const release of releases) release()
     }

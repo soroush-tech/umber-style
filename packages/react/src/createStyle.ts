@@ -16,7 +16,12 @@ import {
 } from '@umber-style/core'
 import { useProvidedCache } from './CacheProvider'
 import { createGlobal } from './Global'
-import { createGlobalElements, createStampElement, createStyleElements } from './styleElements'
+import {
+  createGlobalElements,
+  createGlobalMarkerElements,
+  createStampElement,
+  createStyleElements,
+} from './styleElements'
 import { createStyled } from './styled'
 import { createThemeProvider } from './ThemeProvider'
 import { createThemeContexts, createThemeValue, type ThemeContexts } from './ThemeValue'
@@ -98,8 +103,12 @@ export function bindEngine<T extends object>(
     whenScheme: engine.whenScheme,
     keyframes: engine.keyframes,
     globalStyles,
-    Global: createGlobal(engine, useThemeView, (sets) =>
-      hasStyleElements() ? createGlobalElements(engine.cache, sets) : []
+    // A server render sends the style elements of the sets, or, where it sends none, the marker that
+    // names them in the markup, with the prefix of the cache that holds them.
+    Global: createGlobal(engine, useThemeView, (sets, cache) =>
+      cache === undefined && hasStyleElements()
+        ? createGlobalElements(engine.cache, sets)
+        : createGlobalMarkerElements(cache ?? engine.cache, sets)
     ),
   }
 }

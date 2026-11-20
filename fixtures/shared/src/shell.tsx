@@ -14,13 +14,18 @@ const DefaultLink: LinkComponent = ({ href, children, ...rest }) => (
   </a>
 )
 
-/** The frame around every page: the global base styles, the bar with the links, the theme switch and the frame switch. */
+/**
+ * The frame around every page: the global base styles, the bar with the links, the theme switch and the
+ * frame switch. `links` are more links of a fixture, after the shared ones.
+ */
 export function Shell({
   children,
   Link = DefaultLink,
+  links,
 }: {
   children: ReactNode
   Link?: LinkComponent
+  links?: ReactNode
 }) {
   return (
     <>
@@ -36,6 +41,10 @@ export function Shell({
           <Link href="/settings" data-testid="link-settings">
             Settings
           </Link>
+          <Link href="/promo" data-testid="link-promo">
+            Promo
+          </Link>
+          {links}
           <ThemeSwitch />
           <FrameSwitch />
         </NavBar>

@@ -32,6 +32,7 @@ export default defineConfig({
           name: 'server',
           environment: 'node',
           include: ['src/**/*.server.test.{ts,tsx}'],
+          setupFiles: ['src/vitest.clientReferences.ts'],
           server: { deps: { inline: [/react/] } },
         },
       },

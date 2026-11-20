@@ -72,6 +72,26 @@ export function CatalogPage() {
   )
 }
 
+/**
+ * A page whose `override` writes a global rule for the bar of the shell, which is outside the page: leaving
+ * the page unmounts it. `testId` tells apart the routes of a fixture that renders it in more than one way.
+ */
+export function PromoPage({
+  override,
+  testId = 'page-promo',
+}: {
+  override: ReactNode
+  testId?: string
+}) {
+  return (
+    <Page data-testid={testId}>
+      {override}
+      <Heading>Promo</Heading>
+      <Muted>This page outlines the bar above it</Muted>
+    </Page>
+  )
+}
+
 export function SettingsPage() {
   return (
     <Page data-testid="page-settings">

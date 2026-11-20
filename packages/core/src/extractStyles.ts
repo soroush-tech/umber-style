@@ -43,7 +43,10 @@ export interface PageStyleOptions {
  * use and the theme classes trimmed to the variables that the page uses. Nothing depends on what else the cache holds, on the
  * order pages were rendered in, or on pages being rendered at the same time, and the cache is not changed.
  * The `<style href precedence>` elements that `html` carries already (React's server render of the
- * client build emits them) are not written again.
+ * client build emits them) are not written again. The global rules are those inserted for the app
+ * (`engine.insertGlobal`), which are in every page, and those of the `Global` components that `html`
+ * rendered: a style element it carries, or a marker that names the set (a `<meta name="<prefix>-global">`
+ * of React, a comment `<!--<prefix>-global ...-->` of Vue). A set that another page rendered is not.
  */
 export function extractPageStyles(
   cache: Cache,
@@ -59,9 +62,9 @@ function readPage(
   html: string,
   options: PageStyleOptions
 ): [classNames: Iterable<string>, options: PageExtractOptions] {
-  const { classes, carried } = scanHtml(html)
+  const { classes, carried, rendered } = scanHtml(html)
   const themes = (options.themes ?? []).flatMap((value) => value.split(/\s+/))
-  return [classes, { themes, animations: options.animations, carried }]
+  return [classes, { themes, animations: options.animations, carried, rendered }]
 }
 
 /**

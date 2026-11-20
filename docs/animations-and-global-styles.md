@@ -371,7 +371,7 @@ With `hasLayers: false` the rules are written outside every layer, in the order 
 
 ## On a server
 
-A server unmounts nothing. Everywhere below, the rules of a `Global` that renders on a server are written into the cache for good, and the cache is shared by every request it serves: global rules are app-wide on a server.
+A server unmounts nothing. Everywhere below, the rules of a `Global` that renders on a server are written into the cache for good, and the cache is shared by every request it serves. They are still the rules of the page that rendered them: the markup of a page says which sets it rendered (the style elements it carries, or a marker that `Global` leaves in their place), and the CSS extracted for a page holds those sets and no other set of a `Global`. A set written with `engine.insertGlobal`, with no component, is for the app: it is in every page.
 
 A set-up that collects the rules itself, through `@umber-style/cache` and `@umber-style/server`, gets a set of global rules and a `@keyframes` rule as a group of its own, named `<prefix>-global-<hash>` and `@keyframes:<name>`: see [The cache and server packages](cache-and-server.md).
 
@@ -419,7 +419,13 @@ the markup starts with one merged element (shown shortened), then the options st
 </style>
 ```
 
-`extractPageStyles(cache, html)` leaves out what the markup carries (it reads `data-href`), so its `tag` holds only the stamp here. With `hasServerStyleElements: false` the markup has no style element, and `extractPageStyles` returns the whole page in one:
+`extractPageStyles(cache, html)` leaves out what the markup carries (it reads `data-href`), so its `tag` holds only the stamp here. With `hasServerStyleElements: false` the markup has no style element. `Global` renders its marker in their place, a `<meta>` that names its sets, which React moves to the head (in the markup of `renderToString`, to its start):
+
+```html
+<meta name="umber-global" content="umber-global-a3061a" />
+```
+
+`extractPageStyles` reads it and returns the whole page in one:
 
 ```css
 @layer umber-theme, umber-global, umber-components, umber-overrides;
@@ -451,8 +457,8 @@ the markup starts with one merged element (shown shortened), then the options st
 
 What `extractPageStyles` puts in a page:
 
-- **Global rules: all of them**, every set the cache holds, in the order they were written, whatever page wrote them. No class stands for a global rule, so the page cannot tell which it needs.
-- **`@keyframes` rules: only those the page uses**, the animations of the classes in the markup and of the global rules, sorted by name. A rule of a class that is not on the page is not sent.
+- **Global rules: those of the page**, in the order they were written: each set that a `Global` of this page rendered (a style element the markup carries, or a set its marker names), and each set that `engine.insertGlobal` wrote for the app. A set that only another page rendered is not sent, whichever page the server rendered first, and pages rendered at the same time each get their own.
+- **`@keyframes` rules: only those the page uses**, the animations of the classes in the markup and of the global rules of the page, sorted by name. A rule of a class that is not on the page is not sent.
 - **`animations`**: names to include although nothing on the page uses them, for a use the engine cannot see (see `insertKeyframes` above):
 
 ```ts
@@ -460,13 +466,13 @@ const spin = keyframes({ to: { rotate: '1turn' } }, { label: 'spin' })
 const { css } = extractPageStyles(cache, '<p>An empty page</p>', { animations: [spin] })
 ```
 
-`css` is the layer order, `@keyframes spin-1jqe2jv{100%{rotate:1turn;}}`, the `:root` rule of the last render (`--umber-palette-text:#1a1a1a;`, see [Server rendering](server-rendering.md) for the root theme of a page) and the global rule of `base`: the global rule is there although this page never rendered `Global`.
+`css` is `@keyframes spin-1jqe2jv{100%{rotate:1turn;}}` and nothing else: the global rule of `base` is not there, because this page did not render the `Global` that wrote it, and the `:root` rule of the last render declares only the variables that the page uses, here none (see [Server rendering](server-rendering.md) for the root theme of a page). A rule that every page needs and that no component renders, such as a reset written at start-up, is written with `engine.insertGlobal(reset)`: it is in the CSS of every page.
 
-The variables that global rules and `@keyframes` rules use count as used by every page, so the theme classes of a page declare them.
+The variables that the global rules and `@keyframes` rules of a page use count as used by that page, so its theme classes declare them.
 
 ### Vue
 
-`Global` renders nothing on a server either (a comment node, as any component that renders nothing). Its rules and the animations they use are in `extractPageStyles(cache, html).css`, with the rules of the classes:
+Vue has no style elements. On a server `Global` renders a comment, as any component that renders nothing does, and its text is the marker of its sets: `<!--umber-global umber-global-1k672ui-->`. A hydration does not compare the text of a comment, and the browser's `Global` renders an empty one. Its rules and the animations they use are in `extractPageStyles(cache, html).css`, with the rules of the classes:
 
 ```ts
 import { createSSRApp, h } from 'vue'
@@ -515,11 +521,13 @@ const { css } = extractPageStyles(cache, html)
 
 The server components build of the React binding has `keyframes`, `globalStyles` and `Global` too. `Global` there has no hook: a function of the theme reads the root theme of the request (references for tokens, real values for raw keys), which is the base theme when no provider rendered. For each set it renders a `<style href precedence>` element for each animation the set uses (the name as `href`), then the set's own (the id as `href`, the layer order statement first). A styled server component that uses an animation sends the animation in an element of its own before its class. React sends each `href` once, however many elements render it (`Global.server.test.tsx`).
 
-In the browser nothing unmounts a server component's `Global`: its rules came as style elements, which React keeps for the life of the document. A global rule that a page renders in a server component stays after a client-side navigation away from that page (the Next.js fixture checks it). Put a `Global` that must be removed in a client component.
+A server component never runs in the browser, and its rules come as style elements, which React keeps for the life of the document. So after its style elements `Global` renders `GlobalRelease`, a client component of the package (a `'use client'` file: the server build imports a reference to it), with the prefix and the sets as plain data. In the browser it finds the cache of that prefix (`findCache(prefix, document)` of `@umber-style/core`: the first cache made with a sheet in that document, which the client build of the app made) and lets it take the rules over, as a client `Global` does with the rules of a server page (see "Hydration"). When the page is left in a client-side navigation it unmounts, and the cache deletes the rules from the sheet of React's element; when the page is reached again, React does not send the element again, and the cache writes the rules itself. A `Global` in a root layout never unmounts, and its rules stay on every page. The Next.js fixture checks both, the second as scenario M.
+
+The text of React's element keeps the deleted rules. They cannot come back: a browser parses the text of a style element again only when the element is inserted into the document again or its text changes, and React neither moves nor rewrites a style element that is in the head (the element of a streamed boundary is moved once, from the body to the head, before any component of the boundary mounts). Where the page has no cache of the prefix (no client component made one), `GlobalRelease` does nothing and the rules stay.
 
 ### Hydration
 
-The browser's cache reads the page when it is made, and each style element that arrives later in the head (the `data-umber` elements of `@umber-style/server` and of a registry too). A `@keyframes` rule the page has is not written again. A global rule the page has is taken over: when a `Global` with the same content mounts, it holds the rule without writing it, and when it unmounts the rule is deleted from the page's style element. A browser that hydrates a server page therefore writes no global or `@keyframes` rule again. This is checked in tests (`hydrateGlobal.test.tsx`, Vue's `Global.test.ts`) and end to end in every fixture app with a server render.
+The browser's cache reads the page when it is made, and each style element that arrives later in the head (the `data-umber` elements of `@umber-style/server` and of a registry too). Before it takes a global rule over, it reads the elements that arrived since its watch of the head last reported, so an element that React inserts in the commit that mounts the component is found. A style element that React streams with a late boundary waits in the body with `media="not all"` and is moved to the head when the boundary is revealed, which parses it again: the cache reads it there. A `@keyframes` rule the page has is not written again. A global rule the page has is taken over: when a `Global` with the same content mounts, it holds the rule without writing it, and when it unmounts the rule is deleted from the page's style element. A browser that hydrates a server page therefore writes no global or `@keyframes` rule again. This is checked in tests (`hydrateGlobal.test.tsx`, Vue's `Global.test.ts`) and end to end in every fixture app with a server render.
 
 ## Vue
 
@@ -596,8 +604,11 @@ On the web the skeleton animates and `body` gets its rule. On React Native the c
 - A `Global` under a nested provider gets the tokens' values on `<html>`, not those of the provider: a variable declared on the wrapper does not reach `body`. This is how a custom property is inherited; it was not run in a browser.
 - Raw values in steps (breakpoints, `inline` tokens) come from the base theme, not from the nearest provider.
 - Without layers (`hasLayers: false`) a global rule that is written after a class beats it at equal specificity: the rules are only in the order they were inserted. This is the cascade's order rule, seen in the rule text and its order; it was not run in a browser.
-- On a server, global rules are app-wide and never removed. A cache that serves many requests keeps every set it was given: a `Global` whose raw values (a breakpoint, an `inline` token) differ from one request to another leaves each variant in the cache, and every later page extracted from it carries all of them.
-- In the browser, a `Global` of a server component is never removed (React keeps its style element).
+- On a server, global rules are never removed from the cache. A cache that serves many requests keeps every set it was given: a `Global` whose raw values (a breakpoint, an `inline` token) differ from one request to another leaves each variant in the cache. A page gets only the sets its markup names, so this costs memory, not bytes of the page.
+- A page's sets are read from the markup given to `extractPageStyles`: a `Global` whose element or marker is not in that markup (a part of the page rendered and extracted apart) is not in its CSS. A set of `engine.insertGlobal` is in every page, also one that does not use it.
+- The marker of React is a `<meta>` in the head, and that of Vue a comment; both are in the HTML a server sends, also where a page's style is extracted. They were checked to hydrate with no warning in React's development build and in Vue (`hydrateGlobal.test.tsx`, Vue's `Global.test.ts`), not in other versions.
+- In the browser, the rule of a server component's `Global` is removed when its page is left only where a cache of its prefix exists: an app with no client component that made one keeps the rule. A style element that code of the app moves or rewrites after the cache read it is parsed again: rules that were deleted from it come back, and rules the cache took over from it can no longer be deleted.
+- Two caches of one prefix in one document read the same page; `findCache` gives the first, and a `Global` of a server component is released through it.
 - There is no development warning for an animation name that has the engine's form and is not registered: the engine's names cannot be told from ordinary names such as `fade-in`. `insertKeyframes` with an unknown name throws.
 - The types check the keys of a step (a misspelt property and a nested style are errors) and the style under a selector of global styles, but not a step key: `keyframes({ middle: { ... } })` compiles and throws when it runs.
 - React Native runs no animation yet: `keyframes` there is a name only, and `animation*` and `transition*` keys are dropped.

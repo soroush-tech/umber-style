@@ -18,7 +18,21 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       <body>
         <ThemeProvider theme={lightTheme} colorScheme="light" isRoot>
           <Providers>
-            <Shell Link={Link as LinkComponent}>{children}</Shell>
+            <Shell
+              Link={Link as LinkComponent}
+              links={
+                <>
+                  <Link href="/promo-server" data-testid="link-promo-server">
+                    Promo (server)
+                  </Link>
+                  <Link href="/promo-stream" data-testid="link-promo-stream">
+                    Promo (stream)
+                  </Link>
+                </>
+              }
+            >
+              {children}
+            </Shell>
           </Providers>
         </ThemeProvider>
       </body>

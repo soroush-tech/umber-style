@@ -1,3 +1,4 @@
+import { registerCache } from './cacheRegistry'
 import { hashString } from './hash'
 import { createDevChecker, isDevelopment } from './devChecks'
 import { createFingerprint, describeFingerprintDifferences } from './fingerprint'
@@ -101,6 +102,22 @@ export interface PageExtractOptions {
   animations?: Iterable<string>
   /** Keys of the `<style href precedence>` elements that the document carries already (classes, theme classes, animation names, ids of global rules): their rules are left out. */
   carried?: ReadonlySet<string>
+  /**
+   * The ids of the sets of global rules that the page rendered without a style element (the markers of
+   * `Global`). A set that a component inserted (`isRendered`) is part of a page only when the page
+   * carries it or names it here; a set inserted for the app is part of every page.
+   */
+  rendered?: ReadonlySet<string>
+}
+
+/** How `insertGlobal` writes a set of global rules. */
+export interface GlobalInsertOptions {
+  /**
+   * Whether a component rendered the set (`Global`), so that it belongs to the pages that render it: a
+   * page's CSS (`extractPage`) holds it only when the page carries it or names it in `rendered`. Default
+   * false: a set inserted for the app, which is part of every page while it is held.
+   */
+  isRendered?: boolean
 }
 
 export interface Sheet {
@@ -285,10 +302,12 @@ export interface Cache {
    * `@keyframes` rules of the animations they use, and returns the function that releases them. Rules of
    * one id are written once and counted: each insertion adds one, each release takes one, and at none the
    * rules are removed from the sheet (the `@keyframes` rules stay). Rules that the page has (a server
-   * render) are taken over, not written, and removed from the page when released. Rules that cannot be
-   * removed (a sheet without `remove`, rules of the page whose place the browser does not show) stay.
+   * render) are taken over, not written, and removed from the page when released; the style elements
+   * that arrived since the page was last read are read first. Rules that cannot be removed (a sheet
+   * without `remove`, rules of the page whose place the browser does not show) stay. `options` says whether
+   * a component rendered them, which decides the pages they are part of (see `extractPage`).
    */
-  insertGlobal(global: GlobalRules): () => void
+  insertGlobal(global: GlobalRules, options?: GlobalInsertOptions): () => void
   /** `getRules` with every declaration of a theme class, used or not, after the `@property` rules of the registered variables it declares: for a style element that is sent before the rules that use the class. */
   getFullRules(id: string): readonly string[]
   /** The CSS inserted so far and not removed, and the ids it covers (class names, then the global rules held, then the used variables): all of the cache, whatever page asked for it. See `extractPage` for one page. */
@@ -301,11 +320,12 @@ export interface Cache {
    * `insertRoot` was given last, so render and extract one page before the next), then each theme
    * class (of the page, and `options.themes`), each with only
    * the variables the page's rules and the global rules use (all that they refer to, through the values
-   * of the themes too, and the variables marked with `markUsed`) and its color-scheme; every global rule
-   * the cache holds, in the order they were inserted; and the rules of the classes, in an order that
-   * depends on the classes only: a props class after its base class, the rest by name. Names the cache
-   * made no rules for are ignored. It reads the cache and changes nothing, so pages rendered at once, or
-   * in any order, get the same CSS, apart from the root theme.
+   * of the themes too, and the variables marked with `markUsed`) and its color-scheme; the global rules of
+   * the page, in the order they were inserted: every set held for the app, and a set that a component
+   * rendered when the page carries it or names it in `options.rendered`; and the rules of the classes, in
+   * an order that depends on the classes only: a props class after its base class, the rest by name.
+   * Names the cache made no rules for are ignored. It reads the cache and changes nothing, so pages
+   * rendered at once, or in any order, get the same CSS, apart from the root theme.
    */
   extractPage(
     classNames: Iterable<string>,
@@ -839,6 +859,8 @@ export function createCache(options: CacheOptions = {}): Cache {
   /** Global rules held, by id, in the order they were inserted: how many hold them, and where they are. */
   interface GlobalEntry {
     count: number
+    /** How many of the insertions that hold the set are for the app (not `isRendered`): while there is one, the set is part of every page. */
+    appCount: number
     rules: readonly string[]
     animations: readonly string[]
     /** Where each rule this cache wrote is in the sheet. */
@@ -849,6 +871,8 @@ export function createCache(options: CacheOptions = {}): Cache {
   const globals = new Map<string, GlobalEntry>()
   // The global rules of the page by their text, each with the browser's object of the rule when it can be told.
   const pageGlobals = new Map<string, (CSSRule | undefined)[]>()
+  // Reads the style elements that arrived on the page and that the watch has not reported yet; nothing to read without a page.
+  let readArrived = (): void => undefined
 
   /** A class that elements hold (see `cssHeld`): how many, and where its rules are. */
   interface HeldEntry {
@@ -871,15 +895,22 @@ export function createCache(options: CacheOptions = {}): Cache {
     return { id, rules, animations: findAnimationNames(flat) }
   }
 
+  /** Whether the page has every one of `rules`, not taken by another set. */
+  const hasPageRules = (rules: readonly string[]): boolean =>
+    rules.every((rule) => pageGlobals.get(rule)?.length)
+
   /** The rules of the page for `rules`, taken so that no other set takes them, when the page has every one of them; else undefined. */
   const takePageRules = (rules: readonly string[]): (CSSRule | undefined)[] | undefined => {
-    if (!rules.every((rule) => pageGlobals.get(rule)?.length)) return undefined
+    if (!hasPageRules(rules)) return undefined
     return rules.map((rule) => (pageGlobals.get(rule) as (CSSRule | undefined)[]).shift())
   }
 
   /** Writes the rules of `global`, or takes them over from the page, after the `@keyframes` rules they use. */
   const writeGlobal = ({ id, rules, animations: names }: GlobalRules): GlobalEntry => {
     names.forEach(writeKeyframes)
+    // A style element that React put in the head in this commit is not read yet: the watch reports it
+    // after the commit, so what it has noticed is read now.
+    if (!hasPageRules(rules)) readArrived()
     const pageRules = takePageRules(rules)
     const indexes: number[] = []
     // A set with no rules counts as on the page: it writes nothing, not even the layer order.
@@ -894,7 +925,14 @@ export function createCache(options: CacheOptions = {}): Cache {
       checkLater?.(rules)
     }
     markUsed(rules.flatMap((rule) => scanVariables(rule, VARIABLE_START)))
-    const entry: GlobalEntry = { count: 0, rules, animations: names, indexes, pageRules }
+    const entry: GlobalEntry = {
+      count: 0,
+      appCount: 0,
+      rules,
+      animations: names,
+      indexes,
+      pageRules,
+    }
     globals.set(id, entry)
     return entry
   }
@@ -923,14 +961,20 @@ export function createCache(options: CacheOptions = {}): Cache {
     }
   }
 
-  const insertGlobal = (global: GlobalRules): (() => void) => {
+  const insertGlobal = (
+    global: GlobalRules,
+    { isRendered = false }: GlobalInsertOptions = {}
+  ): (() => void) => {
     const entry = globals.get(global.id) ?? writeGlobal(global)
+    const forApp = isRendered ? 0 : 1
     entry.count++
+    entry.appCount += forApp
     let isReleased = false
     return () => {
       if (isReleased) return
       isReleased = true
       entry.count--
+      entry.appCount -= forApp
       if (entry.count === 0) removeGlobal(global.id, entry)
     }
   }
@@ -1165,7 +1209,9 @@ export function createCache(options: CacheOptions = {}): Cache {
     const selector = createStyleSelector(prefix)
     const scanned = new WeakSet<Element>()
     const scan = (element: Element): void => {
-      if (scanned.has(element)) return
+      // A style element of React's stream waits in the body with `media="not all"` until its boundary is
+      // revealed, and is then moved to the head, which parses its rules again: it is read there.
+      if (scanned.has(element) || element.getAttribute('media') === 'not all') return
       scanned.add(element)
       const found = scanStyleText(prefix, element.textContent as string)
       absorb(found)
@@ -1185,17 +1231,21 @@ export function createCache(options: CacheOptions = {}): Cache {
     // children of <body> those that a registry streams after the cache started. Before there is a body,
     // the root element is watched for it. A node of another document (an iframe's) is not an instance of
     // this window's `Element`, so the type of the node is read instead.
-    const observer = new MutationObserver((records) => {
+    const readRecords = (records: readonly MutationRecord[]): void => {
       for (const { addedNodes } of records) {
         for (const node of addedNodes) {
           if (node === page.body) observer.observe(node, { childList: true })
           else if (node.nodeType === 1 && (node as Element).matches(selector)) scan(node as Element)
         }
       }
+    }
+    const observer = new MutationObserver((records) => {
+      readRecords(records)
       checkLater?.()
     })
     observer.observe(page.head, { childList: true })
     observer.observe(page.body ?? page.documentElement, { childList: true })
+    readArrived = () => readRecords(observer.takeRecords())
     checkLater?.()
   }
 
@@ -1247,6 +1297,7 @@ export function createCache(options: CacheOptions = {}): Cache {
       themes: offered = [],
       animations: named = [],
       carried = new Set<string>(),
+      rendered = new Set<string>(),
     } = pageOptions
     const wanted = new Set([...classNames, ...offered])
     const themeIds = [...wanted].filter((name) => themeNames.has(name)).sort(compareCodeUnits)
@@ -1254,7 +1305,10 @@ export function createCache(options: CacheOptions = {}): Cache {
       .filter((name) => name.startsWith(`${prefix}-`) && !themeNames.has(name))
       .filter((name) => insertedRules.has(name))
       .sort((first, second) => (sortKey(first) < sortKey(second) ? -1 : 1))
-    const held = [...globals]
+    // The global rules of this page: those of the app, and those of a component that the page rendered.
+    const held = [...globals].filter(
+      ([id, entry]) => entry.appCount > 0 || rendered.has(id) || carried.has(id)
+    )
     const pageAnimations = [
       ...classIds.flatMap((id) => animations.get(id) ?? []),
       ...held.flatMap(([, entry]) => entry.animations),
@@ -1349,5 +1403,7 @@ export function createCache(options: CacheOptions = {}): Cache {
     extractPageParts,
     fingerprint,
   }
+  // A cache that writes into a style element of a document is the one `findCache` gives for its prefix there.
+  if (sheet.document) registerCache(sheet.document, self)
   return self
 }

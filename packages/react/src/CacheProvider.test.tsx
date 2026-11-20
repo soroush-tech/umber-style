@@ -220,7 +220,7 @@ describe('the default cache of an app', () => {
 })
 
 describe('a server render under a CacheProvider', () => {
-  it('sends no style element: the app sends the rules of its cache', () => {
+  it('sends no style element: the app sends the rules of its cache, and a Global names its sets in a marker of that cache', () => {
     const { styled, ThemeProvider, Global } = setup()
     const sub = createSheetCache('sub')
     const Box = styled('p')(({ theme: view }) => ({ color: view.palette.primary }))
@@ -232,9 +232,11 @@ describe('a server render under a CacheProvider', () => {
         </ThemeProvider>
       </CacheProvider>
     )
+    const { id } = sub.cache.compileGlobal({ body: { margin: 0 } })
     expect(inside).not.toContain('<style')
-    expect(inside).not.toContain('<meta')
-    expect(inside).toMatch(/^<p class="sub-\w+">/)
+    expect(inside).toMatch(
+      new RegExp(`^<meta name="sub-global" content="${id}"/><p class="sub-\\w+">`)
+    )
     expect(sub.css()).toContain('{body{margin:0;}}')
     const outside = renderOnServer(
       <ThemeProvider theme={theme}>

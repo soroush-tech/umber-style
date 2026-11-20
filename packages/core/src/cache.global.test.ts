@@ -255,6 +255,62 @@ describe('global rules in the extracted css', () => {
   })
 })
 
+describe('global rules that a component rendered', () => {
+  const glow = keyframes({ to: { opacity: 0.4 } }, { label: 'rendered' })
+
+  function setupPages() {
+    const { cache } = setup({ hasLayers: false })
+    /** Inserts `styles` as a component does, and returns the id and the release. */
+    const render = (styles: GlobalStyleObject) => {
+      const global = cache.compileGlobal(styles)
+      return { id: global.id, release: cache.insertGlobal(global, { isRendered: true }) }
+    }
+    return { cache, render }
+  }
+
+  it('are in a page only when it names them or carries them, with the animations they use', () => {
+    const { cache, render } = setupPages()
+    const promo = render({ nav: { animationName: glow } })
+    const base = render(reset)
+    expect(cache.extractPage([]).css).toBe('')
+    expect(cache.extractPage([], { rendered: new Set([base.id]) }).css).toBe('body{margin:0;}')
+    expect(cache.extractPage([], { rendered: new Set([promo.id, base.id]) })).toEqual({
+      css: `@keyframes ${glow}{100%{opacity:0.4;}}nav{animation-name:${glow};}body{margin:0;}`,
+      ids: [promo.id, base.id],
+    })
+    // A carried set is not written again, and the animation it uses is still the page's.
+    expect(cache.extractPage([], { carried: new Set([promo.id]) }).css).toBe(
+      `@keyframes ${glow}{100%{opacity:0.4;}}`
+    )
+    // The whole cache still holds them.
+    expect(cache.extract().css).toContain('nav{')
+  })
+
+  it('are in every page while one insertion of the same set is for the app', () => {
+    const { cache, render } = setupPages()
+    const { id } = render(reset)
+    const releaseApp = cache.insertGlobal(cache.compileGlobal(reset))
+    expect(cache.extractPage([]).css).toBe('body{margin:0;}')
+    releaseApp()
+    expect(cache.extractPage([]).css).toBe('')
+    expect(cache.extractPage([], { rendered: new Set([id]) }).css).toBe('body{margin:0;}')
+  })
+
+  it('are what extractPageStyles writes for the page whose markup names them', () => {
+    const { cache, render } = setupPages()
+    const promo = render({ nav: { outline: 'none' } })
+    render(reset)
+    const app = cache.insertGlobal(cache.compileGlobal({ html: { color: 'red' } }))
+    const marked = `<meta name="u-global" content="${promo.id}"><p></p>`
+    expect(extractPageStyles(cache, marked).css).toBe('nav{outline:none;}html{color:red;}')
+    expect(extractPageStyles(cache, `<!--u-global ${promo.id}--><p></p>`).css).toBe(
+      'nav{outline:none;}html{color:red;}'
+    )
+    expect(extractPageStyles(cache, '<p></p>').css).toBe('html{color:red;}')
+    app()
+  })
+})
+
 describe('global rules on a page that a server rendered', () => {
   function render(styles: readonly GlobalStyleObject[], hasLayers = true) {
     const server = setup({ hasLayers })
@@ -297,6 +353,42 @@ describe('global rules on a page that a server rendered', () => {
     const { sheet, insert } = setup()
     insert(reset)()
     expect(sheet.rules).toEqual([])
+    expect(pageRules()).toEqual(['@layeru-theme,u-global,u-components,u-overrides;'])
+  })
+
+  it('are taken from a style element that arrived in the same task, before the watch reported it', () => {
+    const server = render([reset])
+    const { id, rules } = server.compileGlobal(reset)
+    const { sheet, insert } = setup()
+    // React puts the element of a server component's payload in the head in the commit that mounts it.
+    const element = document.createElement('style')
+    element.dataset.precedence = 'u'
+    element.dataset.href = id
+    element.textContent = [server.layerOrder, ...rules].join('')
+    document.head.appendChild(element)
+    insert(reset)()
+    expect(sheet.rules).toEqual([])
+    expect(pageRules()).toEqual(['@layeru-theme,u-global,u-components,u-overrides;'])
+  })
+
+  it('are read from a streamed style element once React moved it from the body to the head', async () => {
+    const server = render([reset])
+    const { id, rules } = server.compileGlobal(reset)
+    const { sheet, insert } = setup()
+    // React's stream sends the element of a late boundary into the body, applying to nothing, and its
+    // script moves it to the head when the boundary is revealed, which parses its rules again.
+    const element = document.createElement('style')
+    element.setAttribute('media', 'not all')
+    element.dataset.precedence = 'u'
+    element.dataset.href = id
+    element.textContent = [server.layerOrder, ...rules].join('')
+    document.body.appendChild(element)
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    element.removeAttribute('media')
+    document.head.appendChild(element)
+    const release = insert(reset)
+    expect(sheet.rules).toEqual([])
+    release()
     expect(pageRules()).toEqual(['@layeru-theme,u-global,u-components,u-overrides;'])
   })
 

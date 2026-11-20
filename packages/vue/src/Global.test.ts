@@ -170,6 +170,8 @@ describe('hydrating a page that a server rendered with Global', () => {
     vi.unstubAllGlobals()
     expect(tag).toContain('@layer hv-global{body{margin:0;')
     expect(tag).toContain(`@keyframes ${server.fade}`)
+    // The server's Global rendered its marker, a comment; the browser's renders an empty one.
+    expect(html).toMatch(/^<!--\[--><!--hv-global hv-global-\w+-->/)
 
     document.head.innerHTML = tag
     const container = document.createElement('div')

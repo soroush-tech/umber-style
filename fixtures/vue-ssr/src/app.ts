@@ -8,6 +8,7 @@ import {
   Card,
   Flex,
   frameStyles,
+  headerOverride,
   Heading,
   Hero,
   Muted,
@@ -79,10 +80,19 @@ const SettingsPage = () =>
     ]),
   ])
 
+// A global rule for the bar, which is outside the page: leaving the page unmounts it.
+const PromoPage = () =>
+  h(Page, { 'data-testid': 'page-promo' }, () => [
+    h(Global, { styles: headerOverride }),
+    h(Heading, null, text('Promo')),
+    h(Muted, null, text('This page outlines the bar above it')),
+  ])
+
 const pages: Record<string, () => VNode> = {
   '/': HomePage,
   '/catalog': CatalogPage,
   '/settings': SettingsPage,
+  '/promo': PromoPage,
 }
 
 /** The path moves with the address bar, and with the links of the app. */
@@ -121,6 +131,7 @@ export const createApp = (initialPath: string) =>
               link('/', 'Home', 'link-home'),
               link('/catalog', 'Catalog', 'link-catalog'),
               link('/settings', 'Settings', 'link-settings'),
+              link('/promo', 'Promo', 'link-promo'),
               h(
                 Button,
                 { variant: 'outline', 'data-testid': 'theme-switch', onClick: toggle },

@@ -2,6 +2,7 @@ import {
   createDomSheet,
   createEngine,
   createMemorySheet,
+  extractPageStyles,
   type UmberCache as CoreUmberCache,
 } from '@umber-style/core'
 import { expectTypeOf } from 'vitest'
@@ -108,6 +109,22 @@ describe('createCache', () => {
     expect(cache.registered.size).toBe(1)
     expect(cache.registered[box]).toBe(true)
     expect(cache.registered['app-missing']).toBeUndefined()
+  })
+
+  it('puts a set of global rules that a component rendered in the page that names it only, and a set of the app in every page', () => {
+    const cache = createServerCache()
+    const engine = createEngine(theme, { cache })
+    const [promo] = engine.resolveGlobal({ nav: { color: 'red' } })
+    cache.insertGlobal(promo, { isRendered: true })
+    engine.insertGlobal({ body: { margin: 0 } })
+    const marked = extractPageStyles(cache, `<meta name="app-global" content="${promo.id}"><p></p>`)
+    expect(marked.css).toContain('@layer app-global{nav{color:red;}}')
+    expect(marked.css).toContain('@layer app-global{body{margin:0;}}')
+    const other = extractPageStyles(cache, '<p></p>')
+    expect(other.css).not.toContain('nav{')
+    expect(other.css).toContain('@layer app-global{body{margin:0;}}')
+    // Every name of the cache is still recorded.
+    expect(cache.inserted[promo.id]).toBe(true)
   })
 
   it('keeps the rules of two caches apart', () => {
