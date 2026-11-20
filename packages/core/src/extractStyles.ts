@@ -1,4 +1,4 @@
-import type { Cache } from './cache'
+import type { Cache, PageExtractOptions, PageParts } from './cache'
 import { scanHtml } from './scanHtml'
 
 /** The style element of `css`: the cache's key, and the stamp of its options for the browser to compare. */
@@ -50,12 +50,29 @@ export function extractPageStyles(
   html: string,
   options: PageStyleOptions = {}
 ): PageStyles {
+  const { css, ids } = cache.extractPage(...readPage(html, options))
+  return { css, ids, options: cache.fingerprint, tag: createTag(cache, css) }
+}
+
+/** The class names of `html`, and what `extractPage` is told besides them. */
+function readPage(
+  html: string,
+  options: PageStyleOptions
+): [classNames: Iterable<string>, options: PageExtractOptions] {
   const { classes, carried } = scanHtml(html)
   const themes = (options.themes ?? []).flatMap((value) => value.split(/\s+/))
-  const { css, ids } = cache.extractPage(classes, {
-    themes,
-    animations: options.animations,
-    carried,
-  })
-  return { css, ids, options: cache.fingerprint, tag: createTag(cache, css) }
+  return [classes, { themes, animations: options.animations, carried }]
+}
+
+/**
+ * `extractPageStyles` in two parts, decided from `html` the same way: the rules that no class stands for
+ * (the layer order, the `@property` and `@keyframes` rules, the theme classes, the global rules) and the
+ * rules of the classes. The two CSS texts joined in this order are the CSS of `extractPageStyles`.
+ */
+export function extractPageStyleParts(
+  cache: Cache,
+  html: string,
+  options: PageStyleOptions = {}
+): PageParts {
+  return cache.extractPageParts(...readPage(html, options))
 }

@@ -1,9 +1,9 @@
-// Proves that the five packages work as npm will hand them out, not as the workspace sees them.
+// Proves that the publishable packages work as npm will hand them out, not as the workspace sees them.
 //
 //   pnpm build && node scripts/smoke-packed.mjs [--keep]
 //
 // It packs each package with `pnpm pack` (which applies `publishConfig`, as `pnpm publish` does),
-// inspects each tarball, installs all five together into a temporary folder outside the workspace
+// inspects each tarball, installs them all together into a temporary folder outside the workspace
 // with npm, and then checks, from there:
 //   - every entry and subpath loads with `import` and with `require`, and both give the same names;
 //   - the `react-server` condition gives the server build, the `react-native` condition gives the
@@ -35,6 +35,8 @@ const keep = process.argv.includes('--keep')
 // Where each package lives, in the order they are published.
 const PACKAGES = [
   { dir: 'core', name: '@umber-style/core' },
+  { dir: 'cache', name: '@umber-style/cache' },
+  { dir: 'server', name: '@umber-style/server' },
   { dir: 'react', name: '@umber-style/react' },
   { dir: 'react-native', name: '@umber-style/react-native' },
   { dir: 'vue', name: '@umber-style/vue' },
@@ -43,6 +45,8 @@ const PACKAGES = [
 // The names every entry of the package must export, and that the ESM and CJS builds must agree on.
 const ENTRIES = {
   '@umber-style/core': ['createEngine', 'createCache', 'extractPageStyles', 'at'],
+  '@umber-style/cache': ['default'],
+  '@umber-style/server/create-instance': ['default'],
   '@umber-style/react': [
     'createStyle',
     'styled',
@@ -187,7 +191,7 @@ try {
     )
   }
 
-  // 2. A consumer outside the workspace: the five tarballs, resolving each other, and their peers.
+  // 2. A consumer outside the workspace: the tarballs, resolving each other, and their peers.
   const version = (dir, field, name) =>
     JSON.parse(readFileSync(join(repoRoot, 'packages', dir, 'package.json'), 'utf8'))[field][name]
   const direct = Object.fromEntries(
@@ -255,7 +259,7 @@ try {
     run('npm', ['install', '--no-audit', '--no-fund', '--ignore-scripts'], { cwd: consumer }),
     'npm install in the consumer'
   )
-  pass('the five tarballs install together with react, react-dom and vue')
+  pass('the tarballs install together with react, react-dom and vue')
 
   // One copy of the core on disk.
   const nested = PACKAGES.filter(({ dir }) => dir !== 'core').filter(({ name }) =>
@@ -301,6 +305,13 @@ const { css } = cache.extract()
 if (!css.includes('.' + match[1] + '{color:var(--smoke-palette-primary);')) throw new Error('no rule for ' + match[1] + ' in ' + css)
 if (!css.includes('--smoke-palette-primary:#1b5fd1;')) throw new Error('no token in ' + css)
 results.html = html
+// The cache package and the server functions over it: a page's CSS as data-umber tags.
+const umberCache = mods['@umber-style/cache'].default({ key: 'smoke' })
+const page = createStyle(theme, { cache: umberCache, hasServerStyleElements: false })
+const Card = page.styled('div', { name: 'Card' })({ margin: 2 })
+const cardHtml = renderToStaticMarkup(React.createElement(Card, null, 'x'))
+const tags = mods['@umber-style/server/create-instance'].default(umberCache).renderStylesToString(cardHtml)
+if (!/^<style data-umber="smoke-global">@layer [^<]+<\\/style><style data-umber="smoke smoke-card-root-\\w+">@layer smoke-components/.test(tags)) throw new Error('no data-umber tags in ' + tags)
 ${format === 'esm' ? "const { writeFileSync } = await import('node:fs')" : "const { writeFileSync } = require('node:fs')"}
 writeFileSync('keys-${format}.json', JSON.stringify(results, null, 2))
 `
@@ -395,6 +406,9 @@ import { createStyle } from '@umber-style/react'
 import { createStyle as createNative } from '@umber-style/react-native'
 import { createStyle as createVue } from '@umber-style/vue'
 import { createEngine as createUmbrellaEngine } from 'umber-style'
+import createCache from '@umber-style/cache'
+import type { UmberCache } from '@umber-style/cache'
+import createInstance from '@umber-style/server/create-instance'
 import { createStyle as createShared } from 'umber-style/react'
 import { createStyle as createUmbrellaNative } from 'umber-style/react-native'
 import { createStyle as createUmbrellaVue } from 'umber-style/vue'
@@ -403,6 +417,10 @@ const theme = { palette: { primary: '#1b5fd1', onPrimary: '#ffffff' }, space: [0
 
 export const engine = createEngine(theme)
 export const umbrellaEngine = createUmbrellaEngine(theme)
+export const umberCache: UmberCache = createCache({ key: 'smoke' })
+export const tags: string = createInstance(umberCache).constructStyleTagsFromChunks(
+  createInstance(umberCache).extractCriticalToChunks('<p></p>')
+)
 export const base: Theme | undefined = undefined
 
 const web = createStyle(theme, { prefix: 'smoke' })

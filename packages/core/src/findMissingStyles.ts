@@ -89,9 +89,9 @@ function isMatched(element: Element, rule: CSSStyleRule): boolean {
   }
 }
 
-/** The rules of the engine's style elements, each with the variables it uses without a fallback. */
+/** The rules of the engine's style elements (those of `data-umber` too), each with the variables it uses without a fallback. */
 function collectRules(prefix: string) {
-  const selector = `style[data-style="${prefix}"], style[data-precedence="${prefix}"]`
+  const selector = `style[data-style="${prefix}"], style[data-precedence="${prefix}"], style[data-umber~="${prefix}"], style[data-umber~="${prefix}-global"]`
   const rules: CSSStyleRule[] = []
   for (const element of document.querySelectorAll<HTMLStyleElement>(selector)) {
     if (element.sheet) collectStyleRules(element.sheet.cssRules, rules)

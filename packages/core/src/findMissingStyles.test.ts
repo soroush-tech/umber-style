@@ -38,6 +38,19 @@ describe('findMissingStyles', () => {
     expect(findMissingStyles()).toEqual([])
   })
 
+  it('reads the rules of data-umber style elements, of classes and of the global key', () => {
+    addStyle('')
+    const classes = document.createElement('style')
+    classes.setAttribute('data-umber', 'u u-a')
+    classes.textContent = '.u-a{color:var(--u-x);}'
+    const global = document.createElement('style')
+    global.setAttribute('data-umber', 'u-global u-theme-1')
+    global.textContent = '.u-theme-1{--u-x:red;}'
+    document.head.append(classes, global)
+    document.body.innerHTML = '<div class="u-theme-1"><p class="u-a"></p></div>'
+    expect(findMissingStyles()).toEqual([])
+  })
+
   it('finds a class that no rule names, and describes the element', () => {
     addStyle('.u-a{color:red;}')
     document.body.innerHTML =

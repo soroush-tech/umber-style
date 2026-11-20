@@ -69,6 +69,28 @@ export interface CacheOptions {
   tokenSignature?: string
   /** Where rules go. Default: a DOM sheet when `document` exists, otherwise an in-memory one. */
   sheet?: Sheet
+  /**
+   * Called after each group of rules the cache writes to its sheet, with a name for the group and its
+   * CSS text as written: the layer order statement (`<prefix>-layers`), a class, a theme class (each time
+   * variables are added to it, the first time under the class name, later under `<class>-<hash>`), a set
+   * of global rules (its id), a `@keyframes` rule (`@keyframes:<name>`) and a `@property` rule
+   * (`@property:<variable>:<hash>`). Rules that the page has, and so are not written, are not reported.
+   */
+  onInsert?: (name: string, css: string) => void
+}
+
+/** A part of the CSS of a page, and the ids it covers. */
+export interface PagePart {
+  css: string
+  ids: string[]
+}
+
+/** The CSS of a page in two parts, which make `extractPage` when joined in this order. */
+export interface PageParts {
+  /** What no class of the page stands for: the layer order, the `@property` and `@keyframes` rules, the theme classes and the global rules; its ids are the theme classes and the global ids. */
+  global: PagePart
+  /** The rules of the classes of the page; its ids are the classes. */
+  classes: PagePart
 }
 
 /** What `extractPage` is told besides the classes of the page. */
@@ -247,6 +269,8 @@ export interface Cache {
     classNames: Iterable<string>,
     options?: PageExtractOptions
   ): { css: string; ids: string[] }
+  /** `extractPage` in two parts: the rules that no class stands for, and the rules of the classes. */
+  extractPageParts(classNames: Iterable<string>, options?: PageExtractOptions): PageParts
   /** The options that change the CSS or the class names, as a short text: the server stamps it on its style output and the browser compares it with its own. */
   readonly fingerprint: string
 }
@@ -332,9 +356,13 @@ export function createDomSheet(key: string, container: Node = document.head): Sh
   }
 }
 
-/** The selector of the style elements that hold engine rules: the cache's own, and the ones React hoists for the same prefix. */
-function createStyleSelector(prefix: string): string {
-  return `style[data-style="${prefix}"], style[data-precedence="${prefix}"]`
+/**
+ * The selector of the style elements that hold engine rules: the cache's own, the ones React hoists for
+ * the same prefix, and the `data-umber="<prefix> <ids>"` and `data-umber="<prefix>-global <ids>"` elements
+ * of `@umber-style/server` and of an app's own registry.
+ */
+export function createStyleSelector(prefix: string): string {
+  return `style[data-style="${prefix}"], style[data-precedence="${prefix}"], style[data-umber~="${prefix}"], style[data-umber~="${prefix}-global"]`
 }
 
 /** The stamp of the options that the server wrote: on a style element, or on the `<meta>` that a server component renders. */
@@ -499,18 +527,23 @@ export function createCache(options: CacheOptions = {}): Cache {
   const wrapInLayer = (rules: readonly string[], layer?: RuleLayer): readonly string[] =>
     hasLayers && layer ? rules.map((rule) => `@layer ${prefix}-${layer}{${rule}}`) : rules
 
+  const { onInsert } = options
+
   // The order statement goes in before the first rule, once; a server render already marked it.
   const insertLayerOrder = (): void => {
     if (hasLayers && !insertedIds.has(layerOrderId)) {
       insertedIds.add(layerOrderId)
       sheet.insert(layerOrder)
+      onInsert?.(layerOrderId, layerOrder)
     }
   }
 
-  const insertLayered = (layered: readonly string[]): void => {
+  /** Writes `layered` after the layer order statement, and reports them under `name`. */
+  const insertLayered = (name: string, layered: readonly string[]): void => {
     if (layered.length === 0) return
     insertLayerOrder()
     for (const rule of layered) sheet.insert(rule)
+    onInsert?.(name, layered.join(''))
     checkLater?.(layered)
   }
 
@@ -537,7 +570,8 @@ export function createCache(options: CacheOptions = {}): Cache {
     if (entry.index !== undefined && remove) removeAt(remove, entry.index)
     entry.index = undefined
     const before = sheet.rules.length
-    insertLayered(rules)
+    // Each rewrite is reported under a name of its own, so that what collects the reports takes it again.
+    insertLayered(`${entry.id}-${hashString(rules.join(''))}`, rules)
     if (sheet.rules.length > before) entry.index = sheet.rules.length - 1
   }
 
@@ -547,20 +581,23 @@ export function createCache(options: CacheOptions = {}): Cache {
     const ownScheme = entry.isSent ? '' : entry.schemeText
     const first = entry.isStarted ? '' : ownScheme
     if (added + first === '') return
+    // What is added is reported as a rule of its own, whether the sheet replaces the rule or appends.
+    const part = wrapInLayer([`.${className}{${added + first}}`], 'theme')
+    const reported = entry.isStarted ? `${className}-${hashString(added)}` : className
     entry.isStarted = true
     for (const name of names) entry.written.add(name)
     entry.variables += added
     const { index } = entry
-    const body = index === undefined ? added + first : entry.variables + ownScheme
-    const rules = wrapInLayer([`.${className}{${body}}`], 'theme')
     if (sheet.replace && index !== undefined) {
+      const rules = wrapInLayer([`.${className}{${entry.variables + ownScheme}}`], 'theme')
       sheet.replace(index, rules[0])
       entry.rules = rules
+      onInsert?.(reported, part[0])
     } else {
       const before = sheet.rules.length
-      insertLayered(rules)
+      insertLayered(reported, part)
       if (sheet.replace && sheet.rules.length > before) entry.index = sheet.rules.length - 1
-      entry.rules = [...entry.rules, ...rules]
+      entry.rules = [...entry.rules, ...part]
     }
     insertedRules.set(className, entry.rules)
   }
@@ -730,7 +767,7 @@ export function createCache(options: CacheOptions = {}): Cache {
     insertedIds.add(id)
     const layered = wrapInLayer(rules, layer)
     insertedRules.set(id, layered)
-    insertLayered(layered)
+    insertLayered(id, layered)
     if (hasPruning) markUsed(rules.flatMap((rule) => scanVariables(rule, VARIABLE_START)))
     return true
   }
@@ -775,6 +812,7 @@ export function createCache(options: CacheOptions = {}): Cache {
         sheet.insert(rule)
         if (sheet.rules.length > index) indexes.push(index)
       }
+      onInsert?.(id, rules.join(''))
       checkLater?.(rules)
     }
     markUsed(rules.flatMap((rule) => scanVariables(rule, VARIABLE_START)))
@@ -990,7 +1028,10 @@ export function createCache(options: CacheOptions = {}): Cache {
     return body === '' ? [] : wrapInLayer([`.${id}{${body}}`], 'theme')
   }
 
-  const extractPage = (classNames: Iterable<string>, pageOptions: PageExtractOptions = {}) => {
+  const extractPageParts = (
+    classNames: Iterable<string>,
+    pageOptions: PageExtractOptions = {}
+  ): PageParts => {
     const {
       themes: offered = [],
       animations: named = [],
@@ -1037,18 +1078,22 @@ export function createCache(options: CacheOptions = {}): Cache {
     const globalRules = newGlobals.flatMap(([, entry]) => entry.rules)
     const classRules = newClasses.flatMap(readRules)
     const hasLayered = themeRules.length + globalRules.length + classRules.length > 0
-    const css = [
+    const globalCss = [
       hasLayers && hasLayered ? layerOrder : '',
       ...properties.map((name) => propertyRules[name]),
       ...keyframesRules,
       ...themeRules,
       ...globalRules,
-      ...classRules,
     ].join('')
     return {
-      css,
-      ids: [...newRoots, ...newThemes, ...newGlobals.map(([id]) => id), ...newClasses],
+      global: { css: globalCss, ids: [...newRoots, ...newThemes, ...newGlobals.map(([id]) => id)] },
+      classes: { css: classRules.join(''), ids: newClasses },
     }
+  }
+
+  const extractPage = (classNames: Iterable<string>, pageOptions?: PageExtractOptions) => {
+    const { global, classes } = extractPageParts(classNames, pageOptions)
+    return { css: global.css + classes.css, ids: [...global.ids, ...classes.ids] }
   }
 
   return {
@@ -1088,6 +1133,7 @@ export function createCache(options: CacheOptions = {}): Cache {
       ids: [...insertedIds, ...globals.keys(), ...used],
     }),
     extractPage,
+    extractPageParts,
     fingerprint,
   }
 }
