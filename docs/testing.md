@@ -34,6 +34,7 @@ The tests build their CSS with the engine and read `getComputedStyle`. They cove
 - Registered tokens: `@property` is accepted, a registered colour resolves, and a theme class change under a `transition` runs through values between both ends.
 - `alpha()`: both declarations are written and the browser computes the `color-mix()` result.
 - Nested themes: three levels each resolve their own values, and `display: contents` wrappers leave the layout of a flex parent's children as it was.
+- The development checker and the browser's `CSS.supports`: a property that Chromium does not have (`elevation: 2`, written `elevation:2px`) is dropped from the inserted rule and warned about once, with its class; `-moz-osx-font-smoothing` and `width: '-moz-available'`, which Chromium does not have either, are not; neither is `-moz-box`, the first item of `display: ['-moz-box', 'flex']`, while a last item that Chromium rejects is; and for `elevation: 'var(--anything)'` the warning comes from the property, not the value.
 
 ### What a registered token does in a transition
 
@@ -79,6 +80,26 @@ A test that documents behaviour the engine does not have yet is marked as a know
 
 `findMissingStyles` is the checker of `@umber-style/core`, the one that the development mode runs. The end-to-end helper carries no copy of it: it sends the compiled text of that file into the page.
 
+### The development checker
+
+With `hasDevChecks` (on in development where there is a `document`, see [Options](options.md)) the cache checks the page after start-up, when it inserts rules and when style elements arrive, throttled, and warns once for each message, with the prefix of the engine: `[umber] ...`. It reports:
+
+- An element with a class of the engine that no rule names (`findMissingStyles`).
+- A variable of the engine that a rule matching the element uses without a fallback, and that has no value on the element.
+- A global rule for `html`, `body` or `:root` whose variables have no value there, because the theme class is not on `<html>`.
+- A declaration of a rule that the cache inserted, or of a global rule it wrote, that the browser does not support, asked with `CSS.supports`: `[umber] the class umber-x1 declares elevation:2px, which this browser does not support`. A global rule is named by its selector, a step of `@keyframes` by the name of the animation.
+
+What it does not report:
+
+- A property with a vendor prefix (`-webkit-`, `-moz-`, `-ms-`, `-o-`): a declaration written for another browser is not a mistake. A custom property (`--x`) takes any value.
+- A value that starts with a vendor prefix, a keyword or a function (`width: '-moz-available'`, `-webkit-linear-gradient(...)`), with or without `!important`: written for another browser too.
+- The earlier items of a fallback list: only the last declaration of a property in a rule is asked about.
+- The value of a declaration that holds `var(`: such a value is valid until it is used, so the browser is asked whether it knows the property at all.
+- Anything about declarations where `CSS.supports` is missing, throws, or does not answer like a browser: a server, and jsdom, which answers from a table of its own.
+- The descriptors of `@property` and `@font-face`, and `!important`, which is left out of the question.
+- A rule that the browser rejects as a whole (a selector or an at-rule it does not know, such as `@scope` in a browser without it): the sheet skips it without a word, as before. Its declarations are still asked about.
+- The rules that reach the page in style elements (written by a server, or rendered by React and hoisted into the head): the cache does not insert them, so they are not asked about.
+
 ## Tier 3 in development
 
 The scenarios above run each fixture as a production build. The development tier starts three of them with their development servers instead: `vike-ssg` (Vike's development server), `next-app` (`next dev`, App Router) and `spa` (the Vite development server). The fixtures that have one say so with a `devPort` in `e2e/fixtures.ts` (the production port plus 100), and a `dev` script in their `package.json`. The specs are in `e2e/dev-tests/`, and the configuration is `e2e/playwright.dev.config.ts`, so `pnpm test:e2e` is unchanged and does not run them.
@@ -114,3 +135,4 @@ The tests change `fixtures/shared/src/components.tsx` and `fixtures/shared/src/p
 - Scenario G runs several times at once with the other scenarios on one machine. Its numbers are for comparison between fixtures on the same run, not absolute.
 - The text of a rule that a browser cache inserted after load is not seen by the rule usage tracking: scenario E does not apply to a client-only app.
 - The class on `<html>` is switched by script. A page with scripting disabled stays in the scheme that the server chose.
+- The development checker's question to `CSS.supports` is tested in Chromium only: what Firefox or WebKit would reject is not observed.

@@ -1,4 +1,5 @@
 import { findMissingStyles } from './findMissingStyles'
+import { findBrowserSupports, findUnsupportedDeclarations } from './findUnsupportedDeclarations'
 
 /** `process` where there is one: the type is declared here so that the core needs no type package for it. */
 declare const process: { env: { NODE_ENV?: string } }
@@ -17,20 +18,36 @@ export function isDevelopment(): boolean {
 
 /**
  * The function that asks for a check of the page: it runs `findMissingStyles` once, after the calls
- * have stopped for a short while, and warns once for each problem (never again for the same one).
+ * have stopped for a short while, and warns once for each problem (never again for the same one). The
+ * rules given to it are asked about in the same run: a declaration that the browser does not support
+ * (`findUnsupportedDeclarations`) is warned about once for each message. Where the browser cannot be
+ * asked (no `CSS.supports`, or jsdom) the rules are not kept.
  */
-export function createDevChecker(prefix: string, delay = CHECK_DELAY): () => void {
+export function createDevChecker(
+  prefix: string,
+  delay = CHECK_DELAY
+): (rules?: readonly string[]) => void {
   const warned = new Set<string>()
+  const supports = findBrowserSupports()
+  const written: string[] = []
   let timer: ReturnType<typeof setTimeout> | undefined
+  const warn = (key: string, message: string): void => {
+    if (warned.has(key)) return
+    warned.add(key)
+    console.warn(`[${prefix}] ${message}`)
+  }
   const run = (): void => {
     timer = undefined
     for (const problem of findMissingStyles(document, { prefix })) {
-      if (warned.has(problem.key)) continue
-      warned.add(problem.key)
-      console.warn(`[${prefix}] ${problem.message}`)
+      warn(problem.key, problem.message)
+    }
+    if (!supports) return
+    for (const message of findUnsupportedDeclarations(written.splice(0), prefix, supports)) {
+      warn(`declaration:${message}`, message)
     }
   }
-  return () => {
+  return (rules) => {
+    if (supports && rules) written.push(...rules)
     timer ??= setTimeout(run, delay)
   }
 }

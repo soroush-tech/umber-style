@@ -60,7 +60,7 @@ export interface CacheOptions {
   hasBaseClass?: boolean
   /**
    * Whether the cache checks the page while it runs in a browser, and warns once for each problem found
-   * (an engine class that has no rule, a variable that has no value): `findMissingStyles`, throttled,
+   * (`findMissingStyles`: an engine class that has no rule, a variable that has no value; `CSS.supports`: an inserted declaration that the browser does not support), throttled,
    * after the first render and when rules are inserted. Default: on in development (`process.env.NODE_ENV`
    * is not `production`), off in production, and off where there is no `document`.
    */
@@ -482,7 +482,7 @@ export function createCache(options: CacheOptions = {}): Cache {
     if (layered.length === 0) return
     insertLayerOrder()
     for (const rule of layered) sheet.insert(rule)
-    checkLater?.()
+    checkLater?.(layered)
   }
 
   // Pruning: each registered theme class, with what it declares and what of that is written.
@@ -687,7 +687,7 @@ export function createCache(options: CacheOptions = {}): Cache {
         sheet.insert(rule)
         if (sheet.rules.length > index) indexes.push(index)
       }
-      checkLater?.()
+      checkLater?.(rules)
     }
     markUsed(rules.flatMap((rule) => scanVariables(rule, VARIABLE_START)))
     const entry: GlobalEntry = { count: 0, rules, animations: names, indexes, pageRules }

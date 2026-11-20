@@ -246,12 +246,12 @@ describe('parseStyleTemplate', () => {
       },
       'html, body': { margin: 0 },
     }
-    expect(compileGlobalRules(parsed, true, DEFAULT_SCOPING)).toEqual([
+    expect(compileGlobalRules(parsed, true, DEFAULT_SCOPING, false)).toEqual([
       '@font-face{font-family:Brand;src:url(brand.woff2) format("woff2");font-display:swap;}',
       'html, body{margin:0;}',
     ])
-    expect(compileGlobalRules(parsed, true, DEFAULT_SCOPING)).toEqual(
-      compileGlobalRules(object, true, DEFAULT_SCOPING)
+    expect(compileGlobalRules(parsed, true, DEFAULT_SCOPING, false)).toEqual(
+      compileGlobalRules(object, true, DEFAULT_SCOPING, false)
     )
   })
 

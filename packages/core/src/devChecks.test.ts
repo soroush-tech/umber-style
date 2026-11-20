@@ -1,5 +1,6 @@
 import { createCache, createMemorySheet } from './cache'
 import { createDevChecker, isDevelopment } from './devChecks'
+import type { WebStyleObject } from './webStyle'
 
 afterEach(() => {
   document.head.innerHTML = ''
@@ -65,6 +66,79 @@ describe('the development checker', () => {
     createDevChecker('u')()
     vi.advanceTimersByTime(1000)
     expect(warn).not.toHaveBeenCalled()
+  })
+})
+
+describe('the development checker, for declarations the browser does not support', () => {
+  /** A style with what the web types do not have, as a style shared with React Native may hold. */
+  const untyped = (style: object) => style as WebStyleObject
+
+  /** A browser whose CSS.supports knows `color` and `display`, and no value that starts with `no`. */
+  function stubBrowser() {
+    const known = new Set(['color', 'display'])
+    const supports = vi.fn(
+      (property: string, value: string) => known.has(property) && !value.startsWith('no')
+    )
+    vi.stubGlobal('navigator', { userAgent: 'Chrome' })
+    vi.stubGlobal('CSS', { supports })
+    return supports
+  }
+
+  it('warns once for each message, in the run after the calls have stopped', () => {
+    vi.useFakeTimers()
+    stubBrowser()
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const check = createDevChecker('u', 100)
+    check(['.u-a{color:red;elevation:2px}'])
+    check(['.u-b{display:nope;display:flex;-webkit-x:1;--u-x:nope}'])
+    vi.advanceTimersByTime(99)
+    expect(warn).not.toHaveBeenCalled()
+    vi.advanceTimersByTime(1)
+    expect(warn.mock.calls).toEqual([
+      ['[u] the class u-a declares elevation:2px, which this browser does not support'],
+    ])
+    check(['.u-a{elevation:2px}', '.u-c{elevation:2px}'])
+    vi.advanceTimersByTime(100)
+    expect(warn).toHaveBeenCalledTimes(2)
+    expect(warn).toHaveBeenLastCalledWith(
+      '[u] the class u-c declares elevation:2px, which this browser does not support'
+    )
+  })
+
+  it('keeps nothing and asks nothing where the browser cannot be asked', () => {
+    vi.useFakeTimers()
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    // jsdom: its CSS.supports is not asked.
+    const check = createDevChecker('u', 100)
+    check(['.u-a{elevation:2px}'])
+    vi.advanceTimersByTime(100)
+    vi.stubGlobal('CSS', undefined)
+    const other = createDevChecker('u', 100)
+    other(['.u-a{elevation:2px}'])
+    vi.advanceTimersByTime(100)
+    expect(warn).not.toHaveBeenCalled()
+  })
+
+  it('is run by a cache for the rules it inserts and the global rules it writes, in development only', () => {
+    vi.useFakeTimers()
+    const supports = stubBrowser()
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    vi.stubEnv('NODE_ENV', 'production')
+    const quiet = createCache({ prefix: 'u', hasLayers: false, sheet: createMemorySheet() })
+    quiet.css(untyped({ elevation: 2 }))
+    vi.advanceTimersByTime(1000)
+    expect(warn).not.toHaveBeenCalled()
+    expect(supports).not.toHaveBeenCalled()
+
+    vi.stubEnv('NODE_ENV', 'development')
+    const cache = createCache({ prefix: 'u', sheet: createMemorySheet() })
+    const name = cache.css(untyped({ elevation: 2, color: 'red' }))
+    cache.insertGlobal(cache.compileGlobal({ body: untyped({ display: 'nope' }) }))
+    vi.advanceTimersByTime(1000)
+    expect(warn.mock.calls).toEqual([
+      [`[u] the class ${name} declares elevation:2px, which this browser does not support`],
+      ['[u] the global rule body declares display:nope, which this browser does not support'],
+    ])
   })
 })
 
