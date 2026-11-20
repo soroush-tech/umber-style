@@ -1,0 +1,138 @@
+import type * as CSS from 'csstype'
+import { hashString } from './hash'
+import type { Scoping } from './scope'
+import { compileRules, type StyleObject } from './serialize'
+import { createStandIn, readStandIn } from './standIn'
+import type { WebStyleObject } from './webStyle'
+
+/** The descriptors of an at-rule that takes them (`@font-face`, `@page`, `@counter-style`, `@font-palette-values`), by camelCase name. */
+export type AtRuleDescriptors =
+  | CSS.AtRule.FontFace<string | number>
+  | CSS.AtRule.Page<string | number>
+  | CSS.AtRule.CounterStyle<string | number>
+  | CSS.AtRule.FontPaletteValues<string | number>
+
+/**
+ * What a key of global styles holds: the style of a selector, the styles that an at-rule such as `@media`
+ * holds (selectors as keys), the descriptors of an at-rule such as `@font-face`, or a list of those (an
+ * at-rule written once for each, because an object cannot hold the same key twice).
+ */
+export type GlobalStyleValue =
+  | WebStyleObject
+  | GlobalStyleObject
+  | AtRuleDescriptors
+  | readonly (WebStyleObject | AtRuleDescriptors)[]
+  | null
+  | undefined
+  | false
+
+/**
+ * Styles that are not a class: selectors (`body`, `html, body`, `*, *::before, *::after`, `#root`) and
+ * at-rules (`@media (...)` holding selectors, `@supports`, `@font-face`) as keys. A selector's style is
+ * written as a class's is: `&` in a nested key stands for the selector.
+ */
+export interface GlobalStyleObject {
+  [key: string]: GlobalStyleValue
+}
+
+/** What `globalStyles` is given: the styles, or a function of the theme that returns them. */
+export type GlobalStylesInput<T> = GlobalStyleObject | ((theme: T) => GlobalStyleObject)
+
+/** Global styles that `globalStyles` made: frozen, and identified by their content. */
+export interface GlobalStyles<T = never> {
+  /** `global-<hash>`, made from the styles alone (a function of the theme is read with a stand-in theme): equal styles give an equal id. */
+  readonly id: string
+  /** The styles: those given, or what the function returns for the theme that `readTheme` gives, which is called only then. */
+  resolve(readTheme: () => T): GlobalStyleObject
+}
+
+/** Global styles in any form an engine takes: a handle, an object, a function of the theme, or a list of them, written in the order of the list. */
+export type GlobalInput<T> =
+  | GlobalStyles<T>
+  | GlobalStylesInput<T>
+  | readonly (GlobalStyles<T> | GlobalStylesInput<T>)[]
+
+const BRAND = Symbol.for('umber-style.global-styles')
+
+/** The at-rules that hold rules (selectors as keys); every other at-rule holds declarations. */
+const GROUP_AT_RULE = /^@(?:media|supports|container|layer|scope|starting-style|document)(?![\w-])/
+
+/** `value` for the id of a handle: a stand-in as its path, everything else as it is. */
+function toText(_key: string, value: unknown): unknown {
+  return readStandIn(value)
+}
+
+/**
+ * Makes global styles and returns their handle at once: nothing is written until an engine is given the
+ * handle (`insertGlobal`), so a module can call it before there is an engine or a theme. The id is made
+ * from the styles alone; a function of the theme is called for it with a stand-in theme whose every token
+ * is its own path as text. Throws a `TypeError` for styles that are not an object or a function.
+ */
+export function globalStyles<T = never>(styles: GlobalStylesInput<T>): GlobalStyles<T> {
+  if (typeof styles === 'function') {
+    const shown = JSON.stringify(styles(createStandIn('') as T), toText)
+    return Object.freeze({
+      [BRAND]: true,
+      id: `global-${hashString(`theme:${shown}`)}`,
+      resolve: (readTheme: () => T) => styles(readTheme()),
+    })
+  }
+  if (typeof styles !== 'object' || styles === null || Array.isArray(styles)) {
+    throw new TypeError(
+      'globalStyles(): the styles must be an object, or a function that returns one.'
+    )
+  }
+  return Object.freeze({
+    [BRAND]: true,
+    id: `global-${hashString(JSON.stringify(styles))}`,
+    resolve: () => styles,
+  })
+}
+
+/** Whether `value` is a handle that `globalStyles` made. */
+export function isGlobalStyles(value: unknown): value is GlobalStyles<unknown> {
+  return typeof value === 'object' && value !== null && BRAND in value
+}
+
+/** The styles of one item of a `GlobalInput`: a handle resolves itself, a function is called with the theme that `readTheme` gives. */
+export function readGlobalStyles<T>(
+  item: GlobalStyles<T> | GlobalStylesInput<T>,
+  readTheme: () => T
+): GlobalStyleObject {
+  if (isGlobalStyles(item)) return (item as GlobalStyles<T>).resolve(readTheme)
+  return typeof item === 'function' ? item(readTheme()) : item
+}
+
+/**
+ * The flat CSS rules of global styles, in the order of their keys: a selector's style compiled as a
+ * class's is, an at-rule that holds rules as one rule around the rules of its keys, any other at-rule as
+ * a rule of declarations (one for each item of a list). Throws a `TypeError` for styles that are not an
+ * object, and for a key that holds no style.
+ */
+export function compileGlobalRules(
+  styles: GlobalStyleObject,
+  hasColorFallbacks: boolean,
+  scoping: Scoping
+): string[] {
+  if (typeof styles !== 'object' || styles === null || Array.isArray(styles)) {
+    throw new TypeError(
+      'globalStyles(): the styles must be an object, or a function that returns one.'
+    )
+  }
+  const rules: string[] = []
+  for (const [key, value] of Object.entries(styles)) {
+    if (value === null || value === undefined || value === false) continue
+    for (const item of Array.isArray(value) ? value : [value]) {
+      if (typeof item !== 'object' || item === null || Array.isArray(item)) {
+        throw new TypeError(`globalStyles(): "${key}" must hold a style object, or a list of them.`)
+      }
+      if (!GROUP_AT_RULE.test(key)) {
+        rules.push(...compileRules(key, item as StyleObject, hasColorFallbacks, scoping))
+        continue
+      }
+      const inner = compileGlobalRules(item as GlobalStyleObject, hasColorFallbacks, scoping)
+      if (inner.length > 0) rules.push(`${key}{${inner.join('')}}`)
+    }
+  }
+  return rules
+}

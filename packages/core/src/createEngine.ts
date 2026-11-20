@@ -1,6 +1,7 @@
 import { hashString } from './hash'
 import { createLazyRecord } from './lazyRecord'
-import { createCache, type Cache, type ClassValue } from './cache'
+import { createCache, type Cache, type ClassValue, type GlobalRules } from './cache'
+import { readGlobalStyles, type GlobalInput } from './globalStyles'
 import {
   createSchemeKey,
   createThemeClassName,
@@ -103,6 +104,19 @@ export interface Engine<T> {
   keyframes(steps: KeyframesInput<T>, options?: KeyframesOptions): string
   /** Writes the `@keyframes` rule of `name` now, for a use the engine cannot see in a class (a name under another key, CSS of the app's own, the Web Animations API). Throws a `TypeError` for a name that `keyframes` did not return. */
   insertKeyframes(name: string): void
+  /**
+   * The rules of global styles (a handle, an object, a function of the theme, or a list of them), one set
+   * for each, in the order of the list; nothing is written. A function is called with `theme` (the theme
+   * view of the nearest provider) when given, else with `refs`: tokens are references either way, and
+   * keys that hold real values (raw keys, the `inline` mode) come from that theme.
+   */
+  resolveGlobal(input: GlobalInput<T>, theme?: T): GlobalRules[]
+  /**
+   * Writes global styles into the `global` layer, as `resolveGlobal` resolves them, in the order of the
+   * list (the cascade order), and returns the function that releases them: the rules of a set are written
+   * once and removed when the last insertion of them is released (see `Cache.insertGlobal`).
+   */
+  insertGlobal(input: GlobalInput<T>, theme?: T): () => void
   /**
    * A sheet of named styles. Given a function of the theme it is a sheet that is resolved against a
    * theme (`resolve`, which `useStyle` calls). Given an object it is the entries themselves, usable at
@@ -364,9 +378,24 @@ export function createLazyEngine<T extends object = Theme>(options: EngineOption
     }
   }
 
+  const resolveGlobal = (input: GlobalInput<T>, theme?: T): GlobalRules[] => {
+    const readTheme = () => theme ?? readTokens().refs
+    const items = Array.isArray(input) ? input : [input]
+    return items.map((item) => cache.compileGlobal(readGlobalStyles<T>(item, readTheme)))
+  }
+
+  const insertGlobal = (input: GlobalInput<T>, theme?: T): (() => void) => {
+    const releases = resolveGlobal(input, theme).map(cache.insertGlobal)
+    return () => {
+      for (const release of releases) release()
+    }
+  }
+
   return {
     cache,
     css: cache.css,
+    resolveGlobal,
+    insertGlobal,
     get hasTheme() {
       return baseTheme !== undefined
     },

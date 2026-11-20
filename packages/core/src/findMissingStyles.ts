@@ -2,7 +2,10 @@
 // the checker that they run is the one that the development mode runs.
 
 /** What `findMissingStyles` can find. */
-export type StyleProblemKind = 'class-without-rule' | 'variable-without-value'
+export type StyleProblemKind =
+  | 'class-without-rule'
+  | 'variable-without-value'
+  | 'root-without-theme'
 
 /** One thing the page lacks. */
 export interface StyleProblem {
@@ -24,6 +27,8 @@ export interface FindMissingStylesOptions {
 
 const STATE_PATTERN = /:(hover|focus|active|focus-visible|focus-within)\b/
 const NAME_CODES = /[a-z0-9_-]/
+/** A selector that names the root element or the body: `html`, `body` or `:root` as a whole word. */
+const ROOT_PATTERN = /(?:^|[\s>+~(,])(?:html|body)(?![\w-])|:root(?![\w-])/
 
 /** The prefix named by the first style element of an engine on the page, or undefined. */
 function findPrefix(): string | undefined {
@@ -140,13 +145,47 @@ function findVariableProblems(
 }
 
 /**
+ * The global rules (rules that name no class of the engine) for `html`, `body` or `:root` that match
+ * `element`, `<html>` or `<body>` without a class of the engine, and use variables that have no value
+ * on it: one problem for each rule, with all of those variables. A variable is declared on the element
+ * that carries a theme class and below it, so a rule for `html` or `body` sees the variables of a theme
+ * only when the theme class is on `<html>`.
+ */
+function findRootProblems(
+  element: Element,
+  label: string,
+  rules: readonly EngineRule[],
+  start: string,
+  problems: StyleProblem[]
+): void {
+  const computed = getComputedStyle(element)
+  for (const { rule, variables, isState } of rules) {
+    const selector = rule.selectorText
+    const isGlobal = readClassNames(selector, start).length === 0 && ROOT_PATTERN.test(selector)
+    if (variables.length === 0 || isState || !isGlobal || !isMatched(element, rule)) continue
+    const missing = variables.filter((name) => computed.getPropertyValue(name).trim() === '')
+    if (missing.length === 0) continue
+    const message = `${label} has no value for ${missing.join(', ')}, which the global rule ${selector} uses: a rule for html or body sees the variables of a theme only when the theme class is on <html>`
+    problems.push({
+      kind: 'root-without-theme',
+      name: missing[0],
+      element: label,
+      message,
+      key: `root:${selector}`,
+    })
+  }
+}
+
+/**
  * Looks at a page that an engine styled, and lists what is missing. For each element under `root`
  * (the document by default): every class of the engine on it is named by at least one rule of the
  * engine's style elements (its own, and the ones React hoists), and every variable of the engine that
  * a rule matching the element uses, without a fallback, has a value on the element. The classes that
  * are markers (`<prefix>-boundary`, `<prefix>-scheme-light` and `-dark`) have no rule of their own and
- * are left out, and so are the rules for `:hover`, `:focus` and the like. An empty list means nothing
- * is missing. Where there is no document, or no style element of an engine, the list is empty.
+ * are left out, and so are the rules for `:hover`, `:focus` and the like. `<html>` and `<body>` without
+ * a class of the engine are checked for the global rules that name them (see `root-without-theme`). An
+ * empty list means nothing is missing. Where there is no document, or no style element of an engine,
+ * the list is empty.
  */
 export function findMissingStyles(
   root?: ParentNode,
@@ -167,7 +206,12 @@ export function findMissingStyles(
     const classes = [...element.classList].filter(
       (name) => name.startsWith(`${prefix}-`) && !markers.has(name)
     )
-    if (classes.length === 0) continue
+    if (classes.length === 0) {
+      if (element === document.documentElement || element === document.body) {
+        findRootProblems(element, describe(element), rules, `${prefix}-`, problems)
+      }
+      continue
+    }
     const label = describe(element)
     findClassProblems(label, classes, named, problems)
     findVariableProblems(element, label, rules, problems)

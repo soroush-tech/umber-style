@@ -1,6 +1,7 @@
 import { hashString } from './hash'
 import { createDevChecker, isDevelopment } from './devChecks'
 import { createFingerprint, describeFingerprintDifferences } from './fingerprint'
+import { compileGlobalRules, type GlobalStyleObject } from './globalStyles'
 import { createKeyframesRule, findAnimationNames, isKeyframesName } from './keyframes'
 import { scanStyleText, type StyleFindings } from './scanStyleText'
 import {
@@ -69,16 +70,32 @@ export interface PageExtractOptions {
   themes?: Iterable<string>
   /** Animation names (`keyframes` results) to include although no class of the page uses them. */
   animations?: Iterable<string>
-  /** Keys of the `<style href precedence>` elements that the document carries already: their rules are left out. */
+  /** Keys of the `<style href precedence>` elements that the document carries already (classes, theme classes, animation names, ids of global rules): their rules are left out. */
   carried?: ReadonlySet<string>
 }
 
 export interface Sheet {
   insert(rule: string): void
-  /** Every rule inserted so far, in order. */
+  /** Every rule inserted so far and not removed, in order. */
   readonly rules: readonly string[]
   /** Replaces the rule inserted at `index` of `rules`; a sheet that cannot (a browser one) has none, and the cache appends instead. */
   replace?(index: number, rule: string): void
+  /**
+   * Removes the rule at `index` of `rules`: the rules after it move down by one, in `rules` and in what
+   * the sheet holds. A sheet without it keeps every rule: global rules that are released then stay, and
+   * count as written.
+   */
+  remove?(index: number): void
+}
+
+/** The rules of one set of global styles, resolved for a theme. */
+export interface GlobalRules {
+  /** `<prefix>-global-<hash>`, a hash of `rules`: equal rules have an equal id. A style element that holds them is keyed by it. */
+  readonly id: string
+  /** The rules, each in the `global` layer when the cache has layers. */
+  readonly rules: readonly string[]
+  /** The animation names (`keyframes` results) that the rules use, whose `@keyframes` rules are written with them. */
+  readonly animations: readonly string[]
 }
 
 /** The cascade layers of a cache, from the lowest priority to the highest. */
@@ -177,19 +194,36 @@ export interface Cache {
   insertKeyframes(name: string): void
   /** The animation names (`keyframes` results) that the rules of the class `className` use. */
   getAnimations(className: string): readonly string[]
+  /**
+   * The rules of global styles for this cache (see `globalStyles`), with their id and the animations they
+   * use; nothing is written. Throws a `TypeError` for styles that are not an object, and for a key that
+   * holds no style.
+   */
+  compileGlobal(styles: GlobalStyleObject): GlobalRules
+  /**
+   * Writes global rules into the `global` layer (outside every layer without layers), after the
+   * `@keyframes` rules of the animations they use, and returns the function that releases them. Rules of
+   * one id are written once and counted: each insertion adds one, each release takes one, and at none the
+   * rules are removed from the sheet (the `@keyframes` rules stay). Rules that the page has (a server
+   * render) are taken over, not written, and removed from the page when released. Rules that cannot be
+   * removed (a sheet without `remove`, rules of the page whose place the browser does not show) stay.
+   */
+  insertGlobal(global: GlobalRules): () => void
   /** `getRules` with every declaration of a theme class, used or not, after the `@property` rules of the registered variables it declares: for a style element that is sent before the rules that use the class. */
   getFullRules(id: string): readonly string[]
-  /** The CSS inserted so far and the ids it covers (class names, then the used variables): all of the cache, whatever page asked for it. See `extractPage` for one page. */
+  /** The CSS inserted so far and not removed, and the ids it covers (class names, then the global rules held, then the used variables): all of the cache, whatever page asked for it. See `extractPage` for one page. */
   extract(): { css: string; ids: string[] }
   /**
-   * The CSS that one page needs, decided from the class names it holds and not from what the cache holds:
-   * the layer order statement; the `@property` rules of the variables in use; the `@keyframes` rules that
-   * the page's classes use (and `options.animations`), by name; each theme class (of the
-   * page, and `options.themes`) with only the variables the page's rules use (all that they refer to,
-   * through the values of the themes too, and the variables marked with `markUsed`) and its color-scheme;
-   * and the rules of the classes, in an order that depends on the classes only: a props class after its
-   * base class, the rest by name. Names the cache made no rules for are ignored. It reads the cache and
-   * changes nothing, so pages rendered at once, or in any order, get the same CSS.
+   * The CSS that one page needs, decided from the class names it holds and not from what the cache holds,
+   * except for the global rules, which no class stands for: the layer order statement; the `@property`
+   * rules of the variables in use; the `@keyframes` rules that the page's classes and the global rules use
+   * (and `options.animations`), by name; each theme class (of the page, and `options.themes`) with only
+   * the variables the page's rules and the global rules use (all that they refer to, through the values
+   * of the themes too, and the variables marked with `markUsed`) and its color-scheme; every global rule
+   * the cache holds, in the order they were inserted; and the rules of the classes, in an order that
+   * depends on the classes only: a props class after its base class, the rest by name. Names the cache
+   * made no rules for are ignored. It reads the cache and changes nothing, so pages rendered at once, or
+   * in any order, get the same CSS.
    */
   extractPage(
     classNames: Iterable<string>,
@@ -235,10 +269,23 @@ export function createMemorySheet(): Sheet {
     replace(index, rule) {
       rules[index] = rule
     },
+    remove(index) {
+      rules.splice(index, 1)
+    },
   }
 }
 
-/** A sheet in the style element marked `data-style="<key>"`, which it creates when there is none. */
+/** Deletes `rule` from the style sheet that holds it, found by its place now; a rule that is held by none any more is left. */
+function deleteCssRule(rule: CSSRule): void {
+  const parent = rule.parentStyleSheet
+  if (parent) parent.deleteRule(Array.prototype.indexOf.call(parent.cssRules, rule))
+}
+
+/**
+ * A sheet in the style element marked `data-style="<key>"`, which it creates when there is none. It keeps
+ * the browser's object of each rule it inserts, and removes a rule by finding where that object is at the
+ * time, so rules that others insert into or delete from the element do not confuse it.
+ */
 export function createDomSheet(key: string, container: Node = document.head): Sheet {
   let element = document.querySelector<HTMLStyleElement>(`style[data-style="${key}"]`)
   if (!element) {
@@ -248,15 +295,21 @@ export function createDomSheet(key: string, container: Node = document.head): Sh
   }
   const sheet = element.sheet as CSSStyleSheet
   const rules: string[] = []
+  const objects: CSSRule[] = []
   return {
     rules,
     insert(rule) {
       try {
-        sheet.insertRule(rule, sheet.cssRules.length)
+        const index = sheet.insertRule(rule, sheet.cssRules.length)
+        objects.push(sheet.cssRules[index])
         rules.push(rule)
       } catch {
         // A rule the browser rejects is skipped.
       }
+    },
+    remove(index) {
+      rules.splice(index, 1)
+      deleteCssRule(objects.splice(index, 1)[0])
     },
   }
 }
@@ -409,13 +462,18 @@ export function createCache(options: CacheOptions = {}): Cache {
     hasLayers && layer ? rules.map((rule) => `@layer ${prefix}-${layer}{${rule}}`) : rules
 
   // The order statement goes in before the first rule, once; a server render already marked it.
-  const insertLayered = (layered: readonly string[]): void => {
-    if (hasLayers && layered.length > 0 && !insertedIds.has(layerOrderId)) {
+  const insertLayerOrder = (): void => {
+    if (hasLayers && !insertedIds.has(layerOrderId)) {
       insertedIds.add(layerOrderId)
       sheet.insert(layerOrder)
     }
+  }
+
+  const insertLayered = (layered: readonly string[]): void => {
+    if (layered.length === 0) return
+    insertLayerOrder()
     for (const rule of layered) sheet.insert(rule)
-    if (layered.length > 0) checkLater?.()
+    checkLater?.()
   }
 
   // Pruning: each registered theme class, with what it declares and what of that is written.
@@ -579,6 +637,89 @@ export function createCache(options: CacheOptions = {}): Cache {
     return true
   }
 
+  /** Global rules held, by id, in the order they were inserted: how many hold them, and where they are. */
+  interface GlobalEntry {
+    count: number
+    rules: readonly string[]
+    animations: readonly string[]
+    /** Where each rule this cache wrote is in the sheet. */
+    indexes: number[]
+    /** The browser's object of each rule that was taken over from the page (undefined where it cannot be told); none when the rules were written. */
+    pageRules: readonly (CSSRule | undefined)[] | undefined
+  }
+  const globals = new Map<string, GlobalEntry>()
+  // The global rules of the page by their text, each with the browser's object of the rule when it can be told.
+  const pageGlobals = new Map<string, (CSSRule | undefined)[]>()
+
+  const compileGlobal = (styles: GlobalStyleObject): GlobalRules => {
+    const flat = compileGlobalRules(styles, hasColorFallbacks, scoping)
+    const rules = wrapInLayer(flat, 'global')
+    const id = `${prefix}-global-${hashString(rules.join(''))}`
+    return { id, rules, animations: findAnimationNames(flat) }
+  }
+
+  /** The rules of the page for `rules`, taken so that no other set takes them, when the page has every one of them; else undefined. */
+  const takePageRules = (rules: readonly string[]): (CSSRule | undefined)[] | undefined => {
+    if (!rules.every((rule) => pageGlobals.get(rule)?.length)) return undefined
+    return rules.map((rule) => (pageGlobals.get(rule) as (CSSRule | undefined)[]).shift())
+  }
+
+  /** Writes the rules of `global`, or takes them over from the page, after the `@keyframes` rules they use. */
+  const writeGlobal = ({ id, rules, animations: names }: GlobalRules): GlobalEntry => {
+    names.forEach(writeKeyframes)
+    const pageRules = takePageRules(rules)
+    const indexes: number[] = []
+    // A set with no rules counts as on the page: it writes nothing, not even the layer order.
+    if (pageRules === undefined) {
+      insertLayerOrder()
+      for (const rule of rules) {
+        const index = sheet.rules.length
+        sheet.insert(rule)
+        if (sheet.rules.length > index) indexes.push(index)
+      }
+      checkLater?.()
+    }
+    markUsed(rules.flatMap((rule) => scanVariables(rule, VARIABLE_START)))
+    const entry: GlobalEntry = { count: 0, rules, animations: names, indexes, pageRules }
+    globals.set(id, entry)
+    return entry
+  }
+
+  /** Removes the rule at `index` of the sheet, and moves down every place the cache keeps that is after it. */
+  const removeAt = (remove: (index: number) => void, index: number): void => {
+    remove(index)
+    for (const entry of globals.values()) {
+      entry.indexes = entry.indexes.map((at) => (at > index ? at - 1 : at))
+    }
+    for (const entry of themes.values()) {
+      if (entry.index !== undefined && entry.index > index) entry.index--
+    }
+  }
+
+  /** Removes the rules of a set that nothing holds any more, unless they cannot be removed: then they stay, and count as written. */
+  const removeGlobal = (id: string, entry: GlobalEntry): void => {
+    const { pageRules, indexes } = entry
+    const { remove } = sheet
+    if (pageRules ? pageRules.includes(undefined) : remove === undefined) return
+    globals.delete(id)
+    pageRules?.forEach((rule) => deleteCssRule(rule as CSSRule))
+    for (let at = indexes.length - 1; at >= 0; at--) {
+      removeAt(remove as (index: number) => void, indexes[at])
+    }
+  }
+
+  const insertGlobal = (global: GlobalRules): (() => void) => {
+    const entry = globals.get(global.id) ?? writeGlobal(global)
+    entry.count++
+    let isReleased = false
+    return () => {
+      if (isReleased) return
+      isReleased = true
+      entry.count--
+      if (entry.count === 0) removeGlobal(global.id, entry)
+    }
+  }
+
   const getFullRules = (id: string): readonly string[] => {
     const entry = themes.get(id)
     const properties = (themeNames.get(id) ?? []).flatMap((name) => propertyRules[name] ?? [])
@@ -672,7 +813,16 @@ export function createCache(options: CacheOptions = {}): Cache {
     const scan = (element: Element): void => {
       if (scanned.has(element)) return
       scanned.add(element)
-      absorb(scanStyleText(prefix, element.textContent as string))
+      const found = scanStyleText(prefix, element.textContent as string)
+      absorb(found)
+      // The rules of the text are those of the element's sheet, in order, when the browser kept them all.
+      const list = (element as HTMLStyleElement).sheet?.cssRules
+      const objects = list?.length === found.ruleCount ? list : undefined
+      for (const [index, text] of found.globals) {
+        const known = pageGlobals.get(text) ?? []
+        known.push(objects?.[index])
+        pageGlobals.set(text, known)
+      }
     }
     for (const element of document.querySelectorAll(selector)) scan(element)
     // Rules reach the page without a call to the engine: streamed content, a route that a framework
@@ -698,18 +848,18 @@ export function createCache(options: CacheOptions = {}): Cache {
   /** The rules that the cache wrote under `id`, a class or a theme class it made. */
   const readRules = (id: string): readonly string[] => insertedRules.get(id) as readonly string[]
 
-  /** The variables a page needs declared: those its rules (of classes, and `@keyframes` rules) refer to, those marked from outside, and what the values of the themes in play refer to. */
+  /** The variables a page needs declared: those its rules (of classes, and `@keyframes` and global rules) refer to, those marked from outside, and what the values of the themes in play refer to. */
   const collectPageVariables = (
     classIds: readonly string[],
     themeIds: readonly string[],
-    keyframesRules: readonly string[]
+    otherRules: readonly string[]
   ) => {
     const names = new Set(pinned)
     const addVariables = (rule: string): void => {
       for (const name of scanVariables(rule, VARIABLE_START)) names.add(name)
     }
     for (const id of classIds) readRules(id).forEach(addVariables)
-    keyframesRules.forEach(addVariables)
+    otherRules.forEach(addVariables)
     addThemeReferences(names, themeIds, themes)
     return names
   }
@@ -736,13 +886,18 @@ export function createCache(options: CacheOptions = {}): Cache {
       .filter((name) => name.startsWith(`${prefix}-`) && !themeNames.has(name))
       .filter((name) => insertedRules.has(name))
       .sort((first, second) => (sortKey(first) < sortKey(second) ? -1 : 1))
-    const pageAnimations = classIds.flatMap((id) => animations.get(id) ?? [])
+    const held = [...globals]
+    const pageAnimations = [
+      ...classIds.flatMap((id) => animations.get(id) ?? []),
+      ...held.flatMap(([, entry]) => entry.animations),
+    ]
     const keyframesRules = [...new Set([...pageAnimations, ...named])]
       .filter((name) => isKeyframesName(name) && !carried.has(name))
       .sort(compareCodeUnits)
       .map(readKeyframesRule)
+    const allGlobalRules = held.flatMap(([, entry]) => entry.rules)
     const names = hasPruning
-      ? collectPageVariables(classIds, themeIds, keyframesRules)
+      ? collectPageVariables(classIds, themeIds, [...keyframesRules, ...allGlobalRules])
       : new Set<string>()
     // A carried theme element holds the `@property` rules of the variables its theme declares.
     const covered = new Set(themeIds.filter((id) => carried.has(id)).flatMap(readNames))
@@ -751,18 +906,21 @@ export function createCache(options: CacheOptions = {}): Cache {
       .filter((name) => propertyRules[name] !== undefined && !covered.has(name))
       .sort(compareCodeUnits)
     const newThemes = themeIds.filter((id) => !carried.has(id))
+    const newGlobals = held.filter(([id]) => !carried.has(id))
     const newClasses = classIds.filter((id) => !carried.has(id))
     const themeRules = newThemes.flatMap((id) => createPageThemeRules(id, names))
+    const globalRules = newGlobals.flatMap(([, entry]) => entry.rules)
     const classRules = newClasses.flatMap(readRules)
-    const hasLayered = themeRules.length + classRules.length > 0
+    const hasLayered = themeRules.length + globalRules.length + classRules.length > 0
     const css = [
       hasLayers && hasLayered ? layerOrder : '',
       ...properties.map((name) => propertyRules[name]),
       ...keyframesRules,
       ...themeRules,
+      ...globalRules,
       ...classRules,
     ].join('')
-    return { css, ids: [...newThemes, ...newClasses] }
+    return { css, ids: [...newThemes, ...newGlobals.map(([id]) => id), ...newClasses] }
   }
 
   return {
@@ -791,10 +949,15 @@ export function createCache(options: CacheOptions = {}): Cache {
     },
     insertKeyframes,
     getAnimations: (className) => animations.get(className) ?? [],
+    compileGlobal,
+    insertGlobal,
     insertOnce,
     getRules: (id) => insertedRules.get(id) ?? [],
     getFullRules,
-    extract: () => ({ css: sheet.rules.join(''), ids: [...insertedIds, ...used] }),
+    extract: () => ({
+      css: sheet.rules.join(''),
+      ids: [...insertedIds, ...globals.keys(), ...used],
+    }),
     extractPage,
     fingerprint,
   }

@@ -15,6 +15,14 @@ export interface StyleFindings {
   keyframes: Set<string>
   /** The variables that the rules of the classes refer to. */
   variables: Set<string>
+  /** How many rules the text holds at its top level (blocks and statements): as many as its style sheet holds when the browser kept them all. */
+  ruleCount: number
+  /**
+   * The top-level rules that may be global rules, each with its place among the top-level rules: those in
+   * the `<prefix>-global` layer, and those in no layer that are not a layer statement, a `@property` or
+   * `@keyframes` rule, or the rule of a class (`.<prefix>-...`).
+   */
+  globals: [index: number, text: string][]
 }
 
 /** Makes findings that hold nothing. */
@@ -26,6 +34,8 @@ export function createEmptyFindings(): StyleFindings {
     properties: new Map(),
     keyframes: new Set(),
     variables: new Set(),
+    ruleCount: 0,
+    globals: [],
   }
 }
 
@@ -36,6 +46,7 @@ interface OpenBlock {
   hasChild: boolean
 }
 
+const LAYER_AT_RULE = '@layer'
 const PROPERTY_AT_RULE = '@property'
 const KEYFRAMES_AT_RULE = '@keyframes'
 
@@ -107,26 +118,38 @@ function openBlock(stack: OpenBlock[], text: string, boundary: number, index: nu
   stack.push({ prelude: text.slice(boundary, index).trim(), bodyStart: index + 1, hasChild: false })
 }
 
-/** Closes the innermost block at `index`, a `}`: a `@keyframes` rule records its name, and a block without a block of its own is a rule to record. */
+/** Closes the innermost block at `index`, a `}`, and returns it: a `@keyframes` rule records its name, and a block without a block of its own is a rule to record. */
 function closeBlock(
   stack: OpenBlock[],
   found: StyleFindings,
   prefix: string,
   text: string,
   index: number
-): void {
+): OpenBlock | undefined {
   const block = stack.pop()
   if (block?.prelude.startsWith(KEYFRAMES_AT_RULE)) {
     found.keyframes.add(block.prelude.slice(KEYFRAMES_AT_RULE.length).trim())
   } else if (block && !block.hasChild) {
     record(found, prefix, block.prelude, text.slice(block.bodyStart, index))
   }
+  return block
+}
+
+/** Whether a top-level rule with `prelude` may be a global rule: in the global layer, or in none and not a rule that the engine writes for something else. */
+function isGlobalPrelude(prefix: string, prelude: string): boolean {
+  if (prelude.startsWith(LAYER_AT_RULE)) return prelude === `${LAYER_AT_RULE} ${prefix}-global`
+  return (
+    !prelude.startsWith(PROPERTY_AT_RULE) &&
+    !prelude.startsWith(KEYFRAMES_AT_RULE) &&
+    !prelude.startsWith(`.${prefix}-`)
+  )
 }
 
 /**
  * Reads the CSS that an engine wrote (compact, no comments) in one pass and adds what it holds to
  * `found`: the layer order statement, the classes with a rule, each theme class with the variables it
- * declares, the `@property` rules, the names of the `@keyframes` rules and the variables that rules use.
+ * declares, the `@property` rules, the names of the `@keyframes` rules, the variables that rules use, how
+ * many rules are at the top level, and the top-level rules that may be global rules.
  */
 export function scanStyleText(
   prefix: string,
@@ -135,6 +158,7 @@ export function scanStyleText(
 ): StyleFindings {
   const stack: OpenBlock[] = []
   let boundary = 0
+  let ruleStart = 0
   let index = 0
   while (index < text.length) {
     const char = text[index]
@@ -143,13 +167,22 @@ export function scanStyleText(
       continue
     }
     if (char === '{') {
+      if (stack.length === 0) ruleStart = boundary
       openBlock(stack, text, boundary, index)
       boundary = index + 1
     } else if (char === '}') {
-      closeBlock(stack, found, prefix, text, index)
+      const block = closeBlock(stack, found, prefix, text, index)
+      if (block && stack.length === 0) {
+        const place = found.ruleCount++
+        if (isGlobalPrelude(prefix, block.prelude)) {
+          found.globals.push([place, text.slice(ruleStart, index + 1).trimStart()])
+        }
+      }
       boundary = index + 1
     } else if (char === ';' && stack.length === 0) {
-      if (text.slice(boundary, index).trim().startsWith('@layer')) found.hasLayerOrder = true
+      const statement = text.slice(boundary, index).trim()
+      if (statement.startsWith(LAYER_AT_RULE)) found.hasLayerOrder = true
+      if (statement !== '') found.ruleCount++
       boundary = index + 1
     }
     index++

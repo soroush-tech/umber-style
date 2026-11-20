@@ -5,6 +5,15 @@ export * from './calc'
 export * from './createEngine'
 export * from './extractStyles'
 export * from './findMissingStyles'
+export {
+  globalStyles,
+  type AtRuleDescriptors,
+  type GlobalInput,
+  type GlobalStyleObject,
+  type GlobalStyles,
+  type GlobalStylesInput,
+  type GlobalStyleValue,
+} from './globalStyles'
 export * from './hash'
 export {
   keyframes,

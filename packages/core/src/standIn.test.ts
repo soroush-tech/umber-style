@@ -13,6 +13,15 @@ describe('createStandIn', () => {
     expect(String(theme)).toBe('')
   })
 
+  it('reads a call of a helper of the theme as the path with its arguments, and goes on from there', () => {
+    const theme = createStandIn('') as unknown as {
+      breakpoints: { up(name: string): string; between(a: string, b: number): { x: string } }
+    }
+    expect(String(theme.breakpoints.up('md'))).toBe('breakpoints.up(md)')
+    expect(String(theme.breakpoints.between('sm', 2).x)).toBe('breakpoints.between(sm,2).x')
+    expect(`${theme.breakpoints.up('lg')}`).toBe('breakpoints.up(lg)')
+  })
+
   it('reads a symbol as undefined', () => {
     const theme = createStandIn('palette') as Record<symbol, unknown>
     expect(theme[Symbol.iterator]).toBeUndefined()
@@ -23,7 +32,7 @@ describe('isStandIn and readStandIn', () => {
   it('tell a stand-in from any other value by its brand', () => {
     const standIn = createStandIn('palette.muted')
     expect(isStandIn(standIn)).toBe(true)
-    for (const value of [{}, null, undefined, 'palette.muted', 4, alpha('#fff', 0.5), []]) {
+    for (const value of [{}, null, undefined, 'palette.muted', 4, alpha('#fff', 0.5), [], String]) {
       expect(isStandIn(value)).toBe(false)
     }
     expect(readStandIn(standIn)).toBe('palette.muted')

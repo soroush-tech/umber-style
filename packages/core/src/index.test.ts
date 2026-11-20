@@ -79,6 +79,8 @@ describe('the core', () => {
       'add',
       'subtract',
       'negate',
+      'keyframes',
+      'globalStyles',
     ]) {
       expect(core).toHaveProperty(name)
     }

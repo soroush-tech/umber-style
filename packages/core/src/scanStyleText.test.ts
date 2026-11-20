@@ -84,6 +84,22 @@ describe('scanStyleText', () => {
     expect([...found.classes]).toEqual(['u-a', 'u-b'])
   })
 
+  it('counts the top-level rules, and lists those that may be global rules with their places', () => {
+    const text =
+      '@layer u-theme,u-global;@property --u-a{syntax:"*";inherits:true;}' +
+      '@keyframes k{to{opacity:1;}}@layer u-global{body{margin:0;}}' +
+      '@layer u-components{.u-a{color:red;}}@layer other{p{color:red;}} ;' +
+      '.u-b{color:red;} html, body{color:var(--u-a);}@media (width >= 1px){body{margin:1px;}}'
+    const found = scanStyleText('u', text)
+    expect(found.ruleCount).toBe(9)
+    expect(found.globals).toEqual([
+      [3, '@layer u-global{body{margin:0;}}'],
+      [7, 'html, body{color:var(--u-a);}'],
+      [8, '@media (width >= 1px){body{margin:1px;}}'],
+    ])
+    expect(found.variables).toEqual(new Set(['--u-a']))
+  })
+
   it('reads a large text in one pass', () => {
     const text = Array.from(
       { length: 20000 },

@@ -112,6 +112,39 @@ describe('findMissingStyles', () => {
     expect(findMissingStyles().map((problem) => problem.name)).toEqual(['--u-x'])
   })
 
+  it('finds a global rule for html, body or :root that uses a variable which nothing above declares', () => {
+    addStyle(
+      '@layer u-global{body{color:var(--u-x);margin:var(--u-y);padding:var(--u-z, 1px);}}' +
+        ':root{background:var(--u-y);}body:hover{color:var(--u-q);}.body{color:var(--u-q);}' +
+        '*{border-color:var(--u-q);}html body p{color:var(--u-q);}body .u-a{color:var(--u-q);}' +
+        'html{font-family:serif;}'
+    )
+    document.body.innerHTML = '<p></p>'
+    const problems = findMissingStyles()
+    expect(problems.map((problem) => problem.message)).toEqual([
+      'html[] has no value for --u-y, which the global rule :root uses: a rule for html or body sees the variables of a theme only when the theme class is on <html>',
+      'body[] has no value for --u-x, --u-y, which the global rule body uses: a rule for html or body sees the variables of a theme only when the theme class is on <html>',
+    ])
+    expect(problems[1]).toMatchObject({
+      kind: 'root-without-theme',
+      name: '--u-x',
+      element: 'body[]',
+      key: 'root:body',
+    })
+  })
+
+  it('finds no problem in a global rule when the theme class is on <html>, and leaves body with a class to the other check', () => {
+    addStyle('.u-t{--u-x:1;}body{color:var(--u-x);}.u-a{color:red;}')
+    document.documentElement.className = 'u-t'
+    expect(findMissingStyles()).toEqual([])
+    document.documentElement.className = ''
+    document.body.className = 'u-a'
+    expect(findMissingStyles()).toMatchObject([
+      { kind: 'variable-without-value', key: 'variable:--u-x:body' },
+    ])
+    document.body.className = ''
+  })
+
   it('ignores a style element that has no sheet', () => {
     const element = document.createElement('style')
     element.setAttribute('data-style', 'u')
