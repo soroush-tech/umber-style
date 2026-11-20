@@ -207,7 +207,7 @@ jobs:
           flags: ${{ matrix.flag }}
           name: ${{ matrix.flag }}
 
-  # What a pull request must prove about publishing: the five packages build, and the packed
+  # What a pull request must prove about publishing: the packages build, and the packed
   # tarballs work together from outside the workspace (import, require, the export conditions, a
   # server render, the declarations under two module resolutions). The smoke test installs from npm.
   build:

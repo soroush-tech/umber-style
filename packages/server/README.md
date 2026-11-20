@@ -10,4 +10,4 @@ import createInstance from '@umber-style/server/create-instance'
 const { extractCriticalToChunks, constructStyleTagsFromChunks } = createInstance(cache)
 ```
 
-Documentation: [docs](../../docs/README.md), and [Server rendering](../../docs/server-rendering.md) for this package.
+Documentation: [docs](../../docs/README.md), and [The cache and server packages](../../docs/cache-and-server.md) for this package.

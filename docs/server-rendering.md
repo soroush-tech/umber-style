@@ -20,6 +20,9 @@ There are four cases, and they use different parts of the engine:
 | Next.js, App Router                          | Nothing to call: server components and client components both render style elements. Render the provider in both builds: its theme goes to `:root`, or with `isRoot` it is the class you put on `<html>` with `themeClass` |
 | Vue                                          | `extractPageStyles(cache, html, { themes }).tag` after `renderToString`; Vue has no style elements of its own                                                                                                              |
 | React, no server components, extraction only | `createStyle(theme, { hasServerStyleElements: false })` and `extractPageStyles`: one style element in the head and no other                                                                                                |
+| A registry of your own, or CSS in chunks     | `@umber-style/cache` and `@umber-style/server/create-instance`: `<style data-umber>` elements keyed by a cache. See [The cache and server packages](cache-and-server.md)                                                   |
+
+The rules of a `Global` reach the page in each of these cases, and are app-wide on a server: see [On a server](animations-and-global-styles.md#on-a-server). A `@keyframes` rule reaches it once, with the first class or global rule of the page that uses it: see the same section.
 
 `createStyleTag(cache)` and `cache.extract()` keep working as they did: they return every rule the cache holds, whatever page inserted it. Use them for a static site that renders one page per cache, or a script. A process that renders more than one page must use `extractPageStyles`.
 
@@ -305,3 +308,5 @@ The condition applies to the whole program, so a project that also type-checks c
 - `hasServerStyleElements` does not know the framework: it is on wherever the client build runs with no `document`.
 - The browser reads the page when its cache is created. The style elements must be in the document before the module that creates the cache runs; those that come later are read by the observer.
 - There is no nonce option for the style elements: see [No inline styles](no-inline-styles.md).
+- On a server, global rules are never removed, and every page extracted from a cache carries all of them: see the Limits of [Animations and global styles](animations-and-global-styles.md).
+- The registry and the chunk functions of `@umber-style/cache` and `@umber-style/server` were run in unit tests only, and the client build's style elements must be turned off next to a registry: see the Limits of [The cache and server packages](cache-and-server.md).

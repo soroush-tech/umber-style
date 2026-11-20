@@ -70,7 +70,9 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 - **Bindings are thin:** `@umber-style/react`, `@umber-style/react-native` and `@umber-style/vue` adapt
   the engine to one platform and keep the same names (`styled`, `ThemeProvider`, `useTheme`,
   `StyleSheet`, `useStyle`, `apply`). Logic that two bindings need belongs in core. `umber-style` only
-  re-exports; it holds no logic.
+  re-exports; it holds no logic. `@umber-style/css`, `@umber-style/cache` and `@umber-style/server`
+  are built on core and know no framework: class names with no theme, the cache that
+  server-rendering set-ups read, and the CSS of one page as `data-umber` chunks.
 - **No library names:** never name another CSS-in-JS library, CSS framework or web framework in code,
   comments, tests, docs or config comments. The platforms (React, React Native, Vue) and
   `@soroush.tech/styled-system` may be named. A dependency name in a `package.json` is the one
@@ -98,7 +100,8 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
   the pre-commit hook enforce it.
 - **Packages:** everything under `packages/` is a workspace package. `packages/packages.md` is the
   **standard** for packages - read it first, and follow it when creating or changing any package
-  (structure, exports, publishing, registration chores). The five packages are publishable and built with
+  (structure, exports, publishing, registration chores). Every package but `eslint-config` is publishable
+  (`core`, `cache`, `server`, `css`, `react`, `react-native`, `vue`, `umber-style`) and built with
   tsdown (`pnpm build`); they consume source inside the workspace and `publishConfig` swaps in `dist` only
   when a tarball is made, so release with `pnpm` through the workflow, never `npm publish`. A publishable
   package must declare a license, ship a `LICENSE` file, and have `release-notes/<version>.md`;
@@ -132,6 +135,9 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 | Engine           | `packages/core`                                           | Tokens, class cache, theme classes, style serialization. No framework                      |
 | Bindings         | `packages/react`, `packages/react-native`, `packages/vue` | `styled`, `ThemeProvider`, theme hooks, sheets for one platform; thin over core            |
 | Umbrella         | `packages/umber-style`                                    | Re-exports core and the bindings as subpaths. Its tests prove one source runs on every one |
+| Plain layer      | `packages/css`                                            | `css`, `cx`, `keyframes`, `injectGlobal`: class names with no theme and no framework       |
+| Cache            | `packages/cache`                                          | `createCache({ key })`: the engine's cache with the members server-rendering set-ups read  |
+| Server           | `packages/server`                                         | `/create-instance`: the CSS of one page as chunks and `<style data-umber>` tags            |
 | Lint config      | `packages/eslint-config`                                  | Private oxlint base and React layers, shared by every package                              |
 | Package standard | `packages/packages.md`                                    | Structure, exports, publishing, 100% coverage, licensing, linting                          |
 | Releasing        | `docs/releasing.md`, `.github/workflows/cd-packages.yml`  | Channels, the order of the packages, installing a prerelease, verifying a tarball          |

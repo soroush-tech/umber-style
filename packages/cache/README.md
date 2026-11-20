@@ -10,4 +10,4 @@ import createCache from '@umber-style/cache'
 const cache = createCache({ key: 'app' })
 ```
 
-Documentation: [docs](../../docs/README.md), and [Server rendering](../../docs/server-rendering.md) for this package.
+Documentation: [docs](../../docs/README.md), and [The cache and server packages](../../docs/cache-and-server.md) for this package.

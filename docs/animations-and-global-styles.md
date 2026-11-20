@@ -2,7 +2,7 @@
 
 After this page you can define an animation with `keyframes` and use it in a style, write styles that are not a class (a `body` rule, a reset, a `@font-face`) with `globalStyles` and `Global`, and say when each rule is written, removed, sent by a server and taken over by the browser, on every platform.
 
-The examples use the React binding unless they say otherwise. `keyframes`, `globalStyles` and `Global` have the same names in the Vue and React Native bindings and in `umber-style/react`; `keyframes` and `globalStyles` are also exported by `@umber-style/core`.
+The examples use the React binding unless they say otherwise. `keyframes`, `globalStyles` and `Global` have the same names in the Vue and React Native bindings and in `umber-style/react`; `keyframes` and `globalStyles` are also exported by `@umber-style/core`. `@umber-style/css` has a `keyframes` and an `injectGlobal` of its own, with no theme: see [Class names without a theme](css.md).
 
 ## An animation: `keyframes`
 
@@ -69,7 +69,7 @@ The hash is made from the steps alone. It does not depend on the theme, its valu
 
 - The server and the browser make the same name, and so does every engine in the process: equal steps give one name.
 - A module can call `keyframes` at its top level, before `configure()` and before there is a theme or an engine. `keyframes` from `@umber-style/core` and from every binding return the same name for the same steps.
-- Steps given as a function of the theme are named by the tokens they read, not by their values: the function is called once, at the call, with a stand-in theme whose every token reads as its path.
+- Steps given as a function of the theme are named by the tokens they read, not by their values: the function is called once, at the call, with a stand-in theme whose every token reads as its path. Listing the keys of that stand-in throws (see Limits).
 
 ### The steps
 
@@ -295,9 +295,14 @@ A handle has an `id` (`global-<hash>`, from the styles alone, as a `keyframes` n
 
 ### What a function of the theme reads
 
-A function gets the theme as references, as a function style does. A token is a variable, so a global rule follows a theme switch (a theme class changed on `<html>`) with no render. Keys that hold real values (`breakpoints`, raw keys, tokens in the `inline` mode) come from the provider `Global` is rendered under, and a change of them replaces the rules. A provider that changes only token values writes nothing again.
+A function gets the theme as references, as a function style does. A token is a variable, so a global rule follows a theme switch with no render: a new theme given to the outermost provider, which rewrites its `:root` rule, or a theme class changed on `<html>`. Keys that hold real values (`breakpoints`, raw keys, tokens in the `inline` mode) come from the provider `Global` is rendered under, and a change of them replaces the rules. A provider that changes only token values writes nothing again.
 
-A rule for `html` or `body` that reads a token needs the variables declared on `<html>` itself, where the rule matches: put the class of the root theme there, as [The root theme and switching](root-theme.md) shows. A provider's wrapper element is below `<body>`, so its variables do not reach those two rules. In development the cache warns once when a global rule for `html`, `body` or `:root` uses a variable that has no value there.
+A rule for `html` or `body` that reads a token sees the variables declared on `<html>` itself, where the rule matches. By default there is nothing to do: the outermost provider declares its theme on `:root`, which is `<html>`, so a `body` rule under it has its values (a real-browser test, `themeProvider.browser.test.tsx`, reads the colour of `body` from a `Global` under the outermost provider). Two set-ups differ:
+
+- **`isRoot`.** The provider declares nothing. Put the class of the root theme (`themeClass(theme)`) on `<html>`, as [The root theme and switching](root-theme.md) shows. A class on `<html>` also wins over the `:root` rule of an outermost provider.
+- **A nested provider.** Its variables are declared on its wrapper element, which is below `<body>`: they do not reach a rule for `html` or `body`. A `Global` under it reads the real values of that provider, but its tokens take the values on `<html>`, those of the root theme.
+
+In development the cache warns once when a global rule for `html`, `body` or `:root` uses a variable that has no value there: no outermost provider declares its theme on `:root`, and no theme class is on `<html>`.
 
 ### Mount, change, unmount
 
@@ -342,13 +347,15 @@ const release = engine.insertGlobal(base)
 
 ### Where global rules sit in the cascade
 
-The `global` layer is declared after `theme` and before `components`. A global rule beats nothing of a component: a class in the `components` or `overrides` layer wins over it whatever the specificity (a real-browser test sets `html body main p#styled` against a class, and the class wins). Unlayered CSS of your own beats it. What it does beat is the `theme` layer, which holds the `display: contents` of a provider's wrapper: a global rule that sets `display` on every `div` gives the wrapper a box. See [Cascade layers and overrides](cascade-layers.md).
+The `global` layer is declared after `theme` and before `components`. A global rule beats nothing of a component: a class in the `components` or `overrides` layer wins over it whatever the specificity (a real-browser test sets `html body main p#styled` against a class, and the class wins). Unlayered CSS of your own beats it. What it does beat is the `theme` layer, which holds the `display: contents` of a nested provider's wrapper: a global rule that sets `display` on every `div` gives the wrapper a box. See [Cascade layers and overrides](cascade-layers.md).
 
 With `hasLayers: false` the rules are written outside every layer, in the order they are inserted, among the classes: the usual cascade decides, so a global rule written after a class can beat it at equal specificity.
 
 ## On a server
 
 A server unmounts nothing. Everywhere below, the rules of a `Global` that renders on a server are written into the cache for good, and the cache is shared by every request it serves: global rules are app-wide on a server.
+
+A set-up that collects the rules itself, through `@umber-style/cache` and `@umber-style/server`, gets a set of global rules and a `@keyframes` rule as a group of its own, named `<prefix>-global-<hash>` and `@keyframes:<name>`: see [The cache and server packages](cache-and-server.md).
 
 ### Classic server render
 
@@ -377,13 +384,15 @@ const App = () => (
 const html = renderToString(<App />)
 ```
 
-the markup starts with one merged element (shown shortened):
+the markup starts with one merged element (shown shortened), then the options stamp and the `div` of `Toast`. The outermost provider renders no element of its own: its theme comes as `umber-root-188kecs`, the rule on `:root` with every variable of the theme:
 
 ```html
 <style
   data-precedence="umber"
-  data-href="umber-theme-188kecs umber-scope umber-global-a3061a fade-1acbpvw umber-toast-root-1atv36o"
+  data-href="umber-root-188kecs umber-global-a3061a fade-1acbpvw umber-toast-root-1atv36o"
 >
+  ...
+  @layer umber-theme{:where(:root){--umber-palette-background:#ffffff;--umber-palette-text:#1a1a1a;}}
   ...
   @layer umber-global{body{margin:0;color:var(--umber-palette-text);}}
   @keyframes fade-1acbpvw{0%{opacity:0;}100%{opacity:1;}}
@@ -405,7 +414,7 @@ the markup starts with one merged element (shown shortened):
   }
 }
 @layer umber-theme {
-  .umber-theme-188kecs {
+  :where(:root) {
     --umber-palette-text: #1a1a1a;
   }
 }
@@ -413,11 +422,6 @@ the markup starts with one merged element (shown shortened):
   body {
     margin: 0;
     color: var(--umber-palette-text);
-  }
-}
-@layer umber-theme {
-  .umber-scope {
-    display: contents;
   }
 }
 @layer umber-components {
@@ -438,7 +442,7 @@ const spin = keyframes({ to: { rotate: '1turn' } }, { label: 'spin' })
 const { css } = extractPageStyles(cache, '<p>An empty page</p>', { animations: [spin] })
 ```
 
-`css` is the layer order, `@keyframes spin-1jqe2jv{100%{rotate:1turn;}}` and the global rule of `base`: the global rule is there although this page never rendered `Global`.
+`css` is the layer order, `@keyframes spin-1jqe2jv{100%{rotate:1turn;}}`, the `:root` rule of the last render (`--umber-palette-text:#1a1a1a;`, see [Server rendering](server-rendering.md) for the root theme of a page) and the global rule of `base`: the global rule is there although this page never rendered `Global`.
 
 The variables that global rules and `@keyframes` rules use count as used by every page, so the theme classes of a page declare them.
 
@@ -497,7 +501,7 @@ In the browser nothing unmounts a server component's `Global`: its rules came as
 
 ### Hydration
 
-The browser's cache reads the page when it is made, and each style element that arrives later. A `@keyframes` rule the page has is not written again. A global rule the page has is taken over: when a `Global` with the same content mounts, it holds the rule without writing it, and when it unmounts the rule is deleted from the page's style element. A browser that hydrates a server page therefore writes no global or `@keyframes` rule again. This is checked in tests (`hydrateGlobal.test.tsx`, Vue's `Global.test.ts`) and end to end in every fixture app with a server render.
+The browser's cache reads the page when it is made, and each style element that arrives later in the head (the `data-umber` elements of `@umber-style/server` and of a registry too). A `@keyframes` rule the page has is not written again. A global rule the page has is taken over: when a `Global` with the same content mounts, it holds the rule without writing it, and when it unmounts the rule is deleted from the page's style element. A browser that hydrates a server page therefore writes no global or `@keyframes` rule again. This is checked in tests (`hydrateGlobal.test.tsx`, Vue's `Global.test.ts`) and end to end in every fixture app with a server render.
 
 ## Vue
 
@@ -561,7 +565,15 @@ On the web the skeleton animates and `body` gets its rule. On React Native the c
 
 - `@import` is not supported. A key `@import` is written as an at-rule with declarations, which is not valid CSS; put an `@import` in a stylesheet of your own.
 - Timeline range offsets (`entry 10%`, `exit 50%`) are not steps: `keyframes` throws for them. Only `from`, `to` and percentages are.
-- A function of the theme that iterates a theme value is not supported. It is called with a stand-in theme for its name, and the stand-in has no keys and is not a list: `Object.keys(view.palette)` is empty there, and the result of `view.space.map(...)` is not a list either, so using it as one throws a `TypeError` at the call. For `keyframes` an empty iteration is worse than an error: two functions that iterate get one name, and the steps of the first are written for both (observed: the rule of the second function held the variables of the first). Write the steps out, or build them outside the function. A `globalStyles` handle that iterates gets an `id` that does not reflect what it writes, but its rules are written correctly.
+- A function of the theme given to `keyframes` or `globalStyles` cannot iterate the theme. It is called with a stand-in theme for its name, before the theme is known. Listing the keys of a part of it (`Object.keys`, a spread, `for...in`) throws at the call, in every build:
+
+  ```text
+  TypeError: A function of the theme given to keyframes() or globalStyles() cannot list the keys of "palette" (Object.keys, a spread, for...in): its name is made before the theme is known. Read each token by its key.
+  ```
+
+  Iterating a list (`[...view.space]`, `for...of`) throws `TypeError: view.space is not iterable`. A method call on a theme value (`view.space.map(fn)`) does not throw: the stand-in names it by the text of its arguments, and the rule is written with the references. Two such calls of one text whose closures differ get one name, and the steps of the first are written for both (observed: two `keyframes` made by one helper with a factor of 1 and of 2 got one name, and the rule held the factor 1). Write the steps out, or build them outside the function.
+
+- A `Global` under a nested provider gets the tokens' values on `<html>`, not those of the provider: a variable declared on the wrapper does not reach `body`. This is how a custom property is inherited; it was not run in a browser.
 - Raw values in steps (breakpoints, `inline` tokens) come from the base theme, not from the nearest provider.
 - Without layers (`hasLayers: false`) a global rule that is written after a class beats it at equal specificity: the rules are only in the order they were inserted. This is the cascade's order rule, seen in the rule text and its order; it was not run in a browser.
 - On a server, global rules are app-wide and never removed. A cache that serves many requests keeps every set it was given: a `Global` whose raw values (a breakpoint, an `inline` token) differ from one request to another leaves each variant in the cache, and every later page extracted from it carries all of them.

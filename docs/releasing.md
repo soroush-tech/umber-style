@@ -1,8 +1,8 @@
 # Releasing
 
-After this page you can publish the five packages to npm, try a change in a real app before it reaches everyone, install a prerelease as a consumer, and check that what npm holds is what you meant to ship.
+After this page you can publish the packages to npm, try a change in a real app before it reaches everyone, install a prerelease as a consumer, and check that what npm holds is what you meant to ship.
 
-The packages are `@umber-style/core`, `@umber-style/react`, `@umber-style/react-native`, `@umber-style/vue` and `umber-style`. They are published by one workflow, by hand, never from a push or a merge.
+The packages are `@umber-style/core`, `@umber-style/cache`, `@umber-style/server`, `@umber-style/css`, `@umber-style/react`, `@umber-style/react-native`, `@umber-style/vue` and `umber-style`: every folder of `packages/` that is not private. They are published by one workflow, by hand, never from a push or a merge.
 
 ## Channels
 
@@ -36,8 +36,10 @@ In the repository on GitHub, open Actions, choose **CD - Packages (npm)**, and R
 The packages depend on each other, so they go out dependencies first:
 
 1. `@umber-style/core`
-2. `@umber-style/react`, `@umber-style/react-native`, `@umber-style/vue`
-3. `umber-style`
+2. `@umber-style/cache`, `@umber-style/server`, `@umber-style/css`, `@umber-style/react`, `@umber-style/react-native`, `@umber-style/vue`: each depends on the core alone
+3. `umber-style`, which depends on the core and the three bindings
+
+The cache, server and css packages are not in `umber-style`: `@umber-style/server` uses `@umber-style/cache` in its tests only (a `devDependency`), so the two can go out in either order.
 
 `all` orders itself. With a named package, publish its dependencies first: a prerelease run points each dependency that is not in the run at its newest version on the same channel, and stops with a message to publish that dependency first when there is none. A stable run stops the same way when the version of a dependency is not on npm. The dependencies are exact: `umber-style@0.1.0` depends on `@umber-style/core@0.1.0`, so one engine is shared by every package.
 
@@ -82,12 +84,14 @@ If a broken version went out, it cannot be overwritten: bump, publish again, the
 
 ### The packed-tarball test
 
-`pnpm smoke:packed` (`scripts/smoke-packed.mjs`) does the same check before a release, from outside the workspace. It packs the five packages with `pnpm pack`, inspects each tarball, installs all five together with npm into a temporary folder with `react`, `react-dom` and `vue`, and then checks:
+`pnpm smoke:packed` (`scripts/smoke-packed.mjs`) does the same check before a release, from outside the workspace. It packs every package with `pnpm pack`, in the order above, and inspects each tarball: not private, `exports`, `main`, `module` and `types` all in `dist` and present, no reference to `src`, no `workspace:` range left in its dependencies, and nothing in it but `dist`, `LICENSE`, `README.md` and `package.json`. It installs all of them together with npm into a temporary folder with `react`, `react-dom` and `vue`, and then checks:
 
-- Every entry and subpath loads with `import` and with `require`, and both give the same names.
+- Every entry and subpath loads with `import` and with `require`, and both give the same names: `@umber-style/cache` and `@umber-style/server/create-instance` give `default`, and `@umber-style/css/create-instance` loads too.
 - The `react-server` condition gives the server build of the React binding (`readTheme`, no `useTheme`), and under the `react-native` condition `umber-style/react` is the React Native binding.
-- The bindings and the umbrella share one copy of `@umber-style/core`.
+- The bindings and the umbrella share one copy of `@umber-style/core`, and only one is installed.
+- `@umber-style/css` makes a class whose rule is in its cache, and its `create-instance` makes a class with its own key.
 - A styled component renders on the server with a class, and the cache holds its CSS.
+- A styled component over a cache of `@umber-style/cache` renders, and `renderStylesToString` of `@umber-style/server` puts its `<style data-umber>` elements first.
 - TypeScript resolves the declarations of every entry under `moduleResolution` `bundler` and `node16`, with `skipLibCheck` off, including a styled component with a typed theme.
 
 Node cannot load `react-native`, so the test installs a small stand-in with the two values the binding imports. It removes its temporary folder, unless it is given `--keep`, and needs the network for npm.
