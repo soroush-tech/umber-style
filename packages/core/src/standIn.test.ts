@@ -64,3 +64,12 @@ describe('the helpers with a stand-in', () => {
     expect(() => alpha(other, 0.5)).toThrow('alpha(): the color must be a string, got object')
   })
 })
+
+describe('listing the keys of a stand-in', () => {
+  it('throws, so that two functions that only list keys do not get one name', () => {
+    const theme = createStandIn('') as unknown as { palette: Record<string, string> }
+
+    expect(() => Object.keys(theme.palette)).toThrow(/cannot list the keys of "palette"/)
+    expect(() => ({ ...theme.palette })).toThrow(TypeError)
+  })
+})
