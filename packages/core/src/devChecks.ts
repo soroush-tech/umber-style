@@ -17,7 +17,7 @@ export function isDevelopment(): boolean {
 }
 
 /**
- * The function that asks for a check of the page: it runs `findMissingStyles` once, after the calls
+ * The function that asks for a check of `page` (the document by default): it runs `findMissingStyles` once, after the calls
  * have stopped for a short while, and warns once for each problem (never again for the same one). The
  * rules given to it are asked about in the same run: a declaration that the browser does not support
  * (`findUnsupportedDeclarations`) is warned about once for each message. Where the browser cannot be
@@ -25,7 +25,8 @@ export function isDevelopment(): boolean {
  */
 export function createDevChecker(
   prefix: string,
-  delay = CHECK_DELAY
+  delay = CHECK_DELAY,
+  page: Document = document
 ): (rules?: readonly string[]) => void {
   const warned = new Set<string>()
   const supports = findBrowserSupports()
@@ -38,7 +39,7 @@ export function createDevChecker(
   }
   const run = (): void => {
     timer = undefined
-    for (const problem of findMissingStyles(document, { prefix })) {
+    for (const problem of findMissingStyles(page, { prefix })) {
       warn(problem.key, problem.message)
     }
     if (!supports) return

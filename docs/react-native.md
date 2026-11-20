@@ -274,6 +274,8 @@ The package exports `add`, `subtract`, `multiply`, `divide`, `negate` and `alpha
 
 `umber-style/react` is the same API, typed for both platforms, and resolves to this binding under the `react-native` export condition: see [Style sheets and the style prop](style-sheets.md).
 
+`CacheProvider` exists so that one source compiles for both platforms: it renders its children, and its `value` is not read.
+
 ## Limits
 
 - **The React Native binding was never run in a real app.** The tests alias the one import of the platform (`react-native`) to a stand-in whose `StyleSheet.create` returns its input and whose `Appearance` is a stub, and they use plain host components that record their props. The styles were compiled against the real `react-native` types.

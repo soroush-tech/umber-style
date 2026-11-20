@@ -168,6 +168,25 @@ export interface Engine<T> {
     styles: readonly StyleInput[],
     inherited?: readonly StyleInput[]
   ): Styler
+  /**
+   * The engine of the same theme over `cache`: this engine for its own cache, else one made on first
+   * call and kept while the cache lives. It has the token options of this engine; its prefix is that of
+   * `cache`, for classes and variables alike, and the other options of a cache are those `cache` was made
+   * with. The engines share one base theme: `setTheme` of either is the base of both. What a cache
+   * provider gives a subtree.
+   */
+  withCache(cache: Cache): Engine<T>
+  /**
+   * Entries of this engine's cache for `entries` (an object sheet, or what a themed sheet resolved to):
+   * each key is `cache.adoptEntry` of the entry, made on first read; one record for each record given.
+   */
+  adoptSheet<K extends string>(entries: SheetEntries<K>): SheetEntries<K>
+}
+
+/** What the engines of one theme share: the base theme, and the engine of each cache. */
+interface EngineFamily<T> {
+  theme: T | undefined
+  engines: WeakMap<Cache, Engine<T>>
 }
 
 /** `text` in kebab-case: ButtonBase gives button-base. */
@@ -195,6 +214,14 @@ function createTokenSignature(values: readonly unknown[]): string {
 
 /** Makes an engine that has no theme yet: it takes one from `setTheme`, or from the first `themeClass`. It needs no framework. */
 export function createLazyEngine<T extends object = Theme>(options: EngineOptions = {}): Engine<T> {
+  return createFamilyEngine(options, { theme: undefined, engines: new WeakMap() })
+}
+
+/** Makes an engine of `family`: its cache is the one in `options` or a new one; its base theme is the family's. */
+function createFamilyEngine<T extends object>(
+  options: EngineOptions,
+  family: EngineFamily<T>
+): Engine<T> {
   const { cache: given, suffix, hasLabels, hasLayers, hasPruning, hasColorFallbacks } = options
   const { hasScope, hasBaseClass, hasDevChecks, hasValueRepair } = options
   const { alwaysDeclare = [] } = options
@@ -221,22 +248,19 @@ export function createLazyEngine<T extends object = Theme>(options: EngineOption
       tokenSignature: createTokenSignature([rawKeys, lengthKeys, modes, registered, alwaysDeclare]),
     })
   const tokenOptions = { prefix, rawKeys, lengthKeys, modes, registered }
-  let baseTheme: T | undefined
+  // The base theme is the family's; the tokens are this engine's (its prefix), made from the base theme
+  // they were last made from, and made again when the family has another one.
+  let tokensTheme: T | undefined
   let tokens: Tokens<T> | undefined
   // Counts the base themes, so that a sheet made from a function is made again for a new one.
   let version = 0
 
-  const readTokens = (): Tokens<T> => {
-    if (!tokens) throw new Error(NO_THEME_MESSAGE)
-    return tokens
-  }
-  // Steps written as a function of the theme are resolved against the references when a rule is written.
-  cache.setKeyframesTheme(() => readTokens().refs)
-
-  const setTheme = (theme: T) => {
-    if (theme === baseTheme) return
-    baseTheme = theme
-    tokens = createTokens(theme, tokenOptions)
+  /** Makes the tokens of the base theme of the family, when they were made from another one or not yet. */
+  const sync = (): void => {
+    const theme = family.theme
+    if (theme === tokensTheme) return
+    tokensTheme = theme
+    tokens = createTokens(theme as T, tokenOptions)
     views = new WeakMap()
     recentViews = []
     // A registered variable gets its @property rule when a rule first uses it.
@@ -246,11 +270,25 @@ export function createLazyEngine<T extends object = Theme>(options: EngineOption
     version++
   }
 
+  const readTokens = (): Tokens<T> => {
+    sync()
+    if (!tokens) throw new Error(NO_THEME_MESSAGE)
+    return tokens
+  }
+  // Steps written as a function of the theme are resolved against the references when a rule is written.
+  cache.setKeyframesTheme(() => readTokens().refs)
+
+  const setTheme = (theme: T) => {
+    family.theme = theme
+    sync()
+  }
+
   // A view keeps the base value as the fallback of a reference token, so a new base makes new views.
   let views = new WeakMap<object, T>()
   // The last views made that differ from each other, newest first, for a new theme object to reuse.
   let recentViews: T[] = []
   const createThemeView = (realTheme: T): T => {
+    sync()
     let view = views.get(realTheme)
     if (view === undefined) {
       const made = (tokens ?? createTokens(realTheme, tokenOptions)).createView(realTheme)
@@ -267,7 +305,7 @@ export function createLazyEngine<T extends object = Theme>(options: EngineOption
   // A theme object is read once per color scheme: a theme object is not changed after it is used.
   const themeClasses = new WeakMap<object, Map<string, string>>()
   const themeId = (partial: DeepPartial<T>, colorScheme?: ColorScheme) => {
-    if (!tokens) setTheme(partial as T)
+    if (family.theme === undefined) setTheme(partial as T)
     const key = colorScheme ?? ''
     const known = themeClasses.get(partial) ?? new Map<string, string>()
     themeClasses.set(partial, known)
@@ -281,7 +319,7 @@ export function createLazyEngine<T extends object = Theme>(options: EngineOption
   // The root rule of a theme object is worked out once per color scheme, like a theme class.
   const roots = new WeakMap<object, Map<string, [string, Record<string, string>]>>()
   const declareRoot = (theme: T, colorScheme?: ColorScheme) => {
-    if (!tokens) setTheme(theme)
+    if (family.theme === undefined) setTheme(theme)
     const key = colorScheme ?? ''
     const known = roots.get(theme) ?? new Map<string, [string, Record<string, string>]>()
     roots.set(theme, known)
@@ -328,8 +366,10 @@ export function createLazyEngine<T extends object = Theme>(options: EngineOption
           }
           return entries
         }
+        // Reading the tokens first makes them again for a new base theme, which counts a new version.
+        const { refs } = readTokens()
         if (baseEntries === undefined || madeAt !== version) {
-          baseEntries = createEntries(styles(readTokens().refs))
+          baseEntries = createEntries(styles(refs))
           madeAt = version
         }
         return baseEntries
@@ -474,16 +514,27 @@ export function createLazyEngine<T extends object = Theme>(options: EngineOption
     }
   }
 
-  return {
+  // The record of this cache's entries for each record of entries given.
+  const adoptedSheets = new WeakMap<object, SheetEntries<string>>()
+  const adoptSheet = <K extends string>(entries: SheetEntries<K>): SheetEntries<K> => {
+    let adopted = adoptedSheets.get(entries)
+    if (adopted === undefined) {
+      adopted = createLazyRecord(Object.keys(entries), (key) => cache.adoptEntry(entries[key as K]))
+      adoptedSheets.set(entries, adopted)
+    }
+    return adopted as SheetEntries<K>
+  }
+
+  const engine: Engine<T> = {
     cache,
     css: cache.css,
     resolveGlobal,
     insertGlobal,
     get hasTheme() {
-      return baseTheme !== undefined
+      return family.theme !== undefined
     },
     get baseTheme() {
-      return baseTheme
+      return family.theme
     },
     get refs() {
       return readTokens().refs
@@ -501,7 +552,14 @@ export function createLazyEngine<T extends object = Theme>(options: EngineOption
     whenScheme: createSchemeKey,
     createSheet,
     createStyler,
+    // The engine of another cache keeps the token options; its prefix is that cache's.
+    withCache: (other) =>
+      family.engines.get(other) ??
+      createFamilyEngine({ ...options, prefix: undefined, cache: other }, family),
+    adoptSheet,
   }
+  family.engines.set(cache, engine)
+  return engine
 }
 
 /** Makes the engine of one theme shape: a cache, the theme as variables, and what the bindings build on. It needs no framework. */

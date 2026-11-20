@@ -6,7 +6,8 @@ import {
   useRef,
   type ReactElement,
 } from 'react'
-import type { Engine, GlobalRules } from '@umber-style/core'
+import type { Cache, Engine, GlobalRules } from '@umber-style/core'
+import { useProvidedCache } from './CacheProvider'
 import type { GlobalProps } from './types'
 
 /** What is released while nothing is written. */
@@ -29,23 +30,26 @@ function insertSets<T>(engine: Engine<T>, sets: readonly GlobalRules[]): () => v
  * styles share them, and an effect that runs twice in development writes them back. Rules that a server
  * render sent are taken over, not written again. Where there is no document (a server render) no effect
  * runs and nothing unmounts, so the rules are written for good, during the render, and the style
- * elements that `createGlobalElements` gives are rendered.
+ * elements that `createGlobalElements` gives are rendered. Under a `CacheProvider` the rules go to the
+ * cache it gives, through the engine over that cache, and no style element is rendered.
  */
 export function createGlobal<T>(
   engine: Engine<T>,
-  useThemeView: () => T,
+  useThemeView: (cache?: Cache) => T,
   createGlobalElements: (sets: readonly GlobalRules[]) => ReactElement[]
 ) {
   return function Global({ styles }: GlobalProps<T>): ReactElement | null {
-    const view = useThemeView()
-    const sets = useMemo(() => engine.resolveGlobal(styles, view), [styles, view])
+    const cache = useProvidedCache()
+    const local = cache === undefined ? engine : engine.withCache(cache)
+    const view = useThemeView(cache)
+    const sets = useMemo(() => local.resolveGlobal(styles, view), [local, styles, view])
     // The release of the rules in the page: the new ones are written before the old ones are released.
     const held = useRef(releaseNothing)
     useInsertionEffect(() => {
       const previous = held.current
-      held.current = insertSets(engine, sets)
+      held.current = insertSets(local, sets)
       previous()
-    }, [sets])
+    }, [local, sets])
     useInsertionEffect(
       () => () => {
         held.current()
@@ -54,7 +58,8 @@ export function createGlobal<T>(
       []
     )
     if (typeof document !== 'undefined') return null
-    insertSets(engine, sets)
+    insertSets(local, sets)
+    if (cache !== undefined) return null
     const elements = createGlobalElements(sets)
     return elements.length === 0 ? null : createElement(Fragment, null, ...elements)
   }

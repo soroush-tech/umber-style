@@ -2,8 +2,10 @@ import type { ElementType } from 'react'
 import {
   createComponentSelector,
   flattenStyle,
+  type Cache,
   type Engine,
   type StyleInput,
+  type Styler,
 } from '@umber-style/core'
 import { isDomProp } from './domProps'
 import type { StyledOptions, StyledStatics } from './types'
@@ -31,18 +33,32 @@ export function prepareStyled<T>(
   const shouldForward = options.shouldForwardProp ?? inner?._shouldForwardProp
   const target = [inner?._target, options.target].filter(Boolean).join(' ') || undefined
   const styler = engine.createStyler(options, styles, inner?._styles)
+  // The styler of the engine over each other cache (a cache provider's), made on first use.
+  const stylers = new WeakMap<Engine<T>, Styler>()
+  const readStyler = (cache: Cache): Styler => {
+    const local = engine.withCache(cache)
+    if (local === engine) return styler
+    let made = stylers.get(local)
+    if (made === undefined) {
+      made = local.createStyler(options, styles, inner?._styles)
+      stylers.set(local, made)
+    }
+    return made
+  }
 
   /**
    * The element, its props and the engine class for `props`; `theme` is the view that function styles
    * read. With `canHold` (the browser), a plain object in `style` makes a class that the element holds:
-   * `hold` counts it, and is undefined when there is nothing to hold.
+   * `hold` counts it, and is undefined when there is nothing to hold. With `cache` (a cache provider's)
+   * the class is made by the engine over that cache, and written there.
    */
-  const resolve = (props: Record<string, unknown>, theme?: T, canHold = false) => {
+  const resolve = (props: Record<string, unknown>, theme?: T, canHold = false, cache?: Cache) => {
+    const own = cache === undefined ? styler : readStyler(cache)
     // Everything in the style prop, entries and plain objects, joins the one class, after the styles.
     // No style attribute is ever rendered.
     const extra = [...flattenStyle(props.style), props.className as string | undefined]
-    const held = canHold && props.style ? styler.getHeldClass(props, extra, theme) : undefined
-    let className = held ? held.className : styler.getClassName(props, extra, theme)
+    const held = canHold && props.style ? own.getHeldClass(props, extra, theme) : undefined
+    let className = held ? held.className : own.getClassName(props, extra, theme)
     if (target) className = className ? `${className} ${target}` : target
     const element = (props.as as ElementType | undefined) ?? baseTag
     const filter = readFilter(element, shouldForward)

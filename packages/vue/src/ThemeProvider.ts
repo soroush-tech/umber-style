@@ -19,6 +19,7 @@ import {
   resolveThemeInput,
   type ThemeInput,
 } from '@umber-style/core'
+import { injectCache } from './CacheProvider'
 
 /** The wrapper of a nested provider: its element and its class string, which `ThemeScope` repeats. */
 export interface ThemeScopeValue {
@@ -29,17 +30,25 @@ export interface ThemeScopeValue {
 /**
  * What the providers of one style give below them: the real theme, its view (references for tokens,
  * the same object while only the values of variables change), and the wrapper of the nearest nested
- * provider (null under the outermost provider, which renders no element; nothing with no provider).
+ * provider (null under the outermost provider, which renders no element; nothing with no provider), and
+ * the engine of the nearest provider: a provider of another engine (under a `CacheProvider`, the engine of
+ * another cache) is the outermost one of its cache.
  */
 export interface ThemeKeys<T> {
   theme: InjectionKey<ComputedRef<T>>
   view: InjectionKey<ComputedRef<T>>
   scope: InjectionKey<ComputedRef<ThemeScopeValue | null>>
+  engine: InjectionKey<Engine<T>>
 }
 
 /** Makes the keys of one style. */
 export function createThemeKeys<T>(): ThemeKeys<T> {
-  return { theme: Symbol('theme'), view: Symbol('view'), scope: Symbol('scope') }
+  return {
+    theme: Symbol('theme'),
+    view: Symbol('view'),
+    scope: Symbol('scope'),
+    engine: Symbol('engine'),
+  }
 }
 
 /**
@@ -55,9 +64,12 @@ export function createThemeKeys<T>(): ThemeKeys<T> {
  * - With `isRoot` it renders no element and makes no rule: the app puts `themeClass(theme)` on an
  *   ancestor, usually `<html>`.
  *
- * Whether a provider is the outermost one, and `isRoot`, are read once, in `setup`.
+ * Whether a provider is the outermost one, and `isRoot`, are read once, in `setup`. Under a
+ * `CacheProvider` it works with the engine over the cache that the provider gives (the same base theme,
+ * the prefix of that cache), and is the outermost one when the nearest provider above it has another
+ * engine: its theme is declared on `:root` in that cache.
  */
-export function createThemeProvider<T extends object>(engine: Engine<T>, keys: ThemeKeys<T>) {
+export function createThemeProvider<T extends object>(baseEngine: Engine<T>, keys: ThemeKeys<T>) {
   return defineComponent({
     name: 'ThemeProvider',
     // The attributes go to the wrapper of a nested provider; the outermost one has no element for them.
@@ -71,8 +83,11 @@ export function createThemeProvider<T extends object>(engine: Engine<T>, keys: T
       isRoot: { type: Boolean, default: false },
     },
     setup(props, { attrs, slots }) {
+      const cache = injectCache()
+      const engine = cache === undefined ? baseEngine : baseEngine.withCache(cache)
       const outer = inject(keys.theme, null)
-      const scope = inject(keys.scope, null)
+      // The scope of a provider of another engine (another cache) is not this one's: it starts its own.
+      const scope = inject(keys.engine, null) === engine ? inject(keys.scope, null) : null
       const isNested = scope !== null && !props.isRoot
       const readOuter = () => outer?.value ?? engine.baseTheme
       const given = computed(() =>
@@ -87,6 +102,7 @@ export function createThemeProvider<T extends object>(engine: Engine<T>, keys: T
         const names = [own, own.startsWith(`${full} `) ? '' : full, engine.scopeClass()]
         return names.filter(Boolean).join(' ')
       })
+      provide(keys.engine, engine)
       provide(keys.theme, merged)
       provide(
         keys.view,

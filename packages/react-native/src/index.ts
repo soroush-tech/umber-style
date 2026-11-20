@@ -24,6 +24,7 @@ export const {
 } = defaults
 
 export { at } from '@umber-style/core'
+export { CacheProvider } from './CacheProvider'
 export * from './alpha'
 export * from './calc'
 export * from './createStyle'

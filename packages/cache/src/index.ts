@@ -41,10 +41,11 @@ export default function createCache(options: UmberCacheOptions): UmberCache {
     onInsert: (name, styles) => cache.insert('', { name, styles }, cache.sheet, true),
   })
   const selector = createStyleSelector(key)
+  // The document the cache serves: that of the sheet given (an iframe's), else the global one.
+  const page = rest.sheet?.document ?? (typeof document === 'undefined' ? undefined : document)
   const sheet: UmberSheet = {
     get tags() {
-      if (typeof document === 'undefined') return []
-      return [...document.querySelectorAll<HTMLStyleElement>(selector)]
+      return page ? [...page.querySelectorAll<HTMLStyleElement>(selector)] : []
     },
   }
   const inserted: Record<string, string | true> = {}

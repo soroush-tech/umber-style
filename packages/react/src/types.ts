@@ -257,6 +257,13 @@ export interface ThemeScopeProps {
   readonly children?: ReactNode
 }
 
+/** The props of `CacheProvider`. */
+export interface CacheProviderProps {
+  /** The cache of the subtree: one that `createCache` of `@umber-style/cache` (or of the core) made. */
+  readonly value: Cache
+  readonly children?: ReactNode
+}
+
 export interface GlobalProps<T> {
   /**
    * The global styles: a handle that `globalStyles` made, a style object, a function of the theme, or a

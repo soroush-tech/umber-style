@@ -50,10 +50,11 @@ Its types are `Styled`, `StyledComponent`, `StyledFactory`, `StyledOptions`, `St
 | `ThemeProvider`, `useTheme`, `themeClass`                  | The theme                                                                              |
 | `ThemeScope`, `useThemeClass`                              | The wrapper of the nearest nested provider, again, for portal content                  |
 | `ThemeContext`                                             | The React context of the real theme, for `useContext` or a consumer                    |
+| `CacheProvider`                                            | Gives a subtree its cache: see [The cache and server packages](cache-and-server.md)    |
 | `when`, `whenScheme`                                       | Keys for [theme conditions](theme-conditions.md)                                       |
 | `add`, `alpha`, `divide`, `multiply`, `negate`, `subtract` | The helpers of [Tokens](tokens.md)                                                     |
 
-Types: `StyleOptions`, `DefaultStyleOptions`, `StyledOptions`, `FilteringStyledOptions`, `StyledStatics`, `StyleProp`, `StyledComponent`, `Styled`, `CreateStyled`, `StyledCall`, `StyledFactory`, `StyledTags`, `PropsOf`, `CssFunction`, `SheetDefinition`, `ThemeProviderProps`, `WebThemeProviderProps`, `ThemeScopeProps`, `Style`, `WebStyle`, `ServerStyle`, `Theme` (the theme of the default style), `Interpolation`, and `ThemeInput` (the type of `theme`). The style types of the core are re-exported too: `CSSObject`, `SerializedStyles`, `Keyframes`, `UmberCache` and the others listed in [Typed styles](typed-styles.md).
+Types: `StyleOptions`, `DefaultStyleOptions`, `StyledOptions`, `FilteringStyledOptions`, `StyledStatics`, `StyleProp`, `StyledComponent`, `Styled`, `CreateStyled`, `StyledCall`, `StyledFactory`, `StyledTags`, `PropsOf`, `CssFunction`, `SheetDefinition`, `ThemeProviderProps`, `WebThemeProviderProps`, `ThemeScopeProps`, `CacheProviderProps`, `Style`, `WebStyle`, `ServerStyle`, `Theme` (the theme of the default style), `Interpolation`, and `ThemeInput` (the type of `theme`). The style types of the core are re-exported too: `CSSObject`, `SerializedStyles`, `Keyframes`, `UmberCache` and the others listed in [Typed styles](typed-styles.md).
 
 `createStyle` returns a `WebStyle`: `styled`, `StyleSheet`, `useStyle`, `apply`, `css`, `keyframes`, `globalStyles`, `Global`, `ThemeProvider`, `ThemeScope`, `ThemeContext`, `useTheme`, `useThemeClass`, `themeClass`, `when`, `whenScheme`, and `engine` and `cache`, the engine and its cache. The default style creates its `ThemeContext` before its engine, so the direct import exists before `configure`. The direct imports have no `engine` or `cache`: use `getEngine()` and `getEngine().cache`. `WebStyleObject` and the other style types (`WebProperties`, `WebNested`, `NestedKey`, `StyleObject`, `AlphaColor`, `SheetEntry`) are re-exported from this package as types, in both builds, and `at` and `alpha` and the arithmetic helpers are exported as values. See [Typed styles](typed-styles.md).
 
@@ -97,6 +98,12 @@ const vueStyle = createVueStyle(theme, { engine })
 
 A `span` styled with the same style in both bindings gets the same class name (this was run).
 
+## A cache for a subtree
+
+`<CacheProvider value={cache}>` gives the subtree below it its cache: the classes, sheet entries, global rules, keyframes, root theme and theme classes of the components below are written there, by the engine of the same theme over that cache, whose prefix is the cache's. A `ThemeProvider` below it, under a provider outside it, is the outermost one of its cache and declares its theme on `:root` there. On a server it turns the automatic style elements off below it, so that a registry is the only output. A cache whose sheet is in an iframe styles a subtree that a portal renders there. One `CacheProvider` serves every style (the default one and those of `createStyle`). See [The cache and server packages](cache-and-server.md).
+
+Until the first `CacheProvider` renders, no component reads it. From then on each styled component reads its context with `use`, which React lets a mounted component start to read without a change in the order of its hooks.
+
 ## Server components
 
 The package has a second build for server components, picked by the `react-server` condition. It has `readTheme` instead of `useTheme`. See [Server rendering](server-rendering.md).
@@ -109,3 +116,4 @@ The package has a second build for server components, picked by the `react-serve
 - Under a nested provider the DOM has one more element; a portal without `ThemeScope` sees the outer theme. See [Themes](themes.md).
 - The default style is a module singleton. Two copies of the package in one app are two engines.
 - An element that is given a plain object in `style` renders a second child next to it, which renders nothing: the element's own state is kept when the object comes and goes (checked in jsdom), but the component's root is then a fragment.
+- `apply`, `themeClass`, `when` and `whenScheme` are not hooks and do not see a `CacheProvider`: read a sheet with `useStyle` under the provider, so that `apply` writes its entries there. The server components build has no `CacheProvider`. The other limits of the provider are in [The cache and server packages](cache-and-server.md).

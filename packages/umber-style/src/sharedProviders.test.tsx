@@ -5,7 +5,14 @@
 import { render } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { expectTypeOf } from 'vitest'
-import { createStyle, ThemeContext, ThemeScope, useThemeClass } from 'umber-style/react'
+import { createCache, createMemorySheet } from 'umber-style'
+import {
+  CacheProvider,
+  createStyle,
+  ThemeContext,
+  ThemeScope,
+  useThemeClass,
+} from 'umber-style/react'
 
 interface HostProps {
   id?: string
@@ -37,5 +44,17 @@ describe('the providers in shared code', () => {
     expectTypeOf(ThemeScope).toBeFunction()
     expectTypeOf(useThemeClass).returns.toEqualTypeOf<string | undefined>()
     expectTypeOf(ThemeContext).not.toBeAny()
+  })
+
+  it('types a CacheProvider around shared code', () => {
+    const own = createStyle({ palette: { text: '#111111' } })
+    const Text = own.styled(Host)({ padding: 4 })
+    const cache = createCache({ prefix: 'shared', sheet: createMemorySheet() })
+    const { container } = render(
+      <CacheProvider value={cache}>
+        <Text id="text" />
+      </CacheProvider>
+    )
+    expect(container.querySelector('#text')).not.toBeNull()
   })
 })

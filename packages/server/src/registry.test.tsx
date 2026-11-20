@@ -1,6 +1,6 @@
-import createCache, { type UmberCache } from '@umber-style/cache'
-import { createStyle } from '@umber-style/react'
-import { createContext, useContext, useState, type ReactNode } from 'react'
+import createCache from '@umber-style/cache'
+import { CacheProvider, createStyle } from '@umber-style/react'
+import { useState, type ReactNode } from 'react'
 import { renderToStaticMarkup, renderToString } from 'react-dom/server'
 
 const theme = { palette: { primary: '#1b5fd1', accent: '#d11b5f' }, space: [0, 4, 8] }
@@ -9,12 +9,6 @@ const theme = { palette: { primary: '#1b5fd1', accent: '#d11b5f' }, space: [0, 4
 let insertedHtml: (() => ReactNode)[] = []
 function useServerInsertedHTML(callback: () => ReactNode): void {
   insertedHtml.push(callback)
-}
-
-/** A stand-in for the cache provider of the React binding: it gives the tree below it its cache. */
-const CacheContext = createContext<UmberCache | undefined>(undefined)
-function CacheProvider({ value, children }: { value: UmberCache; children: ReactNode }) {
-  return <CacheContext.Provider value={value}>{children}</CacheContext.Provider>
 }
 
 // The registry of an app, as it is written for the App Router, with only its imports changed.
@@ -58,33 +52,22 @@ function UmberRegistry({ children }: { children: ReactNode }) {
   return <CacheProvider value={cache}>{children}</CacheProvider>
 }
 
-/** The styling of one cache, made once for it. */
-const styles = new WeakMap<UmberCache, ReturnType<typeof createPage>>()
-function createPage(cache: UmberCache) {
-  const { styled, ThemeProvider, keyframes, Global } = createStyle(theme, {
-    cache,
-    hasServerStyleElements: false,
-  })
-  const fade = keyframes({ from: { opacity: 0 }, to: { opacity: 1 } })
-  const Hero = styled('section', { name: 'Hero' })(({ theme: view }) => ({
-    color: view.palette.primary,
-    padding: view.space[2],
-    animation: `${fade} 1s`,
-  }))
-  return function Page() {
-    return (
-      <ThemeProvider theme={theme}>
-        <Global styles={{ body: { margin: 0 } }} />
-        <Hero>Hello</Hero>
-      </ThemeProvider>
-    )
-  }
-}
+// The styling of the app, made once, with its defaults: the automatic style elements are on, and a
+// CacheProvider turns them off below it, so that the registry is the only output.
+const { styled, ThemeProvider, keyframes, Global } = createStyle(theme)
+const fade = keyframes({ from: { opacity: 0 }, to: { opacity: 1 } })
+const Hero = styled('section', { name: 'Hero' })(({ theme: view }) => ({
+  color: view.palette.primary,
+  padding: view.space[2],
+  animation: `${fade} 1s`,
+}))
 function Page() {
-  const cache = useContext(CacheContext) as UmberCache
-  const Made = styles.get(cache) ?? createPage(cache)
-  styles.set(cache, Made)
-  return <Made />
+  return (
+    <ThemeProvider theme={theme}>
+      <Global styles={{ body: { margin: 0 } }} />
+      <Hero>Hello</Hero>
+    </ThemeProvider>
+  )
 }
 
 /** One request: the HTML of the app, and what the registry inserts into the stream. */
@@ -131,6 +114,18 @@ describe('the registry of an app', () => {
     expect(names.split(' ')).toContain(heroClass)
     expect(css).toContain(`.${heroClass}{color:var(--soroush-palette-primary);`)
     expect(css).not.toContain('--soroush-palette-accent')
+  })
+
+  it('is the only output under the CacheProvider: each rule is sent once in all that the request writes', () => {
+    const { html, head } = renderOnServer()
+    const output = html + head
+    expect(html).not.toContain('<style')
+    expect(html).not.toContain('<meta')
+    const css = /<style data-umber="[^"]+">(.*?)<\/style>/.exec(head)?.[1] as string
+    const rules =
+      css.match(/@layer [\w-]+\{.*?\}\}|@keyframes [\w-]+\{.*?\}\}|@layer [^{]+;/g) ?? []
+    expect(rules.length).toBeGreaterThan(4)
+    for (const rule of rules) expect(output.split(rule)).toHaveLength(2)
   })
 
   it('flushes each rule once: a second flush of the same request writes nothing', () => {

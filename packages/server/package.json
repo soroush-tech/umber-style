@@ -62,6 +62,7 @@
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@umber-style/cache": "workspace:*",
+    "@umber-style/css": "workspace:*",
     "@umber-style/eslint-config": "workspace:*",
     "@umber-style/react": "workspace:*",
     "@vitest/coverage-v8": "^5.1.0",

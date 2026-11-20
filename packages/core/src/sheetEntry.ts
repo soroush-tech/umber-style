@@ -1,3 +1,4 @@
+import type { Cache } from './cache'
 import type { StyleObject } from './serialize'
 import type { WebStyleObject } from './webStyle'
 
@@ -12,6 +13,8 @@ export type EntryRole = 'components' | 'overrides'
 export interface EntrySource {
   /** The style of the entry, merged. */
   readonly style: StyleObject
+  /** The cache that made the entry, whose rules `use` writes. */
+  readonly cache: Cache
   /** The class name for `role`; its rule is written, once, the first time it is asked for. */
   use(role: EntryRole): string
 }
@@ -50,6 +53,15 @@ export function isSheetEntry(value: unknown): value is SheetEntry {
 /** What a cache gave `entry` to make its classes, or undefined for an entry that is only a name. */
 export function readEntrySource(entry: SheetEntry): EntrySource | undefined {
   return (entry as unknown as Record<symbol, EntrySource | undefined>)[SOURCE]
+}
+
+/** The cache that made the first entry among `values` that a cache made, or undefined when there is none. */
+export function findEntryCache(values: readonly unknown[]): Cache | undefined {
+  for (const value of values) {
+    const source = isSheetEntry(value) ? readEntrySource(value) : undefined
+    if (source) return source.cache
+  }
+  return undefined
 }
 
 /**

@@ -115,6 +115,13 @@ export interface Sheet {
    * count as written, and every class is permanent (see `Cache.cssHeld`).
    */
   remove?(index: number): void
+  /**
+   * The document whose style element holds the rules (`createDomSheet` gives the document of its
+   * container). The cache reads that document: the style elements a server left there, the stamp of its
+   * options, and in development the check of the page. None for a sheet in memory: the cache then reads
+   * the global `document`, where there is one.
+   */
+  readonly document?: Document
 }
 
 /** The rules of one set of global styles, resolved for a theme. */
@@ -206,6 +213,13 @@ export interface Cache {
   createEntry(style: WebStyleObject): SheetEntry
   /** The entry that `createEntry` made, by the class name it has when used on its own, for a framework that merged entries into one object. */
   findEntry(className: string): SheetEntry | undefined
+  /**
+   * This cache's entry for the style of `entry`: `entry` itself when this cache made it (or no cache did:
+   * it is only a name), else an entry of this cache for the same style, made once for each entry, so that
+   * its rule is written here and not in the cache that made `entry`. The cache does this itself for every
+   * entry it is given; a binding calls it for entries that it hands on (a sheet under a cache provider).
+   */
+  adoptEntry(entry: SheetEntry): SheetEntry
   /** Whether a component's styles are split into a base class and a props class. */
   readonly hasBaseClass: boolean
   /**
@@ -352,14 +366,17 @@ function deleteCssRule(rule: CSSRule): void {
 }
 
 /**
- * A sheet in the style element marked `data-style="<key>"`, which it creates when there is none. It keeps
- * the browser's object of each rule it inserts, and removes a rule by finding where that object is at the
- * time, so rules that others insert into or delete from the element do not confuse it.
+ * A sheet in the style element marked `data-style="<key>"` of the document of `container`, which it
+ * creates in `container` when that document has none. It keeps the browser's object of each rule it
+ * inserts, and removes a rule by finding where that object is at the time, so rules that others insert
+ * into or delete from the element do not confuse it. Its `document` is that document: a cache over it
+ * reads that one (an iframe's, for a container in the iframe).
  */
 export function createDomSheet(key: string, container: Node = document.head): Sheet {
-  let element = document.querySelector<HTMLStyleElement>(`style[data-style="${key}"]`)
+  const owner = container.ownerDocument as Document
+  let element = owner.querySelector<HTMLStyleElement>(`style[data-style="${key}"]`)
   if (!element) {
-    element = document.createElement('style')
+    element = owner.createElement('style')
     element.dataset.style = key
     container.appendChild(element)
   }
@@ -368,6 +385,7 @@ export function createDomSheet(key: string, container: Node = document.head): Sh
   const objects: CSSRule[] = []
   return {
     rules,
+    document: owner,
     insert(rule) {
       try {
         const index = sheet.insertRule(rule, sheet.cssRules.length)
@@ -393,9 +411,9 @@ export function createStyleSelector(prefix: string): string {
   return `style[data-style="${prefix}"], style[data-precedence="${prefix}"], style[data-umber~="${prefix}"], style[data-umber~="${prefix}-global"]`
 }
 
-/** The stamp of the options that the server wrote: on a style element, or on the `<meta>` that a server component renders. */
-function readServerStamp(prefix: string): string | undefined {
-  const element = document.querySelector<HTMLElement>(
+/** The stamp of the options that the server wrote in `page`: on a style element, or on the `<meta>` that a server component renders. */
+function readServerStamp(page: Document, prefix: string): string | undefined {
+  const element = page.querySelector<HTMLElement>(
     `style[data-style="${prefix}"][data-options], meta[name="${prefix}-options"]`
   )
   return element?.dataset.options ?? element?.getAttribute('content') ?? undefined
@@ -465,11 +483,13 @@ function addThemeReferences(
 
 /**
  * Splits `values` into the styles to merge (the style of an entry a cache made, registered classes
- * resolved back) and the class names to pass through. `sole` is the entry when the one style is its own.
+ * resolved back) and the class names to pass through. `sole` is the entry when the one style is its own;
+ * an entry of another cache is first made this cache's own with `adopt`.
  */
 function sortClassValues(
   values: readonly ClassValue[],
-  registered: ReadonlyMap<string, StyleObject>
+  registered: ReadonlyMap<string, StyleObject>,
+  adopt: (entry: SheetEntry) => SheetEntry
 ): { styles: StyleObject[]; rawClasses: string[]; sole: EntrySource | undefined } {
   const styles: StyleObject[] = []
   const rawClasses: string[] = []
@@ -480,7 +500,7 @@ function sortClassValues(
       styles.push(value)
       continue
     }
-    const source = typeof value === 'string' ? undefined : readEntrySource(value)
+    const source = typeof value === 'string' ? undefined : readEntrySource(adopt(value))
     if (source) {
       styles.push(source.style)
       entry = source
@@ -519,14 +539,16 @@ export function createCache(options: CacheOptions = {}): Cache {
     hasValueRepair,
     tokens: options.tokenSignature ?? '',
   })
-  const hasDocument = typeof document !== 'undefined'
-  if (hasDocument) {
-    const stamp = readServerStamp(prefix)
+  // The document the cache serves: that of its sheet, else the global one where there is one.
+  const page: Document | undefined =
+    options.sheet?.document ?? (typeof document === 'undefined' ? undefined : document)
+  if (page) {
+    const stamp = readServerStamp(page, prefix)
     const difference = stamp === undefined ? '' : describeFingerprintDifferences(stamp, fingerprint)
     if (difference !== '') throw new Error(difference)
   }
-  const { hasDevChecks = hasDocument && isDevelopment() } = options
-  const checkLater = hasDevChecks ? createDevChecker(prefix) : undefined
+  const { hasDevChecks = page !== undefined && isDevelopment() } = options
+  const checkLater = hasDevChecks ? createDevChecker(prefix, undefined, page) : undefined
   // The ids of what is written, or was found on the page: class names, the layer order, `@property` rules.
   const insertedIds = new Set<string>()
   const used = new Set<string>()
@@ -536,9 +558,7 @@ export function createCache(options: CacheOptions = {}): Cache {
   const pageThemes = new Map<string, Set<string>>()
   // The class a props class was made after (its base class), by class name.
   const afters = new Map<string, string>()
-  const sheet =
-    options.sheet ??
-    (typeof document === 'undefined' ? createMemorySheet() : createDomSheet(prefix))
+  const sheet = options.sheet ?? (page ? createDomSheet(prefix, page.head) : createMemorySheet())
   const registered = new Map<string, StyleObject>()
   const entries = new Map<string, SheetEntry>()
   const scoping = { prefix, hasScope }
@@ -961,7 +981,7 @@ export function createCache(options: CacheOptions = {}): Cache {
 
   const cssWith = (options: ClassOptions, ...values: ClassValue[]): string => {
     const { layer = 'components', label, after = '' } = options
-    const { styles, rawClasses, sole } = sortClassValues(values, registered)
+    const { styles, rawClasses, sole } = sortClassValues(values, registered, adoptEntry)
     if (sole && after === '') return [...rawClasses, sole.use(layer)].filter(Boolean).join(' ')
     const prepared = prepareClass(layer, label, after, styles)
     if (prepared === undefined) return rawClasses.join(' ')
@@ -1014,7 +1034,7 @@ export function createCache(options: CacheOptions = {}): Cache {
   const findPageRules = (className: string, count: number): CSSRule[] | undefined => {
     const pattern = new RegExp(`\\.${className.replace(/[^\w-]/g, '\\$&')}(?![\\w-])`)
     const found: CSSRule[] = []
-    for (const element of document.querySelectorAll<HTMLStyleElement>(
+    for (const element of (page as Document).querySelectorAll<HTMLStyleElement>(
       createStyleSelector(prefix)
     )) {
       for (const rule of element.sheet?.cssRules ?? []) {
@@ -1059,7 +1079,7 @@ export function createCache(options: CacheOptions = {}): Cache {
 
   const cssHeld = (options: Omit<ClassOptions, 'after'>, ...values: ClassValue[]): HeldClass => {
     const { layer = 'components', label } = options
-    const { styles, rawClasses, sole } = sortClassValues(values, registered)
+    const { styles, rawClasses, sole } = sortClassValues(values, registered, adoptEntry)
     if (sole || sheet.remove === undefined) {
       return { className: cssWith(options, ...values), hold: undefined }
     }
@@ -1089,6 +1109,7 @@ export function createCache(options: CacheOptions = {}): Cache {
     }
     const source: EntrySource = {
       style: merged,
+      cache: self,
       use(role) {
         const name = nameFor(role)
         // The class of an entry is permanent, also when the same style was held.
@@ -1103,6 +1124,19 @@ export function createCache(options: CacheOptions = {}): Cache {
     const entry = createSheetEntry(nameFor('components'), source)
     entries.set(nameFor('components'), entry)
     return entry
+  }
+
+  // The entry of this cache made for each entry of another cache, by what that cache gave its entry.
+  const adopted = new WeakMap<EntrySource, SheetEntry>()
+  const adoptEntry = (entry: SheetEntry): SheetEntry => {
+    const source = readEntrySource(entry)
+    if (source === undefined || source.cache === self) return entry
+    let own = adopted.get(source)
+    if (own === undefined) {
+      own = createEntry(source.style as WebStyleObject)
+      adopted.set(source, own)
+    }
+    return own
   }
 
   /** Takes in what rules on the page say: the classes, the layer order, the `@property` and `@keyframes` rules and the themes that are written, and the variables the rules use. */
@@ -1126,7 +1160,7 @@ export function createCache(options: CacheOptions = {}): Cache {
     markUsed(found.variables)
   }
 
-  if (hasDocument) {
+  if (page) {
     // The page is read once here, and again for every style element that arrives later.
     const selector = createStyleSelector(prefix)
     const scanned = new WeakSet<Element>()
@@ -1145,17 +1179,23 @@ export function createCache(options: CacheOptions = {}): Cache {
       }
       for (const index of found.roots) pageRoots.push(objects?.[index])
     }
-    for (const element of document.querySelectorAll(selector)) scan(element)
+    for (const element of page.querySelectorAll(selector)) scan(element)
     // Rules reach the page without a call to the engine: streamed content, a route that a framework
-    // fetches. A watch on the children of <head> notices the elements React hoists there.
-    new MutationObserver((records) => {
+    // fetches. A watch on the children of <head> notices the elements React hoists there, and one on the
+    // children of <body> those that a registry streams after the cache started. Before there is a body,
+    // the root element is watched for it. A node of another document (an iframe's) is not an instance of
+    // this window's `Element`, so the type of the node is read instead.
+    const observer = new MutationObserver((records) => {
       for (const { addedNodes } of records) {
         for (const node of addedNodes) {
-          if (node instanceof Element && node.matches(selector)) scan(node)
+          if (node === page.body) observer.observe(node, { childList: true })
+          else if (node.nodeType === 1 && (node as Element).matches(selector)) scan(node as Element)
         }
       }
       checkLater?.()
-    }).observe(document.head, { childList: true })
+    })
+    observer.observe(page.head, { childList: true })
+    observer.observe(page.body ?? page.documentElement, { childList: true })
     checkLater?.()
   }
 
@@ -1267,7 +1307,7 @@ export function createCache(options: CacheOptions = {}): Cache {
     return { css: global.css + classes.css, ids: [...global.ids, ...classes.ids] }
   }
 
-  return {
+  const self: Cache = {
     prefix,
     hasLayers,
     layerOrder,
@@ -1278,6 +1318,7 @@ export function createCache(options: CacheOptions = {}): Cache {
     cssHeld,
     createEntry,
     findEntry: (className) => entries.get(className),
+    adoptEntry,
     hasBaseClass,
     hasScope,
     hasPruning,
@@ -1308,4 +1349,5 @@ export function createCache(options: CacheOptions = {}): Cache {
     extractPageParts,
     fingerprint,
   }
+  return self
 }

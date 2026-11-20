@@ -114,6 +114,8 @@ const tag = createStyleTag(engine.cache)
 
 `createCache(options)` makes the cache an engine uses. Make one when you want to choose where the rules go, or to share it. The sheet is where rules are inserted: `createMemorySheet()` keeps them in an array, `createDomSheet(key, container?)` writes to the `<style data-style="key">` element, and any object with `insert(rule)` and `rules` is a sheet.
 
+`createDomSheet(key, container)` looks up and creates its style element in the document of `container` (`document.head` by default), and its `document` member is that document. A cache made over it serves that document: it reads the style elements a server left there and those that arrive later as children of its `<head>` or `<body>`, compares the stamp of the options there, and in development checks that page. So a cache for an iframe is `createCache({ prefix: 'frame', sheet: createDomSheet('frame', iframe.contentDocument.head) })` (`cache.document.test.ts`). A sheet with no `document` (one in memory) leaves the cache with the global `document`, where there is one.
+
 ```ts
 import { createCache, createEngine, createMemorySheet } from '@umber-style/core'
 
@@ -126,6 +128,27 @@ engine.css({ padding: engine.refs.space[1] })
 `sheet.rules` is then the layer statement and `@layer umber-components{.umber-d940h0{padding:var(--umber-space-1);}}`.
 
 When you give an engine a cache, its `hasLayers`, `hasBaseClass`, `hasPruning`, `hasColorFallbacks`, `hasScope`, `suffix` and `hasLabels` come from the cache. The engine takes the `prefix` of the cache for its variable names too, so give only the cache. Giving the engine a `prefix` as well is allowed only if it is the same one: a different one throws a `TypeError` that names both prefixes.
+
+## The engine of another cache
+
+`engine.withCache(cache)` is the engine of the same theme over another cache: the engine itself for its own cache, else one made on the first call and kept while the cache lives. It keeps the token options of the engine; its prefix is the cache's, for classes and variables alike. The two share one base theme: `setTheme` of either is the base of both. From `createEngine.withCache.test.ts`:
+
+```ts
+import { createCache, createEngine, createMemorySheet } from '@umber-style/core'
+
+const theme = { palette: { primary: '#0000ff', accent: '#ff0000' }, space: [0, 4, 8] }
+const engine = createEngine(theme, {
+  cache: createCache({ prefix: 'css', sheet: createMemorySheet() }),
+})
+const frame = createCache({ prefix: 'frame', sheet: createMemorySheet() })
+const derived = engine.withCache(frame)
+const name = derived.css({ color: derived.refs.palette.primary })
+derived.declareRoot(theme)
+```
+
+`name` starts with `frame-`, its rule is `color:var(--frame-palette-primary)`, the root rule declares `--frame-palette-primary:#0000ff`, and the first cache has no rule. This is what a `CacheProvider` of a binding uses.
+
+A sheet entry belongs to the cache that made it. Given to another cache (`cssIn('overrides', entry)`, `css(entry, ...)`), its style is written there, under a class of that cache: `cache.adoptEntry(entry)` is that cache's entry for it, made once. `engine.adoptSheet(entries)` does it for each entry of a sheet, and `findEntryCache(values)` is the cache that made the first entry among `values`.
 
 ## An engine with no theme yet
 
@@ -191,4 +214,5 @@ Types include `Engine`, `EngineOptions`, `BindingOptions`, `Cache`, `CacheOption
 
 - `engine.css` returns a class name but does not put it anywhere: apply it to an element yourself.
 - Classes are never removed from a cache. Global rules are, when the function that `insertGlobal` returned is called and nothing else holds them.
-- The core was run in Node and in jsdom. It was not run in a worker or in a real browser by the tests.
+- The core was run in Node and in jsdom. It was not run in a worker or in a real browser by the tests, apart from the browser tests of the core and the iframe test of the React binding.
+- A cache watches the children of the `<head>` and the `<body>` of its document; a style element added deeper is not read.

@@ -19,6 +19,7 @@ describe('the entry of @umber-style/react', () => {
       'keyframes',
       'globalStyles',
       'Global',
+      'CacheProvider',
       'getEngine',
       'configure',
       'createStyle',

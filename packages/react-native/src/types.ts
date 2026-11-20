@@ -1,5 +1,6 @@
 import type {
   BindingOptions,
+  Cache,
   ColorScheme,
   DeepPartial,
   GlobalInput,
@@ -77,6 +78,13 @@ export interface ThemeProviderProps<T> {
   readonly className?: string
   /** Accepted and ignored: there are no classes on React Native, so the provider never renders an element. */
   readonly isRoot?: boolean
+  readonly children?: ReactNode
+}
+
+/** The props of `CacheProvider`: the same as on the web, so that one source compiles for both. */
+export interface CacheProviderProps {
+  /** A cache of the web engine: React Native writes no CSS, so it is not read. */
+  readonly value: Cache
   readonly children?: ReactNode
 }
 

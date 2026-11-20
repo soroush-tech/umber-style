@@ -502,6 +502,9 @@ importers:
       '@umber-style/cache':
         specifier: workspace:*
         version: link:../cache
+      '@umber-style/css':
+        specifier: workspace:*
+        version: link:../css
       '@umber-style/eslint-config':
         specifier: workspace:*
         version: link:../eslint-config

@@ -84,6 +84,10 @@ A nested provider (under an outermost one with the theme above) given `{ palette
 
 There is no theme context to export in Vue: the providers use `provide` and `inject`, and `useTheme` reads them.
 
+## A cache for a subtree
+
+`CacheProvider`, with a `value` prop, gives the components in its slot its cache through `provide` and `inject`, with the same guarantees as in React (see [The cache and server packages](cache-and-server.md)): classes, entries of `useStyle` and `apply` of them, entries and `css()` values in `style`, `Global`, keyframes, the root theme and the theme classes go to that cache, by the engine of the same theme over it (`packages/vue/src/CacheProvider.test.ts`). What differs: `value` is read once, in `setup`, as `isRoot` is; to give the subtree another cache, render another provider (a new `key`). Vue has no automatic style elements, so there is nothing to turn off on a server. `inject` has no order to keep, so a styled component of an app that never sets up a `CacheProvider` makes no call for it, and one of an app that does calls `inject` on each render.
+
 ## Server rendering
 
 `createSSRApp` and `renderToString` from `vue/server-renderer` work, and `createStyleTag(cache)` gives the CSS: see [Server rendering](server-rendering.md). There is no second build for Vue.
@@ -95,6 +99,7 @@ There is no theme context to export in Vue: the providers use `provide` and `inj
 - Whether a provider is the outermost one, and `isRoot`, are read once, in `setup`.
 - Under a nested provider the DOM has one more element; teleported content without `ThemeScope` sees the outer theme. See [Themes](themes.md).
 - The Vue binding has no typed props for styled components.
+- The `value` of `CacheProvider` is read once, in `setup`. `apply`, `themeClass` and `when` do not see a `CacheProvider`: read a sheet with `useStyle` under it.
 - An element given a plain object in `style` gets a function ref of the binding, which counts the class. A `ref` you put on the styled component is not affected.
 - Vue merges the objects of a `style` array by key before the binding sees them, so a sheet entry that appears twice in one array counts once, at its first place: `[a, b, a]` is the same class as `[a, b]`, and `b` wins over `a`, where in React the last `a` wins. Checked with Vue 3.5.45 in jsdom.
 - A sheet entry given to the `style` of a plain element adds nothing to the attribute, on the client and on the server. That was observed in jsdom and in server output, not in a browser.

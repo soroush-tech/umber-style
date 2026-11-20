@@ -4,8 +4,11 @@ import {
   flattenStyle,
   readStyleArguments,
   withTagShorthands,
+  type Cache,
   type Engine,
+  type Styler,
 } from '@umber-style/core'
+import { injectCache } from './CacheProvider'
 import type { Styled, StyledComponent, StyledOptions, StyledStatics } from './types'
 
 /** Whether `tag` is a component made by `styled`. */
@@ -41,9 +44,10 @@ function createHoldRef(hold: () => () => void) {
  * Makes `styled` over an engine: a functional component that renders the tag with one class. A
  * function style gets the view of the theme of the nearest provider, which `useThemeView` reads. In the
  * browser, an element given a plain object in `style` holds the class that the object made, so that the
- * class is removed when no element uses it.
+ * class is removed when no element uses it. Under a `CacheProvider` the class is made by the engine over
+ * the cache it gives, and written there.
  */
-export function createStyled<T>(engine: Engine<T>, useThemeView: () => T): Styled<T> {
+export function createStyled<T>(engine: Engine<T>, useThemeView: (cache?: Cache) => T): Styled<T> {
   const styled =
     (tag: string | Component, options: StyledOptions = {}) =>
     (...args: unknown[]) => {
@@ -54,25 +58,41 @@ export function createStyled<T>(engine: Engine<T>, useThemeView: () => T): Style
       const shouldForward = options.shouldForwardProp ?? inner?._shouldForwardProp
       const target = [inner?._target, options.target].filter(Boolean).join(' ') || undefined
       const styler = engine.createStyler(options, styles, inner?._styles)
+      // The styler of the engine over each other cache (a cache provider's), made on first use.
+      const stylers = new WeakMap<Engine<T>, Styler>()
+      const readStyler = (local: Engine<T>): Styler => {
+        let made = stylers.get(local)
+        if (made === undefined) {
+          made = local.createStyler(options, styles, inner?._styles)
+          stylers.set(local, made)
+        }
+        return made
+      }
 
       const Styled: StyledComponent = Object.assign(
         (
           _props: Record<string, unknown>,
           { attrs, slots }: Pick<Parameters<StyledComponent>[1], 'attrs' | 'slots'>
         ) => {
+          const cache = injectCache()
+          const local = cache === undefined ? engine : engine.withCache(cache)
+          const own = local === engine ? styler : readStyler(local)
+          // An entry that Vue merged into an object is found by its name: in the cache of the
+          // provider, else in the engine's, where an entry made at module scope is.
+          const findEntry =
+            local === engine
+              ? engine.cache.findEntry
+              : (name: string) => local.cache.findEntry(name) ?? engine.cache.findEntry(name)
           // Everything in the style attribute, entries and plain objects, joins the one class, after
           // the styles. No style attribute is ever rendered; a string is an error.
-          const extra = [
-            ...flattenStyle(attrs.style, engine.cache.findEntry),
-            normalizeClass(attrs.class),
-          ]
-          const theme = styler.isDynamic ? useThemeView() : undefined
+          const extra = [...flattenStyle(attrs.style, findEntry), normalizeClass(attrs.class)]
+          const theme = own.isDynamic ? useThemeView(cache) : undefined
           // Only the browser lets a class go; a server render keeps every class.
           const held =
             typeof document !== 'undefined' && attrs.style
-              ? styler.getHeldClass(attrs, extra, theme)
+              ? own.getHeldClass(attrs, extra, theme)
               : undefined
-          let className = held ? held.className : styler.getClassName(attrs, extra, theme)
+          let className = held ? held.className : own.getClassName(attrs, extra, theme)
           if (target) className = className ? `${className} ${target}` : target
           const element = (attrs.as as string | Component | undefined) ?? baseTag
           const filter = typeof element === 'string' ? shouldForward : undefined

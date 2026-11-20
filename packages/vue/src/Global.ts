@@ -1,14 +1,7 @@
-import {
-  computed,
-  defineComponent,
-  inject,
-  onUnmounted,
-  watch,
-  type ComputedRef,
-  type InjectionKey,
-  type PropType,
-} from 'vue'
+import { computed, defineComponent, inject, onUnmounted, watch, type PropType } from 'vue'
 import { EMPTY_THEME, type Engine, type GlobalInput, type GlobalRules } from '@umber-style/core'
+import { injectCache } from './CacheProvider'
+import type { ThemeKeys } from './ThemeProvider'
 
 /** Writes `sets` into the cache of `engine`, in order, and returns the function that releases them all. */
 function insertSets<T>(engine: Engine<T>, sets: readonly GlobalRules[]): () => void {
@@ -27,10 +20,12 @@ function insertSets<T>(engine: Engine<T>, sets: readonly GlobalRules[]): () => v
  * there is no moment with neither. The cache counts the rules of each set, so two components with equal
  * styles share them, and rules that a server render left in the page are taken over. Where there is no
  * document (a server render) nothing unmounts: the rules are written for good, for `extractPageStyles`.
+ * Under a `CacheProvider` the rules go to the cache it gives, through the engine over that cache, with
+ * the view of that engine.
  */
 export function createGlobal<T extends object>(
   engine: Engine<T>,
-  viewKey: InjectionKey<ComputedRef<T>>
+  keys: Pick<ThemeKeys<T>, 'theme' | 'view'>
 ) {
   return defineComponent({
     name: 'Global',
@@ -39,20 +34,27 @@ export function createGlobal<T extends object>(
       styles: { type: [Object, Function, Array] as PropType<GlobalInput<T>>, required: true },
     },
     setup(props) {
-      const outer = inject(viewKey, null)
+      const cache = injectCache()
+      const local = cache === undefined ? engine : engine.withCache(cache)
+      const outerView = inject(keys.view, null)
+      const outerTheme = inject(keys.theme, null)
+      const readOwnTheme = () => engine.baseTheme ?? (EMPTY_THEME as T)
       const sets = computed(() => {
-        const view = outer?.value ?? engine.createThemeView(engine.baseTheme ?? (EMPTY_THEME as T))
-        return engine.resolveGlobal(props.styles, view)
+        const view =
+          local === engine
+            ? (outerView?.value ?? engine.createThemeView(readOwnTheme()))
+            : local.createThemeView(outerTheme?.value ?? readOwnTheme())
+        return local.resolveGlobal(props.styles, view)
       })
       if (typeof document === 'undefined') {
-        insertSets(engine, sets.value)
+        insertSets(local, sets.value)
         return () => null
       }
       const ids = computed(() => sets.value.map(({ id }) => id).join(' '))
-      let release = insertSets(engine, sets.value)
+      let release = insertSets(local, sets.value)
       watch(ids, () => {
         const previous = release
-        release = insertSets(engine, sets.value)
+        release = insertSets(local, sets.value)
         previous()
       })
       onUnmounted(() => release())

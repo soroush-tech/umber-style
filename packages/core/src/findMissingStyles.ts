@@ -29,17 +29,19 @@ const STATE_PATTERN = /:(hover|focus|active|focus-visible|focus-within)\b/
 const NAME_CODES = /[a-z0-9_-]/
 /** A selector that names the root element or the body: `html`, `body` or `:root` as a whole word. */
 const ROOT_PATTERN = /(?:^|[\s>+~(,])(?:html|body)(?![\w-])|:root(?![\w-])/
+/** The type of a style rule (`CSSRule.STYLE_RULE`). */
+const STYLE_RULE = 1
 
-/** The prefix named by the first style element of an engine on the page, or undefined. */
-function findPrefix(): string | undefined {
-  const element = document.querySelector<HTMLElement>('style[data-style], style[data-precedence]')
+/** The prefix named by the first style element of an engine in `page`, or undefined. */
+function findPrefix(page: Document): string | undefined {
+  const element = page.querySelector<HTMLElement>('style[data-style], style[data-precedence]')
   return element?.dataset.style ?? element?.dataset.precedence
 }
 
-/** The style rules under `list`, groups included. */
+/** The style rules under `list`, groups included. A rule of another document (an iframe's) is not an instance of this window's `CSSStyleRule`, so its type is read instead. */
 function collectStyleRules(list: CSSRuleList, found: CSSStyleRule[]): CSSStyleRule[] {
   for (const rule of list) {
-    if (rule instanceof CSSStyleRule) found.push(rule)
+    if (rule.type === STYLE_RULE) found.push(rule as CSSStyleRule)
     else if ('cssRules' in rule) collectStyleRules((rule as CSSGroupingRule).cssRules, found)
   }
   return found
@@ -89,11 +91,11 @@ function isMatched(element: Element, rule: CSSStyleRule): boolean {
   }
 }
 
-/** The rules of the engine's style elements (those of `data-umber` too), each with the variables it uses without a fallback. */
-function collectRules(prefix: string) {
+/** The rules of the engine's style elements in `page` (those of `data-umber` too), each with the variables it uses without a fallback. */
+function collectRules(page: Document, prefix: string) {
   const selector = `style[data-style="${prefix}"], style[data-precedence="${prefix}"], style[data-umber~="${prefix}"], style[data-umber~="${prefix}-global"]`
   const rules: CSSStyleRule[] = []
-  for (const element of document.querySelectorAll<HTMLStyleElement>(selector)) {
+  for (const element of page.querySelectorAll<HTMLStyleElement>(selector)) {
     if (element.sheet) collectStyleRules(element.sheet.cssRules, rules)
   }
   return rules.map((rule) => ({
@@ -179,7 +181,7 @@ function findRootProblems(
 
 /**
  * Looks at a page that an engine styled, and lists what is missing. For each element under `root`
- * (the document by default): every class of the engine on it is named by at least one rule of the
+ * (the document by default; the style elements are read in the document of `root`): every class of the engine on it is named by at least one rule of the
  * engine's style elements (its own, and the ones React hoists), and every variable of the engine that
  * a rule matching the element uses, without a fallback, has a value on the element. The classes that
  * are markers (`<prefix>-boundary`, `<prefix>-scheme-light` and `-dark`) have no rule of their own and
@@ -193,22 +195,27 @@ export function findMissingStyles(
   options: FindMissingStylesOptions = {}
 ): StyleProblem[] {
   if (typeof document === 'undefined') return []
-  const prefix = options.prefix ?? findPrefix()
-  if (prefix === undefined) return []
   const scope = root ?? document
-  const rules = collectRules(prefix)
+  // A document has no owner document: it is its own.
+  const page = (scope as Node).ownerDocument ?? (scope as Document)
+  const prefix = options.prefix ?? findPrefix(page)
+  if (prefix === undefined) return []
+  const rules = collectRules(page, prefix)
   const named = new Set(
     rules.flatMap(({ rule }) => readClassNames(rule.selectorText, `${prefix}-`))
   )
   const markers = new Set([`${prefix}-boundary`, `${prefix}-scheme-light`, `${prefix}-scheme-dark`])
   const problems: StyleProblem[] = []
-  const elements = [...(scope instanceof Element ? [scope] : []), ...scope.querySelectorAll('*')]
+  const elements = [
+    ...((scope as Node).nodeType === 1 ? [scope as Element] : []),
+    ...scope.querySelectorAll('*'),
+  ]
   for (const element of elements) {
     const classes = [...element.classList].filter(
       (name) => name.startsWith(`${prefix}-`) && !markers.has(name)
     )
     if (classes.length === 0) {
-      if (element === document.documentElement || element === document.body) {
+      if (element === page.documentElement || element === page.body) {
         findRootProblems(element, describe(element), rules, `${prefix}-`, problems)
       }
       continue

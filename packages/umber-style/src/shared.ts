@@ -4,11 +4,17 @@
 // `react-server` custom condition the entry points at `shared.server.ts` instead. This file holds types
 // and declarations only: it is never loaded.
 import type { Context, ReactElement } from 'react'
-import type { DefaultStyleOptions, StyleOptions, Theme, ThemeScopeProps } from '@umber-style/react'
+import type {
+  CacheProviderProps,
+  DefaultStyleOptions,
+  StyleOptions,
+  Theme,
+  ThemeScopeProps,
+} from '@umber-style/react'
 import type { SharedStyleBase } from './sharedCommon'
 
 export * from './sharedCommon'
-export type { ThemeScopeProps }
+export type { CacheProviderProps, ThemeScopeProps }
 
 /** The options of `useMediaQuery`, the same on both platforms. */
 export interface MediaQueryOptions {
@@ -32,6 +38,8 @@ export declare const useTheme: SharedStyle<Theme>['useTheme']
 export declare const ThemeContext: SharedStyle<Theme>['ThemeContext']
 export declare const ThemeScope: SharedStyle<Theme>['ThemeScope']
 export declare const useThemeClass: SharedStyle<Theme>['useThemeClass']
+/** On the web, gives the subtree its cache: the rules of its components go there; on React Native, its children. */
+export declare function CacheProvider(props: CacheProviderProps): ReactElement
 /** Whether the media query matches: the window on React Native, `matchMedia` on the web, where a server render gives `defaultMatches`, false when it is not given. */
 export declare function useMediaQuery(query: string, options?: MediaQueryOptions): boolean
 export declare function createStyle<T extends object>(

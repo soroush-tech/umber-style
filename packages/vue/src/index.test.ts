@@ -18,6 +18,7 @@ describe('the entry of @umber-style/vue', () => {
       'keyframes',
       'globalStyles',
       'Global',
+      'CacheProvider',
       'getEngine',
       'configure',
       'createStyle',

@@ -1,4 +1,5 @@
 import {
+  createDomSheet,
   createEngine,
   createMemorySheet,
   type UmberCache as CoreUmberCache,
@@ -164,5 +165,24 @@ describe('a cache made in the browser', () => {
     expect(seen).toEqual([])
     const own = document.querySelector<HTMLStyleElement>('style[data-style="soroush"]')
     expect(own?.sheet?.cssRules).toHaveLength(0)
+  })
+
+  it('reads the document of its sheet: the style elements of an iframe, and not those of the page', () => {
+    writeRegistryPage()
+    const iframe = document.createElement('iframe')
+    document.body.appendChild(iframe)
+    const frame = iframe.contentDocument as Document
+    frame.head.innerHTML =
+      '<style data-umber="soroush soroush-framed">.soroush-framed{color:red;}</style>'
+    const cache = createCache({
+      key: 'soroush',
+      sheet: createDomSheet('soroush', frame.head),
+      hasDevChecks: false,
+    })
+    expect(cache.sheet.tags.map((tag) => tag.getAttribute('data-umber') ?? 'own')).toEqual([
+      'soroush soroush-framed',
+      'own',
+    ])
+    expect(cache.inserted).toEqual({ 'soroush-framed': true })
   })
 })

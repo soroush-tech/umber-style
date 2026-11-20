@@ -15,6 +15,7 @@ import {
   type DeepPartial,
   type Engine,
 } from '@umber-style/core'
+import { useProvidedCache } from './CacheProvider'
 import type { ThemeContexts, ThemeScopeValue } from './ThemeValue'
 import type { WebThemeProviderProps } from './types'
 
@@ -49,10 +50,15 @@ export interface ThemeProviderParts<T> {
  *   of its own, usually `<html>`.
  *
  * On a server, where the build renders style elements, it sends those of its rules, and the stamp.
+ *
+ * Under a `CacheProvider` it works with the engine over the cache that the provider gives (the same base
+ * theme, the prefix of that cache), sends no style element, and is the outermost one when the nearest
+ * provider above it has another engine: its theme is declared on `:root` in that cache, which is the root
+ * of the document of that cache (an iframe's).
  */
 export function createThemeProvider<T extends object>({
-  engine,
-  contexts: { ThemeContext, ViewContext, ScopeContext },
+  engine: baseEngine,
+  contexts: { ThemeContext, ViewContext, ScopeContext, EngineContext },
   getServerStyle,
 }: ThemeProviderParts<T>) {
   return function ThemeProvider({
@@ -63,10 +69,15 @@ export function createThemeProvider<T extends object>({
     isRoot,
     children,
   }: WebThemeProviderProps<T>): ReactElement {
+    const cache = useProvidedCache()
+    const engine = cache === undefined ? baseEngine : baseEngine.withCache(cache)
+    const above = useContext(EngineContext)
+    // The scope of a provider of another engine (another cache) is not this one's: it starts its own.
     const scope = useContext(ScopeContext)
+    const ownScope = above === engine ? scope : undefined
     const outer = useContext(ThemeContext) ?? engine.baseTheme
-    const isOutermost = scope === undefined && !isRoot
-    const isNested = scope !== undefined && !isRoot
+    const isOutermost = ownScope === undefined && !isRoot
+    const isNested = ownScope !== undefined && !isRoot
     const given = useMemo(
       () => resolveThemeInput(theme, outer ?? (EMPTY_THEME as T)),
       [theme, outer]
@@ -80,22 +91,27 @@ export function createThemeProvider<T extends object>({
       const full = engine.themeId(merged as DeepPartial<T>, colorScheme)
       const names = [own, own.startsWith(`${full} `) ? '' : full, engine.scopeClass(), className]
       return { as, className: names.filter(Boolean).join(' ') }
-    }, [isNested, given, merged, colorScheme, className, as])
+    }, [engine, isNested, given, merged, colorScheme, className, as])
     useInsertionEffect(() => {
       if (isOutermost) engine.declareRoot(merged, colorScheme)
-    }, [isOutermost, merged, colorScheme])
+    }, [engine, isOutermost, merged, colorScheme])
     const hasDocument = typeof document !== 'undefined'
     const rootId = isOutermost && !hasDocument ? engine.declareRoot(merged, colorScheme) : undefined
 
     const content = (
-      <ThemeContext.Provider value={merged}>
-        <ViewContext.Provider value={engine.createThemeView(merged)}>
-          <ScopeContext.Provider value={wrapper ?? scope ?? null}>{children}</ScopeContext.Provider>
-        </ViewContext.Provider>
-      </ThemeContext.Provider>
+      <EngineContext.Provider value={engine}>
+        <ThemeContext.Provider value={merged}>
+          <ViewContext.Provider value={engine.createThemeView(merged)}>
+            <ScopeContext.Provider value={wrapper ?? ownScope ?? null}>
+              {children}
+            </ScopeContext.Provider>
+          </ViewContext.Provider>
+        </ThemeContext.Provider>
+      </EngineContext.Provider>
     )
     const element = wrapper ? createElement(as, { className: wrapper.className }, content) : content
-    const server = getServerStyle()
+    // Under a cache provider the app sends the rules of its cache itself.
+    const server = cache === undefined ? getServerStyle() : undefined
     if (server === undefined) return element
     // The rules that this provider stands for: its wrapper's classes, its root theme, or for `isRoot` the
     // theme classes that the app already made for its theme.

@@ -60,7 +60,7 @@ An engine makes its own cache from the options that are shared with the cache. I
 | `hasScope`          | `boolean` | `true`                                                         | Whether conditional rules use `@scope`                                                                                                     |
 | `sheet`             | `Sheet`   | a DOM sheet when `document` exists, otherwise an in-memory one | Where rules go                                                                                                                             |
 
-A `Sheet` has `insert(rule)`, a readonly `rules` list, and optionally `replace(index, rule)` and `remove(index)`. Without `remove`, released global rules stay, and so does every class made from a plain object in `style` (see [No inline styles](no-inline-styles.md)). `createMemorySheet()` and `createDomSheet(key, container = document.head)` make the two sheets that the package has.
+A `Sheet` has `insert(rule)`, a readonly `rules` list, and optionally `replace(index, rule)` and `remove(index)`. Without `remove`, released global rules stay, and so does every class made from a plain object in `style` (see [No inline styles](no-inline-styles.md)). `createMemorySheet()` and `createDomSheet(key, container = document.head)` make the two sheets that the package has. A sheet may have a `document`: the document whose style element holds its rules. `createDomSheet` gives the document of its container, and the cache then reads that document (an iframe's) instead of the global one; see [The cache and server packages](cache-and-server.md).
 
 ## Binding options
 
@@ -101,3 +101,5 @@ On the web the outermost provider (none above it) renders no element and declare
 | `engine.when(theme, colorScheme?)`       | same                                               | The `colorScheme` must match the one given to the provider                           |
 | `alpha(color, opacity)`                  | `opacity`: 0 to 1                                  | Outside the range throws a `RangeError`                                              |
 | `createDomSheet(key, container?)`        | `key`: string                                      | The `data-style` of the style element it uses or creates                             |
+| `createDomSheet(key, container?)`        | `container`: `Node`, default `document.head`       | Where the element is created; the element is looked up in the document of it         |
+| `<CacheProvider value={cache}>`          | `value`: a cache                                   | The cache of the subtree; under it no server style element is rendered (React)       |
