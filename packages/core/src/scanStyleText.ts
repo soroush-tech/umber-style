@@ -11,6 +11,8 @@ export interface StyleFindings {
   themes: Map<string, Set<string>>
   /** The `@property` rules, by variable name, with the text of the rule. */
   properties: Map<string, string>
+  /** The names of the `@keyframes` rules. */
+  keyframes: Set<string>
   /** The variables that the rules of the classes refer to. */
   variables: Set<string>
 }
@@ -22,6 +24,7 @@ export function createEmptyFindings(): StyleFindings {
     classes: new Set(),
     themes: new Map(),
     properties: new Map(),
+    keyframes: new Set(),
     variables: new Set(),
   }
 }
@@ -34,6 +37,7 @@ interface OpenBlock {
 }
 
 const PROPERTY_AT_RULE = '@property'
+const KEYFRAMES_AT_RULE = '@keyframes'
 
 /** Whether `code` is a character of a class name: a lowercase letter, a digit, '-' or '_'. */
 function isNameCode(code: number): boolean {
@@ -103,7 +107,7 @@ function openBlock(stack: OpenBlock[], text: string, boundary: number, index: nu
   stack.push({ prelude: text.slice(boundary, index).trim(), bodyStart: index + 1, hasChild: false })
 }
 
-/** Closes the innermost block at `index`, a `}`; a block without a block of its own is a rule to record. */
+/** Closes the innermost block at `index`, a `}`: a `@keyframes` rule records its name, and a block without a block of its own is a rule to record. */
 function closeBlock(
   stack: OpenBlock[],
   found: StyleFindings,
@@ -112,7 +116,9 @@ function closeBlock(
   index: number
 ): void {
   const block = stack.pop()
-  if (block && !block.hasChild) {
+  if (block?.prelude.startsWith(KEYFRAMES_AT_RULE)) {
+    found.keyframes.add(block.prelude.slice(KEYFRAMES_AT_RULE.length).trim())
+  } else if (block && !block.hasChild) {
     record(found, prefix, block.prelude, text.slice(block.bodyStart, index))
   }
 }
@@ -120,7 +126,7 @@ function closeBlock(
 /**
  * Reads the CSS that an engine wrote (compact, no comments) in one pass and adds what it holds to
  * `found`: the layer order statement, the classes with a rule, each theme class with the variables it
- * declares, the `@property` rules and the variables that rules use.
+ * declares, the `@property` rules, the names of the `@keyframes` rules and the variables that rules use.
  */
 export function scanStyleText(
   prefix: string,

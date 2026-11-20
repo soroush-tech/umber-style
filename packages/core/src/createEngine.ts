@@ -9,6 +9,7 @@ import {
   type SchemeName,
   type ThemeKey,
 } from './scope'
+import { keyframes, type KeyframesInput, type KeyframesOptions } from './keyframes'
 import { isStyleFunction, splitLeading } from './styleBase'
 import { createThemeClass } from './theme'
 import { createTokens, type DeepPartial, type Tokens } from './tokens'
@@ -94,6 +95,15 @@ export interface Engine<T> {
   /** The class of a wrapper that a provider renders: it only has display: contents. Inserted once. It is not part of a theme class, which is also put on <html>. */
   scopeClass(): string
   /**
+   * Registers an animation and returns its name at once, before there is a theme too (see `keyframes`).
+   * Its `@keyframes` rule is written once, outside every layer, when a class that uses the name in
+   * `animation` or `animation-name` is first inserted; steps given as a function of the theme are then
+   * resolved against `refs`.
+   */
+  keyframes(steps: KeyframesInput<T>, options?: KeyframesOptions): string
+  /** Writes the `@keyframes` rule of `name` now, for a use the engine cannot see in a class (a name under another key, CSS of the app's own, the Web Animations API). Throws a `TypeError` for a name that `keyframes` did not return. */
+  insertKeyframes(name: string): void
+  /**
    * A sheet of named styles. Given a function of the theme it is a sheet that is resolved against a
    * theme (`resolve`, which `useStyle` calls). Given an object it is the entries themselves, usable at
    * once: no theme is read, so it works before there is one. Entries are made on first access and a
@@ -163,6 +173,8 @@ export function createLazyEngine<T extends object = Theme>(options: EngineOption
     if (!tokens) throw new Error(NO_THEME_MESSAGE)
     return tokens
   }
+  // Steps written as a function of the theme are resolved against the references when a rule is written.
+  cache.setKeyframesTheme(() => readTokens().refs)
 
   const setTheme = (theme: T) => {
     if (theme === baseTheme) return
@@ -365,6 +377,8 @@ export function createLazyEngine<T extends object = Theme>(options: EngineOption
       return readTokens().refs
     },
     scopeClass,
+    keyframes,
+    insertKeyframes: cache.insertKeyframes,
     setTheme,
     createThemeView,
     themeClass,

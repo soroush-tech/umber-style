@@ -6,6 +6,13 @@ export * from './createEngine'
 export * from './extractStyles'
 export * from './findMissingStyles'
 export * from './hash'
+export {
+  keyframes,
+  type KeyframesInput,
+  type KeyframesOptions,
+  type KeyframesStep,
+  type KeyframesSteps,
+} from './keyframes'
 export * from './lazyRecord'
 export * from './mergeDeep'
 export type { RegisteredSyntax } from './registered'

@@ -1,4 +1,5 @@
 import { isAlphaColor } from './alpha'
+import { readStandIn } from './standIn'
 
 /** A value of arithmetic on tokens: a CSS value (a reference such as `var(--space-2)`, a length) or a number. */
 export type Operand = string | number
@@ -76,8 +77,9 @@ const OPERATIONS: Record<Operator, (value: number, factor: number) => number> = 
   '/': (value, factor) => value / factor,
 }
 
-/** `value` multiplied or divided by `factor`, as a number, a literal length or a calc. */
-function scale(name: string, value: Operand, factor: number, operator: Operator): Operand {
+/** `value` (a stand-in of `keyframes` as its path) multiplied or divided by `factor`, as a number, a literal length or a calc. */
+function scale(name: string, given: Operand, factor: number, operator: Operator): Operand {
+  const value = readStandIn(given)
   assertOperand(name, value)
   assertFinite(name, operator === '*' ? 'the factor' : 'the divisor', factor)
   if (factor === 0) {
@@ -133,8 +135,9 @@ function sum(terms: Term[]): Operand {
   return sumNumbers(terms) ?? sumLengths(terms) ?? toCalc(terms)
 }
 
-/** The terms of `values` with `sign`, without the zeros that change nothing; each is checked. */
-function toTerms(name: string, values: readonly Operand[], sign: 1 | -1): Term[] {
+/** The terms of `values` with `sign`, without the zeros that change nothing; each is checked, a stand-in as its path. */
+function toTerms(name: string, given: readonly Operand[], sign: 1 | -1): Term[] {
+  const values = given.map((value) => readStandIn(value))
   for (const value of values) assertOperand(name, value)
   return values.filter((value) => value !== 0).map((operand) => ({ operand, sign }))
 }
@@ -165,8 +168,9 @@ export function add(...values: Operand[]): Operand {
 export function subtract(value: number, ...values: number[]): number
 export function subtract(value: Operand, ...values: Operand[]): Operand
 export function subtract(value: Operand, ...values: Operand[]): Operand {
-  assertOperand('subtract', value)
-  return sum([{ operand: value, sign: 1 }, ...toTerms('subtract', values, -1)])
+  const first = readStandIn(value)
+  assertOperand('subtract', first)
+  return sum([{ operand: first, sign: 1 }, ...toTerms('subtract', values, -1)])
 }
 
 /** `value` times -1: a negative margin from a token. */

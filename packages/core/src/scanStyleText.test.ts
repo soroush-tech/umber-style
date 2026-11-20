@@ -62,6 +62,16 @@ describe('scanStyleText', () => {
     expect(scanStyleText('u', text).classes.size).toBe(0)
   })
 
+  it('finds the names of @keyframes rules, empty ones too, and the variables their steps use', () => {
+    const text =
+      '@keyframes fade-1a{0%{opacity:0;}100%{color:var(--u-x);}}@keyframes  empty-2b {}' +
+      '@layer u-components{.u-a{animation:fade-1a 1s;}}'
+    const found = scanStyleText('u', text)
+    expect(found.keyframes).toEqual(new Set(['fade-1a', 'empty-2b']))
+    expect([...found.classes]).toEqual(['u-a'])
+    expect([...found.variables]).toEqual(['--u-x'])
+  })
+
   it('is not fooled by braces and semicolons in strings', () => {
     const text = `.u-a::before{content:"}{;";}.u-b::after{content:'it\\'s }';}.u-c{color:red;}`
     expect([...scanStyleText('u', text).classes]).toEqual(['u-a', 'u-b', 'u-c'])

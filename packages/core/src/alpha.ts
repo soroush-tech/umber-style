@@ -1,3 +1,5 @@
+import { readStandIn } from './standIn'
+
 const BRAND = Symbol.for('umber-style.alpha-color')
 
 /**
@@ -107,14 +109,16 @@ export function assertAlphaInput(color: unknown, opacity: unknown): void {
  * that is not a string or an opacity that is not a number, a `RangeError` for an opacity outside 0 to 1.
  */
 export function alpha(color: string, opacity: number): AlphaColor | string {
-  assertAlphaInput(color, opacity)
-  if (opacity === 1) return color
+  // A stand-in of `keyframes` is the text of a reference, as a token of the theme is.
+  const text = readStandIn(color)
+  assertAlphaInput(text, opacity)
+  if (opacity === 1) return text
   if (opacity === 0) return 'transparent'
   const percent = Math.round(opacity * 10000) / 100
-  const value = `color-mix(in srgb, ${color} ${percent}%, transparent)`
+  const value = `color-mix(in srgb, ${text} ${percent}%, transparent)`
   const mix = {}
   Object.defineProperties(mix, {
-    fallback: { value: toRgba(color, opacity) ?? color, enumerable: true },
+    fallback: { value: toRgba(text, opacity) ?? text, enumerable: true },
     value: { value, enumerable: true },
     toString: { value: () => value },
     [BRAND]: { value: true },

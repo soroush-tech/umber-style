@@ -59,6 +59,14 @@ const UNITLESS = new Set([
   'strokeWidth',
 ])
 
+/** The properties whose value is a time: a number is in milliseconds. */
+const TIMES = new Set([
+  'animationDelay',
+  'animationDuration',
+  'transitionDelay',
+  'transitionDuration',
+])
+
 const propertyNames = new Map<string, string>()
 
 /** Whether `value` is a nested style object, not an array, an `alpha()` result or a plain value. */
@@ -79,10 +87,11 @@ function toPropertyName(key: string): string {
   return name
 }
 
-/** The CSS text of one declared value. */
+/** The CSS text of one declared value: a number is a time in `ms` (0 too: a time needs its unit), or a length in `px` unless it is 0 or the property takes a plain number. */
 function toValue(key: string, value: string | number): string {
-  const isLength = typeof value === 'number' && value !== 0
-  const hasUnit = isLength && !key.startsWith('--') && !UNITLESS.has(key)
+  if (typeof value === 'string') return value
+  if (TIMES.has(key)) return `${value}ms`
+  const hasUnit = value !== 0 && !key.startsWith('--') && !UNITLESS.has(key)
   return hasUnit ? `${value}px` : String(value)
 }
 

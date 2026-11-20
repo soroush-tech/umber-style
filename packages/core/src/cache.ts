@@ -1,6 +1,7 @@
 import { hashString } from './hash'
 import { createDevChecker, isDevelopment } from './devChecks'
 import { createFingerprint, describeFingerprintDifferences } from './fingerprint'
+import { createKeyframesRule, findAnimationNames, isKeyframesName } from './keyframes'
 import { scanStyleText, type StyleFindings } from './scanStyleText'
 import {
   createSheetEntry,
@@ -66,6 +67,8 @@ export interface CacheOptions {
 export interface PageExtractOptions {
   /** Theme classes to include although no element has them (the themes the page offers for switching). */
   themes?: Iterable<string>
+  /** Animation names (`keyframes` results) to include although no class of the page uses them. */
+  animations?: Iterable<string>
   /** Keys of the `<style href precedence>` elements that the document carries already: their rules are left out. */
   carried?: ReadonlySet<string>
 }
@@ -164,13 +167,24 @@ export interface Cache {
    * that is the same as a written one, or that a server render sent, is not written again.
    */
   registerProperties(rules: Readonly<Record<string, string>>): void
+  /** Gives the cache the theme that steps written as a function of the theme are resolved against, read when a `@keyframes` rule is first written (the engine gives its references). */
+  setKeyframesTheme(read: () => unknown): void
+  /**
+   * Writes the `@keyframes` rule of `name` (a `keyframes` result) now, once, outside every layer: for a
+   * use that the cache cannot see in a class. A rule that is written, or that the page has, is not written
+   * again. Throws a `TypeError` for a name that `keyframes` did not return.
+   */
+  insertKeyframes(name: string): void
+  /** The animation names (`keyframes` results) that the rules of the class `className` use. */
+  getAnimations(className: string): readonly string[]
   /** `getRules` with every declaration of a theme class, used or not, after the `@property` rules of the registered variables it declares: for a style element that is sent before the rules that use the class. */
   getFullRules(id: string): readonly string[]
   /** The CSS inserted so far and the ids it covers (class names, then the used variables): all of the cache, whatever page asked for it. See `extractPage` for one page. */
   extract(): { css: string; ids: string[] }
   /**
    * The CSS that one page needs, decided from the class names it holds and not from what the cache holds:
-   * the layer order statement; the `@property` rules of the variables in use; each theme class (of the
+   * the layer order statement; the `@property` rules of the variables in use; the `@keyframes` rules that
+   * the page's classes use (and `options.animations`), by name; each theme class (of the
    * page, and `options.themes`) with only the variables the page's rules use (all that they refer to,
    * through the values of the themes too, and the variables marked with `markUsed`) and its color-scheme;
    * and the rules of the classes, in an order that depends on the classes only: a props class after its
@@ -445,6 +459,47 @@ export function createCache(options: CacheOptions = {}): Cache {
     }
   }
 
+  // The animation names that the rules of each class use, and the theme that steps of a function are resolved against.
+  const animations = new Map<string, readonly string[]>()
+  let readKeyframesTheme = (): unknown => {
+    throw new Error(
+      'keyframes(): these steps are a function of the theme, and this cache has no theme: make the cache through an engine.'
+    )
+  }
+
+  /** The `@keyframes` rule of `name`: the one written, else made now. */
+  const readKeyframesRule = (name: string): string =>
+    insertedRules.get(name)?.[0] ?? createKeyframesRule(name, readKeyframesTheme, hasColorFallbacks)
+
+  /** Writes the `@keyframes` rule of the registered `name` once, outside every layer, unless the page has it. */
+  const writeKeyframes = (name: string): void => {
+    const id = `@keyframes:${name}`
+    if (insertedIds.has(id)) return
+    const rule = readKeyframesRule(name)
+    insertOnce(id, [rule])
+    insertedRules.set(name, [rule])
+  }
+
+  /** Inserts the rules of a class once, after the `@keyframes` rules of the animations they use. */
+  const insertClass = (className: string, rules: readonly string[], layer: ClassLayer): void => {
+    if (insertedIds.has(className)) return
+    const names = findAnimationNames(rules)
+    if (names.length > 0) {
+      animations.set(className, names)
+      names.forEach(writeKeyframes)
+    }
+    insertOnce(className, rules, layer)
+  }
+
+  const insertKeyframes = (name: string): void => {
+    if (!isKeyframesName(name)) {
+      throw new TypeError(
+        `insertKeyframes(): "${name}" is not a name that keyframes() returned, so there is no rule to write.`
+      )
+    }
+    writeKeyframes(name)
+  }
+
   const markUsed = (names: Iterable<string>): void => {
     if (!hasPruning) return
     const queue = [...names]
@@ -558,7 +613,7 @@ export function createCache(options: CacheOptions = {}): Cache {
     const className = nameClass(layer, merged, rules, after)
     registered.set(className, merged)
     if (after !== '') afters.set(className, after)
-    insertOnce(className, compileRules(`.${className}`, merged, hasColorFallbacks, scoping), layer)
+    insertClass(className, compileRules(`.${className}`, merged, hasColorFallbacks, scoping), layer)
     return [...rawClasses, className].join(' ')
   }
 
@@ -579,7 +634,7 @@ export function createCache(options: CacheOptions = {}): Cache {
         const name = nameFor(role)
         if (name !== '' && !registered.has(name)) {
           registered.set(name, merged)
-          insertOnce(name, compileRules(`.${name}`, merged, hasColorFallbacks, scoping), role)
+          insertClass(name, compileRules(`.${name}`, merged, hasColorFallbacks, scoping), role)
         }
         return name
       },
@@ -589,10 +644,11 @@ export function createCache(options: CacheOptions = {}): Cache {
     return entry
   }
 
-  /** Takes in what rules on the page say: the classes, the layer order, the `@property` rules and the themes that are written, and the variables the rules use. */
+  /** Takes in what rules on the page say: the classes, the layer order, the `@property` and `@keyframes` rules and the themes that are written, and the variables the rules use. */
   const absorb = (found: StyleFindings): void => {
     if (found.hasLayerOrder) insertedIds.add(layerOrderId)
     for (const name of found.classes) insertedIds.add(name)
+    for (const name of found.keyframes) insertedIds.add(`@keyframes:${name}`)
     for (const [name, rule] of found.properties) {
       insertedIds.add(`@property:${name}:${hashString(rule)}`)
     }
@@ -642,14 +698,18 @@ export function createCache(options: CacheOptions = {}): Cache {
   /** The rules that the cache wrote under `id`, a class or a theme class it made. */
   const readRules = (id: string): readonly string[] => insertedRules.get(id) as readonly string[]
 
-  /** The variables a page needs declared: those its rules refer to, those marked from outside, and what the values of the themes in play refer to. */
-  const collectPageVariables = (classIds: readonly string[], themeIds: readonly string[]) => {
+  /** The variables a page needs declared: those its rules (of classes, and `@keyframes` rules) refer to, those marked from outside, and what the values of the themes in play refer to. */
+  const collectPageVariables = (
+    classIds: readonly string[],
+    themeIds: readonly string[],
+    keyframesRules: readonly string[]
+  ) => {
     const names = new Set(pinned)
-    for (const id of classIds) {
-      for (const rule of readRules(id)) {
-        for (const name of scanVariables(rule, VARIABLE_START)) names.add(name)
-      }
+    const addVariables = (rule: string): void => {
+      for (const name of scanVariables(rule, VARIABLE_START)) names.add(name)
     }
+    for (const id of classIds) readRules(id).forEach(addVariables)
+    keyframesRules.forEach(addVariables)
     addThemeReferences(names, themeIds, themes)
     return names
   }
@@ -665,14 +725,25 @@ export function createCache(options: CacheOptions = {}): Cache {
   }
 
   const extractPage = (classNames: Iterable<string>, pageOptions: PageExtractOptions = {}) => {
-    const { themes: offered = [], carried = new Set<string>() } = pageOptions
+    const {
+      themes: offered = [],
+      animations: named = [],
+      carried = new Set<string>(),
+    } = pageOptions
     const wanted = new Set([...classNames, ...offered])
     const themeIds = [...wanted].filter((name) => themeNames.has(name)).sort(compareCodeUnits)
     const classIds = [...wanted]
       .filter((name) => name.startsWith(`${prefix}-`) && !themeNames.has(name))
       .filter((name) => insertedRules.has(name))
       .sort((first, second) => (sortKey(first) < sortKey(second) ? -1 : 1))
-    const names = hasPruning ? collectPageVariables(classIds, themeIds) : new Set<string>()
+    const pageAnimations = classIds.flatMap((id) => animations.get(id) ?? [])
+    const keyframesRules = [...new Set([...pageAnimations, ...named])]
+      .filter((name) => isKeyframesName(name) && !carried.has(name))
+      .sort(compareCodeUnits)
+      .map(readKeyframesRule)
+    const names = hasPruning
+      ? collectPageVariables(classIds, themeIds, keyframesRules)
+      : new Set<string>()
     // A carried theme element holds the `@property` rules of the variables its theme declares.
     const covered = new Set(themeIds.filter((id) => carried.has(id)).flatMap(readNames))
     const declared = hasPruning ? names : themeIds.flatMap(readNames)
@@ -687,6 +758,7 @@ export function createCache(options: CacheOptions = {}): Cache {
     const css = [
       hasLayers && hasLayered ? layerOrder : '',
       ...properties.map((name) => propertyRules[name]),
+      ...keyframesRules,
       ...themeRules,
       ...classRules,
     ].join('')
@@ -714,6 +786,11 @@ export function createCache(options: CacheOptions = {}): Cache {
     },
     insertTheme,
     registerProperties,
+    setKeyframesTheme: (read) => {
+      readKeyframesTheme = read
+    },
+    insertKeyframes,
+    getAnimations: (className) => animations.get(className) ?? [],
     insertOnce,
     getRules: (id) => insertedRules.get(id) ?? [],
     getFullRules,

@@ -17,6 +17,25 @@ describe('compileRules', () => {
     ).toEqual(['.a{padding:4px;margin:0;opacity:0.5;z-index:3;--gap:8;}'])
   })
 
+  it('gives a number of a duration or a delay ms, 0 too, and leaves a string of one as written', () => {
+    expect(
+      compileRules('.a', {
+        animationDuration: 1500,
+        animationDelay: -200,
+        transitionDuration: 0,
+        transitionDelay: 0.5,
+      })
+    ).toEqual([
+      '.a{animation-duration:1500ms;animation-delay:-200ms;transition-duration:0ms;transition-delay:0.5ms;}',
+    ])
+    expect(compileRules('.a', { animationDuration: '1.5s', transitionDelay: ['0s', 100] })).toEqual(
+      ['.a{animation-duration:1.5s;transition-delay:0s;transition-delay:100ms;}']
+    )
+    expect(compileRules('.a', { animationIterationCount: 2 })).toEqual([
+      '.a{animation-iteration-count:2;}',
+    ])
+  })
+
   it('leaves custom properties as written', () => {
     expect(compileRules('.a', { '--fooBar': 'x' })).toEqual(['.a{--fooBar:x;}'])
   })
