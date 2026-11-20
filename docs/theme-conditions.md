@@ -43,13 +43,13 @@ const App = () => (
 The markup has one class for both cards. The rules decide which applies:
 
 ```html
-<div class="umber-theme-45dnwr umber-boundary umber-scheme-light umber-scope">
+<div class="umber-card-root-c8wvsy"></div>
+<div class="umber-theme-8yk78z umber-boundary umber-scheme-dark umber-theme-6pu5tk umber-scope">
   <div class="umber-card-root-c8wvsy"></div>
-  <div class="umber-theme-8yk78z umber-boundary umber-scheme-dark umber-scope">
-    <div class="umber-card-root-c8wvsy"></div>
-  </div>
 </div>
 ```
+
+The outermost provider renders no element: its theme and its `color-scheme: light` are declared on `:root`, which carries no marker class. So the first card follows the system preference for `whenScheme('dark')`, and no `when()` of the light theme can match it. Where a condition must see the theme of the root, put the theme class on `<html>` and render the provider with `isRoot`: see [The root theme and switching](root-theme.md). The nested provider carries the class of the theme it was given (`umber-theme-8yk78z`, which `when(darkTheme, 'dark')` names), the markers, and the class of its merged theme.
 
 ```css
 @layer umber-components {
@@ -130,7 +130,8 @@ const Card = styled(View)({
 
 ## Limits
 
-- A conditional style applies to the descendants of the theme element, not to the element that carries the theme class. On a root provider this is the whole page below `<html>`.
+- A conditional style applies to the descendants of the theme element, not to the element that carries the theme class. With the class on `<html>` this is the whole page below it.
+- The outermost provider, without `isRoot`, declares its theme on `:root` and gives no marker: below it and outside any nested provider, `when()` of its theme does not match and `whenScheme()` follows the system preference.
 - A condition inside a `::before` selector cannot take the guard that `whenScheme` needs for the system preference.
 - Call `when(theme)` after the base theme is known (`createStyle(theme)` or `configure({ theme })`). It makes the theme class like `themeClass` does, and if there is no base theme yet, the theme you pass becomes the base theme.
 - `@scope` needs a browser that supports it. One that does not drops those rules and keeps the rest, so the style falls back to the base style. The versions are to be confirmed: see [Browser and platform support](browser-support.md).

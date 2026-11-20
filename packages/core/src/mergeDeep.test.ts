@@ -37,3 +37,43 @@ describe('mergeDeep', () => {
     })
   })
 })
+
+describe('mergeDeep and members that are not enumerable', () => {
+  /** Breakpoints with a helper function that is not enumerable, as a theme helper makes them. */
+  const withHelper = (values: Record<string, number>, up: (key: string) => string) =>
+    Object.defineProperty({ values }, 'up', { value: up, enumerable: false })
+
+  it('keeps the helpers of the base when the override sets the key', () => {
+    const up = (key: string) => `@media (min-width: ${key})`
+    const base = { breakpoints: withHelper({ sm: 600 }, up), palette: { a: 1 } }
+    const merged = mergeDeep(base, { breakpoints: { values: { sm: 480 } } } as never)
+    expect(merged.breakpoints.values).toEqual({ sm: 480 })
+    expect((merged.breakpoints as unknown as { up: typeof up }).up).toBe(up)
+    expect(Object.keys(merged.breakpoints)).toEqual(['values'])
+  })
+
+  it('takes the helpers of the override over those of the base, and its accessors as they are', () => {
+    const first = () => 'first'
+    const second = () => 'second'
+    const get = () => 3
+    const override = withHelper({ sm: 1 }, second)
+    Object.defineProperty(override, 'count', { get, enumerable: true })
+    const merged = mergeDeep({ breakpoints: withHelper({ sm: 600 }, first) }, {
+      breakpoints: override,
+    } as never)
+    expect((merged.breakpoints as unknown as { up: () => string }).up).toBe(second)
+    expect(Object.getOwnPropertyDescriptor(merged.breakpoints, 'count')?.get).toBe(get)
+  })
+
+  it('keeps symbol keys and an object with no prototype', () => {
+    const key = Symbol('key')
+    const base = Object.assign(Object.create(null) as Record<PropertyKey, unknown>, {
+      [key]: 1,
+      a: 1,
+    })
+    const merged = mergeDeep(base, { [key]: 2 })
+    expect(Object.getPrototypeOf(merged)).toBe(null)
+    expect(merged[key]).toBe(2)
+    expect(merged.a).toBe(1)
+  })
+})

@@ -55,15 +55,15 @@ const App = () => (
 `styled(tag, options)` returns a function that takes styles and returns a component. The rendered markup:
 
 ```html
-<div class="umber-theme-1qp5eh6 umber-boundary umber-scope">
-  <section class="umber-card-root-19c1q5u">
-    <div class="umber-card-header-15j3uve">Title</div>
-    <span class="umber-badge-root-n8ncc0">new</span>
-    <div class="umber-row-root-1sgg100"></div>
-    <button class="umber-wide-button-root-1r6qi7r">Save</button>
-  </section>
-</div>
+<section class="umber-card-root-19c1q5u">
+  <div class="umber-card-header-15j3uve">Title</div>
+  <span class="umber-badge-root-n8ncc0">new</span>
+  <div class="umber-row-root-1sgg100"></div>
+  <button class="umber-wide-button-root-1r6qi7r">Save</button>
+</section>
 ```
+
+The provider is the outermost one: it renders no element, and its theme is declared on `:root`.
 
 ## Options
 

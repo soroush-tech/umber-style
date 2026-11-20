@@ -8,7 +8,7 @@ import {
   type InjectionKey,
   type PropType,
 } from 'vue'
-import type { Engine, GlobalInput, GlobalRules } from '@umber-style/core'
+import { EMPTY_THEME, type Engine, type GlobalInput, type GlobalRules } from '@umber-style/core'
 
 /** Writes `sets` into the cache of `engine`, in order, and returns the function that releases them all. */
 function insertSets<T>(engine: Engine<T>, sets: readonly GlobalRules[]): () => void {
@@ -19,8 +19,9 @@ function insertSets<T>(engine: Engine<T>, sets: readonly GlobalRules[]): () => v
 }
 
 /**
- * Makes the `Global` of an engine: it renders nothing, and writes the rules of its styles with the theme
- * of the nearest provider (references for tokens, real values for raw keys). In the browser they are
+ * Makes the `Global` of an engine: it renders nothing, and writes the rules of its styles with the view
+ * of the theme of the nearest provider (references for tokens, real values for raw keys), or of the base
+ * theme (or an empty one) with none. In the browser they are
  * written in `setup`, before it mounts, and released when it unmounts; when the rules change (its styles,
  * or what they read of the theme) the new ones are written first and then the old ones released, so that
  * there is no moment with neither. The cache counts the rules of each set, so two components with equal
@@ -29,7 +30,7 @@ function insertSets<T>(engine: Engine<T>, sets: readonly GlobalRules[]): () => v
  */
 export function createGlobal<T extends object>(
   engine: Engine<T>,
-  key: InjectionKey<ComputedRef<T>>
+  viewKey: InjectionKey<ComputedRef<T>>
 ) {
   return defineComponent({
     name: 'Global',
@@ -38,10 +39,9 @@ export function createGlobal<T extends object>(
       styles: { type: [Object, Function, Array] as PropType<GlobalInput<T>>, required: true },
     },
     setup(props) {
-      const outer = inject(key, null)
+      const outer = inject(viewKey, null)
       const sets = computed(() => {
-        const real = outer?.value ?? engine.baseTheme
-        const view = real === undefined ? undefined : engine.createThemeView(real)
+        const view = outer?.value ?? engine.createThemeView(engine.baseTheme ?? (EMPTY_THEME as T))
         return engine.resolveGlobal(props.styles, view)
       })
       if (typeof document === 'undefined') {

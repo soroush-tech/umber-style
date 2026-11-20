@@ -7,10 +7,12 @@ import {
   type WebStyleObject,
 } from '@umber-style/core'
 import { bindEngine } from './createStyle'
+import { createThemeContexts } from './ThemeValue'
 import type {
   DefaultStyleOptions,
   GlobalProps,
   Styled,
+  ThemeScopeProps,
   WebStyle,
   WebThemeProviderProps,
 } from './types'
@@ -19,12 +21,14 @@ import type {
 export function createDefaultStyle() {
   let pending: DefaultStyleOptions = {}
   let bound: WebStyle<Theme> | undefined
+  // The contexts exist before the engine, so that the theme context can be exported.
+  const contexts = createThemeContexts<Theme>()
 
   const getStyle = (): WebStyle<Theme> => {
     if (!bound) {
       const engine = pending.engine ?? createLazyEngine<Theme>(pending)
       if (pending.theme) engine.setTheme(pending.theme)
-      bound = bindEngine(engine, pending)
+      bound = bindEngine(engine, pending, contexts)
     }
     return bound
   }
@@ -61,6 +65,14 @@ export function createDefaultStyle() {
     return getStyle().Global(props)
   }
 
+  function ThemeScope(props: ThemeScopeProps) {
+    return getStyle().ThemeScope(props)
+  }
+
+  function useThemeClass(): string | undefined {
+    return getStyle().useThemeClass()
+  }
+
   return {
     configure,
     getEngine: () => getStyle().engine,
@@ -69,6 +81,9 @@ export function createDefaultStyle() {
     useStyle,
     useTheme,
     ThemeProvider,
+    ThemeScope,
+    useThemeClass,
+    ThemeContext: contexts.ThemeContext,
     apply: ((...entries) => getStyle().apply(...entries)) as WebStyle<Theme>['apply'],
     when: ((theme, colorScheme) => getStyle().when(theme, colorScheme)) as WebStyle<Theme>['when'],
     whenScheme: ((scheme) => getStyle().whenScheme(scheme)) as WebStyle<Theme>['whenScheme'],

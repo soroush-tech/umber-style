@@ -7,6 +7,9 @@ describe('the entry of @umber-style/react-native', () => {
     for (const name of [
       'styled',
       'ThemeProvider',
+      'ThemeScope',
+      'useThemeClass',
+      'ThemeContext',
       'useTheme',
       'StyleSheet',
       'useStyle',

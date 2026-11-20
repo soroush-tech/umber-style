@@ -12,6 +12,8 @@ import {
 } from 'umber-style/react'
 // @ts-expect-error the server build has no useTheme
 import { useTheme } from 'umber-style/react'
+// @ts-expect-error nor ThemeScope: there is no portal in server components
+import { ThemeScope } from 'umber-style/react'
 
 describe('the types of the server build', () => {
   it('has readTheme, and no useTheme', () => {
@@ -23,6 +25,9 @@ describe('the types of the server build', () => {
     expectTypeOf(style).toEqualTypeOf<SharedServerStyle<{ palette: { primary: string } }>>()
     expectTypeOf(style.readTheme).returns.toEqualTypeOf<{ palette: { primary: string } }>()
     expectTypeOf(style).not.toHaveProperty('useTheme')
+    expectTypeOf(style).not.toHaveProperty('ThemeScope')
+    expectTypeOf(style).not.toHaveProperty('useThemeClass')
+    expectTypeOf(ThemeScope).toBeAny()
     expectTypeOf(styled).toBeFunction()
     expectTypeOf<WebStyleObject>().not.toBeAny()
   })

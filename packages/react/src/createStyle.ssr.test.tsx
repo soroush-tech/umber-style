@@ -19,9 +19,14 @@ describe('createStyle on the server', () => {
         </ThemeProvider>
       </ThemeProvider>
     )
-    expect(html).toMatch(/<div class="srv-theme-\w+ srv-boundary srv-scope">/)
+    // The outermost provider renders no element and declares its theme on :root.
+    expect(html).toMatch(
+      />a<\/button><div class="srv-theme-\w+ srv-boundary srv-theme-\w+ srv-scope">/
+    )
     expect(html).not.toContain('style=')
     const { css } = cache.extract()
+    expect(css).toContain(':where(:root){--srv-palette-primary:#0000ff;}')
+    // The nested provider: the class of what it changes, and the class of its whole merged theme.
     expect(css.match(/\.srv-theme-\w+\{/g)).toHaveLength(2)
     expect(css).toContain('.srv-scope{display:contents;}')
     expect(css).toContain('--srv-palette-primary:#ff0000;}')

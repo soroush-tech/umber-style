@@ -86,7 +86,7 @@ With `hasDevChecks` (on in development where there is a `document`, see [Options
 
 - An element with a class of the engine that no rule names (`findMissingStyles`).
 - A variable of the engine that a rule matching the element uses without a fallback, and that has no value on the element.
-- A global rule for `html`, `body` or `:root` whose variables have no value there, because the theme class is not on `<html>`.
+- A global rule for `html`, `body` or `:root` whose variables have no value there: no outermost provider declares its theme on `:root`, and no theme class is on `<html>`.
 - A declaration of a rule that the cache inserted, or of a global rule it wrote, that the browser does not support, asked with `CSS.supports`: `[umber] the class umber-x1 declares elevation:2px, which this browser does not support`. A global rule is named by its selector, a step of `@keyframes` by the name of the animation.
 
 What it does not report:

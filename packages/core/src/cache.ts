@@ -185,6 +185,15 @@ export interface Cache {
     colorScheme?: string
   ): void
   /**
+   * Makes the root theme `id` (`<prefix>-root-<hash>`, with `declarations` and `colorScheme`) the one
+   * declared on the document root: one rule `:where(:root){...}` in the theme layer. Its specificity is
+   * 0, so a theme class on `<html>` wins over it. With pruning only the used variables are written, more
+   * as they become used. Another id replaces the rule (removed where the sheet can remove it, else
+   * written again after it), and in a browser the root rules that a server render left in the page are
+   * removed the first time; the same id again does nothing. Every id given is kept for `getFullRules`.
+   */
+  insertRoot(id: string, declarations: Readonly<Record<string, string>>, colorScheme?: string): void
+  /**
    * Gives the cache the `@property` rule of each registered variable, by variable name (`createTokens`
    * makes them), replacing those it had. A rule is written once, outside every layer, when its variable
    * is first used (at once for a variable that is used already, or when there is no pruning); a rule
@@ -224,13 +233,15 @@ export interface Cache {
    * The CSS that one page needs, decided from the class names it holds and not from what the cache holds,
    * except for the global rules, which no class stands for: the layer order statement; the `@property`
    * rules of the variables in use; the `@keyframes` rules that the page's classes and the global rules use
-   * (and `options.animations`), by name; each theme class (of the page, and `options.themes`) with only
+   * (and `options.animations`), by name; the rule of the root theme that is in the sheet (the one
+   * `insertRoot` was given last, so render and extract one page before the next), then each theme
+   * class (of the page, and `options.themes`), each with only
    * the variables the page's rules and the global rules use (all that they refer to, through the values
    * of the themes too, and the variables marked with `markUsed`) and its color-scheme; every global rule
    * the cache holds, in the order they were inserted; and the rules of the classes, in an order that
    * depends on the classes only: a props class after its base class, the rest by name. Names the cache
    * made no rules for are ignored. It reads the cache and changes nothing, so pages rendered at once, or
-   * in any order, get the same CSS.
+   * in any order, get the same CSS, apart from the root theme.
    */
   extractPage(
     classNames: Iterable<string>,
@@ -359,16 +370,34 @@ function compareCodeUnits(first: string, second: string): number {
   return first < second ? -1 : 1
 }
 
+/** The selector of the rule of the root theme: the document root, with no specificity. */
+const ROOT_SELECTOR = ':where(:root)'
+
+/** A root theme that the cache was given: its variables and its color-scheme declaration. */
+interface RootTheme {
+  declarations: Readonly<Record<string, string>>
+  /** The color-scheme declaration, or ''. */
+  schemeText: string
+}
+
+/** The root theme that is in the sheet: which one, the variables written, and where its rule is. */
+interface RootEntry {
+  id: string
+  written: Set<string>
+  /** Where the rule is in the sheet, while it is there. */
+  index: number | undefined
+}
+
 /** Adds to `names` every variable that the theme values of `themeIds` bring in for a name already in it. */
 function addThemeReferences(
   names: Set<string>,
   themeIds: readonly string[],
-  themes: ReadonlyMap<string, ThemeEntry>
+  readDeclarations: (id: string) => Readonly<Record<string, string>> | undefined
 ): void {
   const queue = [...names]
   for (const queued of queue) {
     for (const id of themeIds) {
-      const value = themes.get(id)?.declarations[queued]
+      const value = readDeclarations(id)?.[queued]
       if (value === undefined) continue
       for (const name of scanVariables(value, VARIABLE_START)) {
         if (!names.has(name)) queue.push(name)
@@ -487,6 +516,30 @@ export function createCache(options: CacheOptions = {}): Cache {
 
   // Pruning: each registered theme class, with what it declares and what of that is written.
   const themes = new Map<string, ThemeEntry>()
+  // Every root theme given, by id; the one in the sheet; and the root rules that a server render left in
+  // the page, each with the browser's object of the rule when it can be told.
+  const roots = new Map<string, RootTheme>()
+  let root: RootEntry | undefined
+  let pageRoots: (CSSRule | undefined)[] = []
+
+  /** The rule of a root theme with the variables `names`, and its color-scheme; none when that is nothing. */
+  const createRootRules = (theme: RootTheme, names: Iterable<string>): readonly string[] => {
+    const declared = [...names].map((name): [string, string] => [name, theme.declarations[name]])
+    const body = toDeclarationText(declared) + theme.schemeText
+    return body === '' ? [] : wrapInLayer([`${ROOT_SELECTOR}{${body}}`], 'theme')
+  }
+
+  /** Writes the rule of the root theme anew with every variable written so far, after removing the one it had where the sheet can; a sheet that cannot keeps it, and the new rule, later, wins. */
+  const writeRoot = (entry: RootEntry): void => {
+    const rules = createRootRules(roots.get(entry.id) as RootTheme, entry.written)
+    insertedRules.set(entry.id, rules)
+    const { remove } = sheet
+    if (entry.index !== undefined && remove) removeAt(remove, entry.index)
+    entry.index = undefined
+    const before = sheet.rules.length
+    insertLayered(rules)
+    if (sheet.rules.length > before) entry.index = sheet.rules.length - 1
+  }
 
   /** Writes `names` for a theme class: a rule of its own, or in place of the rule it has when the sheet can replace. */
   const writeTheme = (className: string, entry: ThemeEntry, names: readonly string[]): void => {
@@ -577,7 +630,7 @@ export function createCache(options: CacheOptions = {}): Cache {
       used.add(name)
       fresh.push(name)
       // The value of a token in some theme may refer to another variable, which is then used too.
-      for (const { declarations } of themes.values()) {
+      for (const { declarations } of [...themes.values(), ...roots.values()]) {
         const value = declarations[name]
         if (value !== undefined) queue.push(...scanVariables(value, VARIABLE_START))
       }
@@ -591,6 +644,41 @@ export function createCache(options: CacheOptions = {}): Cache {
         fresh.filter((name) => entry.declarations[name] !== undefined && !entry.written.has(name))
       )
     }
+    if (root === undefined) return
+    const { declarations } = roots.get(root.id) as RootTheme
+    const added = fresh.filter((name) => declarations[name] !== undefined)
+    if (added.length === 0) return
+    for (const name of added) root.written.add(name)
+    writeRoot(root)
+  }
+
+  const insertRoot = (
+    id: string,
+    declarations: Readonly<Record<string, string>>,
+    colorScheme?: string
+  ): void => {
+    if (!roots.has(id)) {
+      roots.set(id, { declarations, schemeText: colorScheme ? `color-scheme:${colorScheme};` : '' })
+      themeNames.set(id, Object.keys(declarations))
+    }
+    if (root?.id === id) return
+    // The rules of the page stand for the root theme of the server; from now on the cache writes it.
+    for (const rule of pageRoots) if (rule) deleteCssRule(rule)
+    pageRoots = []
+    if (root) {
+      insertedIds.delete(root.id)
+      insertedRules.delete(root.id)
+    }
+    insertedIds.add(id)
+    const names = Object.keys(declarations)
+    const isUsed = (name: string) => !hasPruning || used.has(name)
+    const entry: RootEntry = { id, written: new Set(names.filter(isUsed)), index: root?.index }
+    root = entry
+    writeRoot(entry)
+    // A value of this theme may refer to a variable that no rule uses yet: marking it writes it.
+    markUsed(
+      [...entry.written].flatMap((name) => scanVariables(declarations[name], VARIABLE_START))
+    )
   }
 
   const insertTheme = (
@@ -704,6 +792,7 @@ export function createCache(options: CacheOptions = {}): Cache {
     for (const entry of themes.values()) {
       if (entry.index !== undefined && entry.index > index) entry.index--
     }
+    if (root?.index !== undefined && root.index > index) root.index--
   }
 
   /** Removes the rules of a set that nothing holds any more, unless they cannot be removed: then they stay, and count as written. */
@@ -733,6 +822,10 @@ export function createCache(options: CacheOptions = {}): Cache {
   const getFullRules = (id: string): readonly string[] => {
     const entry = themes.get(id)
     const properties = (themeNames.get(id) ?? []).flatMap((name) => propertyRules[name] ?? [])
+    const rootTheme = roots.get(id)
+    if (rootTheme) {
+      return [...properties, ...createRootRules(rootTheme, Object.keys(rootTheme.declarations))]
+    }
     if (entry === undefined) return [...properties, ...(insertedRules.get(id) ?? [])]
     const body = toDeclarationText(Object.entries(entry.declarations)) + entry.schemeText
     return [...properties, ...(body ? wrapInLayer([`.${id}{${body}}`], 'theme') : [])]
@@ -841,6 +934,7 @@ export function createCache(options: CacheOptions = {}): Cache {
         known.push(objects?.[index])
         pageGlobals.set(text, known)
       }
+      for (const index of found.roots) pageRoots.push(objects?.[index])
     }
     for (const element of document.querySelectorAll(selector)) scan(element)
     // Rules reach the page without a call to the engine: streamed content, a route that a framework
@@ -878,7 +972,11 @@ export function createCache(options: CacheOptions = {}): Cache {
     }
     for (const id of classIds) readRules(id).forEach(addVariables)
     otherRules.forEach(addVariables)
-    addThemeReferences(names, themeIds, themes)
+    addThemeReferences(
+      names,
+      themeIds,
+      (id) => themes.get(id)?.declarations ?? roots.get(id)?.declarations
+    )
     return names
   }
 
@@ -914,19 +1012,28 @@ export function createCache(options: CacheOptions = {}): Cache {
       .sort(compareCodeUnits)
       .map(readKeyframesRule)
     const allGlobalRules = held.flatMap(([, entry]) => entry.rules)
+    // The root theme of the page is the one in the sheet: the one that the last render declared.
+    const rootIds = root === undefined ? [] : [root.id]
+    const allThemeIds = [...rootIds, ...themeIds]
     const names = hasPruning
-      ? collectPageVariables(classIds, themeIds, [...keyframesRules, ...allGlobalRules])
+      ? collectPageVariables(classIds, allThemeIds, [...keyframesRules, ...allGlobalRules])
       : new Set<string>()
     // A carried theme element holds the `@property` rules of the variables its theme declares.
-    const covered = new Set(themeIds.filter((id) => carried.has(id)).flatMap(readNames))
-    const declared = hasPruning ? names : themeIds.flatMap(readNames)
+    const covered = new Set(allThemeIds.filter((id) => carried.has(id)).flatMap(readNames))
+    const declared = hasPruning ? names : allThemeIds.flatMap(readNames)
     const properties = [...new Set(declared)]
       .filter((name) => propertyRules[name] !== undefined && !covered.has(name))
       .sort(compareCodeUnits)
+    const newRoots = rootIds.filter((id) => !carried.has(id))
     const newThemes = themeIds.filter((id) => !carried.has(id))
     const newGlobals = held.filter(([id]) => !carried.has(id))
     const newClasses = classIds.filter((id) => !carried.has(id))
-    const themeRules = newThemes.flatMap((id) => createPageThemeRules(id, names))
+    const rootRules = newRoots.flatMap((id) => {
+      const theme = roots.get(id) as RootTheme
+      const all = Object.keys(theme.declarations)
+      return createRootRules(theme, hasPruning ? all.filter((name) => names.has(name)) : all)
+    })
+    const themeRules = [...rootRules, ...newThemes.flatMap((id) => createPageThemeRules(id, names))]
     const globalRules = newGlobals.flatMap(([, entry]) => entry.rules)
     const classRules = newClasses.flatMap(readRules)
     const hasLayered = themeRules.length + globalRules.length + classRules.length > 0
@@ -938,7 +1045,10 @@ export function createCache(options: CacheOptions = {}): Cache {
       ...globalRules,
       ...classRules,
     ].join('')
-    return { css, ids: [...newThemes, ...newGlobals.map(([id]) => id), ...newClasses] }
+    return {
+      css,
+      ids: [...newRoots, ...newThemes, ...newGlobals.map(([id]) => id), ...newClasses],
+    }
   }
 
   return {
@@ -961,6 +1071,7 @@ export function createCache(options: CacheOptions = {}): Cache {
       markUsed(list)
     },
     insertTheme,
+    insertRoot,
     registerProperties,
     setKeyframesTheme: (read) => {
       readKeyframesTheme = read

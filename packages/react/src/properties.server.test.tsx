@@ -30,12 +30,19 @@ function setup(options: { hasColorFallbacks?: boolean } = {}) {
 describe('registered properties in the server build', () => {
   it('sends the @property rule with the element of the theme class, after the order and before the rule', async () => {
     const { ThemeProvider } = setup()
-    const tree = await resolveTree(<ThemeProvider theme={theme}>x</ThemeProvider>)
-    const [themeElement] = findAll(tree, 'style')
+    const tree = await resolveTree(
+      <ThemeProvider theme={theme}>
+        <ThemeProvider theme={theme}>x</ThemeProvider>
+      </ThemeProvider>
+    )
+    const [rootElement, themeElement] = findAll(tree, 'style')
     const [text] = themeElement.children as string[]
     expect(text.startsWith(`${ORDER}${PRIMARY}@layer p-theme{.p-theme-`)).toBe(true)
     expect(text).toContain('--p-palette-primary:#0000ff;')
     expect(text.match(/@property/g)).toHaveLength(1)
+    // The element of the root theme of the outermost provider, the same way.
+    const [rootText] = rootElement.children as string[]
+    expect(rootText.startsWith(`${ORDER}${PRIMARY}@layer p-theme{:where(:root){`)).toBe(true)
   })
 
   it('sends it for a root provider too, and not with the element of a component class', async () => {

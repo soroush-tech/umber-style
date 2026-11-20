@@ -21,10 +21,15 @@ describe('createStyle on the server', () => {
       ])
     )
     const html = await renderToString(app)
-    expect(html).toMatch(/^<div class="vs-theme-\w+ vs-boundary vs-scope">/)
+    // The outermost provider renders no element and declares its theme on :root; the nested one has
+    // the class of what it changes and the class of its whole merged theme.
+    expect(html).toMatch(
+      /^<!--\[--><button class="vs-button-root-\w+">a<\/button><div class="vs-theme-\w+ vs-boundary vs-theme-\w+ vs-scope">/
+    )
     expect(html).not.toContain('style=')
     expect(html.match(/vs-button-root-\w+/g)).toHaveLength(2)
     const { css } = cache.extract()
+    expect(css).toContain(':where(:root){--vs-palette-primary:#0000ff;}')
     expect(css.match(/\.vs-theme-\w+\{/g)).toHaveLength(2)
     expect(css).toContain('--vs-palette-primary:#ff0000;}')
     expect(css).toMatch(/\.vs-button-root-\w+\{color:var\(--vs-palette-primary\);\}/)

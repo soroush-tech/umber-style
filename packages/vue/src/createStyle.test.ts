@@ -149,8 +149,12 @@ describe('ThemeProvider and useTheme', () => {
     const root = mount(() =>
       h('div', null, [
         h(Probe),
-        h(ThemeProvider, { theme: { palette: { primary: '#ff0000' } }, class: 'mine' }, () => [
-          h(ThemeProvider, { theme: { space: { small: 8 } }, colorScheme: 'dark' }, () => h(Probe)),
+        h(ThemeProvider, { theme: { palette: { primary: '#ff0000' } } }, () => [
+          h(
+            ThemeProvider,
+            { theme: { space: { small: 8 } }, colorScheme: 'dark', class: 'mine' },
+            () => h(Probe)
+          ),
         ]),
       ])
     )
@@ -159,18 +163,23 @@ describe('ThemeProvider and useTheme', () => {
       palette: { primary: '#ff0000', text: '#111111' },
       space: { small: 8 },
     })
-    const outer = root.querySelector('[class*="v-theme-"]') as HTMLElement
-    expect(outer.className).toMatch(/^v-theme-[a-z0-9]+ v-boundary v-scope mine$/)
+    // The outermost provider renders no element; the nested one has its classes and the given one.
+    const nested = root.querySelector('[class*="v-theme-"]') as HTMLElement
+    expect(nested.className).toMatch(
+      /^v-theme-[a-z0-9]+ v-boundary v-scheme-dark v-theme-[a-z0-9]+ v-scope mine$/
+    )
+    expect(root.querySelectorAll('[class*="v-theme-"]')).toHaveLength(1)
     expect(root.querySelectorAll('[style]')).toHaveLength(0)
     const buttons = [...root.querySelectorAll('button')].map((button) => button.className)
     expect(new Set(buttons).size).toBe(1)
     expect(sheet.rules.filter((rule) => rule.startsWith('.v-theme-'))).toHaveLength(2)
+    expect(sheet.rules.filter((rule) => rule.startsWith(':where(:root)'))).toHaveLength(1)
     expect(sheet.rules.join('')).toContain('color-scheme:dark;')
   })
 
   it('renders an empty element without a default slot', () => {
     const { ThemeProvider } = setup()
-    const root = mount(() => h(ThemeProvider, { theme: {} }))
+    const root = mount(() => h(ThemeProvider, { theme: {} }, () => h(ThemeProvider, { theme: {} })))
     expect(root.firstElementChild?.childNodes).toHaveLength(0)
   })
 })

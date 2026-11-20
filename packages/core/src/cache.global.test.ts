@@ -348,7 +348,7 @@ describe('the development check of global rules', () => {
     vi.advanceTimersByTime(1000)
     expect(warn).toHaveBeenCalledTimes(1)
     expect(warn).toHaveBeenCalledWith(
-      '[u] body[] has no value for --u-bg, which the global rule body uses: a rule for html or body sees the variables of a theme only when the theme class is on <html>'
+      '[u] body[] has no value for --u-bg, which the global rule body uses: a rule for html or body sees the variables of a theme declared on :root (the outermost provider) or on <html> (its theme class)'
     )
     cache.css({ color: 'red' })
     vi.advanceTimersByTime(1000)

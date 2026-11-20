@@ -136,10 +136,15 @@ describe('the layers of a styled component', () => {
     const { className } = apply(box, { margin: 1 } as never)
     expect(layerOf(box.className)).toBe('l-components')
     expect(layerOf(className as string)).toBe('l-components')
-    render(<ThemeProvider theme={baseTheme}>x</ThemeProvider>)
+    render(
+      <ThemeProvider theme={baseTheme} colorScheme="dark">
+        <ThemeProvider theme={baseTheme}>x</ThemeProvider>
+      </ThemeProvider>
+    )
     const themed = sheet.rules.filter((rule) => rule.startsWith('@layer l-theme{'))
-    expect(themed).toHaveLength(2)
+    expect(themed).toHaveLength(3)
     expect(themed.some((rule) => rule.includes('.l-scope{display:contents;}'))).toBe(true)
+    expect(themed.some((rule) => rule.startsWith('@layer l-theme{:where(:root){'))).toBe(true)
   })
 })
 

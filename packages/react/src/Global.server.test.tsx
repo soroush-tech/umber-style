@@ -1,4 +1,4 @@
-import { createCache, createEngine, createLazyEngine, NO_THEME_MESSAGE } from '@umber-style/core'
+import { createCache, createEngine, createLazyEngine } from '@umber-style/core'
 import { bindEngine } from './createStyle.server'
 import { findAll, resolveTree } from './vitest.resolveTree'
 import type { CacheFunction } from './serverContext'
@@ -74,7 +74,7 @@ describe('Global in the server components build', () => {
     expect(readStyles(tree)[0]).toEqual([pulse, `@keyframes ${pulse}{50%{opacity:0.4;}}`])
   })
 
-  it('writes an object with no theme at all, and throws for a function of the theme', async () => {
+  it('writes an object with no theme at all, and calls a function of the theme with an empty one', async () => {
     const style = bindEngine(createLazyEngine({ prefix: 'z' }), requestCache)
     const tree = await resolveTree(<style.Global styles={{ body: { margin: 0 } }} />)
     expect(readStyles(tree)).toEqual([
@@ -83,8 +83,8 @@ describe('Global in the server components build', () => {
         `${style.cache.layerOrder}@layer z-global{body{margin:0;}}`,
       ],
     ])
-    await expect(resolveTree(<style.Global styles={() => ({ body: {} })} />)).rejects.toThrow(
-      NO_THEME_MESSAGE
-    )
+    const seen: unknown[] = []
+    await resolveTree(<style.Global styles={(view) => (seen.push(view), { body: {} })} />)
+    expect(seen).toEqual([{}])
   })
 })

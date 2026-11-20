@@ -13,6 +13,12 @@ export function toDeclarationText(entries: Iterable<readonly [string, string]>):
   return text
 }
 
+/** The hash of all the declarations of a theme, and of its color-scheme: what names its class or root rule. */
+function hashTheme(declarations: Readonly<Record<string, string>>, colorScheme?: string): string {
+  const variables = toDeclarationText(Object.entries(declarations))
+  return hashString(colorScheme ? `${variables}color-scheme:${colorScheme};` : variables)
+}
+
 /**
  * Registers the theme class of `declarations` and returns it: the scope of a theme. Its name is the
  * hash of all the declarations, whatever the cache writes of them (see `hasPruning`).
@@ -23,9 +29,22 @@ export function createThemeClass(
   options: ThemeRuleOptions = {}
 ): string {
   const { colorScheme } = options
-  const variables = toDeclarationText(Object.entries(declarations))
-  const body = colorScheme ? `${variables}color-scheme:${colorScheme};` : variables
-  const className = `${cache.prefix}-theme-${hashString(body)}`
+  const className = `${cache.prefix}-theme-${hashTheme(declarations, colorScheme)}`
   cache.insertTheme(className, declarations, colorScheme)
   return className
+}
+
+/**
+ * Makes `declarations` the root theme, the one declared on `:root` (see `Cache.insertRoot`), and returns
+ * its id, `<prefix>-root-<hash>`: like a theme class, named by the hash of all its declarations.
+ */
+export function declareRootTheme(
+  cache: Cache,
+  declarations: Readonly<Record<string, string>>,
+  options: ThemeRuleOptions = {}
+): string {
+  const { colorScheme } = options
+  const id = `${cache.prefix}-root-${hashTheme(declarations, colorScheme)}`
+  cache.insertRoot(id, declarations, colorScheme)
+  return id
 }

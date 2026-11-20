@@ -5,6 +5,9 @@ describe('the entry of @umber-style/react', () => {
     for (const name of [
       'styled',
       'ThemeProvider',
+      'ThemeScope',
+      'useThemeClass',
+      'ThemeContext',
       'useTheme',
       'StyleSheet',
       'useStyle',

@@ -36,29 +36,35 @@ configure({ prefix: 'umber', theme: lightTheme })
 | `getEngine()`                                              | The engine of the default style                                                        |
 | `styled`, `StyleSheet`, `useStyle`, `apply`                | Styling, sheets (an object sheet needs no `useStyle`), and putting entries on elements |
 | `ThemeProvider`, `useTheme`, `themeClass`                  | The theme                                                                              |
+| `ThemeScope`, `useThemeClass`                              | The wrapper of the nearest nested provider, again, for portal content                  |
+| `ThemeContext`                                             | The React context of the real theme, for `useContext` or a consumer                    |
 | `when`, `whenScheme`                                       | Keys for [theme conditions](theme-conditions.md)                                       |
 | `add`, `alpha`, `divide`, `multiply`, `negate`, `subtract` | The helpers of [Tokens](tokens.md)                                                     |
 
-Types: `StyleOptions`, `DefaultStyleOptions`, `StyledOptions`, `StyledStatics`, `StyleProp`, `StyledComponent`, `Styled`, `SheetDefinition`, `ThemeProviderProps`, `WebThemeProviderProps`, `Style`, `WebStyle`, `ServerStyle`.
+Types: `StyleOptions`, `DefaultStyleOptions`, `StyledOptions`, `StyledStatics`, `StyleProp`, `StyledComponent`, `Styled`, `SheetDefinition`, `ThemeProviderProps`, `WebThemeProviderProps`, `ThemeScopeProps`, `Style`, `WebStyle`, `ServerStyle`, and `ThemeInput` (the type of `theme`).
 
-`createStyle` returns a `WebStyle`: `styled`, `StyleSheet`, `useStyle`, `apply`, `ThemeProvider`, `useTheme`, `themeClass`, `when`, `whenScheme`, and `engine` and `cache`, the engine and its cache. The direct imports have no `engine` or `cache`: use `getEngine()` and `getEngine().cache`. `WebStyleObject` and the other style types (`WebProperties`, `WebNested`, `NestedKey`, `StyleObject`, `AlphaColor`, `SheetEntry`) are re-exported from this package as types, in both builds, and `at` and `alpha` and the arithmetic helpers are exported as values. See [Typed styles](typed-styles.md).
+`createStyle` returns a `WebStyle`: `styled`, `StyleSheet`, `useStyle`, `apply`, `ThemeProvider`, `ThemeScope`, `ThemeContext`, `useTheme`, `useThemeClass`, `themeClass`, `when`, `whenScheme`, and `engine` and `cache`, the engine and its cache. The default style creates its `ThemeContext` before its engine, so the direct import exists before `configure`. The direct imports have no `engine` or `cache`: use `getEngine()` and `getEngine().cache`. `WebStyleObject` and the other style types (`WebProperties`, `WebNested`, `NestedKey`, `StyleObject`, `AlphaColor`, `SheetEntry`) are re-exported from this package as types, in both builds, and `at` and `alpha` and the arithmetic helpers are exported as values. See [Typed styles](typed-styles.md).
 
 ## `ThemeProvider`
 
-| Prop          | Type                                | Default | Effect                                                                                           |
-| ------------- | ----------------------------------- | ------- | ------------------------------------------------------------------------------------------------ |
-| `theme`       | `DeepPartial<Theme>`                | none    | The theme, or the part of it that this subtree changes                                           |
-| `colorScheme` | `'light' \| 'dark' \| 'light dark'` | none    | Sets `color-scheme` in the theme class and, for `light` and `dark`, adds the scheme marker class |
-| `className`   | `string`                            | none    | Added to the classes of the wrapper                                                              |
-| `as`          | `string`                            | `'div'` | The element that carries the theme class                                                         |
-| `isRoot`      | `boolean`                           | `false` | Renders no element, no class and no rule: see [The root theme and switching](root-theme.md)      |
-| `children`    | `ReactNode`                         | none    | The subtree                                                                                      |
+| Prop          | Type                                | Default | Effect                                                                                                                                  |
+| ------------- | ----------------------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `theme`       | `ThemeInput<Theme>`                 | none    | The theme, or the part of it that this subtree changes, or a function of the theme above that returns it                                |
+| `colorScheme` | `'light' \| 'dark' \| 'light dark'` | none    | Sets `color-scheme` (on `:root`, or in the theme class) and, for a nested provider with `light` or `dark`, adds the scheme marker class |
+| `className`   | `string`                            | none    | Added to the classes of the wrapper of a nested provider                                                                                |
+| `as`          | `string`                            | `'div'` | The element of the wrapper of a nested provider                                                                                         |
+| `isRoot`      | `boolean`                           | `false` | Renders no element, no class and no rule: see [The root theme and switching](root-theme.md)                                             |
+| `children`    | `ReactNode`                         | none    | The subtree                                                                                                                             |
+
+The outermost provider (none above it) renders no element: its theme is declared on `:root`. A nested provider renders a wrapper with `display: contents` and its theme classes. See [Themes](themes.md), which also shows `ThemeScope` and `useThemeClass` for portal content.
+
+`ThemeScope` takes `children` only. `useThemeClass()` returns a `string`, or `undefined` under the outermost provider or none.
 
 ## `styled` in React
 
 - Every prop except `as`, `theme`, `className` and `style` is forwarded to a string tag unless `shouldForwardProp` says otherwise. For a component tag, all but those four are passed on.
 - `style` is typed `StyleProp`: sheet entries and web style objects in arrays, with falsy values dropped. It never renders an attribute: see [No inline styles](no-inline-styles.md).
-- A component that has only object styles reads no context. One with a function style reads the nearest provider's theme through a hook, so it re-renders when the theme above changes.
+- A component that has only object styles reads no context. One with a function style reads the view of the nearest provider's theme through a hook. The view stays the same object while only the values of tokens change, so such a component renders again only when a value that is not a token changes (a breakpoint, an `inline` token, a function in the theme).
 
 ## Sharing one engine with another binding
 
@@ -85,5 +91,7 @@ The package has a second build for server components, picked by the `react-serve
 ## Limits
 
 - The context part of the binding is a client module (it has the `'use client'` directive). Whether a framework treats it as one was not checked.
-- `useTheme()` returns the real theme, merged: do not mutate it.
+- `useTheme()` returns the real theme, merged: do not mutate it. With no provider and no base theme it returns an empty object.
+- The value of `ThemeContext` is `undefined` with no provider above, where `useTheme()` returns the base theme.
+- Under a nested provider the DOM has one more element; a portal without `ThemeScope` sees the outer theme. See [Themes](themes.md).
 - The default style is a module singleton. Two copies of the package in one app are two engines.

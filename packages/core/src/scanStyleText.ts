@@ -23,6 +23,8 @@ export interface StyleFindings {
    * `@keyframes` rule, or the rule of a class (`.<prefix>-...`).
    */
   globals: [index: number, text: string][]
+  /** The places, among the top-level rules, of the rules of a root theme: `:where(:root){...}`, in the `<prefix>-theme` layer or in none. */
+  roots: number[]
 }
 
 /** Makes findings that hold nothing. */
@@ -36,6 +38,7 @@ export function createEmptyFindings(): StyleFindings {
     variables: new Set(),
     ruleCount: 0,
     globals: [],
+    roots: [],
   }
 }
 
@@ -47,6 +50,7 @@ interface OpenBlock {
 }
 
 const LAYER_AT_RULE = '@layer'
+const ROOT_SELECTOR = ':where(:root)'
 const PROPERTY_AT_RULE = '@property'
 const KEYFRAMES_AT_RULE = '@keyframes'
 
@@ -94,7 +98,8 @@ function record(found: StyleFindings, prefix: string, prelude: string, body: str
     found.properties.set(prelude.slice(PROPERTY_AT_RULE.length).trim(), `${prelude}{${body}}`)
     return
   }
-  if (prelude.startsWith('@')) return
+  // A root theme declares variables; it uses none.
+  if (prelude.startsWith('@') || prelude === ROOT_SELECTOR) return
   const themeStart = `${prefix}-theme-`
   const classes = readClasses(prelude, `${prefix}-`)
   const themeId = classes.length === 1 && prelude === `.${classes[0]}` ? classes[0] : undefined
@@ -145,11 +150,20 @@ function isGlobalPrelude(prefix: string, prelude: string): boolean {
   )
 }
 
+/** Whether the top-level rule `text` is the rule of a root theme, in the theme layer or in none. */
+function isRootRule(prefix: string, text: string): boolean {
+  return (
+    text.startsWith(`${ROOT_SELECTOR}{`) ||
+    text.startsWith(`${LAYER_AT_RULE} ${prefix}-theme{${ROOT_SELECTOR}{`)
+  )
+}
+
 /**
  * Reads the CSS that an engine wrote (compact, no comments) in one pass and adds what it holds to
  * `found`: the layer order statement, the classes with a rule, each theme class with the variables it
  * declares, the `@property` rules, the names of the `@keyframes` rules, the variables that rules use, how
- * many rules are at the top level, and the top-level rules that may be global rules.
+ * many rules are at the top level, the top-level rules that may be global rules, and the places of the
+ * rules of a root theme.
  */
 export function scanStyleText(
   prefix: string,
@@ -174,9 +188,9 @@ export function scanStyleText(
       const block = closeBlock(stack, found, prefix, text, index)
       if (block && stack.length === 0) {
         const place = found.ruleCount++
-        if (isGlobalPrelude(prefix, block.prelude)) {
-          found.globals.push([place, text.slice(ruleStart, index + 1).trimStart()])
-        }
+        const rule = text.slice(ruleStart, index + 1).trimStart()
+        if (isRootRule(prefix, rule)) found.roots.push(place)
+        else if (isGlobalPrelude(prefix, block.prelude)) found.globals.push([place, rule])
       }
       boundary = index + 1
     } else if (char === ';' && stack.length === 0) {

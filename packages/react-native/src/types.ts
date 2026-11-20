@@ -10,6 +10,7 @@ import type {
   SchemeKey,
   SchemeName,
   StylerOptions,
+  ThemeInput,
   ThemeKey,
 } from '@umber-style/core'
 import type {
@@ -19,7 +20,14 @@ import type {
   NativeStyleObject,
 } from './nativeStyle'
 import type { platformStyleSheet } from './platform'
-import type { ComponentProps, ElementType, FunctionComponent, ReactElement, ReactNode } from 'react'
+import type {
+  ComponentProps,
+  Context,
+  ElementType,
+  FunctionComponent,
+  ReactElement,
+  ReactNode,
+} from 'react'
 
 /** The options of `createStyle`: the same as on the web, so one call runs on both; they are not used. */
 export type StyleOptions<T = never> = BindingOptions<T>
@@ -49,14 +57,22 @@ export interface SheetDefinition<S extends NativeSheetStyles, E> {
 }
 
 export interface ThemeProviderProps<T> {
-  /** The theme, or the part of it that this subtree changes. */
-  readonly theme: DeepPartial<T>
+  /**
+   * The theme, or the part of it that this subtree changes; or a function of the theme above (the base
+   * theme, or an empty object, for the outermost provider) that returns it. It is merged over the theme above.
+   */
+  readonly theme: ThemeInput<T>
   /** The color scheme of this subtree, for `whenScheme`: `light` or `dark`; `light dark` keeps the one above. */
   readonly colorScheme?: ColorScheme
   /** Ignored on React Native. */
   readonly className?: string
   /** Accepted and ignored: there are no classes on React Native, so the provider never renders an element. */
   readonly isRoot?: boolean
+  readonly children?: ReactNode
+}
+
+/** The props of `ThemeScope`: the same as on the web, so one source runs on both. */
+export interface ThemeScopeProps {
   readonly children?: ReactNode
 }
 
@@ -92,7 +108,13 @@ export interface NativeStyle<T> {
     style: NativeStyleObject[]
   }
   ThemeProvider(props: ThemeProviderProps<T>): ReactElement
-  /** The real theme values, for JavaScript that needs a number or a name. */
+  /** Renders its children: there is no wrapper to repeat, and a modal stays inside the tree, under the providers above it. It exists so that one source runs on both. */
+  ThemeScope(props: ThemeScopeProps): ReactElement
+  /** Always undefined: there are no classes on React Native. */
+  useThemeClass(): string | undefined
+  /** The context that holds the real theme of the nearest provider (merged over the ones above); undefined with no provider above. */
+  ThemeContext: Context<T | undefined>
+  /** The real theme values, for JavaScript that needs a number or a name: of the nearest provider, else the base theme, else an empty object. */
   useTheme(): T
   /** Always '': there are no classes on React Native. */
   themeClass(theme: DeepPartial<T>, colorScheme?: ColorScheme): string

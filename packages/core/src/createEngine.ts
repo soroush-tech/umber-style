@@ -12,7 +12,8 @@ import {
 } from './scope'
 import { keyframes, type KeyframesInput, type KeyframesOptions } from './keyframes'
 import { isStyleFunction, splitLeading } from './styleBase'
-import { createThemeClass } from './theme'
+import { isSameView } from './sameView'
+import { createThemeClass, declareRootTheme } from './theme'
 import { createTokens, type DeepPartial, type Tokens } from './tokens'
 import type { WebStyleObject } from './webStyle'
 import type {
@@ -32,6 +33,9 @@ import type {
 export function isThemedSheet(sheet: object): sheet is ThemedSheet<string, unknown> {
   return typeof (sheet as { resolve?: unknown }).resolve === 'function'
 }
+
+/** How many recent views a new view is compared with. */
+const RECENT_VIEWS = 8
 
 /** What is thrown when something needs the shape of the theme before any theme is known. */
 export const NO_THEME_MESSAGE =
@@ -73,7 +77,12 @@ export interface Engine<T> {
   readonly baseTheme: T | undefined
   /** The view of the base theme: its shape, with a var(--name) reference for each token. Throws while there is no theme. */
   readonly refs: T
-  /** The view of `realTheme`: each token is a var(--name) reference, every other part (breakpoints, functions, other objects) is taken from `realTheme`. Made once for each theme object. */
+  /**
+   * The view of `realTheme`: each token is a var(--name) reference, every other part (breakpoints,
+   * functions, other objects) is taken from `realTheme`. Made once for each theme object; a view that is
+   * the same as a recent one (themes that differ only in the values of their variables) is that one, so
+   * that a component that reads the view does not render again when only variables change.
+   */
   createThemeView(realTheme: T): T
   /** Gives the engine its base theme. The same object again does nothing; another one replaces the base. */
   setTheme(theme: T): void
@@ -89,6 +98,13 @@ export interface Engine<T> {
   themeId(theme: DeepPartial<T>, colorScheme?: ColorScheme): string
   /** The theme classes already made for this theme object (one for each color scheme it was asked with), without making any. */
   findThemeIds(theme: DeepPartial<T>): string[]
+  /**
+   * Declares the variables of `theme` (a whole theme, the real values) on `:root`, in the theme layer,
+   * and returns the id of that rule, `<prefix>-root-<hash>`; with a `colorScheme` the rule sets it too.
+   * The engine has one root theme: a call with another theme replaces the rule (see `Cache.insertRoot`).
+   * Made once for each theme object and color scheme. With no base theme yet, this theme becomes it.
+   */
+  declareRoot(theme: T, colorScheme?: ColorScheme): string
   /** A style key for "the nearest theme is this theme": `{ [when(dark)]: { border: ... } }`. Needs `@scope` (see `hasScope`). */
   when(theme: DeepPartial<T>, colorScheme?: ColorScheme): ThemeKey
   /** A style key for "the nearest color scheme is this one": the nearest theme given that `colorScheme`, else the system preference. */
@@ -196,6 +212,7 @@ export function createLazyEngine<T extends object = Theme>(options: EngineOption
     baseTheme = theme
     tokens = createTokens(theme, tokenOptions)
     views = new WeakMap()
+    recentViews = []
     // A registered variable gets its @property rule when a rule first uses it.
     cache.registerProperties(tokens.registrations)
     // Variables that code outside the engine reads are always declared.
@@ -205,10 +222,17 @@ export function createLazyEngine<T extends object = Theme>(options: EngineOption
 
   // A view keeps the base value as the fallback of a reference token, so a new base makes new views.
   let views = new WeakMap<object, T>()
+  // The last views made that differ from each other, newest first, for a new theme object to reuse.
+  let recentViews: T[] = []
   const createThemeView = (realTheme: T): T => {
     let view = views.get(realTheme)
     if (view === undefined) {
-      view = (tokens ?? createTokens(realTheme, tokenOptions)).createView(realTheme)
+      const made = (tokens ?? createTokens(realTheme, tokenOptions)).createView(realTheme)
+      view = recentViews.find((recent) => isSameView(recent, made))
+      if (view === undefined) {
+        view = made
+        recentViews = [made, ...recentViews].slice(0, RECENT_VIEWS)
+      }
       views.set(realTheme, view)
     }
     return view
@@ -227,6 +251,23 @@ export function createLazyEngine<T extends object = Theme>(options: EngineOption
       known.set(key, className)
     }
     return className
+  }
+  // The root rule of a theme object is worked out once per color scheme, like a theme class.
+  const roots = new WeakMap<object, Map<string, [string, Record<string, string>]>>()
+  const declareRoot = (theme: T, colorScheme?: ColorScheme) => {
+    if (!tokens) setTheme(theme)
+    const key = colorScheme ?? ''
+    const known = roots.get(theme) ?? new Map<string, [string, Record<string, string>]>()
+    roots.set(theme, known)
+    let made = known.get(key)
+    if (made === undefined) {
+      const declarations = readTokens().declare(theme as DeepPartial<T>)
+      made = [declareRootTheme(cache, declarations, { colorScheme }), declarations]
+      known.set(key, made)
+    }
+    const [id, declarations] = made
+    cache.insertRoot(id, declarations, colorScheme)
+    return id
   }
   const findThemeIds = (partial: DeepPartial<T>) => [...(themeClasses.get(partial)?.values() ?? [])]
   const themeClass = (partial: DeepPartial<T>, colorScheme?: ColorScheme) =>
@@ -414,6 +455,7 @@ export function createLazyEngine<T extends object = Theme>(options: EngineOption
     themeClass,
     themeId,
     findThemeIds,
+    declareRoot,
     when,
     whenScheme: createSchemeKey,
     createSheet,

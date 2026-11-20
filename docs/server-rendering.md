@@ -13,13 +13,13 @@ There are four cases, and they use different parts of the engine:
 
 ### Which to use
 
-| Framework                                    | Use                                                                                                                                                                                         |
-| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Vike (React), prerendered                    | `extractPageStyles(style.cache, html, { themes: [lightClass, darkClass] })` in the render hook; the style elements of the client build are carried by the markup and are not written again  |
-| Next.js, Pages Router                        | The same, in `getInitialProps` of the custom document, from `initial.html`                                                                                                                  |
-| Next.js, App Router                          | Nothing to call: server components and client components both render style elements. Put the classes of the themes on `<html>` with `themeClass`, and render a root provider in both builds |
-| Vue                                          | `extractPageStyles(cache, html, { themes }).tag` after `renderToString`; Vue has no style elements of its own                                                                               |
-| React, no server components, extraction only | `createStyle(theme, { hasServerStyleElements: false })` and `extractPageStyles`: one style element in the head and no other                                                                 |
+| Framework                                    | Use                                                                                                                                                                                                                        |
+| -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Vike (React), prerendered                    | `extractPageStyles(style.cache, html, { themes: [lightClass, darkClass] })` in the render hook; the style elements of the client build are carried by the markup and are not written again                                 |
+| Next.js, Pages Router                        | The same, in `getInitialProps` of the custom document, from `initial.html`                                                                                                                                                 |
+| Next.js, App Router                          | Nothing to call: server components and client components both render style elements. Render the provider in both builds: its theme goes to `:root`, or with `isRoot` it is the class you put on `<html>` with `themeClass` |
+| Vue                                          | `extractPageStyles(cache, html, { themes }).tag` after `renderToString`; Vue has no style elements of its own                                                                                                              |
+| React, no server components, extraction only | `createStyle(theme, { hasServerStyleElements: false })` and `extractPageStyles`: one style element in the head and no other                                                                                                |
 
 `createStyleTag(cache)` and `cache.extract()` keep working as they did: they return every rule the cache holds, whatever page inserted it. Use them for a static site that renders one page per cache, or a script. A process that renders more than one page must use `extractPageStyles`.
 
@@ -71,7 +71,7 @@ const page = [
 ].join('')
 ```
 
-`extractPageStyles` returns `{ css, ids, options, tag }`. `tag` is one `<style>` element with the CSS of this page. The page below is shown with `hasServerStyleElements: false`; with the default, the same rules come as `<style data-precedence>` elements inside the markup (see "Client components" below), and `tag` holds only what the markup does not carry, such as the themes offered for switching. The page:
+`extractPageStyles` returns `{ css, ids, options, tag }`. `tag` is one `<style>` element with the CSS of this page. The page below is shown with `hasServerStyleElements: false`; with the default, the same rules come as `<style data-precedence>` elements inside the markup (see "Client components" below), and `tag` holds only what the markup does not carry, such as the themes offered for switching. The provider is the outermost one, so it renders no element: its theme is declared on `:root`, and that rule is part of the CSS of the page. The page:
 
 ```html
 <!doctype html>
@@ -80,8 +80,10 @@ const page = [
     <style data-style="umber" data-options="p=umber;x=;l=1;y=1;r=1;b=1;s=1;f=1;t=">
       @layer umber-theme, umber-global, umber-components, umber-overrides;
       @layer umber-theme {
-        .umber-scope {
-          display: contents;
+        :where(:root) {
+          --umber-palette-primary: #1b5fd1;
+          --umber-palette-on-primary: #ffffff;
+          --umber-space-2: 8px;
         }
       }
       @layer umber-components {
@@ -91,25 +93,18 @@ const page = [
           padding: var(--umber-space-2);
         }
       }
-      @layer umber-theme {
-        .umber-theme-b2oxy9 {
-          --umber-palette-primary: #1b5fd1;
-          --umber-palette-on-primary: #ffffff;
-          --umber-space-2: 8px;
-        }
-      }
     </style>
   </head>
   <body>
-    <div id="root">
-      <div class="umber-theme-b2oxy9 umber-boundary umber-scope">
-        <button class="umber-button-root-jiompv">Save</button>
-      </div>
-    </div>
+    <div id="root"><button class="umber-button-root-jiompv">Save</button></div>
     <script src="/client.js"></script>
   </body>
 </html>
 ```
+
+(The markup of the root and the CSS are asserted in `packages/react/src/providers.docs.ssr.test.tsx`; the page is shown formatted.)
+
+**The root theme of a page.** No element stands for the outermost provider, so `extractPageStyles` cannot find its theme in the markup. It takes the root theme that the cache declared last, the one of the render that just ran: render a page and extract its CSS before the next page renders, as above (`renderToString` is synchronous). A server that interleaves the renders of two pages (a stream for each, extracted at the end) and gives them different root themes should use the default `hasServerStyleElements`: the provider then sends its root theme as a style element in its own markup, keyed `umber-root-<hash>`, and `extractPageStyles` leaves it out.
 
 In the browser, hydrate with the same module:
 
@@ -123,11 +118,13 @@ hydrateRoot(document.getElementById('root') as HTMLElement, <App />)
 
 The cache of the browser reads the page when it is created: the rules of `style[data-style="umber"]` and of every `style[data-precedence="umber"]` (the elements React hoists). From their text it learns which classes have a rule, which theme classes are written with which variables, which `@property` rules are there, which layer order statement, and which variables the rules use. It inserts none of those again. Nothing is read from a list of ids: `data-ids` is no longer written.
 
+The `:root` rule of the server is the one exception. The outermost provider declares its theme again in the browser, at hydration (in an insertion effect), and the cache then removes the root rules of the page and writes its own, with the same declarations: from then on a change of the theme rewrites the cache's rule, and no rule of the page stands in its way. Hydration does not change the markup or warn: `packages/react/src/themeProvider.hydrate.test.tsx` checks both builds of the page (one style element, and style elements in the markup), with `console.error` watched, the markup compared and the elements kept.
+
 **How it notices rules that arrive later.** Streamed content and a client-side navigation in the App Router add style elements to the head after the cache was made. The cache watches the children of `<head>` with one `MutationObserver` (`childList` only, no subtree) and reads each matching element once as it arrives. A lazy re-scan on a class it does not know would cover the elements that a client component inserts, but not a navigation that renders only server components: no engine call follows, and the theme class that the browser made (the dark one) would lack the variables that the new rules use. The observer's callback runs only when the head changes. Reading 400 rules at start-up took about 1 ms in Chromium (`page.browser.test.ts`).
 
 **Options must match.** The server stamps its options on its output (`data-options` on the style element of `extractPageStyles` and `createStyleTag`, a `<meta name="<prefix>-options">` from the providers of the React builds) and the browser compares them with its own: prefix, suffix, `hasLabels`, `hasLayers`, `hasPruning`, `hasBaseClass`, `hasScope`, `hasColorFallbacks` and a hash of the token options. One difference throws one error that names the options that differ and both values. A cache that is given to an engine does not know the token options of that engine, so its stamp has none.
 
-**Order.** The CSS of a page is written in an order that depends on its classes only: the layer order, the `@property` rules, the theme classes by name, then the classes by name, each props class right after its base class. It is not the order in which the cache first saw them, because that depends on which pages were rendered before: the same page gets the same CSS in every order, and from pages rendered at the same time.
+**Order.** The CSS of a page is written in an order that depends on its classes only: the layer order, the `@property` rules, the rule of the root theme, the theme classes by name, then the classes by name, each props class right after its base class. It is not the order in which the cache first saw them, because that depends on which pages were rendered before: the same page gets the same CSS in every order, and from pages rendered at the same time.
 
 **What the scan reads.** `extractPageStyles` reads the values of the `class` and `className` attributes in one linear pass. It skips comments and the content of `script`, `style`, `textarea` and `title`, and it never looks at a class name in another attribute. A class name that only appears in text is not written. A theme class that no element of the markup has (the one on `<html>`, a theme offered for switching) goes in `themes`; it gets the same variables as the others, the ones the page uses. A style element that the markup carries (its `data-href`) is left out, with the variables that it uses still counted.
 
@@ -186,7 +183,7 @@ The second map is that of `umber-style`: under the `react-server` condition, the
 | Client (the default)    | A React context                   | In the browser none: the cache inserts rules. On a server, yes (see below) | `useTheme`, `useStyle`                    |
 | Server (`react-server`) | A slot that lives for one request | `<style href precedence>` per element                                      | None: `readTheme()` instead of `useTheme` |
 
-Both builds export `configure`, `getEngine`, `styled`, `StyleSheet`, `useStyle`, `ThemeProvider`, `apply`, `themeClass`, `when`, `whenScheme`, `createStyle`, `at`, the arithmetic helpers and `alpha`, and the style types. The server build has `readTheme` and no `useTheme`.
+Both builds export `configure`, `getEngine`, `styled`, `StyleSheet`, `useStyle`, `ThemeProvider`, `apply`, `themeClass`, `when`, `whenScheme`, `createStyle`, `at`, the arithmetic helpers and `alpha`, and the style types. The server build has `readTheme` and no `useTheme`, and no `ThemeContext`, `ThemeScope` or `useThemeClass`: it has no context and no portal.
 
 A server component page:
 
@@ -227,10 +224,13 @@ const Page = () => (
 )
 ```
 
+Without `isRoot` the first provider declares its theme on `:root` instead, and sends that rule (see below); nothing goes on `<html>`.
+
 What this renders, and what each part means:
 
 - **The request-scoped root theme.** A server component has no React context. The server `ThemeProvider` writes its theme into a slot that `React.cache` keeps for the length of one request. Only the first provider that renders in a request writes it: server components can render out of order, and a nested provider must not change what the root gave. Both `FirstBreakpoint` components read `600px`, the root's breakpoint, because the nested provider's `300px` is not written. A nested provider still changes the variables below it, through its theme class.
-- **What a server component gets.** A function style gets the tokens as variables everywhere, and the real values (breakpoints, functions, your own settings) of the root theme. `readTheme()` returns the real values of the root theme merged over the base theme; with no provider it returns the base theme, and it throws if there is none.
+- **The outermost provider.** With no context, the first provider that renders in a request is the outermost one. Without `isRoot` it renders no element and sends the rule that declares its theme (merged over the base theme) on `:root`: a style element keyed `umber-root-<hash>`, with every variable of the theme. A later provider is nested and renders its wrapper, with the theme class of the theme it was given (only those variables: it cannot know the providers between it and the root) and `umber-scope`. A function theme gets the root theme of the request.
+- **What a server component gets.** A function style gets the tokens as variables everywhere, and the real values (breakpoints, functions, your own settings) of the root theme. `readTheme()` returns the real values of the root theme merged over the base theme; with no provider it returns the base theme, and an empty object if there is none.
 - **Style elements.** Each styled element and each provider renders `<style href precedence>` elements for its classes. React 19 moves them to the head and renders each `href` once. The `precedence` is the cache prefix. Each one starts with the layer order statement, so it is right on its own. For the page above the elements are `umber-theme-b2oxy9` (the theme class with every variable), `umber-hero-root-1gepzxb` (the Hero rule) and `umber-scope`.
 - **`isRoot`.** A root provider renders no wrapper element and makes no theme class. It sends the `<style>` of the theme classes that `themeClass(theme, colorScheme)` already made for its `theme` (one for each colour scheme you asked with), so call `themeClass` for the class you put on an ancestor you control, in a component that renders before the provider (the layout that renders `<html>`), as in [The root theme and switching](root-theme.md). Without that call nothing is sent for the root theme.
 - **`apply()` and sheets.** They make classes and rules, but nothing renders those rules: `apply(entry)` returns a class name and no `<style>` element comes with it. Use them through `styled` (a sheet entry in `style`), or add the rules yourself with `createStyleTag`.
@@ -273,7 +273,7 @@ The file imports the theme itself instead of receiving it as a prop. Use the sam
 
 #### The server render of a client component
 
-A client component is also rendered on the server for the first HTML, by the client build. Where there is no `document`, that build renders the same `<style href precedence>` elements for its classes as the server components build does (one implementation, `styleElements.ts`), and its theme providers send the style of their theme classes. React moves them to the head and renders each `href` once, so a class that a server component and a client component both use is sent once. In the browser the client build keeps inserting into its sheet and renders none; the cache recognises the rules that arrived as style elements, so it does not insert them again. A theme class that only the browser made (the dark one) gets, from the rules of the page, every variable that the page uses.
+A client component is also rendered on the server for the first HTML, by the client build. Where there is no `document`, that build renders the same `<style href precedence>` elements for its classes as the server components build does (one implementation, `styleElements.ts`), and its theme providers send the style of their theme classes, and the outermost one the style of its root theme. React moves them to the head and renders each `href` once, so a class that a server component and a client component both use is sent once. In the browser the client build keeps inserting into its sheet and renders none; the cache recognises the rules that arrived as style elements, so it does not insert them again. A theme class that only the browser made (the dark one) gets, from the rules of the page, every variable that the page uses.
 
 React treats these elements as resources, not as part of the tree, so rendering them on the server and not in the browser raises no hydration warning. This was checked in two places: a test in the development build of React (`hydrateStyleElements.test.tsx`: `renderToString` with no `document`, then `hydrateRoot`, no `console.error`, the same DOM node kept), and the Next.js fixture, whose end-to-end run fails on any console error or hydration warning.
 
@@ -294,6 +294,9 @@ A server component file needs the `react-server` custom condition in its TypeScr
 The condition applies to the whole program, so a project that also type-checks client components uses the condition only for the server files: a second `tsconfig` that extends the first and includes the server component files. Without the condition the types are those of the client build: `readTheme` is reported as missing and `useTheme` is typed although it does not exist there. `@umber-style/react` and `umber-style/react` both follow it (the exports map of each names its own types under `react-server`): under it, `umber-style/react` types `readTheme` and has no `useTheme`. `readTheme` is typed in that entry only under the condition, because the React Native binding has no `readTheme` and no server build: shared code that has to run on React Native does not call it.
 
 ## Limits
+
+- `extractPageStyles` takes the root theme that the cache declared last. Two pages rendered at the same time with different root themes need the style elements of the React builds, which carry their root theme, or a render and an extraction that do not interleave.
+- Vue has no style elements: its server render is extracted with `extractPageStyles`, so the same holds for it.
 
 - The server components build runs in the Next.js App Router fixture (Turbopack, production build) and the end-to-end suite checks it. Other frameworks with server components were not run.
 - `React.cache` keeps nothing outside a render: called elsewhere it makes a new slot each time, so `readTheme()` there returns the base theme.

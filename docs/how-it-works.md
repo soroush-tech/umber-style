@@ -178,13 +178,13 @@ const App = () => (
 )
 ```
 
-Both tags get `umber-tag-root-n8ncc0`. The sheet holds one component rule and one theme rule for each theme:
+Both tags get `umber-tag-root-n8ncc0`. The sheet holds one component rule and one theme rule for each theme: the outermost provider declares its theme on `:root`, the nested one in the theme class on its wrapper:
 
 ```css
 .umber-tag-root-n8ncc0 {
   color: var(--umber-palette-primary);
 }
-.umber-theme-14mu3wo {
+:where(:root) {
   --umber-palette-primary: #1b5fd1;
 }
 .umber-theme-1an5zox {
@@ -195,7 +195,7 @@ Both tags get `umber-tag-root-n8ncc0`. The sheet holds one component rule and on
 This is the idea behind the engine:
 
 - A style is computed once, however many themes you have.
-- Switching a theme is changing a class, so nothing re-renders and no style is recomputed.
+- Switching a theme is changing a class, or rewriting the `:root` rule, so no styled component renders again and no style is recomputed.
 - A theme can be added at run time by making one more theme class: see [The root theme and switching](root-theme.md).
 
 What does depend on the theme is whatever is not a token: a breakpoint, a number you compute with, a function. Those are real values, read from the nearest provider, and a different value makes a different class: see [Themes](themes.md).

@@ -1,8 +1,16 @@
+import { createContext } from 'react'
 import { createDeferredRecord, globalStyles, keyframes, type Theme } from '@umber-style/core'
 import type { NativeStyleObject } from './nativeStyle'
 import { bindHolder, type NativeHolder } from './createStyle'
 import { platformStyleSheet } from './platform'
-import type { GlobalProps, NativeStyle, Styled, StyleOptions, ThemeProviderProps } from './types'
+import type {
+  GlobalProps,
+  NativeStyle,
+  Styled,
+  StyleOptions,
+  ThemeProviderProps,
+  ThemeScopeProps,
+} from './types'
 
 export interface DefaultStyleOptions extends StyleOptions<Theme> {
   /** The base theme, for an app that has no provider at all. */
@@ -13,9 +21,11 @@ export interface DefaultStyleOptions extends StyleOptions<Theme> {
 export function createDefaultStyle() {
   const holder: NativeHolder<Theme> = { baseTheme: undefined }
   let bound: NativeStyle<Theme> | undefined
+  // The context exists before the style is used, so that it can be exported.
+  const ThemeContext = createContext<Theme | undefined>(undefined)
 
   const getStyle = (): NativeStyle<Theme> => {
-    bound ??= bindHolder(holder)
+    bound ??= bindHolder(holder, ThemeContext)
     return bound
   }
 
@@ -52,6 +62,14 @@ export function createDefaultStyle() {
     return getStyle().Global(props)
   }
 
+  function ThemeScope(props: ThemeScopeProps) {
+    return getStyle().ThemeScope(props)
+  }
+
+  function useThemeClass(): string | undefined {
+    return getStyle().useThemeClass()
+  }
+
   return {
     configure,
     styled,
@@ -59,6 +77,9 @@ export function createDefaultStyle() {
     useStyle,
     useTheme,
     ThemeProvider,
+    ThemeScope,
+    useThemeClass,
+    ThemeContext,
     apply: ((...entries) => getStyle().apply(...entries)) as NativeStyle<Theme>['apply'],
     when: ((theme, colorScheme) =>
       getStyle().when(theme, colorScheme)) as NativeStyle<Theme>['when'],

@@ -21,8 +21,8 @@ function insertSets<T>(engine: Engine<T>, sets: readonly GlobalRules[]): () => v
 }
 
 /**
- * Makes `Global` over an engine: it reads the theme of the nearest provider through `useThemeValue`
- * (references for tokens, real values for raw keys) and writes the rules of its styles into the cache.
+ * Makes `Global` over an engine: it reads the view of the theme of the nearest provider through
+ * `useThemeView` (references for tokens, real values for raw keys) and writes the rules of its styles into the cache.
  * In the browser an insertion effect writes them, before the page changes, and releases them when it
  * unmounts; when the rules change it writes the new ones first and then releases the old ones, so that
  * there is no moment with neither. The cache counts the rules of each set: two elements with equal
@@ -33,12 +33,11 @@ function insertSets<T>(engine: Engine<T>, sets: readonly GlobalRules[]): () => v
  */
 export function createGlobal<T>(
   engine: Engine<T>,
-  useThemeValue: () => T | undefined,
+  useThemeView: () => T,
   createGlobalElements: (sets: readonly GlobalRules[]) => ReactElement[]
 ) {
   return function Global({ styles }: GlobalProps<T>): ReactElement | null {
-    const real = useThemeValue()
-    const view = real === undefined ? undefined : engine.createThemeView(real)
+    const view = useThemeView()
     const sets = useMemo(() => engine.resolveGlobal(styles, view), [styles, view])
     // The release of the rules in the page: the new ones are written before the old ones are released.
     const held = useRef(releaseNothing)

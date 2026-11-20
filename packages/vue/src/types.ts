@@ -2,7 +2,6 @@ import type { Component, ComputedRef, FunctionalComponent } from 'vue'
 import type {
   BindingOptions,
   ColorScheme,
-  DeepPartial,
   Engine,
   GlobalInput,
   GlobalStyles,
@@ -14,6 +13,7 @@ import type {
   SheetStyles,
   StyleInput,
   StylerOptions,
+  ThemeInput,
   WebStyleObject,
 } from '@umber-style/core'
 
@@ -29,6 +29,7 @@ export type {
   SchemeName,
   SheetEntry,
   StyleObject,
+  ThemeInput,
   ThemeKey,
   WebNested,
   WebProperties,
@@ -64,12 +65,18 @@ export interface Sheet<S extends SheetStyles> {
 }
 
 export interface ThemeProviderProps<T> {
-  /** The theme, or the part of it that this subtree changes. */
-  theme: DeepPartial<T>
+  /**
+   * The theme, or the part of it that this subtree changes; or a function of the theme above (the base
+   * theme, or an empty object, for the outermost provider) that returns it. It is merged over the theme above.
+   */
+  theme: ThemeInput<T>
   colorScheme?: ColorScheme
-  /** The element that carries the theme class. Default 'div'. */
+  /** The element of the wrapper of a nested provider. Default 'div'. */
   as?: string
-  /** Renders no element and no class: the app puts `themeClass(theme)` on an ancestor, usually `<html>`. */
+  /**
+   * Renders no element, no class and no rule: the app puts `themeClass(theme)` on an ancestor, usually
+   * `<html>`. Without it the outermost provider declares its theme on `:root`, and renders no element either.
+   */
   isRoot?: boolean
 }
 
@@ -102,8 +109,16 @@ export interface Style<T> {
   /** The attributes that apply entries of a sheet: a class. */
   apply(...entries: (SheetEntry | string | null | undefined | false)[]): { class?: string }
   ThemeProvider: Component<ThemeProviderProps<T>>
-  /** The real theme values, merged over the providers above; reactive. Call it in `setup`. */
+  /**
+   * Renders the wrapper of the nearest nested provider again (the same element and classes) around its
+   * slot, for content that a teleport puts elsewhere in the document; under the outermost provider, or
+   * none, the slot alone.
+   */
+  ThemeScope: Component
+  /** The real theme values, merged over the providers above; reactive. With no provider, the base theme, or an empty object. Call it in `setup`. */
   useTheme(): ComputedRef<T>
+  /** The class string of the wrapper of the nearest nested provider, reactive; undefined under the outermost provider, or none. Call it in `setup`. */
+  useThemeClass(): ComputedRef<string | undefined>
   themeClass: Engine<T>['themeClass']
   /** A style key for "the nearest theme is this theme"; it needs `@scope`. */
   when: Engine<T>['when']

@@ -100,6 +100,16 @@ describe('scanStyleText', () => {
     expect(found.variables).toEqual(new Set(['--u-a']))
   })
 
+  it('lists the places of the rules of a root theme, in the theme layer or in none, as no global rule', () => {
+    const text =
+      '@layer u-theme,u-global;@layer u-theme{:where(:root){--u-a:var(--u-b);}}' +
+      ':where(:root){--u-a:1;}@layer u-theme{.u-theme-x{--u-a:2;}}:root{color:var(--u-c);}'
+    const found = scanStyleText('u', text)
+    expect(found.roots).toEqual([1, 2])
+    expect(found.globals).toEqual([[4, ':root{color:var(--u-c);}']])
+    expect(found.variables).toEqual(new Set(['--u-c']))
+  })
+
   it('reads a large text in one pass', () => {
     const text = Array.from(
       { length: 20000 },

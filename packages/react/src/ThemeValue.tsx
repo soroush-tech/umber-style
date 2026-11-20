@@ -1,41 +1,72 @@
 'use client'
 
-import { createContext, useContext, useMemo, type ReactNode } from 'react'
-import { type DeepPartial, mergeDeep, NO_THEME_MESSAGE } from '@umber-style/core'
+import { createContext, createElement, Fragment, useContext, type Context } from 'react'
+import { EMPTY_THEME, type Engine } from '@umber-style/core'
+import type { ThemeScopeProps } from './types'
 
-export interface ThemeValueProviderProps<T> {
-  readonly theme: DeepPartial<T>
-  readonly children?: ReactNode
+/** The wrapper of a nested provider: its element and its class string, which `ThemeScope` repeats. */
+export interface ThemeScopeValue {
+  readonly as: string
+  readonly className: string
 }
 
-/** Where the base theme comes from while no provider is above: an engine, or any object with a `baseTheme`. */
-export interface ThemeHolder<T> {
-  readonly baseTheme: T | undefined
+/**
+ * The contexts of one style. `ThemeContext` holds the real theme of the nearest provider (its theme
+ * merged over the ones above). `ViewContext` holds its view (references for tokens), which stays the same
+ * object while only the values of variables change. `ScopeContext` is undefined with no provider above,
+ * null under the outermost provider, which renders no element, and the wrapper of the nearest nested one.
+ */
+export interface ThemeContexts<T> {
+  ThemeContext: Context<T | undefined>
+  ViewContext: Context<T | undefined>
+  ScopeContext: Context<ThemeScopeValue | null | undefined>
 }
 
-/** The one React context of the engine: it holds the real theme values, and the base theme of `holder` is its default. */
-export function createThemeValue<T extends object>(holder: ThemeHolder<T>) {
-  const ThemeContext = createContext<T | undefined>(undefined)
-
-  function ThemeValueProvider({ theme, children }: ThemeValueProviderProps<T>) {
-    const outer = useContext(ThemeContext) ?? holder.baseTheme
-    const value = useMemo(
-      () => (outer === undefined ? (theme as T) : mergeDeep(outer, theme)),
-      [outer, theme]
-    )
-    return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>
+/** Makes the contexts of one style: the default style makes them before it has an engine, so that it can export the theme context. */
+export function createThemeContexts<T>(): ThemeContexts<T> {
+  return {
+    ThemeContext: createContext<T | undefined>(undefined),
+    ViewContext: createContext<T | undefined>(undefined),
+    ScopeContext: createContext<ThemeScopeValue | null | undefined>(undefined),
   }
+}
 
-  /** The theme above, or the base theme, or undefined when there is none. */
-  function useThemeValue(): T | undefined {
-    return useContext(ThemeContext) ?? holder.baseTheme
-  }
+/** What the hooks read where no provider is above: the base theme of the engine, or nothing. */
+export type ThemeHolder<T> = Pick<Engine<T>, 'baseTheme' | 'createThemeView'>
 
+/** The hooks of one style, and `ThemeScope`, over its contexts. */
+export function createThemeValue<T extends object>(
+  holder: ThemeHolder<T>,
+  { ThemeContext, ViewContext, ScopeContext }: ThemeContexts<T>
+) {
+  /** The theme where no provider is above: the base theme, or the empty theme. */
+  const readOwnTheme = () => holder.baseTheme ?? (EMPTY_THEME as T)
+
+  /** The real theme of the nearest provider, the base theme, or an empty object. */
   function useTheme(): T {
-    const value = useThemeValue()
-    if (value === undefined) throw new Error(NO_THEME_MESSAGE)
-    return value
+    return useContext(ThemeContext) ?? readOwnTheme()
   }
 
-  return { ThemeValueProvider, useTheme, useThemeValue }
+  /** The view of the theme that function styles read: of the nearest provider, else of the base theme (or of the empty theme). */
+  function useThemeView(): T {
+    return useContext(ViewContext) ?? holder.createThemeView(readOwnTheme())
+  }
+
+  /** The class string of the wrapper of the nearest nested provider; undefined under the outermost one or none. */
+  function useThemeClass(): string | undefined {
+    return useContext(ScopeContext)?.className
+  }
+
+  /**
+   * Renders the wrapper of the nearest nested provider again around its children (the same element and
+   * classes), for content that a portal puts somewhere else in the document; under the outermost provider,
+   * or none, its children alone.
+   */
+  function ThemeScope({ children }: ThemeScopeProps) {
+    const scope = useContext(ScopeContext)
+    if (!scope) return createElement(Fragment, null, children)
+    return createElement(scope.as, { className: scope.className }, children)
+  }
+
+  return { useTheme, useThemeView, useThemeClass, ThemeScope }
 }

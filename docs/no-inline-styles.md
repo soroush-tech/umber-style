@@ -6,7 +6,7 @@ After this page you can say what the engine guarantees about the `style` attribu
 
 On the web the engine never renders a `style` attribute. Not on a provider's wrapper, and not on a styled component.
 
-- A wrapper made by `ThemeProvider` has classes only: the theme class, `<prefix>-boundary`, the scheme marker for `light` and `dark`, `<prefix>-scope` and your `className`. The `<prefix>-scope` class holds `display: contents`. The theme class itself has no `display`, because the same class goes on `<html>`.
+- The wrapper of a nested `ThemeProvider` has classes only: the theme class, `<prefix>-boundary`, the scheme marker for `light` and `dark`, the theme class of its merged theme, `<prefix>-scope` and your `className`. The outermost provider renders no element: its theme is a rule on `:root`. The `<prefix>-scope` class holds `display: contents`. The theme class itself has no `display`, because the same class goes on `<html>`.
 - Everything given in the `style` prop of a styled component, sheet entries and plain objects, in order, is merged into one class of the element: into the override class, after the component's own styles and before a `className` you pass. A string is an error, because it cannot be merged.
 - `apply()` returns the class (`{ className }` in React, `{ class }` in Vue) and nothing else.
 

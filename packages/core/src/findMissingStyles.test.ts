@@ -122,8 +122,8 @@ describe('findMissingStyles', () => {
     document.body.innerHTML = '<p></p>'
     const problems = findMissingStyles()
     expect(problems.map((problem) => problem.message)).toEqual([
-      'html[] has no value for --u-y, which the global rule :root uses: a rule for html or body sees the variables of a theme only when the theme class is on <html>',
-      'body[] has no value for --u-x, --u-y, which the global rule body uses: a rule for html or body sees the variables of a theme only when the theme class is on <html>',
+      'html[] has no value for --u-y, which the global rule :root uses: a rule for html or body sees the variables of a theme declared on :root (the outermost provider) or on <html> (its theme class)',
+      'body[] has no value for --u-x, --u-y, which the global rule body uses: a rule for html or body sees the variables of a theme declared on :root (the outermost provider) or on <html> (its theme class)',
     ])
     expect(problems[1]).toMatchObject({
       kind: 'root-without-theme',
@@ -143,6 +143,12 @@ describe('findMissingStyles', () => {
       { kind: 'variable-without-value', key: 'variable:--u-x:body' },
     ])
     document.body.className = ''
+  })
+
+  it('finds no problem in a global rule when the root theme declares the variables on :root', () => {
+    addStyle('@layer u-theme{:where(:root){--u-x:1;}}@layer u-global{html,body{color:var(--u-x);}}')
+    document.body.innerHTML = '<p></p>'
+    expect(findMissingStyles()).toEqual([])
   })
 
   it('ignores a style element that has no sheet', () => {

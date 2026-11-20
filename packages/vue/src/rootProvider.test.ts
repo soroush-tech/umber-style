@@ -50,7 +50,9 @@ describe('a ThemeProvider with isRoot', () => {
 describe('the wrapper of a ThemeProvider', () => {
   it('has only classes, and computes display: contents, which a theme class alone does not set', () => {
     const { ThemeProvider, themeClass } = createStyle(theme, { prefix: 'dc' })
-    const root = mount(() => h(ThemeProvider, { theme }, () => h('i')))
+    const root = mount(() =>
+      h(ThemeProvider, { theme }, () => h(ThemeProvider, { theme }, () => h('i')))
+    )
     document.body.append(root)
     const wrapper = root.firstElementChild as HTMLElement
     expect(wrapper.hasAttribute('style')).toBe(false)

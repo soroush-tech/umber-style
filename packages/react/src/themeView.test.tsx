@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react'
-import { at, createCache, createMemorySheet, NO_THEME_MESSAGE } from '@umber-style/core'
+import { at, createCache, createMemorySheet } from '@umber-style/core'
 import { space } from '@soroush.tech/styled-system/space'
 import { createStyle } from './createStyle'
 import { createDefaultStyle } from './defaultStyle'
@@ -114,12 +114,12 @@ describe('what reads no context', () => {
     expect(screen.getByTestId('box').className).toMatch(/^css-/)
   })
 
-  it('throws for a function style with no theme', () => {
+  it('gives a function style an empty theme with no theme at all', () => {
     const { styled } = createDefaultStyle()
     const Box = styled('div')(({ theme: view }) => ({
-      color: (view as unknown as { palette: string }).palette,
+      color: (view as unknown as { palette?: string }).palette ?? 'red',
     }))
-    vi.spyOn(console, 'error').mockImplementation(() => undefined)
-    expect(() => render(<Box />)).toThrow(NO_THEME_MESSAGE)
+    render(<Box data-testid="empty" />)
+    expect(screen.getByTestId('empty').className).toMatch(/^css-/)
   })
 })

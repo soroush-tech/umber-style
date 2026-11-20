@@ -76,12 +76,12 @@ A component made by `styled()` takes `style`, and this is the engine's own API, 
 The rendered `Box` is:
 
 ```html
-<div class="umber-theme-p5e9bg umber-boundary umber-scope">
-  <div class="umber-card-root-1l5hymm umber-card-root-qkafnl">
-    <p class="umber-qdsl9p">a plain element</p>
-  </div>
+<div class="umber-card-root-1l5hymm umber-card-root-qkafnl">
+  <p class="umber-qdsl9p">a plain element</p>
 </div>
 ```
+
+(The provider around it is the outermost one: it renders no element, and its theme is on `:root`.)
 
 and the rules for the card:
 

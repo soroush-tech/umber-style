@@ -1,5 +1,5 @@
 import { render } from '@testing-library/react'
-import { NO_THEME_MESSAGE } from '@umber-style/core'
+import { EMPTY_THEME } from '@umber-style/core'
 import { createThemeValue } from './ThemeValue'
 
 const base = { a: { b: 1, c: 2 } }
@@ -26,7 +26,7 @@ describe('createThemeValue', () => {
     expect(seen[1]).toEqual({ a: { b: 5, c: 7 } })
   })
 
-  it('takes the theme as it is when there is no base, and throws without a provider', () => {
+  it('takes the theme as it is when there is no base, and gives an empty object without a provider', () => {
     const { ThemeValueProvider, useTheme } = createThemeValue<typeof base>({ baseTheme: undefined })
     const seen: unknown[] = []
     const Probe = () => {
@@ -40,7 +40,14 @@ describe('createThemeValue', () => {
       </ThemeValueProvider>
     )
     expect(seen[0]).toBe(theme)
-    vi.spyOn(console, 'error').mockImplementation(() => undefined)
-    expect(() => render(<Probe />)).toThrow(NO_THEME_MESSAGE)
+    render(<Probe />)
+    expect(seen[1]).toBe(theme)
+    const empty = createThemeValue<typeof base>({ baseTheme: undefined })
+    const Empty = () => {
+      seen.push(empty.useTheme())
+      return null
+    }
+    render(<Empty />)
+    expect(seen[2]).toBe(EMPTY_THEME)
   })
 })

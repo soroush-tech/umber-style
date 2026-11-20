@@ -28,7 +28,9 @@ describe('the server entry of @umber-style/react', () => {
     ]) {
       expect(entry).toHaveProperty(name)
     }
-    expect(entry).not.toHaveProperty('useTheme')
+    for (const name of ['useTheme', 'ThemeScope', 'useThemeClass', 'ThemeContext']) {
+      expect(entry).not.toHaveProperty(name)
+    }
   })
 
   it('configures the default engine once, before it is used', () => {

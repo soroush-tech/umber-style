@@ -10,6 +10,8 @@ export const {
   useStyle,
   useTheme,
   ThemeProvider,
+  ThemeScope,
+  useThemeClass,
   apply,
   themeClass,
   when,

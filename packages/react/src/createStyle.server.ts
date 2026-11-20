@@ -1,7 +1,7 @@
 import {
   createEngine,
+  EMPTY_THEME,
   mergeDeep,
-  NO_THEME_MESSAGE,
   type ColorScheme,
   type DeepPartial,
   type Engine,
@@ -38,22 +38,23 @@ export function bindEngine<T extends object>(
   // The root theme over the base theme, made once for each root.
   const merged = new WeakMap<object, T>()
 
-  /** The root theme of the request, or the base theme of the engine; throws when there is neither. */
-  const readTheme = (): T => {
-    const rootTheme = readServerContext(root)
-    const base = engine.baseTheme
-    if (rootTheme === undefined) {
-      if (base === undefined) throw new Error(NO_THEME_MESSAGE)
-      return base
-    }
-    // A provider gives the engine its base theme before it gives the root, so the base exists here.
-    if ((rootTheme as unknown) === base) return rootTheme as T
+  /** `rootTheme` over the base theme. A provider gives the engine its base theme before it gives the root, so the base exists here. */
+  const mergeRoot = (rootTheme: DeepPartial<T>): T => {
+    const base = engine.baseTheme as T
+    if ((rootTheme as unknown) === base) return base
     let theme = merged.get(rootTheme)
     if (theme === undefined) {
-      theme = mergeDeep<T>(base as T, rootTheme)
+      theme = mergeDeep<T>(base, rootTheme)
       merged.set(rootTheme, theme)
     }
     return theme
+  }
+
+  /** The root theme of the request, or the base theme of the engine, or an empty object when there is neither. */
+  const readTheme = (): T => {
+    const rootTheme = readServerContext(root)
+    if (rootTheme === undefined) return engine.baseTheme ?? (EMPTY_THEME as T)
+    return mergeRoot(rootTheme)
   }
 
   const themeClass = (partial: DeepPartial<T>, colorScheme?: ColorScheme) =>
@@ -82,7 +83,7 @@ export function bindEngine<T extends object>(
     StyleSheet: { create },
     useStyle,
     apply: (...entries) => ({ className: engine.css(...entries) || undefined }),
-    ThemeProvider: createThemeProvider(engine, root, stamp),
+    ThemeProvider: createThemeProvider(engine, { root, stamp, readTheme, mergeRoot }),
     readTheme,
     themeClass,
     when: engine.when,

@@ -1,19 +1,25 @@
 # Themes
 
-After this page you can give a subtree its own theme, read theme values in JavaScript, know what a style function sees as `theme`, and type your theme in two ways.
+After this page you can give a page and a subtree their themes, theme portal content, read theme values in JavaScript, know what a style function sees as `theme`, and type your theme in two ways.
 
 ## The provider
 
-`ThemeProvider` takes a theme and makes it the theme of everything below it. On the web it renders one element, and that element carries the theme's class so that the variables apply below it:
+`ThemeProvider` takes a theme and makes it the theme of everything below it. How it does that on the web depends on whether another provider is above it:
+
+- **The outermost provider** (no provider above it) renders no element and puts no class on `<html>`. It declares the variables of its theme on the document root, in one rule `:where(:root){...}` in the `theme` layer. Everything on the page sees them: plain elements, portal content, and the rules for `html` and `body` that `Global` writes. A change of its theme rewrites that one rule, and no styled component renders again (unless the theme changes a value that is not a token, see below).
+- **A nested provider** renders one wrapper element, which carries its classes.
 
 ```html
-<div class="umber-theme-1x8aice umber-boundary umber-scope">...</div>
+<div class="umber-theme-1lpp26f umber-boundary umber-theme-3cgoer umber-scope">...</div>
 ```
 
-- `umber-theme-<hash>` is the theme class: it declares the theme's variables. The hash is of the declarations.
-- `umber-boundary` marks an element that starts a theme. [Theme conditions](theme-conditions.md) use it.
+- `umber-theme-1lpp26f` is the theme class of the theme it was given: it declares those variables. The hash is of the declarations. [Theme conditions](theme-conditions.md) match it.
+- `umber-boundary` marks an element that starts a theme. Theme conditions use it.
 - `umber-scheme-light` or `umber-scheme-dark` is added when you pass `colorScheme="light"` or `"dark"`.
+- `umber-theme-3cgoer` is the theme class of its whole merged theme (its theme over the ones above), with every variable that the page uses. It is there for content whose element is not inside the wrappers above it, such as a provider rendered through a portal. When the theme it was given is already the whole theme, the two classes are one, and it is written once.
 - `umber-scope` has `display: contents`, so the wrapper takes no space in the layout. It is a class, not an inline style.
+
+A change of a nested provider's theme changes these classes, and no styled component renders again either.
 
 The `theme` prop is a partial theme. A nested provider gives only what it changes and the rest comes from the provider above:
 
@@ -58,19 +64,32 @@ const App = () => (
 The result:
 
 ```html
-<div class="umber-theme-1x8aice umber-boundary umber-scope">
+<div class="umber-card-root-c45tr"></div>
+<div class="umber-theme-1lpp26f umber-boundary umber-theme-3cgoer umber-scope">
   <div class="umber-card-root-c45tr"></div>
-  <div class="umber-theme-1lpp26f umber-boundary umber-scope">
-    <div class="umber-card-root-c45tr"></div>
-  </div>
-  <div class="umber-theme-0 umber-boundary umber-scope">
-    <div class="umber-card-root-1h3unrm"></div>
-  </div>
-  <div class="umber-theme-45hmwp umber-boundary umber-scope"><code>#0b7a4b</code></div>
+</div>
+<div class="umber-theme-0 umber-boundary umber-theme-1x8aice umber-scope">
+  <div class="umber-card-root-1h3unrm"></div>
+</div>
+<div class="umber-theme-45hmwp umber-boundary umber-theme-q5wsxh umber-scope">
+  <code>#0b7a4b</code>
 </div>
 ```
 
 ```css
+:where(:root) {
+  --umber-palette-text: #1a1a1a;
+  --umber-palette-surface: #ffffff;
+  --umber-space-3: 16px;
+}
+.umber-theme-1lpp26f {
+  --umber-palette-surface: #fff4d6;
+}
+.umber-theme-3cgoer {
+  --umber-palette-text: #1a1a1a;
+  --umber-palette-surface: #fff4d6;
+  --umber-space-3: 16px;
+}
 .umber-card-root-c45tr {
   color: var(--umber-palette-text);
   background-color: var(--umber-palette-surface);
@@ -79,14 +98,6 @@ The result:
   .umber-card-root-c45tr {
     padding: var(--umber-space-3);
   }
-}
-.umber-theme-1x8aice {
-  --umber-palette-text: #1a1a1a;
-  --umber-palette-surface: #ffffff;
-  --umber-space-3: 16px;
-}
-.umber-theme-1lpp26f {
-  --umber-palette-surface: #fff4d6;
 }
 .umber-card-root-1h3unrm {
   color: var(--umber-palette-text);
@@ -99,10 +110,62 @@ The result:
 }
 ```
 
-(Each rule is inside its cascade layer; the layers are left out here.)
+(Each rule is inside its cascade layer; the layers, the `umber-scope` rule and the classes of the merged themes of the last two providers are left out here. The markup is shown formatted. It is the output of a classic server render, asserted in `packages/react/src/providers.docs.ssr.test.tsx`.)
 
+- The outermost provider has no element: the first Card is at the top, and its theme is on `:root`.
 - The second provider changes one token. Its theme class declares one variable, and the Card inside has the same class as the first, because only a variable changed.
-- The third provider changes a breakpoint. A breakpoint is not a token (see below), so it is written into the media rule and the Card inside has its own class. The provider's class is `umber-theme-0`: it has nothing to declare, so no rule is written for it.
+- The third provider changes a breakpoint. A breakpoint is not a token (see below), so it is written into the media rule and the Card inside has its own class. Its own theme class is `umber-theme-0`: it has nothing to declare, so no rule is written for it.
+
+### A function of the theme above
+
+`theme` can be a function of the theme above it. It returns the theme to give, which is merged over that theme like an object:
+
+```tsx
+<ThemeProvider theme={(outer) => ({ palette: { surface: outer.palette.text } })}>
+```
+
+The outermost provider calls it with the base theme, or with an empty object when there is none (its result then becomes the base theme). The server components build calls it with the root theme of the request: no context tells a server component which providers are above it.
+
+### Portal content: `ThemeScope` and `useThemeClass`
+
+Content that a portal (`createPortal`, a Vue `Teleport`) puts elsewhere in the document is outside the wrapper of the nested provider above it in the tree, so it sees the variables of `:root`, the outer theme. `ThemeScope` gives it the nested theme: it renders the wrapper of the nearest nested provider again (the same element and classes) around its children. Under the outermost provider only, or under none, it renders its children and no element.
+
+```tsx
+const { ThemeProvider, ThemeScope } = createStyle(lightTheme, { prefix: 'umber' })
+const darkTheme = { palette: { text: '#f2f2f2', surface: '#101114' } }
+
+const Dialog = () =>
+  createPortal(
+    <ThemeScope>
+      <Card />
+    </ThemeScope>,
+    document.body
+  )
+
+const App = () => (
+  <ThemeProvider theme={lightTheme}>
+    <ThemeProvider theme={darkTheme}>
+      <Dialog />
+    </ThemeProvider>
+  </ThemeProvider>
+)
+```
+
+`useThemeClass()` returns the class string of that wrapper, or `undefined`, for code that already has a container element of its own (the root element of a dialog component): put the class on it. A theme change reaches `ThemeScope` and `useThemeClass` as it reaches the wrapper.
+
+A provider rendered inside portal content is merged over the providers above it in the tree, and its wrapper declares its whole merged theme (the class of the merged theme, above), so it shows its own theme there too.
+
+Both exist in the React client build and in Vue (where `useThemeClass()` returns a computed ref). The server components build has no portal and has neither. On React Native `ThemeScope` renders its children and `useThemeClass()` returns `undefined`: a modal stays inside the React tree, so its content already reads the theme of the provider above it.
+
+These cases are checked in a real browser (Chromium) by `packages/react/src/themeProvider.browser.test.tsx`: the computed values below the wrapper of a nested provider, plain elements too; portal content with and without `ThemeScope`; a provider inside portal content under a nested provider.
+
+### The theme context
+
+`ThemeContext` (React client build and React Native) is the React context that holds the real theme of the nearest provider, merged over the ones above: `<ThemeContext.Consumer>{(theme) => ...}</ThemeContext.Consumer>`, or `useContext(ThemeContext)`. With no provider above, its value is `undefined`; `useTheme()` gives the base theme there instead.
+
+### Two React roots on one page
+
+An engine has one `:root` rule. Two React roots whose outermost providers share an engine (the default style, or one `createStyle`) share it: the theme of the provider that committed last is the one on `:root`, for both. Give both the same theme, which is the usual case (islands of one app). For a root that needs another theme, give its outermost provider the same theme as the other root, and put the theme it needs on a nested provider inside it: that one renders its wrapper.
 
 ## What a style function sees as `theme`
 
@@ -126,7 +189,7 @@ By default `breakpoints` and `components` are raw, and everything else is a vari
 | React Native | the theme                                        |
 | Vue          | a computed ref of the theme (`useTheme().value`) |
 
-With no provider above, `useTheme()` returns the base theme.
+With no provider above, `useTheme()` returns the base theme, or an empty object when there is none. Styles still render: a style function then gets an empty theme, and one that reads a token (`theme.palette.primary`) throws a `TypeError` of the language, because `theme.palette` is `undefined`.
 
 ## The base theme
 
@@ -136,9 +199,11 @@ The engine needs one full theme to know its shape: which tokens exist and what t
 - `configure({ theme })`, for the default style.
 - The first `ThemeProvider` that renders, or the first `themeClass(theme)` call, when none of the above was used. That theme becomes the base, so give the full theme to the outermost provider, not a partial one.
 
-A style function, a function sheet or `useTheme` that runs before any base theme exists throws: `There is no theme yet: render a ThemeProvider with the full theme first, or call setTheme (or configure({ theme })) before a function style, a sheet or useTheme is used.`
+With no base theme and no provider, a style function, a function sheet and `Global` get an empty theme, and `useTheme` returns an empty object. What needs the shape of the theme still throws `There is no theme yet: render a ThemeProvider with the full theme first, or call setTheme (or configure({ theme })) before a function style, a sheet or useTheme is used.`: the engine's own calls, such as `engine.refs`, and `keyframes` steps given as a function of the theme.
 
 Arrays are replaced as a whole in the real values: a provider with `{ space: [0, 8] }` makes `useTheme().space` that two-item array. The variables are per item, so only `--umber-space-0` and `--umber-space-1` are redeclared and `--umber-space-2` and `--umber-space-3` keep the outer values. If you need to change an array, give all of it.
+
+A merge keeps every own member of an object, with its descriptor: a helper function that is not enumerable (the `up` of `theme.breakpoints`, made with `Object.defineProperty`) survives a nested provider that sets `breakpoints`, from that provider's object when it has one, else from the one above.
 
 ## Typing your theme
 
@@ -198,4 +263,11 @@ The same works with `@umber-style/vue` and `@umber-style/react-native`. One `The
 - The module declaration names `@umber-style/core`, and TypeScript resolves that name from the file that holds the declaration. It was verified with the workspace layout of this repository. With a package manager that does not let your app see a package it did not install itself, you may need to install `@umber-style/core` directly; that was reasoned, not tried.
 - `Theme` is one interface for the whole program. Two different themes in one program (two `createStyle` calls with different shapes) are typed by `createStyle`, not by `Theme`.
 - A key built at run time in a web style, such as the media query above, is written with `at()`: written directly it is a type error. See [Typed styles](typed-styles.md).
-- A provider that changes only raw values (a breakpoint) declares nothing, and its theme class is always `umber-theme-0`. No rule is written for it, and every such provider shares that name.
+- A provider that changes only raw values (a breakpoint) declares nothing, and its own theme class is always `umber-theme-0`. No rule is written for it, and every such provider shares that name.
+- Under a nested provider the DOM has one more element, the wrapper. It has `display: contents`, so the layout is the same, but selectors that count elements see it: a child selector (`>`), a sibling selector (`+`, `~`), `:first-child` and the like.
+- Portal content without `ThemeScope` sees the outer theme (the variables of `:root`), not the theme of the nested provider above it in the tree.
+- A provider inside portal content that has no `colorScheme` of its own declares none: `color-scheme` there comes from `:root`, and `whenScheme` follows the system preference.
+- A theme change of the outermost provider renders no styled component when only token values change. A change of a value that is not a token (a breakpoint, an `inline` token, a function in the theme) makes a new view of the theme, and every styled component with a function style renders again, as it must. What reads `useTheme()` renders again on every change.
+- The `:root` rule is written in an insertion effect in the browser, after the render. Of two React roots, the one that commits last decides, and an unmounted root leaves its theme there until another provider declares one.
+- In the server components build the first provider of a request is the outermost one. A nested provider there declares only the theme it was given: it cannot know the providers between it and the root.
+- `isRoot` keeps working as before: no element, no class, no rule, and the class on `<html>` is yours. See [The root theme and switching](root-theme.md).

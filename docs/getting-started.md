@@ -52,10 +52,10 @@ createRoot(document.getElementById('root') as HTMLElement).render(<App />)
 The page ends up as:
 
 ```html
-<div class="umber-theme-b2oxy9 umber-boundary umber-scope">
-  <button class="umber-button-root-15gvy7r">Save</button>
-</div>
+<button class="umber-button-root-15gvy7r">Save</button>
 ```
+
+The provider renders no element: the variables of its theme are declared on `:root`, in the style element of the engine. A provider nested inside another renders a wrapper with its own theme: see [Themes](themes.md).
 
 The hashes in these pages come from real output; yours will differ if your theme or styles differ.
 

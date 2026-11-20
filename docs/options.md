@@ -82,13 +82,15 @@ A `Sheet` has `insert(rule)`, a readonly `rules` list, and optionally `replace(i
 
 ## `ThemeProvider` props
 
-| Name          | Type                                | React | Vue              | React Native | Default | Effect                                                                                            |
-| ------------- | ----------------------------------- | ----- | ---------------- | ------------ | ------- | ------------------------------------------------------------------------------------------------- |
-| `theme`       | `DeepPartial<Theme>`                | yes   | yes              | yes          | none    | The theme, or the part of it that this subtree changes                                            |
-| `colorScheme` | `'light' \| 'dark' \| 'light dark'` | yes   | yes              | yes          | none    | Sets `color-scheme` and the scheme marker class (web); the scheme for `whenScheme` (React Native) |
-| `className`   | `string`                            | yes   | no (use `class`) | ignored      | none    | Added to the classes of the wrapper                                                               |
-| `as`          | `string`                            | yes   | yes              | no           | `'div'` | The element that carries the theme class                                                          |
-| `isRoot`      | `boolean`                           | yes   | yes              | ignored      | `false` | Renders no element, no class and no rule: see [The root theme and switching](root-theme.md)       |
+| Name          | Type                                | React | Vue              | React Native | Default | Effect                                                                                                                                                                                 |
+| ------------- | ----------------------------------- | ----- | ---------------- | ------------ | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `theme`       | `ThemeInput<Theme>`                 | yes   | yes              | yes          | none    | The theme, or the part of it that this subtree changes, or a function of the theme above that returns it                                                                               |
+| `colorScheme` | `'light' \| 'dark' \| 'light dark'` | yes   | yes              | yes          | none    | Sets `color-scheme` (web: on `:root` for the outermost provider, else in its theme class) and the scheme marker class of a nested provider; the scheme for `whenScheme` (React Native) |
+| `className`   | `string`                            | yes   | no (use `class`) | ignored      | none    | Added to the classes of the wrapper of a nested provider                                                                                                                               |
+| `as`          | `string`                            | yes   | yes              | no           | `'div'` | The element of the wrapper of a nested provider                                                                                                                                        |
+| `isRoot`      | `boolean`                           | yes   | yes              | ignored      | `false` | Renders no element, no class and no rule: see [The root theme and switching](root-theme.md)                                                                                            |
+
+On the web the outermost provider (none above it) renders no element and declares its theme on `:root`; a nested one renders its wrapper. See [Themes](themes.md). `ThemeScope` takes only children (a default slot in Vue).
 
 ## Other signatures with options
 

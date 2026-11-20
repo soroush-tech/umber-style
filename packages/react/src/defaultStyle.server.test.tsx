@@ -1,4 +1,4 @@
-import { createCache, createMemorySheet, NO_THEME_MESSAGE } from '@umber-style/core'
+import { createCache, createMemorySheet, EMPTY_THEME } from '@umber-style/core'
 import { createDefaultStyle } from './defaultStyle.server'
 import { findAll, resolveTree } from './vitest.resolveTree'
 
@@ -18,18 +18,21 @@ describe('the default style for server components', () => {
       color: view.palette.primary,
     }))
     expect(getEngine().hasTheme).toBe(false)
-    expect(() => readTheme()).toThrow(NO_THEME_MESSAGE)
+    expect(readTheme()).toBe(EMPTY_THEME)
     const tree = await resolveTree(
       <ThemeProvider theme={theme}>
         <Box />
       </ThemeProvider>
     )
     expect(getEngine().baseTheme).toBe(theme)
+    // The outermost provider renders no element: one style element for its root theme, one for the Box.
     expect(findAll(tree, 'div').map((element) => element.props.className)).toEqual([
-      expect.stringMatching(/^d-theme-/),
       expect.stringMatching(/^d-box-root-/),
     ])
-    expect(findAll(tree, 'style')).toHaveLength(3)
+    expect(findAll(tree, 'style').map((element) => element.props.href)).toEqual([
+      expect.stringMatching(/^d-root-/),
+      expect.stringMatching(/^d-box-root-/),
+    ])
   })
 
   it('makes keyframes and global styles before configure, and renders them through Global', async () => {

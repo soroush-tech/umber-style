@@ -50,11 +50,15 @@ describe('the server build with layers', () => {
     ])
   })
 
-  it('starts the element of a theme class and of the scope with the order statement', async () => {
+  it('starts the element of a root theme, a theme class and the scope with the order statement', async () => {
     const { ThemeProvider } = setup()
-    const tree = await resolveTree(<ThemeProvider theme={theme}>x</ThemeProvider>)
+    const tree = await resolveTree(
+      <ThemeProvider theme={theme}>
+        <ThemeProvider theme={theme}>x</ThemeProvider>
+      </ThemeProvider>
+    )
     const styles = findAll(tree, 'style')
-    expect(styles).toHaveLength(2)
+    expect(styles).toHaveLength(3)
     for (const element of styles) {
       expect(element.children[0]).toMatch(
         /^@layer s-theme,s-global,s-components,s-overrides;@layer s-theme\{/

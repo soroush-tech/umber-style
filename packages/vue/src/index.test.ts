@@ -5,6 +5,8 @@ describe('the entry of @umber-style/vue', () => {
     for (const name of [
       'styled',
       'ThemeProvider',
+      'ThemeScope',
+      'useThemeClass',
       'useTheme',
       'StyleSheet',
       'useStyle',

@@ -1,10 +1,5 @@
 import { createApp, defineComponent, h, type Component } from 'vue'
-import {
-  createCache,
-  createLazyEngine,
-  createMemorySheet,
-  NO_THEME_MESSAGE,
-} from '@umber-style/core'
+import { createCache, createLazyEngine, createMemorySheet } from '@umber-style/core'
 import { createDefaultStyle } from './defaultStyle'
 
 // The shape of the theme that these tests give the default style.
@@ -58,16 +53,16 @@ describe('the default style', () => {
     expect(getEngine().baseTheme).toBe(light)
     const button = root.querySelector('button') as HTMLElement
     expect(ruleOf(button.className)).toBe(`.${button.className}{color:var(--d-palette-primary);}`)
-    expect((root.firstElementChild as HTMLElement).className).toMatch(
-      /^d-theme-\w+ d-boundary d-scope mine$/
-    )
+    // The outermost provider renders no element, so a class given to it goes nowhere.
+    expect(root.firstElementChild).toBe(button)
+    expect(root.querySelector('.mine')).toBeNull()
   })
 
-  it('throws one clear error for a function style before any theme', () => {
+  it('gives a function style an empty theme before any theme, so reading a token throws', () => {
     const { styled } = setup()
     const Button = styled('button')(({ theme }) => ({ color: theme.palette.primary }))
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
-    expect(() => mount(() => h(Button))).toThrow(NO_THEME_MESSAGE)
+    expect(() => mount(() => h(Button))).toThrow(TypeError)
     warn.mockRestore()
   })
 

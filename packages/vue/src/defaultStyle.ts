@@ -64,6 +64,19 @@ export function createDefaultStyle() {
     },
   }) as unknown as Style<Theme>['ThemeProvider']
 
+  // A stand-in that renders the real ThemeScope, as the provider does.
+  const ThemeScope = defineComponent({
+    name: 'ThemeScope',
+    setup(_props, { slots }) {
+      const Real = getStyle().ThemeScope
+      return () => h(Real, null, slots)
+    },
+  }) as unknown as Style<Theme>['ThemeScope']
+
+  function useThemeClass(): ComputedRef<string | undefined> {
+    return getStyle().useThemeClass()
+  }
+
   // A stand-in that renders the real Global, as the provider does.
   const Global = defineComponent({
     name: 'Global',
@@ -82,6 +95,8 @@ export function createDefaultStyle() {
     useStyle,
     useTheme,
     ThemeProvider,
+    ThemeScope,
+    useThemeClass,
     apply: ((...entries) => getStyle().apply(...entries)) as Style<Theme>['apply'],
     when: ((theme, colorScheme) => getStyle().when(theme, colorScheme)) as Style<Theme>['when'],
     whenScheme: ((scheme) => getStyle().whenScheme(scheme)) as Style<Theme>['whenScheme'],

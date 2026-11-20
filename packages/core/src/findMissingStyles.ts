@@ -149,7 +149,8 @@ function findVariableProblems(
  * `element`, `<html>` or `<body>` without a class of the engine, and use variables that have no value
  * on it: one problem for each rule, with all of those variables. A variable is declared on the element
  * that carries a theme class and below it, so a rule for `html` or `body` sees the variables of a theme
- * only when the theme class is on `<html>`.
+ * only when they are declared on `:root` (what the outermost provider does) or the theme class is on
+ * `<html>`; then there is no problem.
  */
 function findRootProblems(
   element: Element,
@@ -165,7 +166,7 @@ function findRootProblems(
     if (variables.length === 0 || isState || !isGlobal || !isMatched(element, rule)) continue
     const missing = variables.filter((name) => computed.getPropertyValue(name).trim() === '')
     if (missing.length === 0) continue
-    const message = `${label} has no value for ${missing.join(', ')}, which the global rule ${selector} uses: a rule for html or body sees the variables of a theme only when the theme class is on <html>`
+    const message = `${label} has no value for ${missing.join(', ')}, which the global rule ${selector} uses: a rule for html or body sees the variables of a theme declared on :root (the outermost provider) or on <html> (its theme class)`
     problems.push({
       kind: 'root-without-theme',
       name: missing[0],

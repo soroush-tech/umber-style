@@ -1,4 +1,11 @@
-import type { ComponentProps, ElementType, FunctionComponent, ReactElement, ReactNode } from 'react'
+import type {
+  ComponentProps,
+  Context,
+  ElementType,
+  FunctionComponent,
+  ReactElement,
+  ReactNode,
+} from 'react'
 import type {
   BindingOptions,
   Cache,
@@ -18,6 +25,7 @@ import type {
   StyleInput,
   StylerOptions,
   Theme,
+  ThemeInput,
   ThemeKey,
   WebStyleObject,
 } from '@umber-style/core'
@@ -34,6 +42,7 @@ export type {
   SchemeName,
   SheetEntry,
   StyleObject,
+  ThemeInput,
   ThemeKey,
   WebNested,
   WebProperties,
@@ -107,14 +116,25 @@ export interface SheetDefinition<S extends SheetStyles, E> {
 }
 
 export interface ThemeProviderProps<T> {
-  /** The theme, or the part of it that this subtree changes. */
-  readonly theme: DeepPartial<T>
+  /**
+   * The theme, or the part of it that this subtree changes; or a function of the theme above (the base
+   * theme, or an empty object, for the outermost provider) that returns it. It is merged over the theme above.
+   */
+  readonly theme: ThemeInput<T>
   /** Web only. */
   readonly colorScheme?: ColorScheme
-  /** Web only. */
+  /** Web only: a class of the wrapper of a nested provider. */
   readonly className?: string
-  /** Web only. Renders no element and no class: the app puts `themeClass(theme)` on an ancestor, usually `<html>`. The theme still reaches the engine and the context. */
+  /**
+   * Web only. Renders no element, no class and no rule: the app puts `themeClass(theme)` on an ancestor,
+   * usually `<html>`. The theme still reaches the engine and the context. Without it the outermost provider
+   * declares its theme on `:root`, and renders no element either.
+   */
   readonly isRoot?: boolean
+  readonly children?: ReactNode
+}
+
+export interface ThemeScopeProps {
   readonly children?: ReactNode
 }
 
@@ -128,7 +148,7 @@ export interface GlobalProps<T> {
 }
 
 export interface WebThemeProviderProps<T> extends ThemeProviderProps<T> {
-  /** The element that carries the theme class. Default 'div'. */
+  /** The element of the wrapper of a nested provider. Default 'div'. */
   readonly as?: string
 }
 
@@ -146,7 +166,7 @@ export interface Style<T, E> {
   useStyle<K extends string>(sheet: { readonly [P in K]: E }): { readonly [P in K]: E }
   useStyle<S extends SheetStyles>(sheet: SheetDefinition<S, E>): { [K in keyof S]: E }
   ThemeProvider(props: ThemeProviderProps<T>): ReactElement
-  /** The real theme values, for JavaScript that needs a number or a name. */
+  /** The real theme values, for JavaScript that needs a number or a name: of the nearest provider, else the base theme, else an empty object. */
   useTheme(): T
   /** The class that declares the variables of `theme`; '' on React Native. */
   themeClass(theme: DeepPartial<T>, colorScheme?: ColorScheme): string
@@ -172,9 +192,12 @@ export interface Style<T, E> {
   Global(props: GlobalProps<T>): ReactElement | null
 }
 
-/** The styling for server components: the root theme of the request is read with readTheme, not with a hook. */
-export interface ServerStyle<T> extends Omit<WebStyle<T>, 'useTheme'> {
-  /** The root theme of the request, or the base theme of the engine; throws when there is neither. */
+/** The styling for server components: the root theme of the request is read with readTheme, not with a hook. There is no context, and so no `ThemeContext`, `ThemeScope` or `useThemeClass`. */
+export interface ServerStyle<T> extends Omit<
+  WebStyle<T>,
+  'useTheme' | 'ThemeContext' | 'ThemeScope' | 'useThemeClass'
+> {
+  /** The root theme of the request, or the base theme of the engine, or an empty object when there is neither. */
   readTheme(): T
 }
 
@@ -182,6 +205,16 @@ export interface WebStyle<T> extends Omit<Style<T, SheetEntry>, 'ThemeProvider' 
   /** The props that apply sheet entries (or class names) to a plain element: a class name. */
   apply(...entries: (SheetEntry | string | null | undefined | false)[]): { className?: string }
   ThemeProvider(props: WebThemeProviderProps<T>): ReactElement
+  /**
+   * Renders the wrapper of the nearest nested provider again (the same element and classes) around its
+   * children, for content that a portal puts elsewhere in the document; under the outermost provider, or
+   * none, its children alone.
+   */
+  ThemeScope(props: ThemeScopeProps): ReactElement
+  /** The class string of the wrapper of the nearest nested provider, for an element of your own; undefined under the outermost provider, or none. */
+  useThemeClass(): string | undefined
+  /** The context that holds the real theme of the nearest provider (merged over the ones above); undefined with no provider above. */
+  ThemeContext: Context<T | undefined>
   engine: Engine<T>
   cache: Cache
 }

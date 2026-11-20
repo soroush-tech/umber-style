@@ -207,7 +207,7 @@ describe('styled, the class of a style with no function', () => {
 })
 
 describe('ThemeProvider', () => {
-  it('uses one component class under two themes, and one rule per theme class', () => {
+  it('uses one component class under two themes: the outer on :root, the nested one on its wrapper', () => {
     const { styled, ThemeProvider, sheet } = setup()
     const Button = styled('button')(({ theme }) => ({ color: theme.palette.primary }))
     const { container } = render(
@@ -220,29 +220,36 @@ describe('ThemeProvider', () => {
     )
     expect(screen.getByText('inner').className).toBe(screen.getByText('outer').className)
 
-    const outer = container.firstElementChild as HTMLElement
-    const inner = outer.querySelector('div') as HTMLElement
-    expect(inner.className).not.toBe(outer.className)
-    expect(outer.hasAttribute('style')).toBe(false)
+    // The outermost provider renders no element; the nested one renders its wrapper.
+    expect(container.firstElementChild).toBe(screen.getByText('outer'))
+    const inner = container.querySelector('div') as HTMLElement
+    expect(inner.hasAttribute('style')).toBe(false)
+    const [own, , full] = inner.className.split(' ')
 
     const themeRules = sheet.rules.filter((rule) => rule.startsWith('.t-theme-'))
-    expect(themeRules).toHaveLength(2)
-    expect(themeRules).toContain(`.${inner.className.split(' ')[0]}{--t-palette-primary:#ff0000;}`)
-    expect(themeRules.find((rule) => rule.startsWith(`.${outer.className.split(' ')[0]}{`))).toBe(
-      `.${outer.className.split(' ')[0]}{--t-palette-primary:#0000ff;--t-palette-text:#111111;--t-space-small:4px;}`
+    expect(themeRules).toEqual([
+      `.${own}{--t-palette-primary:#ff0000;}`,
+      `.${full}{--t-palette-primary:#ff0000;--t-palette-text:#111111;--t-space-small:4px;}`,
+    ])
+    expect(sheet.rules).toContain(
+      ':where(:root){--t-palette-primary:#0000ff;--t-palette-text:#111111;--t-space-small:4px;}'
     )
   })
 
   it('renders the element of `as`, adds a class, and sets the color scheme', () => {
     const { ThemeProvider, sheet } = setup()
     const { container } = render(
-      <ThemeProvider theme={{}} as="section" className="mine" colorScheme="dark">
-        x
+      <ThemeProvider theme={baseTheme}>
+        <ThemeProvider theme={{}} as="section" className="mine" colorScheme="dark">
+          x
+        </ThemeProvider>
       </ThemeProvider>
     )
     const element = container.firstElementChild as HTMLElement
     expect(element.tagName).toBe('SECTION')
-    expect(element.className).toMatch(/^t-theme-[a-z0-9]+ t-boundary t-scheme-dark t-scope mine$/)
+    expect(element.className).toMatch(
+      /^t-theme-[a-z0-9]+ t-boundary t-scheme-dark t-theme-[a-z0-9]+ t-scope mine$/
+    )
     expect(sheet.rules.find((rule) => rule.includes('color-scheme'))).toMatch(
       /color-scheme:dark;\}$/
     )
@@ -259,7 +266,9 @@ describe('ThemeProvider', () => {
     const Button = styled(Probe)(({ theme }) => ({ color: theme.palette.primary }))
     const { container } = render(
       <ThemeProvider theme={baseTheme}>
-        <Button>x</Button>
+        <ThemeProvider theme={baseTheme}>
+          <Button>x</Button>
+        </ThemeProvider>
       </ThemeProvider>
     )
     const wrapper = container.firstElementChild as HTMLElement
@@ -399,7 +408,9 @@ describe('the wrapper of a ThemeProvider', () => {
     const { ThemeProvider, themeClass } = createStyle(baseTheme, { prefix: 'dc' })
     const { container } = render(
       <ThemeProvider theme={baseTheme}>
-        <i />
+        <ThemeProvider theme={baseTheme}>
+          <i />
+        </ThemeProvider>
       </ThemeProvider>
     )
     const wrapper = container.firstElementChild as HTMLElement
@@ -418,7 +429,9 @@ describe('the wrapper of a ThemeProvider', () => {
     const { ThemeProvider, themeClass } = createStyle(baseTheme, { prefix: 'dc' })
     const { container } = render(
       <ThemeProvider theme={baseTheme}>
-        <i />
+        <ThemeProvider theme={baseTheme}>
+          <i />
+        </ThemeProvider>
       </ThemeProvider>
     )
     const wrapper = container.firstElementChild as HTMLElement

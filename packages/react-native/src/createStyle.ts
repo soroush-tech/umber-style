@@ -1,4 +1,4 @@
-import { createElement, type ReactElement } from 'react'
+import { createElement, Fragment, type Context, type ReactElement } from 'react'
 import { createNativeThemeKey, type NativeCondition } from './conditions'
 import {
   createLazyRecord,
@@ -6,7 +6,6 @@ import {
   globalStyles,
   isThemedSheet,
   keyframes,
-  NO_THEME_MESSAGE,
 } from '@umber-style/core'
 import { createThemeValue } from './ThemeValue'
 import type {
@@ -15,6 +14,7 @@ import type {
   SheetDefinition,
   StyleOptions,
   ThemeProviderProps,
+  ThemeScopeProps,
 } from './types'
 import type { NativeObjectSheet, NativeSheetStyles, NativeStyleObject } from './nativeStyle'
 import { createStyled } from './styled'
@@ -66,23 +66,33 @@ function Global<T>(_props: GlobalProps<T>): null {
   return null
 }
 
+/** `ThemeScope` on React Native: there is no wrapper to repeat, and a modal stays inside the tree, so it renders its children. */
+function ThemeScope({ children }: ThemeScopeProps): ReactElement {
+  return createElement(Fragment, null, children)
+}
+
+/** `useThemeClass` on React Native: there are no classes. */
+function useThemeClass(): string | undefined {
+  return undefined
+}
+
 /** Where the base theme lives: set by the outermost provider, or by the app. */
 export interface NativeHolder<T> {
   baseTheme: T | undefined
 }
 
-/** Makes the React Native styling over a holder of the base theme. */
-export function bindHolder<T extends object>(holder: NativeHolder<T>): NativeStyle<T> {
-  const { ThemeValueProvider, useTheme, useThemeValue, useCondition } = createThemeValue(holder)
+/** Makes the React Native styling over a holder of the base theme; the theme context is made here unless given. */
+export function bindHolder<T extends object>(
+  holder: NativeHolder<T>,
+  context?: Context<T | undefined>
+): NativeStyle<T> {
+  const { ThemeContext, ThemeValueProvider, useTheme, useCondition } = createThemeValue(
+    holder,
+    context
+  )
 
-  function ThemeProvider({
-    theme: partial,
-    colorScheme,
-    children,
-  }: ThemeProviderProps<T>): ReactElement {
-    // The outermost provider that renders gives the base theme, as on the web.
-    holder.baseTheme ??= partial as T
-    return createElement(ThemeValueProvider, { theme: partial, colorScheme }, children)
+  function ThemeProvider({ theme, colorScheme, children }: ThemeProviderProps<T>): ReactElement {
+    return createElement(ThemeValueProvider, { theme, colorScheme }, children)
   }
 
   function create<K extends string>(
@@ -118,10 +128,9 @@ export function bindHolder<T extends object>(holder: NativeHolder<T>): NativeSty
   // The contexts are read first, for every sheet, so that the hooks of a component never change; an
   // object sheet is its own registered styles and uses no theme.
   const useStyle = ((sheet: object) => {
-    const theme = useThemeValue()
+    const theme = useTheme()
     const condition = useCondition()
     if (!isThemedSheet(sheet)) return sheet
-    if (theme === undefined) throw new Error(NO_THEME_MESSAGE)
     return (sheet as NativeSheet<NativeSheetStyles, T>).resolve(theme, condition)
   }) as NativeStyle<T>['useStyle']
 
@@ -131,7 +140,10 @@ export function bindHolder<T extends object>(holder: NativeHolder<T>): NativeSty
     useStyle,
     apply: (...entries) => ({ style: entries.filter((entry) => !!entry) as NativeStyleObject[] }),
     ThemeProvider,
+    ThemeScope,
+    ThemeContext,
     useTheme,
+    useThemeClass,
     themeClass: () => '',
     when: createNativeThemeKey,
     whenScheme: createSchemeKey,

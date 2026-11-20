@@ -1,10 +1,5 @@
 import { render, screen } from '@testing-library/react'
-import {
-  createCache,
-  createLazyEngine,
-  createMemorySheet,
-  NO_THEME_MESSAGE,
-} from '@umber-style/core'
+import { createCache, createLazyEngine, createMemorySheet } from '@umber-style/core'
 import { createStyle } from './createStyle'
 import { createDefaultStyle } from './defaultStyle'
 
@@ -40,11 +35,14 @@ describe('the default style', () => {
     expect(ruleOf(className)).toBe(`.${className}{color:var(--d-palette-primary);}`)
   })
 
-  it('throws one clear error when a function style runs before any theme', () => {
+  it('gives a function style an empty theme before any theme, so reading a token throws', () => {
     const { styled } = setup()
     const Button = styled('button')(({ theme }) => ({ color: theme.palette.primary }))
+    const Plain = styled('button')(({ theme }) => ({ color: theme.palette ? 'blue' : 'red' }))
+    render(<Plain>plain</Plain>)
+    expect(screen.getByText('plain').className).toMatch(/^d-/)
     vi.spyOn(console, 'error').mockImplementation(() => undefined)
-    expect(() => render(<Button>ok</Button>)).toThrow(NO_THEME_MESSAGE)
+    expect(() => render(<Button>ok</Button>)).toThrow(TypeError)
   })
 
   it('nests providers: one component class, the merged real theme from useTheme', () => {
@@ -77,7 +75,7 @@ describe('the default style', () => {
     expect(getEngine().refs.palette.onPrimary).toBeUndefined()
   })
 
-  it('keeps the first of two full themes as the base; each root merges over it', () => {
+  it('keeps the first of two full themes as the base; each outermost provider merges over it', () => {
     const { ThemeProvider, useTheme, getEngine, sheet } = setup()
     const seen: unknown[] = []
     const Probe = () => {
@@ -96,14 +94,15 @@ describe('the default style', () => {
     )
     expect(getEngine().baseTheme).toBe(light)
     expect(seen).toEqual([light, other])
-    expect(sheet.rules.filter((rule) => rule.startsWith('.d-theme-'))).toHaveLength(2)
+    // Neither renders a wrapper: their themes go to :root, and make no theme class.
+    expect(sheet.rules.filter((rule) => rule.startsWith('.d-theme-'))).toHaveLength(0)
   })
 
-  it('has useTheme throw without a provider, and return the theme of configure({ theme })', () => {
+  it('has useTheme give an empty object without a provider, and the theme of configure({ theme })', () => {
     const bare = setup()
     const Probe = () => <i>{JSON.stringify(bare.useTheme())}</i>
-    vi.spyOn(console, 'error').mockImplementation(() => undefined)
-    expect(() => render(<Probe />)).toThrow(NO_THEME_MESSAGE)
+    render(<Probe />)
+    expect(screen.getByText('{}')).toBeTruthy()
 
     const cache = createCache({ hasLayers: false, prefix: 'e', sheet: createMemorySheet() })
     const configured = createDefaultStyle()
