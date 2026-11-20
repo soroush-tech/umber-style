@@ -19,6 +19,7 @@ import type {
   NativeStyleInput,
   NativeStyleObject,
 } from './nativeStyle'
+import type { NativeTheme } from './nativeTheme'
 import type { platformStyleSheet } from './platform'
 import type {
   ComponentProps,
@@ -29,8 +30,15 @@ import type {
   ReactNode,
 } from 'react'
 
-/** The options of `createStyle`: the same as on the web, so one call runs on both; they are not used. */
-export type StyleOptions<T = never> = BindingOptions<T>
+/**
+ * The options of `createStyle`: the same as on the web, so one call runs on both, and `remBase`. Only
+ * `remBase` and `lengthKeys` are used: a theme value under one of `lengthKeys` (default `space`,
+ * `sizes`, `radii`, `fontSizes`, `borderWidths`) that is a length in `px`, `rem` or no unit is a number.
+ */
+export interface StyleOptions<T = never> extends BindingOptions<T> {
+  /** The font size, in density-independent pixels, that `1rem` is, in a theme and in a style. Default 16. */
+  remBase?: number
+}
 
 export interface StyledOptions extends StylerOptions {
   /** Whether a prop is forwarded. Default: every prop but `as`, `theme` and `style`. */
@@ -91,9 +99,14 @@ export type NativeStyleSheet<T> = Omit<typeof platformStyleSheet, 'create'> & {
   ): SheetDefinition<Record<K, NativeStyleObject>, NativeStyleObject>
 }
 
+/**
+ * The styling of the theme shape `T` on React Native. What reads the theme (`useTheme`, a style function,
+ * a sheet made from a function, `ThemeContext`) gets it as React Native holds it, `NativeTheme<T>`:
+ * lengths are numbers. What takes a theme (`ThemeProvider`, `when`) takes `T`.
+ */
 export interface NativeStyle<T> {
-  styled: Styled<T>
-  StyleSheet: NativeStyleSheet<T>
+  styled: Styled<NativeTheme<T>>
+  StyleSheet: NativeStyleSheet<NativeTheme<T>>
   /** The styles of a sheet; an object sheet is its own registered styles and is returned as it is. */
   useStyle<K extends string>(sheet: { readonly [P in K]: NativeStyleObject }): {
     readonly [P in K]: NativeStyleObject
@@ -112,10 +125,10 @@ export interface NativeStyle<T> {
   ThemeScope(props: ThemeScopeProps): ReactElement
   /** Always undefined: there are no classes on React Native. */
   useThemeClass(): string | undefined
-  /** The context that holds the real theme of the nearest provider (merged over the ones above); undefined with no provider above. */
-  ThemeContext: Context<T | undefined>
-  /** The real theme values, for JavaScript that needs a number or a name: of the nearest provider, else the base theme, else an empty object. */
-  useTheme(): T
+  /** The context that holds the real theme of the nearest provider (merged over the ones above, lengths as numbers); undefined with no provider above. */
+  ThemeContext: Context<NativeTheme<T> | undefined>
+  /** The real theme values, for JavaScript that needs a number or a name: of the nearest provider, else the base theme, else an empty object. Lengths are numbers. */
+  useTheme(): NativeTheme<T>
   /** Always '': there are no classes on React Native. */
   themeClass(theme: DeepPartial<T>, colorScheme?: ColorScheme): string
   /** A style key for "the nearest provider has this theme object" (compared by identity; `colorScheme` is not used here). */

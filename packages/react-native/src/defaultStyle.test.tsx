@@ -88,6 +88,15 @@ describe('the default style on React Native', () => {
     expect(calls[0].style).toEqual([{ padding: 4 }])
   })
 
+  it('takes remBase and lengthKeys from configure', () => {
+    const { configure, styled } = createDefaultStyle()
+    configure({ theme: light, remBase: 20, lengthKeys: ['space'] })
+    const { View, calls } = createStandIn()
+    const Box = styled(View)({ padding: '0.5rem' })
+    render(<Box />)
+    expect(calls[0].style).toEqual([{ padding: 10 }])
+  })
+
   it('throws from configure once it was used', () => {
     const { configure, useTheme } = createDefaultStyle()
     configure({ theme: light })

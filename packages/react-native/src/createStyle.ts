@@ -17,9 +17,11 @@ import type {
   ThemeScopeProps,
 } from './types'
 import type { NativeObjectSheet, NativeSheetStyles, NativeStyleObject } from './nativeStyle'
+import { DEFAULT_LENGTH_KEYS, toNativeTheme, type NativeTheme } from './nativeTheme'
 import { createStyled } from './styled'
 import { platformStyleSheet } from './platform'
 import { hasConditions, toNativeStyle } from './toNativeStyle'
+import { DEFAULT_REM_BASE } from './units'
 
 export type { StyleOptions } from './types'
 
@@ -39,9 +41,15 @@ interface RegisteredSheet<S extends NativeSheetStyles> {
   isConditional: boolean
 }
 
-/** Registers `source` with the platform StyleSheet, without the keys that only the web has. */
-function register<S extends NativeSheetStyles>(source: S): RegisteredSheet<S> {
-  const pairs = Object.entries(source).map(([key, style]) => [key, toNativeStyle(style)])
+/** The name of the sheet entry `key` in the development warnings. */
+const toEntryName = (key: string) => `sheet entry "${key}"`
+
+/** Registers `source` with the platform StyleSheet, without the keys that only the web has; a `rem` length is `remBase` times its number. */
+function register<S extends NativeSheetStyles>(source: S, remBase: number): RegisteredSheet<S> {
+  const pairs = Object.entries(source).map(([key, style]) => [
+    key,
+    toNativeStyle(style, undefined, { remBase, name: toEntryName(key) }),
+  ])
   const entries = platformStyleSheet.create(Object.fromEntries(pairs)) as {
     [K in keyof S]: NativeStyleObject
   }
@@ -51,12 +59,15 @@ function register<S extends NativeSheetStyles>(source: S): RegisteredSheet<S> {
 /** The entries of `sheet`, with the ones that have a `when()` or `whenScheme()` key resolved against `condition` (not registered: they change with the providers). */
 function resolveEntries<S extends NativeSheetStyles>(
   sheet: RegisteredSheet<S>,
-  condition: NativeCondition | undefined
+  condition: NativeCondition | undefined,
+  remBase: number
 ): { [K in keyof S]: NativeStyleObject } {
   if (!sheet.isConditional) return sheet.entries
   const pairs = Object.entries(sheet.source).map(([key, style]) => [
     key,
-    hasConditions(style) ? toNativeStyle(style, condition) : sheet.entries[key],
+    hasConditions(style)
+      ? toNativeStyle(style, condition, { remBase, name: toEntryName(key) })
+      : sheet.entries[key],
   ])
   return Object.fromEntries(pairs) as { [K in keyof S]: NativeStyleObject }
 }
@@ -81,13 +92,19 @@ export interface NativeHolder<T> {
   baseTheme: T | undefined
 }
 
-/** Makes the React Native styling over a holder of the base theme; the theme context is made here unless given. */
+/**
+ * Makes the React Native styling over a holder of the base theme; the theme context is made here unless
+ * given. Of `options`, `remBase` and `lengthKeys` are used: a theme is converted under `lengthKeys`.
+ */
 export function bindHolder<T extends object>(
   holder: NativeHolder<T>,
-  context?: Context<T | undefined>
+  context?: Context<NativeTheme<T> | undefined>,
+  options: StyleOptions<T> = {}
 ): NativeStyle<T> {
+  const { remBase = DEFAULT_REM_BASE, lengthKeys = DEFAULT_LENGTH_KEYS } = options
   const { ThemeContext, ThemeValueProvider, useTheme, useCondition } = createThemeValue(
     holder,
+    (theme: T) => toNativeTheme(theme, lengthKeys, remBase),
     context
   )
 
@@ -99,28 +116,30 @@ export function bindHolder<T extends object>(
     styles: NativeObjectSheet<K>
   ): { readonly [P in K]: NativeStyleObject }
   function create<K extends string>(
-    styles: (theme: T) => Record<K, NativeStyleObject>
-  ): NativeSheet<Record<K, NativeStyleObject>, T>
+    styles: (theme: NativeTheme<T>) => Record<K, NativeStyleObject>
+  ): NativeSheet<Record<K, NativeStyleObject>, NativeTheme<T>>
   function create(
-    styles: NativeObjectSheet<string> | ((theme: T) => Record<string, NativeStyleObject>)
+    styles:
+      | NativeObjectSheet<string>
+      | ((theme: NativeTheme<T>) => Record<string, NativeStyleObject>)
   ): unknown {
     if (typeof styles !== 'function') {
       // Registered with the platform when the first key is read, once. There is no theme and no condition.
       let registered: RegisteredSheet<NativeSheetStyles> | undefined
       return createLazyRecord(Object.keys(styles), (key) => {
-        registered ??= register(styles as NativeSheetStyles)
+        registered ??= register(styles as NativeSheetStyles, remBase)
         return registered.entries[key]
       })
     }
     const byTheme = new WeakMap<object, RegisteredSheet<Record<string, NativeStyleObject>>>()
     return {
-      resolve(current: T, condition?: NativeCondition) {
+      resolve(current: NativeTheme<T>, condition?: NativeCondition) {
         let sheet = byTheme.get(current)
         if (!sheet) {
-          sheet = register(styles(current))
+          sheet = register(styles(current), remBase)
           byTheme.set(current, sheet)
         }
-        return resolveEntries(sheet, condition)
+        return resolveEntries(sheet, condition, remBase)
       },
     }
   }
@@ -131,11 +150,11 @@ export function bindHolder<T extends object>(
     const theme = useTheme()
     const condition = useCondition()
     if (!isThemedSheet(sheet)) return sheet
-    return (sheet as NativeSheet<NativeSheetStyles, T>).resolve(theme, condition)
+    return (sheet as NativeSheet<NativeSheetStyles, NativeTheme<T>>).resolve(theme, condition)
   }) as NativeStyle<T>['useStyle']
 
   return {
-    styled: createStyled(useTheme, useCondition),
+    styled: createStyled(useTheme, useCondition, remBase),
     StyleSheet: { ...platformStyleSheet, create },
     useStyle,
     apply: (...entries) => ({ style: entries.filter((entry) => !!entry) as NativeStyleObject[] }),
@@ -153,11 +172,14 @@ export function bindHolder<T extends object>(
   }
 }
 
-/** Makes the styling of one theme shape for React Native, apart from the default one; the options are those of the web and are not used. */
+/**
+ * Makes the styling of one theme shape for React Native, apart from the default one. The options are
+ * those of the web, so that one call runs on both platforms, with `remBase` added; of them only
+ * `remBase` and `lengthKeys` are used.
+ */
 export function createStyle<T extends object>(
   theme: T,
-  // The options are only here so that the same call runs on both platforms.
-  _options: StyleOptions<T> = {}
+  options: StyleOptions<T> = {}
 ): NativeStyle<T> {
-  return bindHolder({ baseTheme: theme })
+  return bindHolder({ baseTheme: theme }, undefined, options)
 }

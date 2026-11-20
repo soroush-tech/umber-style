@@ -1,3 +1,5 @@
+import { readNumber } from './units'
+
 /** What arithmetic on tokens takes on React Native: a number, a numeric string, or a percentage string. */
 export type Operand = string | number
 
@@ -15,8 +17,6 @@ interface Reading {
   value: number
   isPercent: boolean
 }
-
-const NUMBER_PATTERN = /^(-?(?:\d+(?:\.\d*)?|\.\d+))(px|%)?$/i
 
 /** `value` rounded so that float noise (0.1 * 3) does not show; `-0` is `0`. */
 function tidy(value: number): number {
@@ -44,15 +44,18 @@ function assertFinite(name: string, what: string, value: unknown): asserts value
   }
 }
 
-/** The number of `operand`, and whether it is a percentage; anything else cannot be computed. */
+/**
+ * The number of `operand`, and whether it is a percentage; anything else cannot be computed. A string is
+ * read as a style value is converted (`readNumber`), but `rem` is refused: a helper has no base for it.
+ */
 function read(name: string, operand: unknown): Reading {
   if (typeof operand !== 'string') {
     assertFinite(name, 'a value', operand)
     return { value: operand, isPercent: false }
   }
-  const match = NUMBER_PATTERN.exec(operand.trim())
-  if (match === null) throw unsupported(name, operand)
-  return { value: Number.parseFloat(match[1]), isPercent: match[2] === '%' }
+  const reading = readNumber(operand)
+  if (reading === undefined || reading.unit === 'rem') throw unsupported(name, operand)
+  return { value: reading.value, isPercent: reading.unit === '%' }
 }
 
 /** `value` as the percentage that a style takes. */

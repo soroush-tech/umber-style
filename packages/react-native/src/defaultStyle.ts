@@ -2,6 +2,7 @@ import { createContext } from 'react'
 import { createDeferredRecord, globalStyles, keyframes, type Theme } from '@umber-style/core'
 import type { NativeStyleObject } from './nativeStyle'
 import { bindHolder, type NativeHolder } from './createStyle'
+import type { NativeTheme } from './nativeTheme'
 import { platformStyleSheet } from './platform'
 import type {
   GlobalProps,
@@ -21,26 +22,28 @@ export interface DefaultStyleOptions extends StyleOptions<Theme> {
 export function createDefaultStyle() {
   const holder: NativeHolder<Theme> = { baseTheme: undefined }
   let bound: NativeStyle<Theme> | undefined
+  let settings: DefaultStyleOptions = {}
   // The context exists before the style is used, so that it can be exported.
-  const ThemeContext = createContext<Theme | undefined>(undefined)
+  const ThemeContext = createContext<NativeTheme<Theme> | undefined>(undefined)
 
   const getStyle = (): NativeStyle<Theme> => {
-    bound ??= bindHolder(holder, ThemeContext)
+    bound ??= bindHolder(holder, ThemeContext, settings)
     return bound
   }
 
-  /** Gives the default style a base theme. Throws once the default style was used. */
+  /** Gives the default style a base theme and its options (`remBase`, `lengthKeys`). Throws once the default style was used. */
   function configure(options: DefaultStyleOptions): void {
     if (bound) throw new Error('configure must be called before the default style is used.')
     holder.baseTheme = options.theme
+    settings = options
   }
 
-  const styled = ((tag, options) => getStyle().styled(tag, options)) as Styled<Theme>
+  const styled = ((tag, options) => getStyle().styled(tag, options)) as Styled<NativeTheme<Theme>>
 
   // An object sheet is registered on first read, so a module can create one before `configure` is called.
   const StyleSheet: NativeStyle<Theme>['StyleSheet'] = {
     ...platformStyleSheet,
-    create: ((styles: Record<string, NativeStyleObject> | ((theme: Theme) => never)) =>
+    create: ((styles: Record<string, NativeStyleObject> | ((theme: NativeTheme<Theme>) => never)) =>
       typeof styles === 'function'
         ? getStyle().StyleSheet.create(styles)
         : createDeferredRecord(styles, () =>
@@ -50,7 +53,7 @@ export function createDefaultStyle() {
 
   const useStyle = ((sheet: never) => getStyle().useStyle(sheet)) as NativeStyle<Theme>['useStyle']
 
-  function useTheme(): Theme {
+  function useTheme(): NativeTheme<Theme> {
     return getStyle().useTheme()
   }
 

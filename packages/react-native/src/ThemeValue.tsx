@@ -9,6 +9,7 @@ import {
   type ThemeInput,
 } from '@umber-style/core'
 import { readSchemeName, type NativeCondition } from './conditions'
+import type { NativeTheme } from './nativeTheme'
 
 export interface ThemeValueProviderProps<T> {
   readonly theme: ThemeInput<T>
@@ -25,19 +26,40 @@ export interface ThemeHolder<T> {
 /**
  * The contexts of the engine: the real theme values (`ThemeContext`, made here unless given; the base
  * theme of `holder`, else an empty object, where there is no provider), and what a condition is matched
- * against.
+ * against. A theme is held as React Native takes it: `convert` makes that of each theme object once, and
+ * the result is remembered for that object. A provider merges, and a function theme receives, the theme
+ * as it was given, not the converted one, so that one source does the same on both platforms.
  */
 export function createThemeValue<T extends object>(
   holder: ThemeHolder<T>,
-  ThemeContext: Context<T | undefined> = createContext<T | undefined>(undefined)
+  convert: (theme: T) => NativeTheme<T>,
+  ThemeContext: Context<NativeTheme<T> | undefined> = createContext<NativeTheme<T> | undefined>(
+    undefined
+  )
 ) {
   const ConditionContext = createContext<NativeCondition | undefined>(undefined)
+  const nativeByTheme = new WeakMap<object, NativeTheme<T>>()
+  const themeByNative = new WeakMap<object, T>()
+
+  /** `theme` converted, once for each theme object. */
+  const toNative = (theme: T): NativeTheme<T> => {
+    let native = nativeByTheme.get(theme)
+    if (native === undefined) {
+      native = convert(theme)
+      nativeByTheme.set(theme, native)
+      themeByNative.set(native, theme)
+    }
+    return native
+  }
 
   /** The theme where no provider is above: the base theme, or the empty theme. */
   const readOwnTheme = () => holder.baseTheme ?? (EMPTY_THEME as T)
 
   function ThemeValueProvider({ theme, colorScheme, children }: ThemeValueProviderProps<T>) {
-    const outer = useContext(ThemeContext) ?? holder.baseTheme
+    const above = useContext(ThemeContext)
+    // The theme above as it was given; a value that an app put in the context itself is taken as it is.
+    const outer =
+      above === undefined ? holder.baseTheme : (themeByNative.get(above) ?? (above as T))
     const outerScheme = useContext(ConditionContext)?.colorScheme
     const given = useMemo(
       () => resolveThemeInput(theme, outer ?? (EMPTY_THEME as T)),
@@ -45,7 +67,7 @@ export function createThemeValue<T extends object>(
     )
     // The outermost provider that renders gives the base theme, as on the web.
     holder.baseTheme ??= given as T
-    const value = useMemo(() => mergeTheme(outer, given), [outer, given])
+    const value = useMemo(() => toNative(mergeTheme(outer, given)), [outer, given])
     const scheme = readSchemeName(colorScheme) ?? outerScheme
     const condition = useMemo(() => ({ theme: given, colorScheme: scheme }), [given, scheme])
     return (
@@ -55,9 +77,9 @@ export function createThemeValue<T extends object>(
     )
   }
 
-  /** The theme of the nearest provider, the base theme, or an empty object. */
-  function useTheme(): T {
-    return useContext(ThemeContext) ?? readOwnTheme()
+  /** The theme of the nearest provider, the base theme, or an empty object, converted. */
+  function useTheme(): NativeTheme<T> {
+    return useContext(ThemeContext) ?? toNative(readOwnTheme())
   }
 
   /** What `when()` and `whenScheme()` keys are matched against: the nearest provider, or the base theme with no color scheme. */
