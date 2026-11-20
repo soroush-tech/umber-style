@@ -38,6 +38,13 @@ export interface CacheOptions {
    */
   hasColorFallbacks?: boolean
   /**
+   * Whether the string forms of token maths that are never valid CSS are rewritten in each value: a
+   * reference followed by two hex digits (`var(--x)1F`) as `alpha()` writes it, a minus before a
+   * reference (`-var(--x)`) as `negate()` writes it, and a reference followed by `ms` or `s` as a
+   * `calc()` of a time. Custom properties are left alone. Default false.
+   */
+  hasValueRepair?: boolean
+  /**
    * Whether a style written with `when()` or `whenScheme()` is scoped with `@scope`, so that it follows the
    * nearest theme. Default true. Without it the rule is the plain descendant form `:where(.theme) .class`,
    * which also matches below a nested theme, and so is wrong for nested themes. A browser without `@scope`
@@ -408,6 +415,7 @@ export function createCache(options: CacheOptions = {}): Cache {
     hasLayers = true,
     hasPruning = true,
     hasColorFallbacks = true,
+    hasValueRepair = false,
     hasScope = true,
     hasBaseClass = true,
   } = options
@@ -423,6 +431,7 @@ export function createCache(options: CacheOptions = {}): Cache {
     hasBaseClass,
     hasScope,
     hasColorFallbacks,
+    hasValueRepair,
     tokens: options.tokenSignature ?? '',
   })
   const hasDocument = typeof document !== 'undefined'
@@ -527,7 +536,8 @@ export function createCache(options: CacheOptions = {}): Cache {
 
   /** The `@keyframes` rule of `name`: the one written, else made now. */
   const readKeyframesRule = (name: string): string =>
-    insertedRules.get(name)?.[0] ?? createKeyframesRule(name, readKeyframesTheme, hasColorFallbacks)
+    insertedRules.get(name)?.[0] ??
+    createKeyframesRule(name, readKeyframesTheme, hasColorFallbacks, hasValueRepair)
 
   /** Writes the `@keyframes` rule of the registered `name` once, outside every layer, unless the page has it. */
   const writeKeyframes = (name: string): void => {
@@ -652,7 +662,7 @@ export function createCache(options: CacheOptions = {}): Cache {
   const pageGlobals = new Map<string, (CSSRule | undefined)[]>()
 
   const compileGlobal = (styles: GlobalStyleObject): GlobalRules => {
-    const flat = compileGlobalRules(styles, hasColorFallbacks, scoping)
+    const flat = compileGlobalRules(styles, hasColorFallbacks, scoping, hasValueRepair)
     const rules = wrapInLayer(flat, 'global')
     const id = `${prefix}-global-${hashString(rules.join(''))}`
     return { id, rules, animations: findAnimationNames(flat) }
@@ -749,12 +759,16 @@ export function createCache(options: CacheOptions = {}): Cache {
     if (styles.length === 0) return rawClasses.join(' ')
 
     const merged = mergeStyles(label ? [...styles, { label }] : styles)
-    const rules = compileRules('&', merged, hasColorFallbacks, scoping)
+    const rules = compileRules('&', merged, hasColorFallbacks, scoping, hasValueRepair)
     if (rules.length === 0) return rawClasses.join(' ')
     const className = nameClass(layer, merged, rules, after)
     registered.set(className, merged)
     if (after !== '') afters.set(className, after)
-    insertClass(className, compileRules(`.${className}`, merged, hasColorFallbacks, scoping), layer)
+    insertClass(
+      className,
+      compileRules(`.${className}`, merged, hasColorFallbacks, scoping, hasValueRepair),
+      layer
+    )
     return [...rawClasses, className].join(' ')
   }
 
@@ -763,7 +777,7 @@ export function createCache(options: CacheOptions = {}): Cache {
 
   const createEntry = (style: WebStyleObject): SheetEntry => {
     const merged = mergeStyles([style as StyleObject])
-    const rules = compileRules('&', merged, hasColorFallbacks, scoping)
+    const rules = compileRules('&', merged, hasColorFallbacks, scoping, hasValueRepair)
     const names: Partial<Record<EntryRole, string>> = {}
     const nameFor = (role: EntryRole): string => {
       names[role] ??= rules.length === 0 ? '' : nameClass(role, merged, rules, '')
@@ -775,7 +789,11 @@ export function createCache(options: CacheOptions = {}): Cache {
         const name = nameFor(role)
         if (name !== '' && !registered.has(name)) {
           registered.set(name, merged)
-          insertClass(name, compileRules(`.${name}`, merged, hasColorFallbacks, scoping), role)
+          insertClass(
+            name,
+            compileRules(`.${name}`, merged, hasColorFallbacks, scoping, hasValueRepair),
+            role
+          )
         }
         return name
       },

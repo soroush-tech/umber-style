@@ -154,7 +154,7 @@ function createTokenSignature(values: readonly unknown[]): string {
 /** Makes an engine that has no theme yet: it takes one from `setTheme`, or from the first `themeClass`. It needs no framework. */
 export function createLazyEngine<T extends object = Theme>(options: EngineOptions = {}): Engine<T> {
   const { cache: given, suffix, hasLabels, hasLayers, hasPruning, hasColorFallbacks } = options
-  const { hasScope, hasBaseClass, hasDevChecks } = options
+  const { hasScope, hasBaseClass, hasDevChecks, hasValueRepair } = options
   const { alwaysDeclare = [] } = options
   const { rawKeys, lengthKeys, modes, registered } = options
   if (given && options.prefix !== undefined && options.prefix !== given.prefix) {
@@ -172,6 +172,7 @@ export function createLazyEngine<T extends object = Theme>(options: EngineOption
       hasLayers,
       hasPruning,
       hasColorFallbacks,
+      hasValueRepair,
       hasScope,
       hasBaseClass,
       hasDevChecks,

@@ -1,5 +1,6 @@
 import { isAlphaColor, type AlphaColor } from './alpha'
 import { hashString } from './hash'
+import { DEFAULT_SCOPING } from './scope'
 import { compileRules, mergeStyles, type StyleObject } from './serialize'
 import { createStandIn, readStandIn } from './standIn'
 import type { WebProperties } from './webStyle'
@@ -78,9 +79,15 @@ function normalizeSteps(steps: KeyframesSteps): [number, StyleObject][] {
 }
 
 /** The body of a `@keyframes` rule: each step that declares something, sorted, written as the rule of a class. */
-function compileSteps(steps: KeyframesSteps, hasColorFallbacks: boolean): string {
+function compileSteps(
+  steps: KeyframesSteps,
+  hasColorFallbacks: boolean,
+  hasValueRepair: boolean
+): string {
   return normalizeSteps(steps)
-    .flatMap(([offset, step]) => compileRules(`${offset}%`, step, hasColorFallbacks))
+    .flatMap(([offset, step]) =>
+      compileRules(`${offset}%`, step, hasColorFallbacks, DEFAULT_SCOPING, hasValueRepair)
+    )
     .join('')
 }
 
@@ -104,7 +111,7 @@ export function keyframes<T = never>(
   }
   const isThemed = typeof steps === 'function'
   const resolved = isThemed ? steps(createStandIn('') as T) : steps
-  const name = `${label}-${hashString((isThemed ? 'theme:' : '') + compileSteps(resolved, true))}`
+  const name = `${label}-${hashString((isThemed ? 'theme:' : '') + compileSteps(resolved, true, false))}`
   if (!registry.has(name)) registry.set(name, steps as KeyframesInput<never>)
   return name
 }
@@ -121,11 +128,12 @@ export function isKeyframesName(name: string): boolean {
 export function createKeyframesRule(
   name: string,
   readTheme: () => unknown,
-  hasColorFallbacks: boolean
+  hasColorFallbacks: boolean,
+  hasValueRepair: boolean
 ): string {
   const steps = registry.get(name) as KeyframesInput<unknown>
   const resolved = typeof steps === 'function' ? steps(readTheme()) : steps
-  return `@keyframes ${name}{${compileSteps(resolved, hasColorFallbacks)}}`
+  return `@keyframes ${name}{${compileSteps(resolved, hasColorFallbacks, hasValueRepair)}}`
 }
 
 /** Adds to `names` each identifier of `value` that is a registered name. */

@@ -13,8 +13,12 @@ const NO_THEME = () => {
 }
 
 /** The rule of `name`, with `theme` for steps that are a function of it. */
-const ruleOf = (name: string, theme: unknown = undefined, hasColorFallbacks = true) =>
-  createKeyframesRule(name, () => theme, hasColorFallbacks)
+const ruleOf = (
+  name: string,
+  theme: unknown = undefined,
+  hasColorFallbacks = true,
+  hasValueRepair = false
+) => createKeyframesRule(name, () => theme, hasColorFallbacks, hasValueRepair)
 
 describe('keyframes', () => {
   it('returns <label>-<hash> at once, and the same name for the same steps', () => {
@@ -182,6 +186,14 @@ describe('createKeyframesRule', () => {
     )
   })
 
+  it('rewrites the string forms of token maths with hasValueRepair', () => {
+    const name = keyframes({ to: { transitionDelay: 'var(--x)s' } })
+    expect(ruleOf(name, undefined, true, true)).toBe(
+      `@keyframes ${name}{100%{transition-delay:calc(var(--x) * 1s);}}`
+    )
+    expect(ruleOf(name)).toBe(`@keyframes ${name}{100%{transition-delay:var(--x)s;}}`)
+  })
+
   it('leaves out a step that declares nothing', () => {
     const name = keyframes({ from: {}, to: { opacity: 1 } })
     expect(ruleOf(name)).toBe(`@keyframes ${name}{100%{opacity:1;}}`)
@@ -189,11 +201,11 @@ describe('createKeyframesRule', () => {
 
   it('reads the theme only for steps that are a function of it, and only then', () => {
     const plain = keyframes({ to: { opacity: 0.25 } })
-    expect(createKeyframesRule(plain, NO_THEME, true)).toBe(
+    expect(createKeyframesRule(plain, NO_THEME, true, false)).toBe(
       `@keyframes ${plain}{100%{opacity:0.25;}}`
     )
     const themed = keyframes((theme: StandInTheme) => ({ to: { color: theme.palette.muted } }))
-    expect(() => createKeyframesRule(themed, NO_THEME, true)).toThrow('no theme')
+    expect(() => createKeyframesRule(themed, NO_THEME, true, false)).toThrow('no theme')
     expect(ruleOf(themed, { palette: { muted: 'var(--u-palette-muted)' } })).toBe(
       `@keyframes ${themed}{100%{color:var(--u-palette-muted);}}`
     )

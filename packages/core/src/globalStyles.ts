@@ -112,7 +112,8 @@ export function readGlobalStyles<T>(
 export function compileGlobalRules(
   styles: GlobalStyleObject,
   hasColorFallbacks: boolean,
-  scoping: Scoping
+  scoping: Scoping,
+  hasValueRepair: boolean
 ): string[] {
   if (typeof styles !== 'object' || styles === null || Array.isArray(styles)) {
     throw new TypeError(
@@ -127,10 +128,17 @@ export function compileGlobalRules(
         throw new TypeError(`globalStyles(): "${key}" must hold a style object, or a list of them.`)
       }
       if (!GROUP_AT_RULE.test(key)) {
-        rules.push(...compileRules(key, item as StyleObject, hasColorFallbacks, scoping))
+        rules.push(
+          ...compileRules(key, item as StyleObject, hasColorFallbacks, scoping, hasValueRepair)
+        )
         continue
       }
-      const inner = compileGlobalRules(item as GlobalStyleObject, hasColorFallbacks, scoping)
+      const inner = compileGlobalRules(
+        item as GlobalStyleObject,
+        hasColorFallbacks,
+        scoping,
+        hasValueRepair
+      )
       if (inner.length > 0) rules.push(`${key}{${inner.join('')}}`)
     }
   }

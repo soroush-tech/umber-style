@@ -13,7 +13,8 @@ interface AppTheme {
   breakpoints: { up(name: string): string }
 }
 
-const compile = (styles: GlobalStyleObject) => compileGlobalRules(styles, true, DEFAULT_SCOPING)
+const compile = (styles: GlobalStyleObject, hasValueRepair = false) =>
+  compileGlobalRules(styles, true, DEFAULT_SCOPING, hasValueRepair)
 
 describe('globalStyles', () => {
   it('returns a frozen handle that writes nothing and needs no engine', () => {
@@ -161,6 +162,15 @@ describe('compileGlobalRules', () => {
     expect(compile({ body: false, html: undefined, p: { color: alpha('#ff0000', 0.5) } })).toEqual([
       'p{color:rgba(255, 0, 0, 0.5);color:color-mix(in srgb, #ff0000 50%, transparent);}',
     ])
+  })
+
+  it('rewrites the string forms of token maths with hasValueRepair, at any depth', () => {
+    const styles = { p: { margin: '-var(--x)' }, '@media print': { p: { color: 'var(--x)ff' } } }
+    expect(compile(styles, true)).toEqual([
+      'p{margin:calc(var(--x) * -1);}',
+      '@media print{p{color:var(--x);}}',
+    ])
+    expect(compile(styles)).toEqual(['p{margin:-var(--x);}', '@media print{p{color:var(--x)ff;}}'])
   })
 
   it('throws a TypeError for styles that are not an object, and for a key that holds no style', () => {
