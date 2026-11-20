@@ -69,22 +69,15 @@ case                                                           ops/s    margin
 core/classes > class creation > hit: the same small style ...  378 414   +-1.16%
 ```
 
-- **case** is `<package>/<file> > <group> > <name>`. It is what two runs are matched by, so renaming a case makes it appear as removed and added.
+- **case** is `<package>/<file> > <group> > <name>`.
 - **ops/s** is operations per second, `1000 / mean`, where the mean is the mean time of one operation in milliseconds. A bigger number is faster. What one operation is, is in the comment at the top of the file: for the render cases it is one render of 48 elements or of the tree, not one element.
 - **margin** is the relative margin of error of the mean at 95% confidence. It says how well this run knows its own mean. It does not say how much two runs differ: that is the noise section below.
 
 Each run writes, in `bench/results/` (ignored by git): `<package>.json` for each package, `all.json` for all of them, and `report.md`, a Markdown table with the mean and the number of samples too. A case in the JSON has its `id`, `hz` (operations per second), `mean` (milliseconds), `rme` (the relative margin of error, in percent) and `samples`. The memory figures are in a `memory` list next to the cases.
 
-## Comparing two runs
+## Comparing two versions
 
-```sh
-pnpm bench:compare before.json after.json          # thresholds 0.8 and 1.25
-pnpm bench:compare before.json after.json 0.9 1.1  # lower, then upper
-```
-
-For each case it prints the ratio of the second run to the first in operations per second: below 1 the case got slower. A case below the lower threshold is marked `SLOWER` and a case above the upper one `faster`; a case that only one file has is `added` or `removed`. The exit code is 1 when any case is `SLOWER`, 2 for a wrong call, and 0 otherwise. The continuous integration gate does not use this command (it is soroush-bench, below), but this is the way to look at two single runs of the vitest suite. The logic is in `bench/src/compare.ts`, with its unit tests.
-
-The two files should come from the same machine, in the same state, with the same `BENCH_TIME`.
+This suite shows absolute figures for every scenario. It is not a way to compare two versions: two single runs on one machine differ too much (see "Noise of two runs" below). To compare a change with what came before, or one implementation with another, write a file for [soroush-bench](https://soroush.tech/bench/), which runs both sides in one pinned sandbox and takes the median of rounds. The files of the gate in `bench/gate/` are the model.
 
 ## What the figures include
 
@@ -104,7 +97,7 @@ A figure is the mean of many samples, so its own margin is small, but two runs c
 
 - Compare runs from one machine, with nothing else busy. A browser, a build or a virus scan during a run moves the figures of the cases that ran at that time.
 - Cases of a few nanoseconds to a microsecond move the most in relative terms; so do the cases that make a fresh engine for each operation.
-- A threshold of 0.8 is meant to catch a change of a quarter in a case that is steady. Do not gate on a case that is listed as noisy: the gate below gates only operations that proved steady in the sandbox.
+- Do not judge a change by a case that is listed as noisy: the gate below gates only operations that proved steady in the sandbox.
 
 What was found to make cases unstable, and what is done about it:
 
@@ -124,7 +117,7 @@ Two runs of the whole suite, one after the other on one Windows laptop (Node 26,
 | `vue`          | 7     | 0.91         | 0.72   | 1.51    | 1                       |
 | `react-native` | 9     | 0.76         | 0.65   | 1.54    | 1                       |
 
-80 of the 139 cases were within the default thresholds of 0.8 and 1.25, and `pnpm bench:compare` between the two runs exited 1 with 42 cases below 0.8. The margin of error each run printed (mostly 1% to 10%) was far smaller than that: it does not cover what the machine did between the runs. The cases that moved most (below 0.5 or above 1.5) were the start-up reads, the theme classes made for a new object, and the first and small cases of the React server render, the DOM render of the same props, and the React Native object sheet. Do not gate on one run of a case from a laptop in this state: compare against a run made just before on the same machine, and better, take the median of rounds as the gate below does.
+80 of the 139 cases were within 0.8 to 1.25, and 42 were below 0.8. The margin of error each run printed (mostly 1% to 10%) was far smaller than that: it does not cover what the machine did between the runs. The cases that moved most (below 0.5 or above 1.5) were the start-up reads, the theme classes made for a new object, and the first and small cases of the React server render, the DOM render of the same props, and the React Native object sheet. So one run of a case from a laptop in this state decides nothing: take the median of rounds in one sandbox, as the gate below does.
 
 ## The gate
 
