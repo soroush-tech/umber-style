@@ -5,18 +5,14 @@
 //   page           one `extractPageStyles(cache, html, { themes })` for one page, of a cache that holds
 //                  the classes of ten pages (40 classes each). The HTML has 300 elements. Result: the CSS
 //                  of the one page, and the theme classes trimmed to the variables that page uses.
-//   scan HTML      one `scanHtml(html)` of that page: the pass that reads the class attributes.
+//   scan HTML      one `scanHtml(html)` of that page: the pass that reads the class attributes. The built
+//                  core does not export it, so this one case runs the source (`src/scanHtml.ts`), which
+//                  tsx compiles in the sandbox; the other cases run the build.
 // The cache is built once, before the cases, and is not changed by any of them (extraction only reads).
-import {
-  createCache,
-  createEngine,
-  createMemorySheet,
-  createStyleTag,
-  extractPageStyles,
-} from '../src'
+import type { BenchConfig } from '@soroush.tech/bench'
+import { createSmallTheme, type SmallTheme } from '../../../bench/src/themes'
 import { scanHtml } from '../src/scanHtml'
-import { runGroup } from '@umber-bench/shared/harness'
-import { createSmallTheme, type SmallTheme } from '@umber-bench/shared/themes'
+import { core } from './core'
 
 const PAGES = 10
 const CLASSES_PER_PAGE = 40
@@ -25,9 +21,9 @@ const ELEMENTS_PER_PAGE = 300
 /** An engine whose cache holds the classes of ten pages, each class using the theme through references. */
 function createPagesEngine() {
   const theme = createSmallTheme()
-  const engine = createEngine<SmallTheme>(theme, {
+  const engine = core.createEngine<SmallTheme>(theme, {
     prefix: 'b',
-    cache: createCache({ prefix: 'b', sheet: createMemorySheet() }),
+    cache: core.createCache({ prefix: 'b', sheet: core.createMemorySheet() }),
   })
   const { palette, space, radii } = engine.refs
   const colors = Object.values(palette)
@@ -61,17 +57,17 @@ function createPageHtml(classes: readonly string[], themeClass: string, count: n
   return `<html><body class="${themeClass}"><main>${body}</main></body></html>`
 }
 
-it('extraction', async (context) => {
-  const { engine, pages, themeClass } = createPagesEngine()
-  const html = createPageHtml(pages[3], themeClass, ELEMENTS_PER_PAGE)
-  const { cache } = engine
-  await runGroup(context, 'extraction', [
-    { name: 'extract: a cache with 400 classes', fn: () => cache.extract() },
-    { name: 'createStyleTag: a cache with 400 classes', fn: () => createStyleTag(cache) },
-    {
-      name: 'extractPageStyles: one page of ten, 300 elements',
-      fn: () => extractPageStyles(cache, html, { themes: [themeClass] }),
-    },
-    { name: 'scanHtml: 300 elements', fn: () => scanHtml(html) },
-  ])
-})
+const { engine, pages, themeClass } = createPagesEngine()
+const html = createPageHtml(pages[3], themeClass, ELEMENTS_PER_PAGE)
+const { cache } = engine
+
+export default {
+  name: 'core: extraction',
+  cases: {
+    'extract: a cache with 400 classes': () => cache.extract(),
+    'createStyleTag: a cache with 400 classes': () => core.createStyleTag(cache),
+    'extractPageStyles: one page of ten, 300 elements': () =>
+      core.extractPageStyles(cache, html, { themes: [themeClass] }),
+    'scanHtml: 300 elements (source)': () => scanHtml(html),
+  },
+} satisfies BenchConfig

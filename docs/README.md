@@ -30,7 +30,7 @@ These pages are the one set of documentation for all five packages. A documentat
 | [Options reference](options.md)                    | Look up every option and prop: name, type, default and effect                                 |
 | [Browser and platform support](browser-support.md) | See which browser features each part of the output needs                                      |
 | [Testing](testing.md)                              | Choose the tier of a test, run the browser tests and the fixture apps, read the gaps          |
-| [Benchmarks](benchmarks.md)                        | Run the benchmark suite, read its table, compare two runs, and know which figures are steady  |
+| [Benchmarks](benchmarks.md)                        | Run the benchmark suite in its sandbox, read its table, and know which figures are steady     |
 | [Releasing](releasing.md)                          | Publish the packages through alpha, rc and stable, install a prerelease, and verify a tarball |
 
 ## The packages

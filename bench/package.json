@@ -4,11 +4,6 @@
   "version": "0.1.0",
   "license": "MIT",
   "type": "module",
-  "exports": {
-    "./themes": "./src/themes.ts",
-    "./styles": "./src/styles.ts",
-    "./harness": "./src/harness.ts"
-  },
   "scripts": {
     "lint": "oxlint --deny-warnings",
     "typecheck": "pnpm --filter @umber-style/core build && tsc --noEmit",

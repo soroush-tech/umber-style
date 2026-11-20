@@ -253,12 +253,12 @@ importers:
         specifier: ^3.2.3
         version: 3.2.4
     devDependencies:
+      '@soroush.tech/bench':
+        specifier: ^2.2.3
+        version: 2.2.3
       '@types/node':
         specifier: ^26.6.6
         version: 26.6.6
-      '@umber-bench/shared':
-        specifier: workspace:*
-        version: link:../../bench
       '@umber-style/eslint-config':
         specifier: workspace:*
         version: link:../eslint-config
@@ -315,6 +315,9 @@ importers:
       '@emotion/is-prop-valid':
         specifier: ^1.4.0
         version: 1.4.0
+      '@soroush.tech/bench':
+        specifier: ^2.2.3
+        version: 2.2.3
       '@soroush.tech/styled-system':
         specifier: ^6.0.1
         version: 6.0.1(@emotion/is-prop-valid@1.4.0)
@@ -330,9 +333,6 @@ importers:
       '@types/react-dom':
         specifier: ^19.3.0
         version: 19.3.0(@types/react@19.3.0)
-      '@umber-bench/shared':
-        specifier: workspace:*
-        version: link:../../bench
       '@umber-style/eslint-config':
         specifier: workspace:*
         version: link:../eslint-config
@@ -373,6 +373,9 @@ importers:
         specifier: workspace:*
         version: link:../core
     devDependencies:
+      '@soroush.tech/bench':
+        specifier: ^2.2.3
+        version: 2.2.3
       '@testing-library/react':
         specifier: ^16.3.3
         version: 16.3.3(@testing-library/dom@10.4.2)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
@@ -385,9 +388,6 @@ importers:
       '@types/react-dom':
         specifier: ^19.3.0
         version: 19.3.0(@types/react@19.3.0)
-      '@umber-bench/shared':
-        specifier: workspace:*
-        version: link:../../bench
       '@umber-style/eslint-config':
         specifier: workspace:*
         version: link:../eslint-config
@@ -483,12 +483,12 @@ importers:
         specifier: workspace:*
         version: link:../core
     devDependencies:
+      '@soroush.tech/bench':
+        specifier: ^2.2.3
+        version: 2.2.3
       '@types/node':
         specifier: ^26.6.6
         version: 26.6.6
-      '@umber-bench/shared':
-        specifier: workspace:*
-        version: link:../../bench
       '@umber-style/eslint-config':
         specifier: workspace:*
         version: link:../eslint-config

@@ -63,7 +63,7 @@
     "vue": "^3.5.0"
   },
   "devDependencies": {
-    "@umber-bench/shared": "workspace:*",
+    "@soroush.tech/bench": "^2.2.3",
     "@types/node": "^26.6.6",
     "@umber-style/eslint-config": "workspace:*",
     "@vitest/coverage-v8": "^5.1.0",
