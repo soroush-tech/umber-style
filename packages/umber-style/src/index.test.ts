@@ -47,6 +47,7 @@ describe('the entries of umber-style', () => {
       'StyleSheet',
       'useStyle',
       'apply',
+      'css',
       'themeClass',
       'configure',
       'keyframes',

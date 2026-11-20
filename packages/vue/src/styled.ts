@@ -1,5 +1,11 @@
 import { h, normalizeClass, type Component } from 'vue'
-import { flattenStyle, withTagShorthands, type Engine, type StyleInput } from '@umber-style/core'
+import {
+  createComponentSelector,
+  flattenStyle,
+  readStyleArguments,
+  withTagShorthands,
+  type Engine,
+} from '@umber-style/core'
 import type { Styled, StyledComponent, StyledOptions, StyledStatics } from './types'
 
 /** Whether `tag` is a component made by `styled`. */
@@ -40,7 +46,9 @@ function createHoldRef(hold: () => () => void) {
 export function createStyled<T>(engine: Engine<T>, useThemeView: () => T): Styled<T> {
   const styled =
     (tag: string | Component, options: StyledOptions = {}) =>
-    (...styles: StyleInput[]) => {
+    (...args: unknown[]) => {
+      // Called with styles, or as a tag: a template is one style.
+      const styles = readStyleArguments(args)
       const inner = isStyledComponent(tag) ? tag : undefined
       const baseTag = inner?._tag ?? tag
       const shouldForward = options.shouldForwardProp ?? inner?._shouldForwardProp
@@ -83,6 +91,8 @@ export function createStyled<T>(engine: Engine<T>, useThemeView: () => T): Style
           _tag: baseTag,
           _shouldForwardProp: shouldForward,
           _target: target,
+          // The component as a selector in a template or a key: `${Button}:hover &`.
+          toString: createComponentSelector(options.target, styler),
         } satisfies StyledStatics
       )
       // The attributes are forwarded here, so Vue must not put them on the root a second time.

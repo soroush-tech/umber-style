@@ -11,11 +11,17 @@ import {
   type SchemeName,
   type ThemeKey,
 } from './scope'
-import { keyframes, type KeyframesInput, type KeyframesOptions } from './keyframes'
+import {
+  keyframes,
+  type KeyframesInput,
+  type KeyframesOptions,
+  type KeyframesSteps,
+} from './keyframes'
 import { isStyleFunction, splitLeading } from './styleBase'
 import { isSameView } from './sameView'
 import { createThemeClass, declareRootTheme } from './theme'
 import { createTokens, type DeepPartial, type Tokens } from './tokens'
+import type { TemplateValue } from './styleTypes'
 import type { WebStyleObject } from './webStyle'
 import type {
   ColorScheme,
@@ -129,6 +135,9 @@ export interface Engine<T> {
    * `animation` or `animation-name` is first inserted; steps given as a function of the theme are then
    * resolved against `refs`.
    */
+  keyframes(steps: (theme: T) => KeyframesSteps, options?: KeyframesOptions): string
+  /** As a tag: the steps written as CSS text; a function among the interpolations is called with `{ theme }`. */
+  keyframes(template: TemplateStringsArray, ...values: TemplateValue<unknown, T>[]): string
   keyframes(steps: KeyframesInput<T>, options?: KeyframesOptions): string
   /** Writes the `@keyframes` rule of `name` now, for a use the engine cannot see in a class (a name under another key, CSS of the app's own, the Web Animations API). Throws a `TypeError` for a name that `keyframes` did not return. */
   insertKeyframes(name: string): void

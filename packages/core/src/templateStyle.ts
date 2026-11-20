@@ -306,6 +306,11 @@ function build(
   return built
 }
 
+/** Whether `value` is the strings of a tagged template: an array with `raw`, which a call with styles never is. */
+export function isTemplateStrings(value: unknown): value is TemplateStringsArray {
+  return Array.isArray(value) && 'raw' in value
+}
+
 /**
  * The style of a tagged template, `strings` and `values` as a tag is given them: CSS text with
  * declarations, nested rules (`&:hover { }`, `> p { }`), at-rules (`@media (...) { }`) and comments.

@@ -11,6 +11,7 @@ describe('the entry of @umber-style/vue', () => {
       'StyleSheet',
       'useStyle',
       'apply',
+      'css',
       'themeClass',
       'when',
       'whenScheme',

@@ -136,7 +136,10 @@ describe('styled', () => {
 
   it('uses shouldForwardProp for a tag', () => {
     const { styled } = setup()
-    const Box = styled('div', { shouldForwardProp: (prop) => prop === 'id' })({ color: 'red' })
+    // A `boolean` return type: a body that reads as a type guard would narrow the props to `id`.
+    const Box = styled('div', { shouldForwardProp: (prop): boolean => prop === 'id' })({
+      color: 'red',
+    })
     const { container } = render(<Box id="a" title="b" />)
     expect((container.firstElementChild as HTMLElement).getAttributeNames().sort()).toEqual([
       'class',

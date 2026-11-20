@@ -71,6 +71,7 @@ const ENTRIES = {
     'at',
     'Global',
     'keyframes',
+    'css',
   ],
   '@umber-style/styled': ['default'],
   '@umber-style/react-native': [
@@ -81,6 +82,7 @@ const ENTRIES = {
     'StyleSheet',
     'Global',
     'keyframes',
+    'css',
   ],
   '@umber-style/vue': [
     'createStyle',
@@ -90,6 +92,7 @@ const ENTRIES = {
     'StyleSheet',
     'Global',
     'keyframes',
+    'css',
   ],
   'umber-style': ['createEngine', 'createCache', 'extractPageStyles'],
   'umber-style/react': [
@@ -99,9 +102,17 @@ const ENTRIES = {
     'StyleSheet',
     'Global',
     'keyframes',
+    'css',
   ],
-  'umber-style/react-native': ['createStyle', 'styled', 'ThemeProvider', 'useTheme', 'Global'],
-  'umber-style/vue': ['createStyle', 'styled', 'ThemeProvider', 'useTheme', 'Global'],
+  'umber-style/react-native': [
+    'createStyle',
+    'styled',
+    'ThemeProvider',
+    'useTheme',
+    'Global',
+    'css',
+  ],
+  'umber-style/vue': ['createStyle', 'styled', 'ThemeProvider', 'useTheme', 'Global', 'css'],
 }
 
 const windows = process.platform === 'win32'
@@ -431,8 +442,9 @@ import type { Theme } from '@umber-style/core'
 import { css, cx } from '@umber-style/css'
 import createCssInstance from '@umber-style/css/create-instance'
 import { createStyle } from '@umber-style/react'
+import type { CSSObject, Keyframes, SerializedStyles } from '@umber-style/react'
 import styled from '@umber-style/styled'
-import type { StyledOptions } from '@umber-style/styled'
+import type { FilteringStyledOptions, StyledOptions } from '@umber-style/styled'
 import { createStyle as createNative } from '@umber-style/react-native'
 import { createStyle as createVue } from '@umber-style/vue'
 import { createEngine as createUmbrellaEngine } from 'umber-style'
@@ -466,6 +478,16 @@ export const color: string = web.useTheme().palette.primary
 const styledOptions: StyledOptions = { name: 'Card', target: 'card' }
 export const Card = styled('section', styledOptions)({ padding: 4 })
 export const Label = styled.span<{ tone?: string }>(({ tone }) => ({ color: tone }))
+const cardStyle: CSSObject = { padding: 4, '&:hover': { opacity: 0.8 } }
+export const card: SerializedStyles = web.css(cardStyle)
+export const fade: Keyframes = web.keyframes\`from { opacity: 0; }\`
+export const Title = web.styled('h1')<{ tone: string }>\`
+  color: \${({ tone }) => tone};
+\`
+const linkOptions = {
+  shouldForwardProp: (prop: string): prop is 'href' => prop === 'href',
+} satisfies FilteringStyledOptions<{ href?: string }, 'href'>
+export const Link = styled('a', linkOptions)({ color: 'red' })
 
 const native = createNative(theme)
 export const nativeColor: string = native.useTheme().palette.primary

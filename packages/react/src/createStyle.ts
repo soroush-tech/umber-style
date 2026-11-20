@@ -1,5 +1,6 @@
 import {
   type ColorScheme,
+  createCssEntry,
   createEngine,
   type DeepPartial,
   type Engine,
@@ -65,6 +66,7 @@ export function bindEngine<T extends object>(
     StyleSheet: { create },
     useStyle,
     apply: (...entries) => ({ className: engine.css(...entries) || undefined }),
+    css: ((...args: unknown[]) => createCssEntry(engine.cache, args)) as WebStyle<T>['css'],
     ThemeProvider: createThemeProvider({
       engine,
       contexts,

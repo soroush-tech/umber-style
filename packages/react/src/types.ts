@@ -11,21 +11,30 @@ import type {
   BindingOptions,
   Cache,
   ColorScheme,
+  CssArgument,
   DeepPartial,
   Engine,
   GlobalInput,
+  GlobalStyleObject,
   GlobalStyles,
   GlobalStylesInput,
+  Interpolation as CoreInterpolation,
+  InterpolationResult,
+  Keyframes,
   KeyframesInput,
   KeyframesOptions,
+  KeyframesSteps,
   ObjectSheet,
   SchemeKey,
   SchemeName,
+  SerializedStyles,
   SheetEntry,
   SheetStyles,
+  StaticTemplateValue,
   StyleInput,
   StylerOptions,
-  Theme,
+  TemplateValue,
+  Theme as CoreTheme,
   ThemeInput,
   ThemeKey,
   WebStyleObject,
@@ -34,6 +43,15 @@ import type {
 /** The style types of the core that an app annotates with or uses `satisfies` with. */
 export type {
   AlphaColor,
+  ComponentSelector,
+  CSSObject,
+  CssArgument,
+  InterpolationResult,
+  Keyframes,
+  SerializedStyles,
+  StaticTemplateValue,
+  TemplateValue,
+  UmberCache,
   GlobalInput,
   GlobalStyleObject,
   GlobalStyles,
@@ -63,6 +81,24 @@ export interface ServerStyleOptions {
   hasServerStyleElements?: boolean
 }
 
+/**
+ * The theme of the default style of this binding: what `styled`, `useTheme`, `StyleSheet` and
+ * `ThemeProvider` of the default style read. It extends the core's `Theme`, so an app gives it members
+ * from either module: `declare module '@umber-style/react' { interface Theme extends MyTheme {} }` for
+ * React alone, or `declare module '@umber-style/core'` for a theme that every binding shares. The
+ * optional member below only keeps it from being empty.
+ */
+export interface Theme extends CoreTheme {
+  readonly _theme?: never
+}
+
+/**
+ * A style in any form that `styled` takes: a style object, a `css()` result or a sheet entry, a function
+ * of the props and the theme, nothing, or a list of them. The core's `Interpolation`, with this binding's
+ * `Theme` unless another is given.
+ */
+export type Interpolation<Props = unknown, T = Theme> = CoreInterpolation<Props, T>
+
 export interface StyleOptions<T = never> extends BindingOptions<T>, ServerStyleOptions {}
 
 export interface DefaultStyleOptions extends BindingOptions<Theme>, ServerStyleOptions {
@@ -86,6 +122,20 @@ export interface StyledOptions extends StylerOptions {
   target?: string
 }
 
+/**
+ * `StyledOptions` whose `shouldForwardProp` is a type guard: the props of the tag that a styled component
+ * then takes are only the ones it names, `Forwarded`.
+ */
+export interface FilteringStyledOptions<
+  Props = Record<string, unknown>,
+  Forwarded extends keyof Props & string = keyof Props & string,
+> extends StyledOptions {
+  shouldForwardProp?: (prop: string) => prop is Forwarded
+}
+
+/** The props of a component or a tag, as an element of it takes them. */
+export type PropsOf<C extends ElementType> = JSX.LibraryManagedAttributes<C, ComponentProps<C>>
+
 /** What a styled component keeps, so that styling it again flattens into one element. */
 export interface StyledStatics {
   /** Every style of the component, the styles of the components it wraps first. */
@@ -95,6 +145,8 @@ export interface StyledStatics {
   _shouldForwardProp?: (prop: string) => boolean
   /** The `target` classes of the component and of the components it wraps. */
   _target?: string
+  /** The component as a selector: `.` and a class that every element of it has. Throws when it has none. */
+  toString(): string
 }
 
 /**
@@ -113,26 +165,68 @@ export type StyleProp =
   | undefined
   | readonly StyleProp[]
 
-export type StyledComponent<C extends ElementType, P extends object> = FunctionComponent<
-  Omit<ComponentProps<C>, keyof P | 'as' | 'style'> & P & { as?: ElementType; style?: StyleProp }
+/**
+ * A component made by `styled`: it takes the props of the tag (`Base`: all of them, unless a
+ * `shouldForwardProp` type guard named some), its own props `P`, `as` and `style`. As text it is a
+ * selector: `.` and a class that every element of it has (its `target`, else its class when none of its
+ * styles is a function).
+ */
+export type StyledComponent<
+  C extends ElementType,
+  P extends object,
+  Base extends object = ComponentProps<C>,
+> = FunctionComponent<
+  Omit<Base, keyof P | 'as' | 'style'> & P & { as?: ElementType; style?: StyleProp }
 > &
   StyledStatics
 
-/** What `styled(tag, options)` returns: it takes the styles and makes the component. */
-export type StyledFactory<T, C extends ElementType> = <P extends object = object>(
-  ...styles: StyleInput<T, P>[]
-) => StyledComponent<C, P>
+/**
+ * What `styled(tag, options)` returns: it takes the styles and makes the component, or is used as a tag,
+ * whose template is one style (a function of the props when an interpolation is a function).
+ */
+export interface StyledFactory<T, C extends ElementType, Base extends object = ComponentProps<C>> {
+  // Three forms, in this order. A function first: a function style whose parameters are annotated is
+  // typed by the first form that sees it, and keeps its literal values only against a style. The
+  // template. Then the styles, last, so that a mistake in a style object is reported against a style.
+  <P extends object = object>(
+    style: (props: P & { theme: T }) => InterpolationResult,
+    ...styles: Interpolation<P, T>[]
+  ): StyledComponent<C, P, Base>
+  // `P` is not inferred from the values: a styled component among them is a selector, not a style.
+  <P extends object = object>(
+    template: TemplateStringsArray,
+    ...values: TemplateValue<NoInfer<P>, T>[]
+  ): StyledComponent<C, P, Base>
+  <P extends object = object>(...styles: Interpolation<P, T>[]): StyledComponent<C, P, Base>
+}
 
 /** The shorthand of each HTML and SVG tag: `styled.div(...styles)` is `styled('div')(...styles)`. */
 export type StyledTags<T> = {
   readonly [K in keyof JSX.IntrinsicElements]: StyledFactory<T, K>
 }
 
-export type Styled<T> = (<C extends ElementType>(
-  tag: C,
-  options?: StyledOptions
-) => StyledFactory<T, C>) &
-  StyledTags<T>
+/** `styled(tag, options)`: with a `shouldForwardProp` type guard, the component takes only the props of `tag` that it names. */
+export interface StyledCall<T> {
+  <C extends ElementType, Forwarded extends keyof ComponentProps<C> & string>(
+    tag: C,
+    options: FilteringStyledOptions<ComponentProps<C>, Forwarded> & {
+      shouldForwardProp: (prop: string) => prop is Forwarded
+    }
+  ): StyledFactory<T, C, Pick<ComponentProps<C>, Forwarded>>
+  <C extends ElementType>(tag: C, options?: StyledOptions): StyledFactory<T, C>
+}
+
+export type Styled<T> = StyledCall<T> & StyledTags<T>
+
+/** The type of `styled` itself, with the tag shorthands: `Styled` of this binding's `Theme` unless another is given. */
+export type CreateStyled<T = Theme> = Styled<T>
+
+/** `css()`: one style made once and passed around, from styles or from a tagged template. */
+export interface CssFunction {
+  // The styles last, so that a mistake in a style object is reported against a style.
+  (template: TemplateStringsArray, ...values: StaticTemplateValue[]): SerializedStyles
+  (...styles: CssArgument[]): SerializedStyles
+}
 
 /** A set of named styles; `E` is what one of them becomes: a class name on the web, a style object on React Native. */
 export interface SheetDefinition<S extends SheetStyles, E> {
@@ -205,8 +299,17 @@ export interface Style<T, E> {
    * `@keyframes` rule is written once, when a class that uses the name is first written. On React Native
    * it only returns the name.
    */
-  keyframes(steps: KeyframesInput<T>, options?: KeyframesOptions): string
+  keyframes(steps: (theme: T) => KeyframesSteps, options?: KeyframesOptions): Keyframes
+  /** As a tag: the steps written as CSS text (`from { ... } to { ... }`); a function among the interpolations is called with `{ theme }`. */
+  keyframes(template: TemplateStringsArray, ...values: TemplateValue<unknown, T>[]): Keyframes
+  keyframes(steps: KeyframesInput<T>, options?: KeyframesOptions): Keyframes
   /** Makes global styles (selectors and at-rules as keys) and returns their handle, for `Global`. It writes nothing and needs no engine. */
+  globalStyles(styles: (theme: T) => GlobalStyleObject): GlobalStyles<T>
+  /** As a tag: the styles written as CSS text (`body { margin: 0; }`); a function among the interpolations is called with `{ theme }`. */
+  globalStyles(
+    template: TemplateStringsArray,
+    ...values: TemplateValue<unknown, T>[]
+  ): GlobalStyles<T>
   globalStyles(styles: GlobalStylesInput<T>): GlobalStyles<T>
   /**
    * Writes global styles into the `global` layer while it is rendered, and renders nothing of its own.
@@ -229,6 +332,14 @@ export interface ServerStyle<T> extends Omit<
 export interface WebStyle<T> extends Omit<Style<T, SheetEntry>, 'ThemeProvider' | 'apply'> {
   /** The props that apply sheet entries (or class names) to a plain element: a class name. */
   apply(...entries: (SheetEntry | string | null | undefined | false)[]): { className?: string }
+  /**
+   * One style made once and passed around: style objects, `css()` results and sheet entries (lists too,
+   * falsy values dropped) merged in order, the last winning; or, as a tag, the template read as CSS text.
+   * It returns a sheet entry: its text is its class name, and it goes in the `style` prop of a styled
+   * component, in `apply`, in another `css()`, among the styles of `styled` and under a selector of
+   * global styles. Equal styles give the same class. A function is a `TypeError`: there are no props.
+   */
+  css: CssFunction
   ThemeProvider(props: WebThemeProviderProps<T>): ReactElement
   /**
    * Renders the wrapper of the nearest nested provider again (the same element and classes) around its

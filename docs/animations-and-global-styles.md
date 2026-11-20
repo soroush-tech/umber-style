@@ -71,6 +71,24 @@ The hash is made from the steps alone. It does not depend on the theme, its valu
 - A module can call `keyframes` at its top level, before `configure()` and before there is a theme or an engine. `keyframes` from `@umber-style/core` and from every binding return the same name for the same steps.
 - Steps given as a function of the theme are named by the tokens they read, not by their values: the function is called once, at the call, with a stand-in theme whose every token reads as its path. Listing the keys of that stand-in throws (see Limits).
 
+### The template form
+
+`keyframes` can also be used as a tag. The template is the steps written as CSS text, read as a template of `styled` is (see [Writing styles](writing-styles.md)), and the name is the one of the equal object:
+
+```ts
+const fade = keyframes`
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+`
+// fade === keyframes({ from: { opacity: 0 }, to: { opacity: 1 } })
+```
+
+A function among the interpolations is called with `{ theme }`, so `${({ theme }) => theme.palette.primary}` makes the steps a function of the theme. The template form takes no options: a template is named with the default label. It is the same in `@umber-style/core` and in every binding, and it can be called before `configure()` too.
+
 ### The steps
 
 A key is `from`, `to`, a percentage from `0%` to `100%` (`'33.5%'` and `'.5%'` too), or a comma list of them (`'0%, 100%'`). A step holds declarations only, written as in a class: camelCase keys, numbers in `px` where CSS takes a length, a list for fallbacks, custom properties, `alpha()` with its fallback. Before the rule is written the steps are put in order: lists are expanded, `from` and `to` are `0%` and `100%`, the steps are sorted, steps of one offset are merged with the later one winning, and a step that declares nothing is left out. Equal steps written in another order are the same steps and get the same name.
@@ -291,7 +309,7 @@ const App = () => (
 | A function of the theme           | `(theme) => ({ body: { color: theme.palette.text } })`   |
 | A list of the three               | `[reset, { body: { margin: 0 } }, (theme) => ({ ... })]` |
 
-A handle has an `id` (`global-<hash>`, from the styles alone, as a `keyframes` name is) and needs no engine. Each item of a list is one set of rules, named `<prefix>-global-<hash>` from its compiled rules: equal content gives one set, whatever form it was given in, and it is written once.
+A handle has an `id` (`global-<hash>`, from the styles alone, as a `keyframes` name is) and needs no engine. `globalStyles` can also be used as a tag, with selectors and at-rules written as CSS text (`` globalStyles`body { margin: 0; }` ``); a function among its interpolations is called with `{ theme }`. Under a selector a `css()` value is taken as its style (`{ body: card }`). Each item of a list is one set of rules, named `<prefix>-global-<hash>` from its compiled rules: equal content gives one set, whatever form it was given in, and it is written once.
 
 ### What a function of the theme reads
 
@@ -564,6 +582,8 @@ On the web the skeleton animates and `body` gets its rule. On React Native the c
 ## Limits
 
 - `@import` is not supported. A key `@import` is written as an at-rule with declarations, which is not valid CSS; put an `@import` in a stylesheet of your own.
+- The template form of `keyframes` takes no `label`. A template of `globalStyles` holds rules only: a declaration at its top level is an error, as a key that holds no style is.
+- A `css()` value under a selector of `globalStyles` at module level makes the default style's engine: see the limits of [Style sheets](style-sheets.md).
 - Timeline range offsets (`entry 10%`, `exit 50%`) are not steps: `keyframes` throws for them. Only `from`, `to` and percentages are.
 - A function of the theme given to `keyframes` or `globalStyles` cannot iterate the theme. It is called with a stand-in theme for its name, before the theme is known. Listing the keys of a part of it (`Object.keys`, a spread, `for...in`) throws at the call, in every build:
 

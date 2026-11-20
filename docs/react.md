@@ -33,7 +33,7 @@ import styled from '@umber-style/styled'
 const Card = styled.div({ padding: 16, borderRadius: 8 })
 ```
 
-Its types are `Styled`, `StyledComponent`, `StyledFactory`, `StyledOptions`, `StyledStatics`, `StyledTags` and `StyleProp`, the same as in `@umber-style/react`.
+Its types are `Styled`, `StyledComponent`, `StyledFactory`, `StyledOptions`, `StyledStatics`, `StyledTags`, `StyleProp`, `CreateStyled`, `FilteringStyledOptions`, `PropsOf`, `CSSObject`, `Interpolation` and `Theme`, the same as in `@umber-style/react`.
 
 ## What the binding exports
 
@@ -45,15 +45,17 @@ Its types are `Styled`, `StyledComponent`, `StyledFactory`, `StyledOptions`, `St
 | `configure(options)`                                       | Options and base theme of the default style, before first use                          |
 | `getEngine()`                                              | The engine of the default style                                                        |
 | `styled`, `StyleSheet`, `useStyle`, `apply`                | Styling, sheets (an object sheet needs no `useStyle`), and putting entries on elements |
+| `css`                                                      | One style made once and passed around: see [Style sheets](style-sheets.md)             |
+| `keyframes`, `globalStyles`, `Global`                      | [Animations and global styles](animations-and-global-styles.md)                        |
 | `ThemeProvider`, `useTheme`, `themeClass`                  | The theme                                                                              |
 | `ThemeScope`, `useThemeClass`                              | The wrapper of the nearest nested provider, again, for portal content                  |
 | `ThemeContext`                                             | The React context of the real theme, for `useContext` or a consumer                    |
 | `when`, `whenScheme`                                       | Keys for [theme conditions](theme-conditions.md)                                       |
 | `add`, `alpha`, `divide`, `multiply`, `negate`, `subtract` | The helpers of [Tokens](tokens.md)                                                     |
 
-Types: `StyleOptions`, `DefaultStyleOptions`, `StyledOptions`, `StyledStatics`, `StyleProp`, `StyledComponent`, `Styled`, `StyledFactory`, `StyledTags`, `SheetDefinition`, `ThemeProviderProps`, `WebThemeProviderProps`, `ThemeScopeProps`, `Style`, `WebStyle`, `ServerStyle`, and `ThemeInput` (the type of `theme`).
+Types: `StyleOptions`, `DefaultStyleOptions`, `StyledOptions`, `FilteringStyledOptions`, `StyledStatics`, `StyleProp`, `StyledComponent`, `Styled`, `CreateStyled`, `StyledCall`, `StyledFactory`, `StyledTags`, `PropsOf`, `CssFunction`, `SheetDefinition`, `ThemeProviderProps`, `WebThemeProviderProps`, `ThemeScopeProps`, `Style`, `WebStyle`, `ServerStyle`, `Theme` (the theme of the default style), `Interpolation`, and `ThemeInput` (the type of `theme`). The style types of the core are re-exported too: `CSSObject`, `SerializedStyles`, `Keyframes`, `UmberCache` and the others listed in [Typed styles](typed-styles.md).
 
-`createStyle` returns a `WebStyle`: `styled`, `StyleSheet`, `useStyle`, `apply`, `ThemeProvider`, `ThemeScope`, `ThemeContext`, `useTheme`, `useThemeClass`, `themeClass`, `when`, `whenScheme`, and `engine` and `cache`, the engine and its cache. The default style creates its `ThemeContext` before its engine, so the direct import exists before `configure`. The direct imports have no `engine` or `cache`: use `getEngine()` and `getEngine().cache`. `WebStyleObject` and the other style types (`WebProperties`, `WebNested`, `NestedKey`, `StyleObject`, `AlphaColor`, `SheetEntry`) are re-exported from this package as types, in both builds, and `at` and `alpha` and the arithmetic helpers are exported as values. See [Typed styles](typed-styles.md).
+`createStyle` returns a `WebStyle`: `styled`, `StyleSheet`, `useStyle`, `apply`, `css`, `keyframes`, `globalStyles`, `Global`, `ThemeProvider`, `ThemeScope`, `ThemeContext`, `useTheme`, `useThemeClass`, `themeClass`, `when`, `whenScheme`, and `engine` and `cache`, the engine and its cache. The default style creates its `ThemeContext` before its engine, so the direct import exists before `configure`. The direct imports have no `engine` or `cache`: use `getEngine()` and `getEngine().cache`. `WebStyleObject` and the other style types (`WebProperties`, `WebNested`, `NestedKey`, `StyleObject`, `AlphaColor`, `SheetEntry`) are re-exported from this package as types, in both builds, and `at` and `alpha` and the arithmetic helpers are exported as values. See [Typed styles](typed-styles.md).
 
 ## `ThemeProvider`
 

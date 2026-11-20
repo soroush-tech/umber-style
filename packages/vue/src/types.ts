@@ -2,17 +2,27 @@ import type { Component, ComputedRef, FunctionalComponent, IntrinsicElementAttri
 import type {
   BindingOptions,
   ColorScheme,
+  CssArgument,
   Engine,
   GlobalInput,
   GlobalStyles,
+  GlobalStyleObject,
   GlobalStylesInput,
+  Interpolation as CoreInterpolation,
+  InterpolationResult,
+  Keyframes,
   KeyframesInput,
   KeyframesOptions,
+  KeyframesSteps,
   ObjectSheet,
+  SerializedStyles,
   SheetEntry,
   SheetStyles,
+  StaticTemplateValue,
   StyleInput,
   StylerOptions,
+  TemplateValue,
+  Theme as CoreTheme,
   ThemeInput,
   WebStyleObject,
 } from '@umber-style/core'
@@ -20,6 +30,15 @@ import type {
 /** The style types of the core that an app annotates with or uses `satisfies` with. */
 export type {
   AlphaColor,
+  ComponentSelector,
+  CSSObject,
+  CssArgument,
+  InterpolationResult,
+  Keyframes,
+  SerializedStyles,
+  StaticTemplateValue,
+  TemplateValue,
+  UmberCache,
   GlobalInput,
   GlobalStyleObject,
   GlobalStyles,
@@ -36,6 +55,24 @@ export type {
   WebStyleObject,
 } from '@umber-style/core'
 
+/**
+ * The theme of the default style of this binding: what `styled`, `useTheme`, `StyleSheet` and
+ * `ThemeProvider` of the default style read. It extends the core's `Theme`, so an app gives it members
+ * from either module: `declare module '@umber-style/vue' { interface Theme extends MyTheme {} }` for Vue
+ * alone, or `declare module '@umber-style/core'` for a theme that every binding shares. The optional
+ * member below only keeps it from being empty.
+ */
+export interface Theme extends CoreTheme {
+  readonly _theme?: never
+}
+
+/**
+ * A style in any form that `styled` takes: a style object, a `css()` result or a sheet entry, a function
+ * of the attributes and the theme, nothing, or a list of them. The core's `Interpolation`, with this
+ * binding's `Theme` unless another is given.
+ */
+export type Interpolation<Props = Record<string, unknown>, T = Theme> = CoreInterpolation<Props, T>
+
 export type StyleOptions<T = never> = BindingOptions<T>
 
 export interface StyledOptions extends StylerOptions {
@@ -49,6 +86,26 @@ export interface StyledOptions extends StylerOptions {
   target?: string
 }
 
+/**
+ * `StyledOptions` whose `shouldForwardProp` is a type guard. A Vue styled component takes any attribute,
+ * so it only types the guard; the attributes that are forwarded are the ones it names.
+ */
+export interface FilteringStyledOptions<
+  Props = Record<string, unknown>,
+  Forwarded extends keyof Props & string = keyof Props & string,
+> extends StyledOptions {
+  shouldForwardProp?: (prop: string) => prop is Forwarded
+}
+
+/** The props of a component or a tag: what its instances declare, or the attributes of an element. */
+export type PropsOf<C> = C extends keyof IntrinsicElementAttributes
+  ? IntrinsicElementAttributes[C]
+  : C extends new (...args: never[]) => { $props: infer P }
+    ? P
+    : C extends FunctionalComponent<infer P>
+      ? P
+      : Record<string, unknown>
+
 /** What a styled component keeps, so that styling it again flattens into one element. */
 export interface StyledStatics {
   /** Every style of the component, the styles of the components it wraps first. */
@@ -58,20 +115,46 @@ export interface StyledStatics {
   _shouldForwardProp?: (prop: string) => boolean
   /** The `target` classes of the component and of the components it wraps. */
   _target?: string
+  /** The component as a selector: `.` and a class that every element of it has. Throws when it has none. */
+  toString(): string
 }
 
 export type StyledComponent = FunctionalComponent<Record<string, unknown>> & StyledStatics
 
-/** What `styled(tag, options)` returns: it takes the styles and makes the component. */
-export type StyledFactory<T> = (
-  ...styles: StyleInput<T, Record<string, unknown>>[]
-) => StyledComponent
+/**
+ * What `styled(tag, options)` returns: it takes the styles and makes the component, or is used as a tag,
+ * whose template is one style (a function of the attributes when an interpolation is a function).
+ */
+export interface StyledFactory<T> {
+  // Three forms, in this order. A function first: a function style whose parameters are annotated is
+  // typed by the first form that sees it, and keeps its literal values only against a style. The
+  // template. Then the styles, last, so that a mistake in a style object is reported against a style.
+  (
+    style: (props: Record<string, unknown> & { theme: T }) => InterpolationResult,
+    ...styles: Interpolation<Record<string, unknown>, T>[]
+  ): StyledComponent
+  (
+    template: TemplateStringsArray,
+    ...values: TemplateValue<Record<string, unknown>, T>[]
+  ): StyledComponent
+  (...styles: Interpolation<Record<string, unknown>, T>[]): StyledComponent
+}
 
 /** The shorthand of each HTML and SVG tag: `styled.div(...styles)` is `styled('div')(...styles)`. */
 export type StyledTags<T> = { readonly [K in keyof IntrinsicElementAttributes]: StyledFactory<T> }
 
 export type Styled<T> = ((tag: string | Component, options?: StyledOptions) => StyledFactory<T>) &
   StyledTags<T>
+
+/** The type of `styled` itself, with the tag shorthands: `Styled` of this binding's `Theme` unless another is given. */
+export type CreateStyled<T = Theme> = Styled<T>
+
+/** `css()`: one style made once and passed around, from styles or from a tagged template. */
+export interface CssFunction {
+  // The styles last, so that a mistake in a style object is reported against a style.
+  (template: TemplateStringsArray, ...values: StaticTemplateValue[]): SerializedStyles
+  (...styles: CssArgument[]): SerializedStyles
+}
 
 /** A set of named styles made from a function of the theme: it has no entries until `useStyle` resolves it. */
 export interface Sheet<S extends SheetStyles> {
@@ -122,6 +205,14 @@ export interface Style<T> {
   useStyle<S extends SheetStyles>(sheet: Sheet<S>): { [K in keyof S]: SheetEntry }
   /** The attributes that apply entries of a sheet: a class. */
   apply(...entries: (SheetEntry | string | null | undefined | false)[]): { class?: string }
+  /**
+   * One style made once and passed around: style objects, `css()` results and sheet entries (lists too,
+   * falsy values dropped) merged in order, the last winning; or, as a tag, the template read as CSS text.
+   * It returns a sheet entry: its text is its class name, and it goes in the `style` attribute of a styled
+   * component, in `apply`, in another `css()`, among the styles of `styled` and under a selector of
+   * global styles. Equal styles give the same class. A function is a `TypeError`: there are no props.
+   */
+  css: CssFunction
   ThemeProvider: Component<ThemeProviderProps<T>>
   /**
    * Renders the wrapper of the nearest nested provider again (the same element and classes) around its
@@ -143,8 +234,17 @@ export interface Style<T> {
    * It writes nothing and needs no engine, so a module can call it before `configure()`: the
    * `@keyframes` rule is written once, when a class that uses the name is first written.
    */
-  keyframes(steps: KeyframesInput<T>, options?: KeyframesOptions): string
+  keyframes(steps: (theme: T) => KeyframesSteps, options?: KeyframesOptions): Keyframes
+  /** As a tag: the steps written as CSS text (`from { ... } to { ... }`); a function among the interpolations is called with `{ theme }`. */
+  keyframes(template: TemplateStringsArray, ...values: TemplateValue<unknown, T>[]): Keyframes
+  keyframes(steps: KeyframesInput<T>, options?: KeyframesOptions): Keyframes
   /** Makes global styles (selectors and at-rules as keys) and returns their handle, for `Global`. It writes nothing and needs no engine. */
+  globalStyles(styles: (theme: T) => GlobalStyleObject): GlobalStyles<T>
+  /** As a tag: the styles written as CSS text (`body { margin: 0; }`); a function among the interpolations is called with `{ theme }`. */
+  globalStyles(
+    template: TemplateStringsArray,
+    ...values: TemplateValue<unknown, T>[]
+  ): GlobalStyles<T>
   globalStyles(styles: GlobalStylesInput<T>): GlobalStyles<T>
   /**
    * Writes global styles into the `global` layer while it is mounted, and renders nothing. In the browser

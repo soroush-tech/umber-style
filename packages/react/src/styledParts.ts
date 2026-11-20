@@ -1,5 +1,10 @@
 import type { ElementType } from 'react'
-import { flattenStyle, type Engine, type StyleInput } from '@umber-style/core'
+import {
+  createComponentSelector,
+  flattenStyle,
+  type Engine,
+  type StyleInput,
+} from '@umber-style/core'
 import { isDomProp } from './domProps'
 import type { StyledOptions, StyledStatics } from './types'
 
@@ -56,6 +61,8 @@ export function prepareStyled<T>(
     _tag: baseTag,
     _shouldForwardProp: shouldForward,
     _target: target,
+    // The component as a selector in a template or a key: `${Button}:hover &`.
+    toString: createComponentSelector(options.target, styler),
   }
 
   return { styler, resolve, statics }

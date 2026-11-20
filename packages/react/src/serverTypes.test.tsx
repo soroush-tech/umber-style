@@ -3,7 +3,15 @@
 // `readTheme` exists and `useTheme` does not. Under vitest it runs against the client build, so it only
 // checks types and calls nothing that the server build alone has.
 import { expectTypeOf } from 'vitest'
-import { createStyle, readTheme, type WebStyleObject } from '@umber-style/react'
+import {
+  createStyle,
+  css,
+  readTheme,
+  type CSSObject,
+  type SerializedStyles,
+  type Theme,
+  type WebStyleObject,
+} from '@umber-style/react'
 // @ts-expect-error the server build has no useTheme
 import { useTheme } from '@umber-style/react'
 
@@ -15,5 +23,12 @@ describe('the types of the server build', () => {
     expectTypeOf(readTheme).returns.not.toBeAny()
     expectTypeOf(useTheme).toBeAny()
     expectTypeOf<WebStyleObject>().not.toBeAny()
+  })
+
+  it('has css, and the type names that apps import', () => {
+    expectTypeOf(css).returns.toEqualTypeOf<SerializedStyles>()
+    expectTypeOf(createStyle({}).css).returns.toEqualTypeOf<SerializedStyles>()
+    expectTypeOf<CSSObject>().toEqualTypeOf<WebStyleObject>()
+    expectTypeOf<Theme>().toHaveProperty('_theme')
   })
 })

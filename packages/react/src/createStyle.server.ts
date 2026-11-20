@@ -1,4 +1,5 @@
 import {
+  createCssEntry,
   createEngine,
   EMPTY_THEME,
   mergeDeep,
@@ -83,6 +84,7 @@ export function bindEngine<T extends object>(
     StyleSheet: { create },
     useStyle,
     apply: (...entries) => ({ className: engine.css(...entries) || undefined }),
+    css: ((...args: unknown[]) => createCssEntry(engine.cache, args)) as ServerStyle<T>['css'],
     ThemeProvider: createThemeProvider(engine, { root, stamp, readTheme, mergeRoot }),
     readTheme,
     themeClass,

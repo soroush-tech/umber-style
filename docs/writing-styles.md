@@ -1,6 +1,6 @@
 # Writing styles
 
-After this page you can make styled components with `styled`: label them, compute styles from props and the theme, control which props reach the element, give the element a class of your own, change the element, and build on another styled component.
+After this page you can make styled components with `styled`: label them, compute styles from props and the theme, write them as objects or as CSS text, control which props reach the element, give the element a class of your own, change the element, build on another styled component, and use one as a selector.
 
 The examples use the React binding. Vue's `styled` takes attributes instead of props and `class` instead of `className`: see [Vue](vue.md). React Native's `styled` takes components only: see [React Native](react-native.md).
 
@@ -198,6 +198,64 @@ Wrapping a component that has a base class keeps that base. The wrapper's styles
 - the wrapped component has none (it is all base) and the wrapper's styles start with a function that reads props: the element carries the base class of the wrapped component as it is, and the wrapper's styles are the props part;
 - the wrapped component has none and the wrapper's styles start with plain objects: the plain objects are added to the base, which is then a new, larger class under the wrapper's label. The declarations of the wrapped component are written again in it. The other choice, keeping the base of the wrapped component and adding the objects as a second fixed class, would write fewer declarations once, but it would put them in the props part, so that they would be repeated in every distinct props class. A wrapper without any props-dependent style also keeps the single class it always had.
 
+## Template strings
+
+The function that `styled(tag, options)` returns can also be used as a tag: the template is CSS text, and it is one style of the component, the same as the equal object. `css` and `keyframes` take the same form (see [Style sheets](style-sheets.md) and [Animations and global styles](animations-and-global-styles.md)), and so does `globalStyles`.
+
+```tsx
+const Title = styled('h1', { name: 'Title' })<{ isMuted?: boolean }>`
+  margin: 0;
+  color: ${({ theme, isMuted }) => (isMuted ? 'gray' : theme.palette.primary)};
+  &:hover {
+    opacity: 0.8;
+  }
+  @media (min-width: 600px) {
+    font-size: 2rem;
+  }
+`
+
+const Tag = styled.span`
+  padding: ${({ theme }) => theme.space[1]}px 8px;
+`
+```
+
+The text holds declarations, nested rules (`&:hover { }`, `> p { }`), at-rules that hold rules (`@media`, `@supports`, `@container`), block comments, and line comments (`//`) outside parentheses. A property is written in kebab-case and becomes the camelCase key (`font-size` is `fontSize`); a value is kept as text, so `2rem` stays `2rem`. A property declared twice in one block is a fallback list, as in CSS.
+
+What is between `${ }`:
+
+- a string, a number, an `alpha()` result or a `keyframes` name is text, in a value, a selector or a property name; `null`, `undefined`, `true` and `false` are nothing;
+- a style object, a `css()` value or a list of them, standing alone on its line between declarations, is merged in at its place;
+- a styled component is a selector (below);
+- a function is called with the props and `theme`, as a function style is, and what it returns is read as one of the above. A template with a function is a function style: `Title` reads `isMuted`, so it has a props class for each value; `Tag` reads only `theme`, so it is part of the base, one class.
+
+Give the props a type with the type argument, as `Title` does: the props are not inferred from the functions in a template. A template that cannot be read throws a `TypeError` with its line and the text around the place.
+
+## A styled component as a selector
+
+A styled component is a selector in a template, and in a key: as text it is `.` and a class that every element of it has.
+
+```tsx
+const Icon = styled('span', { name: 'Icon', target: 'icon' })<{ size: number }>(({ size }) => ({
+  width: size,
+}))
+const Button = styled('button', { name: 'Button' })`
+  ${Icon} {
+    margin-right: 4px;
+  }
+  &:hover ${Icon} {
+    opacity: 0.8;
+  }
+`
+```
+
+The rules are `.umber-button-root-... .icon{margin-right:4px;}` and `.umber-button-root-...:hover .icon{opacity:0.8;}`. The class is:
+
+1. the component's own `target`, when it has one (each of its classes, when it holds several);
+2. else, when none of its styles is a function, its class: the one class every element of it has, the same in every build;
+3. else there is none, because the classes of its elements depend on the props or the theme, and using it as a selector throws a `TypeError` that asks for a `target`.
+
+In an object style write the key with `at`: `at(`&:hover ${Icon}`, { opacity: 0.8 })`.
+
 ## Animations and styles outside a class
 
 A style names an animation that `keyframes` made, inside the `animation` shorthand or as `animationName`; the `@keyframes` rule is written once, with the first class that uses it. Styles for `body`, a reset or a `@font-face` are not a component's: write them with `globalStyles` and render them with `Global`. Both are in [Animations and global styles](animations-and-global-styles.md).
@@ -222,6 +280,9 @@ A `className` you give a styled component is kept, and any class the engine made
 
 ## Limits
 
+- What the template form does not read: an at-rule that is a statement (`@import`, `@charset`) is an error; `/*` inside an unquoted `url(...)` starts a comment (quote the URL); an interpolation is a statement of its own only when it stands alone on its line, so `${card} color: red;` reads `${card} color` as a property name; a value is text, so a number without a unit (`padding: 8`) is written as `8`, where the object `{ padding: 8 }` writes `8px`; a nested selector without `&` (`a:hover { }`) is a descendant of the element.
+- The template form is not offered by `styled` on React Native in this release; `css` and `keyframes` take it there.
+- A styled component is a selector only by its `target` or, without a function style, by its class. A component that wraps it has its own class, so `${Button}` does not match the elements of `styled(Button)(...)`; a `target` is kept by every wrapper. With `hasLayers: false`, an element that is given something in `style` or an engine class in `className` has one merged class and not the component's class: use a `target`.
 - A key built at run time (a media query made from a breakpoint, for example) written directly in a web style object is a type error: write it with `at(key, style)`. See [Typed styles](typed-styles.md).
 - The default filter knows the attributes of HTML and SVG under their React names. A lowercase or hyphenated spelling (`tabindex`, `stroke-width`) and an attribute that is not in the specifications (a vendor attribute, a new one) do not reach the element unless `shouldForwardProp` lets them, and a prop of your own that has the name of an attribute (`color`, `size`, `label`, `width`) does reach it.
 - The shorthands are typed for the tags of React's JSX types (React) and Vue's (Vue). At run time any name that starts with a lowercase letter is made into a tag, except `then`.

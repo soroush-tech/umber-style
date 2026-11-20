@@ -3,6 +3,8 @@ import { hashString } from './hash'
 import { DEFAULT_SCOPING } from './scope'
 import { compileRules, mergeStyles, type StyleObject } from './serialize'
 import { createStandIn, readStandIn } from './standIn'
+import type { TemplateValue } from './styleTypes'
+import { isTemplateStrings, parseKeyframesTemplate } from './templateStyle'
 import type { WebProperties } from './webStyle'
 
 /** One step of an animation: properties and custom properties, written as in a style. It holds no nested style. */
@@ -96,14 +98,27 @@ function compileSteps(
  * class that names it in `animation` or `animation-name` is inserted. The hash is made from the steps
  * alone, so it does not depend on the theme, the prefix or the token options; a function of the theme is
  * called for it with a stand-in theme whose every token is its own path as text. Equal steps give the same
- * name. Throws a `TypeError` for a step that is not one, a nested style in a step, or a label that is not
- * an identifier.
+ * name. As a tag, the template is read as steps (`parseKeyframesTemplate`), and gives the name of the
+ * equal object. Throws a `TypeError` for a step that is not one, a nested style in a step, or a label
+ * that is not an identifier.
  */
+// A function first, the template, then the steps, last: see the forms of `styled` in a binding.
 export function keyframes<T = never>(
-  steps: KeyframesInput<T>,
-  options: KeyframesOptions = {}
+  steps: (theme: T) => KeyframesSteps,
+  options?: KeyframesOptions
+): string
+export function keyframes<T = never>(
+  template: TemplateStringsArray,
+  ...values: TemplateValue<unknown, T>[]
+): string
+export function keyframes<T = never>(steps: KeyframesInput<T>, options?: KeyframesOptions): string
+export function keyframes<T = never>(
+  first: KeyframesInput<T> | TemplateStringsArray,
+  ...rest: unknown[]
 ): string {
-  const { label = DEFAULT_LABEL } = options
+  if (isTemplateStrings(first)) return keyframes(parseKeyframesTemplate<T>(first, rest))
+  const steps = first as KeyframesInput<T>
+  const { label = DEFAULT_LABEL } = (rest[0] ?? {}) as KeyframesOptions
   if (!LABEL_PATTERN.test(label)) {
     throw new TypeError(
       `keyframes(): the label "${label}" is not an identifier: use letters, digits, '-' and '_', not starting with a digit or '-'.`

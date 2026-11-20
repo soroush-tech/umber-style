@@ -1,6 +1,6 @@
 # Typed styles
 
-After this page you can tell what the compiler catches in a style on each platform, what it lets through, and how to get past it when you must.
+After this page you can tell what the compiler catches in a style on each platform, what it lets through, and how to get past it when you must; and you know the type names an app imports, where they live, and the two ways to type the theme.
 
 Each entry checks the keys of a style in an object literal, for its own platform:
 
@@ -185,6 +185,95 @@ Vue uses the web types for styles. A styled component's props are not typed: `st
 
 Under the `react-server` condition `@umber-style/react` has no `useTheme` and has `readTheme`. The compiler picks the server types when its configuration has the `react-server` custom condition (`"customConditions": ["react-server"]` in `compilerOptions`). Without it the types are those of the client build: `readTheme` is reported as missing. Both `@umber-style/react` and `umber-style/react` follow the condition: under it, `umber-style/react` has `readTheme` and no `useTheme`, because that is what it is at run time. See [Server rendering](server-rendering.md).
 
+## The type names apps import
+
+These names describe the same shapes as the types that apps of the design system import today, so that code written against them compiles with only the scope of its imports changed. They are UmberStyle's own types: code that mixes them with types of another library may not line up.
+
+| Name                     | What it is                                                                                                                                      | Declared in                                        |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
+| `CSSObject`              | A style written as an object on the web: `WebStyleObject` under another name                                                                    | `@umber-style/core`                                |
+| `Keyframes`              | What `keyframes` returns: the name of the animation, a plain `string`                                                                           | `@umber-style/core`                                |
+| `SerializedStyles`       | What `css()` of a web binding returns: a sheet entry, `SheetEntry`                                                                              | `@umber-style/core`                                |
+| `Interpolation<Props>`   | Anything `styled` takes: a style object, a `css()` value or entry, a function of the props and `theme`, `null`, `undefined`, `false`, or a list | `@umber-style/core`; each binding with its `Theme` |
+| `Theme`                  | The theme of the default style, an interface an app merges its theme into                                                                       | `@umber-style/core`, and each web binding          |
+| `UmberCache`             | The cache of `@umber-style/cache`                                                                                                               | `@umber-style/core`                                |
+| `StyledComponent`        | A component made by `styled`: a React component in `@umber-style/react`, a Vue component in `@umber-style/vue`                                  | each web binding                                   |
+| `StyledOptions`          | The options of `styled(tag, options)`                                                                                                           | each binding                                       |
+| `FilteringStyledOptions` | `StyledOptions` whose `shouldForwardProp` is a type guard                                                                                       | each web binding                                   |
+| `CreateStyled`           | The type of `styled` itself, with its tag shorthands                                                                                            | each web binding                                   |
+| `PropsOf<C>`             | The props of a component or a tag                                                                                                               | each web binding                                   |
+
+`@umber-style/react` (both builds) and `@umber-style/vue` export all of them; `@umber-style/css` re-exports the six of the core; `@umber-style/styled` re-exports the component types of `@umber-style/react` with `CSSObject`, `Interpolation` and `Theme`; `@umber-style/cache` re-exports `UmberCache`. A file needs one import, from the package of its framework:
+
+```tsx
+import type { CSSObject, Keyframes, SerializedStyles, StyledComponent } from '@umber-style/react'
+
+const card: CSSObject = { padding: 8, '&:hover': { opacity: 0.8 } }
+const raised: SerializedStyles = css(card)
+const fade: Keyframes = keyframes`to { opacity: 1; }`
+
+interface ButtonProps {
+  tone: 'primary' | 'danger'
+}
+const Button: StyledComponent<'button', ButtonProps> = styled('button')<ButtonProps>(
+  ({ theme, tone }) => ({ color: tone === 'primary' ? theme.palette.primary : 'firebrick' })
+)
+```
+
+Where the shapes differ from the types apps import today:
+
+- `StyledComponent<C, P>` takes the tag first and the props of its own second (`StyledComponent<'button', ButtonProps>`), not the props first.
+- `SerializedStyles` is a sheet entry, not an object with the CSS text: it prints as its class name.
+- `Keyframes` is a `string`: it is the name, and it is used as one.
+
+### A `shouldForwardProp` type guard
+
+When `shouldForwardProp` is a type guard, the component takes only the props of the tag that it names, and its own props:
+
+```tsx
+const options = {
+  shouldForwardProp: (prop: string): prop is 'href' | 'children' =>
+    prop === 'href' || prop === 'children',
+} satisfies FilteringStyledOptions<ComponentProps<'a'>, 'href' | 'children'>
+
+const Link = styled(
+  'a',
+  options
+)<{ isActive?: boolean }>(({ isActive }) => ({
+  fontWeight: isActive ? 'bold' : 'normal',
+}))
+
+// @ts-expect-error `title` is not forwarded, so it is not a prop
+const dropped = <Link title="x" />
+```
+
+TypeScript reads some filters as type guards by themselves: `(prop) => prop === 'id'` is one, and narrows the props to `id`. Give such a filter a `boolean` return type to keep every prop of the tag: `(prop): boolean => prop === 'id'`. A filter like `(prop) => prop !== 'tone'` is not a type guard and keeps them all.
+
+### Two ways to type the theme
+
+The core declares `Theme`. Each web binding declares its own `Theme`, which extends the core's, and that one is the theme of its default style: of `styled`, `useTheme`, `StyleSheet` and `ThemeProvider` imported directly. An app adds its members in either module, or in both:
+
+```ts
+// For every binding: the theme shared by React, Vue and React Native.
+declare module '@umber-style/core' {
+  interface Theme {
+    palette: { primary: string; onPrimary: string }
+    space: number[]
+  }
+}
+
+// For React alone, as apps declare their theme today with the scope changed.
+declare module '@umber-style/react' {
+  interface Theme {
+    radii?: { card: number }
+  }
+}
+```
+
+The theme of `@umber-style/react` then has `palette`, `space` and `radii`. The same works with `@umber-style/vue`. Both forms are compiled together by the repository's type tests (`packages/react/src/augmentation.test.tsx`, `packages/vue/src/defaultStyle.test.ts`). `@umber-style/react-native` has no `Theme` of its own: it reads the core's. The types of `umber-style/react` use the `Theme` of `@umber-style/react`.
+
+An engine made for the default style of a binding (`configure({ engine })`) is typed with that binding's `Theme`: `createLazyEngine<Theme>()`, with `Theme` imported from the binding. One made with the core's `Theme` is accepted while the binding adds no required member of its own.
+
 ## Limits
 
 - The values of colours and lengths are not checked, on any platform.
@@ -202,5 +291,8 @@ Under the `react-server` condition `@umber-style/react` has no `useTheme` and ha
   Letting the custom property signature take a style would accept the key and also accept `'--x': { color: 'red' }`.
 
 - The shared types are an intersection: a valid web style (`display: 'block'`) is a type error in shared code and goes in `web`.
-- Types do not know which props of a host element `shouldForwardProp` forwards.
+- Types do not know which props of a host element `shouldForwardProp` forwards, unless it is a type guard: then they narrow the props to the ones it names, also for a component tag, which receives every prop at run time.
+- `styled(tag)` has three call forms (a function first, a template, styles). A mistake in a style is reported against the styles form, and an error message can list the other forms too.
+- The props of a template are not inferred from its functions: give them with the type argument.
+- The examples were compiled by the type tests of `packages/react/src/typeNames.types.test.tsx`, `packages/react/src/augmentation.test.tsx` and `packages/vue/src/css.test.ts`. The design system itself was not compiled against these types: the list of names comes from the issue, not from its build output.
 - The examples were compiled with TypeScript 7.0.2. Other versions were not tried.

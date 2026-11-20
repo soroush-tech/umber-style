@@ -30,6 +30,26 @@ describe('keyframes', () => {
     expect(isKeyframesName('keyframes-unknown')).toBe(false)
   })
 
+  it('reads a tagged template as steps, and gives the name of the equal object', () => {
+    const name = keyframes`
+      from { opacity: 0; }
+      to { opacity: ${1}; }
+    `
+    expect(name).toBe(keyframes({ from: { opacity: 0 }, to: { opacity: 1 } }))
+  })
+
+  it('calls a function of a tagged template with { theme }, as steps of a function of the theme', () => {
+    const name = keyframes<{ palette: { muted: string } }>`
+      to { color: ${({ theme }) => theme.palette.muted}; }
+    `
+    expect(name).toBe(
+      keyframes((theme: { palette: { muted: string } }) => ({ to: { color: theme.palette.muted } }))
+    )
+    expect(ruleOf(name, { palette: { muted: 'var(--m)' } })).toBe(
+      `@keyframes ${name}{100%{color:var(--m);}}`
+    )
+  })
+
   it('takes a label for the first part, and hashes the steps alone', () => {
     const steps = { to: { transform: 'rotate(360deg)' } }
     const plain = keyframes(steps)

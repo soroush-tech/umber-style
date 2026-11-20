@@ -223,7 +223,7 @@ Export the returned functions from one module of your app and import them from t
 
 ### Way 2: direct imports and one module declaration
 
-The functions that `@umber-style/react` exports directly (`styled`, `ThemeProvider`, `useTheme`, `StyleSheet`, `useStyle`, `apply`, `themeClass`, `when`, `whenScheme`, `configure`) share one engine that is made on first use, and their theme type is the interface `Theme` of `@umber-style/core`. It is empty until you merge your theme into it, once:
+The functions that `@umber-style/react` exports directly (`styled`, `ThemeProvider`, `useTheme`, `StyleSheet`, `useStyle`, `apply`, `themeClass`, `when`, `whenScheme`, `configure`) share one engine that is made on first use, and their theme type is the interface `Theme` of the binding, which extends the interface `Theme` of `@umber-style/core`. Both are empty until you merge your theme into one of them, once:
 
 ```tsx
 import { configure, styled, ThemeProvider, useTheme } from '@umber-style/react'
@@ -256,7 +256,7 @@ export const App = () => (
 
 The declaration is derived from the object (`typeof lightTheme`), so the type and the value cannot drift apart. `configure` must run before the first use of any of these functions and throws after it; it takes the same options as `createStyle` (see [Options reference](options.md)) and the base theme.
 
-The same works with `@umber-style/vue` and `@umber-style/react-native`. One `Theme` interface serves all of them, so an app that uses two bindings declares it once.
+The same works with `@umber-style/vue` and `@umber-style/react-native`. The declaration in `@umber-style/core` serves all of them, so an app that uses two bindings declares it once. A declaration in the module of a binding (`declare module '@umber-style/react' { interface Theme extends AppTheme {} }`) types that binding only (React Native has none of its own: it reads the core's), and the two can be used together: the binding's `Theme` has the members of both. See [Typed styles](typed-styles.md).
 
 ## Limits
 

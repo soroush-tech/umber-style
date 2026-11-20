@@ -290,7 +290,7 @@ The options of a shared cache are its own: the other options are not read, and a
 | `getRegisteredStyles`, `merge`                      | Read and merge the classes of a class string                                        |
 | `@umber-style/css/create-instance` (default export) | `createInstance(options)`, a separate instance                                      |
 
-Types: `CssFunction`, `CssInput`, `ClassNamesInput`, `KeyframesFunction`, `InjectGlobalFunction`, `InjectGlobalInput`, `CssInstance`, `InstanceOptions` and `SharedCache`.
+Types: `CssFunction`, `CssInput`, `ClassNamesInput`, `KeyframesFunction`, `InjectGlobalFunction`, `InjectGlobalInput`, `CssInstance`, `InstanceOptions` and `SharedCache`, and the core's `CSSObject`, `Interpolation`, `Keyframes`, `SerializedStyles`, `Theme` and `UmberCache`, re-exported so that a file needs one import (see [Typed styles](typed-styles.md)). `css` here returns a class name, a string, not the `SerializedStyles` that `css()` of a binding returns.
 
 ## Limits
 

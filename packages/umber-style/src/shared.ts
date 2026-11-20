@@ -4,8 +4,7 @@
 // `react-server` custom condition the entry points at `shared.server.ts` instead. This file holds types
 // and declarations only: it is never loaded.
 import type { Context, ReactElement } from 'react'
-import type { Theme } from '@umber-style/core'
-import type { DefaultStyleOptions, StyleOptions, ThemeScopeProps } from '@umber-style/react'
+import type { DefaultStyleOptions, StyleOptions, Theme, ThemeScopeProps } from '@umber-style/react'
 import type { SharedStyleBase } from './sharedCommon'
 
 export * from './sharedCommon'

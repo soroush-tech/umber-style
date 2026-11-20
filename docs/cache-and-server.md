@@ -33,7 +33,7 @@ const box = cache.css({ color: 'red' })
 | `registered`                                       | The style object of each class the cache made, a `Map`: `registered.get(className)`. Read by class name, `registered[className]` is `true`                                        |
 | `sheet.tags`                                       | The style elements that hold the rules of the cache, in document order: its own and those on the page with its key. `[]` without a document                                       |
 
-The types are exported: `UmberCache` (the cache), `UmberCacheOptions`, `SerializedRule` (`{ name, styles }`) and `UmberSheet`.
+The types are exported: `UmberCache` (the cache), `UmberCacheOptions`, `SerializedRule` (`{ name, styles }`) and `UmberSheet`. `UmberCache`, `SerializedRule` and `UmberSheet` are declared in `@umber-style/core`, with the other types apps import, and re-exported here, by `@umber-style/react`, `@umber-style/vue` and `@umber-style/css`: one type, whichever package a file imports it from.
 
 The options are those of the core's `createCache` (see [Options reference](options.md)), with `key` for `prefix` and without `onInsert`, which the package uses itself. A key is lowercase letters, digits and hyphens, starting with a letter; another throws:
 

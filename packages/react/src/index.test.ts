@@ -12,6 +12,7 @@ describe('the entry of @umber-style/react', () => {
       'StyleSheet',
       'useStyle',
       'apply',
+      'css',
       'themeClass',
       'when',
       'whenScheme',

@@ -1,5 +1,7 @@
 import { alpha } from './alpha'
+import { createCache, createMemorySheet } from './cache'
 import { DEFAULT_SCOPING } from './scope'
+import { createSheetEntry } from './sheetEntry'
 import {
   compileGlobalRules,
   globalStyles,
@@ -23,6 +25,29 @@ describe('globalStyles', () => {
     expect(handle.id).toMatch(/^global-[0-9a-z]+$/)
     expect(isGlobalStyles(handle)).toBe(true)
     expect(handle.resolve(() => ({}) as never)).toEqual({ body: { margin: 0 } })
+  })
+
+  it('reads a tagged template as CSS text: selectors and at-rules with their blocks', () => {
+    const handle = globalStyles`
+      body { margin: 0; }
+      @media print { p { color: ${'black'}; } }
+    `
+    expect(handle.id).toBe(
+      globalStyles({ body: { margin: '0' }, '@media print': { p: { color: 'black' } } }).id
+    )
+    expect(compile(handle.resolve(() => ({}) as never))).toEqual([
+      'body{margin:0;}',
+      '@media print{p{color:black;}}',
+    ])
+  })
+
+  it('calls a function of a tagged template with { theme }', () => {
+    const handle = globalStyles<AppTheme>`
+      body { color: ${({ theme }) => theme.palette.text}; }
+    `
+    const theme = { palette: { background: 'white', text: 'var(--text)' } } as AppTheme
+    expect(handle.resolve(() => theme)).toEqual({ body: { color: 'var(--text)' } })
+    expect(handle.id).toMatch(/^global-[0-9a-z]+$/)
   })
 
   it('checks the properties of a selector and the descriptors of an at-rule by their types', () => {
@@ -171,6 +196,24 @@ describe('compileGlobalRules', () => {
       '@media print{p{color:var(--x);}}',
     ])
     expect(compile(styles)).toEqual(['p{margin:-var(--x);}', '@media print{p{color:var(--x)ff;}}'])
+  })
+
+  it('writes the style of a sheet entry under a selector, at any depth of at-rules', () => {
+    const cache = createCache({ prefix: 'g', sheet: createMemorySheet() })
+    const entry = cache.createEntry({ margin: 0, '&:hover': { color: 'red' } })
+    expect(compile({ body: entry, '@media print': { p: [entry] } })).toEqual([
+      'body{margin:0;}',
+      'body:hover{color:red;}',
+      '@media print{p{margin:0;}p:hover{color:red;}}',
+    ])
+  })
+
+  it('throws a TypeError for a sheet entry that is only a class name', () => {
+    expect(() => compile({ body: createSheetEntry('foreign') })).toThrow(
+      new TypeError(
+        'globalStyles(): the sheet entry "foreign" is only a class name, so its style cannot be merged.'
+      )
+    )
   })
 
   it('throws a TypeError for styles that are not an object, and for a key that holds no style', () => {

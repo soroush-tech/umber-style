@@ -50,6 +50,18 @@ describe('the default style for server components', () => {
     ])
   })
 
+  it('makes css() values before configure, with the options given later', async () => {
+    const style = createDefaultStyle()
+    const card = style.css({ padding: 8 })
+    const sheet = createMemorySheet()
+    style.configure({ prefix: 'late', cache: createCache({ prefix: 'late', sheet }) })
+    const Box = style.styled('div')`margin: 0;`
+    const tree = await resolveTree(<Box style={card} />)
+    const [, override] = (findAll(tree, 'div')[0].props.className as string).split(' ')
+    expect(override).toMatch(/^late-/)
+    expect(sheet.rules).toContain(`@layer late-overrides{.${override}{padding:8px;}}`)
+  })
+
   it('has a sheet, useStyle, apply and themeClass, and the base theme of configure', () => {
     const { configure, StyleSheet, useStyle, apply, themeClass, when, whenScheme, readTheme } =
       createDefaultStyle()

@@ -2,8 +2,7 @@
 // server build of the web binding, which has `readTheme` and no `useTheme`. The React Native binding has
 // neither `readTheme` nor a server build, so code that must run on React Native does not use it. This
 // file holds types and declarations only: it is never loaded.
-import type { Theme } from '@umber-style/core'
-import type { DefaultStyleOptions, StyleOptions } from '@umber-style/react'
+import type { DefaultStyleOptions, StyleOptions, Theme } from '@umber-style/react'
 import type { SharedStyleBase } from './sharedCommon'
 
 export * from './sharedCommon'

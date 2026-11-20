@@ -14,6 +14,7 @@ export const {
   useThemeClass,
   ThemeContext,
   apply,
+  css,
   themeClass,
   when,
   whenScheme,

@@ -1,7 +1,17 @@
 import { render } from '@testing-library/react'
 import { createCache, createMemorySheet } from '@umber-style/core'
 import * as react from '@umber-style/react'
-import styled, { type StyledComponent, type StyledOptions } from './index'
+import { expectTypeOf } from 'vitest'
+import styled, {
+  type CreateStyled,
+  type CSSObject,
+  type FilteringStyledOptions,
+  type Interpolation,
+  type PropsOf,
+  type StyledComponent,
+  type StyledOptions,
+  type Theme,
+} from './index'
 
 describe('the default export', () => {
   it('is the styled of the default style of the React binding, with its types and shorthands', () => {
@@ -27,5 +37,18 @@ describe('the default export', () => {
     const card = container.firstElementChild as HTMLElement
     expect(card.className).toMatch(/^st-card-root-\w+ card$/)
     expect(card.firstElementChild?.tagName).toBe('SPAN')
+  })
+
+  it('takes a template, and has the type names that apps import', () => {
+    const Title = styled.h1`
+      margin: 0;
+    `
+    const { container } = render(<Title>x</Title>)
+    expect(container.firstElementChild?.className).toMatch(/^st-/)
+    expectTypeOf(styled).toEqualTypeOf<CreateStyled<Theme>>()
+    expectTypeOf<CSSObject>().toEqualTypeOf<react.CSSObject>()
+    expectTypeOf<Interpolation>().toEqualTypeOf<react.Interpolation>()
+    expectTypeOf<PropsOf<'a'>['href']>().toEqualTypeOf<string | undefined>()
+    expectTypeOf<FilteringStyledOptions>().toExtend<StyledOptions>()
   })
 })

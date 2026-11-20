@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react'
-import { createCache, createLazyEngine, createMemorySheet } from '@umber-style/core'
+import { createCache, createLazyEngine, createMemorySheet, isSheetEntry } from '@umber-style/core'
 import { createStyle } from './createStyle'
 import { createDefaultStyle } from './defaultStyle'
 
@@ -124,6 +124,26 @@ describe('the default style', () => {
     expect(sheet.rules).toEqual([keyframesRule, `body{margin:0;animation:${fade} 1s;}`])
     unmount()
     expect(sheet.rules).toEqual([keyframesRule])
+  })
+
+  it('makes css() values and template keyframes before configure, with the options given later', () => {
+    const style = createDefaultStyle()
+    const card = style.css({ padding: 8 })
+    const loud = style.css`
+      ${card}
+      color: red;
+    `
+    const fade = style.keyframes`from { opacity: 0; }`
+    const sheet = createMemorySheet()
+    style.configure({ prefix: 'late', cache: createCache({ prefix: 'late', sheet }) })
+    expect(isSheetEntry(loud)).toBe(true)
+    expect(fade).toBe(style.keyframes({ from: { opacity: 0 } }))
+    const Box = style.styled('div')({ margin: 0 })
+    render(<Box data-testid="box" style={loud} />)
+    const [, override] = screen.getByTestId('box').className.split(' ')
+    expect(override).toMatch(/^late-/)
+    expect(sheet.rules).toContain(`@layer late-overrides{.${override}{padding:8px;color:red;}}`)
+    expect(String(card)).toMatch(/^late-/)
   })
 
   it('throws from configure once the default style was used', () => {

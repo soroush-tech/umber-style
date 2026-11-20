@@ -1,10 +1,11 @@
+import type { ElementType } from 'react'
 import {
+  createDeferredObject,
   createDeferredRecord,
   createLazyEngine,
   globalStyles,
   keyframes,
   withTagShorthands,
-  type Theme,
   type WebStyleObject,
 } from '@umber-style/core'
 import { bindEngine } from './createStyle'
@@ -13,6 +14,8 @@ import type {
   DefaultStyleOptions,
   GlobalProps,
   Styled,
+  StyledOptions,
+  Theme,
   ThemeScopeProps,
   WebStyle,
   WebThemeProviderProps,
@@ -41,7 +44,7 @@ export function createDefaultStyle() {
   }
 
   // `styled.div` and the other tags are made on use, through the engine's own `styled`.
-  const styled = withTagShorthands(((tag, options) =>
+  const styled = withTagShorthands(((tag: ElementType, options?: StyledOptions) =>
     getStyle().styled(tag, options)) as Styled<Theme>)
 
   // An object sheet is made on first read, so a module can create one before `configure` is called.
@@ -88,6 +91,11 @@ export function createDefaultStyle() {
     useThemeClass,
     ThemeContext: contexts.ThemeContext,
     apply: ((...entries) => getStyle().apply(...entries)) as WebStyle<Theme>['apply'],
+    // The entry is made on first use, so a module can call it before `configure`.
+    css: ((...args: unknown[]) =>
+      createDeferredObject(() =>
+        (getStyle().css as (...all: unknown[]) => object)(...args)
+      )) as WebStyle<Theme>['css'],
     when: ((theme, colorScheme) => getStyle().when(theme, colorScheme)) as WebStyle<Theme>['when'],
     whenScheme: ((scheme) => getStyle().whenScheme(scheme)) as WebStyle<Theme>['whenScheme'],
     themeClass: ((theme, colorScheme) =>

@@ -1,4 +1,11 @@
-import { createCache, createMemorySheet, type StyleObject } from '@umber-style/core'
+import {
+  createCache,
+  createMemorySheet,
+  type StyleObject,
+  type UmberCache as CoreUmberCache,
+  type WebStyleObject,
+} from '@umber-style/core'
+import { expectTypeOf } from 'vitest'
 import {
   cache,
   css,
@@ -10,6 +17,9 @@ import {
   keyframes,
   merge,
   sheet,
+  type CSSObject,
+  type Keyframes,
+  type UmberCache,
 } from './index'
 
 /** The text of the default instance's style element, rule by rule. */
@@ -20,6 +30,15 @@ function readStyleElement(): string[] {
 
 afterEach(() => {
   flush()
+})
+
+describe('the type names that apps import', () => {
+  it('are the types of the core', () => {
+    expectTypeOf<CSSObject>().toEqualTypeOf<WebStyleObject>()
+    expectTypeOf<UmberCache>().toEqualTypeOf<CoreUmberCache>()
+    const name: Keyframes = keyframes({ to: { opacity: 1 } })
+    expect(name).toMatch(/^keyframes-/)
+  })
 })
 
 describe('the default instance', () => {

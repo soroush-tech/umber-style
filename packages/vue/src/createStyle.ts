@@ -1,5 +1,6 @@
 import { computed, inject, type ComputedRef } from 'vue'
 import {
+  createCssEntry,
   createEngine,
   EMPTY_THEME,
   type Engine,
@@ -48,6 +49,7 @@ export function bindEngine<T extends object>(engine: Engine<T>): Style<T> {
     useStyle: ((sheet: object) =>
       isThemedSheet(sheet) ? sheet.resolve(useThemeView()) : sheet) as Style<T>['useStyle'],
     apply: (...entries) => ({ class: engine.css(...entries) || undefined }),
+    css: ((...args: unknown[]) => createCssEntry(engine.cache, args)) as Style<T>['css'],
     ThemeProvider: createThemeProvider(engine, keys),
     ThemeScope,
     useTheme,

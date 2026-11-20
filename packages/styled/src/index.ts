@@ -8,6 +8,11 @@ import { styled } from '@umber-style/react'
 export default styled
 
 export type {
+  CreateStyled,
+  CSSObject,
+  FilteringStyledOptions,
+  Interpolation,
+  PropsOf,
   Styled,
   StyledComponent,
   StyledFactory,
@@ -15,4 +20,5 @@ export type {
   StyledStatics,
   StyledTags,
   StyleProp,
+  Theme,
 } from '@umber-style/react'

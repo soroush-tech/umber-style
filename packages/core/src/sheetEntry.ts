@@ -53,6 +53,22 @@ export function readEntrySource(entry: SheetEntry): EntrySource | undefined {
 }
 
 /**
+ * The style of `value` when it is a sheet entry, else `value` as it is: for a place that takes a style
+ * object and so also an entry. Throws a `TypeError`, that names `caller`, for an entry that is only a class
+ * name (one that no cache made), whose style is not known.
+ */
+export function readEntryStyle(value: unknown, caller: string): unknown {
+  if (!isSheetEntry(value)) return value
+  const source = readEntrySource(value)
+  if (!source) {
+    throw new TypeError(
+      `${caller}(): the sheet entry "${value.className}" is only a class name, so its style cannot be merged.`
+    )
+  }
+  return source.style
+}
+
+/**
  * What a `style` prop holds, as a flat list in order, for the cache to merge into one class: sheet
  * entries and plain style objects, with arrays flattened and what is empty dropped. An object in which a
  * framework merged entries and plain keys (Vue does) is split back into its entries, then the rest; an

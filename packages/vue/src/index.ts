@@ -13,6 +13,7 @@ export const {
   ThemeScope,
   useThemeClass,
   apply,
+  css,
   themeClass,
   when,
   whenScheme,

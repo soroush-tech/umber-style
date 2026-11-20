@@ -1,12 +1,23 @@
 import { createApp, defineComponent, h, type Component } from 'vue'
-import { createCache, createLazyEngine, createMemorySheet } from '@umber-style/core'
+import { createCache, createLazyEngine, createMemorySheet, isSheetEntry } from '@umber-style/core'
+import { expectTypeOf } from 'vitest'
 import { createDefaultStyle } from './defaultStyle'
 
-// The shape of the theme that these tests give the default style.
+// The shape of the theme that these tests give the default style, in the core's module: every binding
+// shares it.
 declare module '@umber-style/core' {
   interface Theme {
     palette: { primary: string }
     space: { small: number }
+  }
+}
+
+// And in the binding's module, for Vue alone: the binding's `Theme` extends the core's, so it has both.
+// The member is optional so that the themes of the other tests, which give the core's members only,
+// still compile.
+declare module '@umber-style/vue' {
+  interface Theme {
+    radii?: { card: number }
   }
 }
 
@@ -41,6 +52,39 @@ describe('the default style', () => {
     expect(sheet.rules).toEqual([keyframesRule, `body{margin:0;animation:${fade} 1s;}`])
     app.unmount()
     expect(sheet.rules).toEqual([keyframesRule])
+  })
+
+  it('types the theme with the members of both modules', () => {
+    const { useTheme, styled } = createDefaultStyle()
+    expectTypeOf<
+      ReturnType<typeof useTheme>['value']['palette']['primary']
+    >().toEqualTypeOf<string>()
+    expectTypeOf<ReturnType<typeof useTheme>['value']['radii']>().toEqualTypeOf<
+      { card: number } | undefined
+    >()
+    const Box = styled('div')(({ theme }) => {
+      expectTypeOf(theme.radii).toEqualTypeOf<{ card: number } | undefined>()
+      expectTypeOf(theme.space.small).toEqualTypeOf<number>()
+      return { color: theme.palette.primary }
+    })
+    expect(Box).toBeTypeOf('function')
+  })
+
+  it('makes css() values before configure, with the options given later', () => {
+    const style = createDefaultStyle()
+    const card = style.css({ padding: 8 })
+    const loud = style.css(card, { color: 'red' })
+    const sheet = createMemorySheet()
+    style.configure({
+      prefix: 'late',
+      cache: createCache({ hasLayers: false, prefix: 'late', sheet }),
+    })
+    expect(isSheetEntry(loud)).toBe(true)
+    const Box = style.styled('div')({ margin: 0 })
+    const root = mount(() => h(Box, { style: [loud, { opacity: 1 }] }))
+    const className = (root.firstElementChild as HTMLElement).className
+    expect(sheet.rules).toContain(`.${className}{margin:0;padding:8px;color:red;opacity:1;}`)
+    expect(String(card)).toMatch(/^late-/)
   })
 
   it('lets styled run before any theme, and takes the tokens from the first provider', () => {

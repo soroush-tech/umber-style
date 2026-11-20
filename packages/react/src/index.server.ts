@@ -11,6 +11,7 @@ export const {
   readTheme,
   ThemeProvider,
   apply,
+  css,
   themeClass,
   when,
   whenScheme,

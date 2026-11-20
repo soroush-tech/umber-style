@@ -9,6 +9,7 @@ import type {
   KeyframesOptions,
   SchemeKey,
   SchemeName,
+  StaticTemplateValue,
   StylerOptions,
   ThemeInput,
   ThemeKey,
@@ -89,6 +90,21 @@ export interface GlobalProps<T> {
   readonly styles: GlobalInput<T>
 }
 
+/** What `css()` takes on React Native: native style objects, nothing, and lists of them. */
+export type NativeCssArgument =
+  | NativeStyleObject
+  | null
+  | undefined
+  | false
+  | readonly NativeCssArgument[]
+
+/** `css()` on React Native: one native style, from styles or from a tagged template. */
+export interface NativeCssFunction {
+  // The styles last, so that a mistake in a style object is reported against a style.
+  (template: TemplateStringsArray, ...values: StaticTemplateValue[]): NativeStyleObject
+  (...styles: NativeCssArgument[]): NativeStyleObject
+}
+
 /** The platform StyleSheet, with a `create` that registers the styles, and resolves them with the theme when they are a function of it. */
 export type NativeStyleSheet<T> = Omit<typeof platformStyleSheet, 'create'> & {
   /** A sheet given as an object is registered with the platform on first read and is its registered styles, usable at once, with no hook and no theme. */
@@ -120,6 +136,13 @@ export interface NativeStyle<T> {
   apply(...entries: (NativeStyleObject | null | undefined | false)[]): {
     style: NativeStyleObject[]
   }
+  /**
+   * One style made once and passed around: native styles merged in order, the last key winning, each
+   * turned into a native style as a sheet entry is (lengths in `px` and `rem` are numbers, web-only keys
+   * are dropped); or, as a tag, the template read as CSS text and turned the same way. It returns the
+   * native style, for `style`. A function is a `TypeError`: there are no props.
+   */
+  css: NativeCssFunction
   ThemeProvider(props: ThemeProviderProps<T>): ReactElement
   /** Renders its children: there is no wrapper to repeat, and a modal stays inside the tree, under the providers above it. It exists so that one source runs on both. */
   ThemeScope(props: ThemeScopeProps): ReactElement

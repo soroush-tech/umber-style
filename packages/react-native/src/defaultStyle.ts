@@ -1,5 +1,11 @@
 import { createContext } from 'react'
-import { createDeferredRecord, globalStyles, keyframes, type Theme } from '@umber-style/core'
+import {
+  createDeferredObject,
+  createDeferredRecord,
+  globalStyles,
+  keyframes,
+  type Theme,
+} from '@umber-style/core'
 import type { NativeStyleObject } from './nativeStyle'
 import { bindHolder, type NativeHolder } from './createStyle'
 import type { NativeTheme } from './nativeTheme'
@@ -84,6 +90,11 @@ export function createDefaultStyle() {
     useThemeClass,
     ThemeContext,
     apply: ((...entries) => getStyle().apply(...entries)) as NativeStyle<Theme>['apply'],
+    // The style is made on first use, so a module can call it before `configure`.
+    css: ((...args: unknown[]) =>
+      createDeferredObject(() =>
+        (getStyle().css as (...all: unknown[]) => object)(...args)
+      )) as NativeStyle<Theme>['css'],
     when: ((theme, colorScheme) =>
       getStyle().when(theme, colorScheme)) as NativeStyle<Theme>['when'],
     whenScheme: ((scheme) => getStyle().whenScheme(scheme)) as NativeStyle<Theme>['whenScheme'],

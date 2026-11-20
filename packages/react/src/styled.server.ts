@@ -1,5 +1,5 @@
 import { createElement, Fragment, type ElementType } from 'react'
-import { withTagShorthands, type Engine, type StyleInput } from '@umber-style/core'
+import { readStyleArguments, withTagShorthands, type Engine } from '@umber-style/core'
 import { createStyleElements } from './styleElements'
 import { prepareStyled } from './styledParts'
 import type { Styled, StyledOptions } from './types'
@@ -12,7 +12,9 @@ import type { Styled, StyledOptions } from './types'
 export function createStyled<T>(engine: Engine<T>, readTheme: () => T): Styled<T> {
   const styled =
     (tag: ElementType, options: StyledOptions = {}) =>
-    (...styles: StyleInput[]) => {
+    (...args: unknown[]) => {
+      // Called with styles, or as a tag: a template is one style.
+      const styles = readStyleArguments(args)
       const { styler, resolve, statics } = prepareStyled(engine, tag, options, styles)
 
       const Styled = (props: Record<string, unknown>) => {

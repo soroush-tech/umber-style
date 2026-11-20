@@ -1,4 +1,4 @@
-import { createDeferredRecord, createLazyRecord } from './lazyRecord'
+import { createDeferredObject, createDeferredRecord, createLazyRecord } from './lazyRecord'
 
 describe('createLazyRecord', () => {
   it('makes nothing until a key is read, and each value once', () => {
@@ -32,5 +32,75 @@ describe('createDeferredRecord', () => {
     expect(record.b).toBe(2)
     expect(record.a).toBe(1)
     expect(build).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('createDeferredObject', () => {
+  /** A frozen object with a getter, a hidden symbol and a method, as a sheet entry is. */
+  const makeEntry = () => {
+    const hidden = Symbol.for('test.hidden')
+    const entry = { visible: null, [Symbol.for('test.brand')]: true }
+    Object.defineProperties(entry, {
+      name: { get: () => 'a-1' },
+      toString: { value: () => 'a-1' },
+      [hidden]: { value: 'source' },
+    })
+    return Object.freeze(entry)
+  }
+
+  it('makes nothing until it is used', () => {
+    const make = vi.fn(makeEntry)
+    createDeferredObject(make)
+    expect(make).not.toHaveBeenCalled()
+  })
+
+  it('is the object that make returns, made once, for every way of using it', () => {
+    const make = vi.fn(makeEntry)
+    const object = createDeferredObject<Record<string | symbol, unknown>>(make)
+    expect(object.name).toBe('a-1')
+    expect(String(object)).toBe('a-1')
+    expect(Symbol.for('test.brand') in object).toBe(true)
+    expect(object[Symbol.for('test.hidden')]).toBe('source')
+    expect(Object.keys(object)).toEqual(['visible'])
+    expect({ ...object }).toEqual({ visible: null, [Symbol.for('test.brand')]: true })
+    expect(Object.getPrototypeOf(object)).toBe(Object.prototype)
+    expect(Object.isFrozen(object)).toBe(true)
+    expect(make).toHaveBeenCalledTimes(1)
+  })
+
+  it('makes it on the first use of any kind', () => {
+    const uses: ((object: object) => unknown)[] = [
+      (object) => 'visible' in object,
+      Object.keys,
+      Object.getPrototypeOf,
+      Object.isExtensible,
+      (object) => Object.getOwnPropertyDescriptor(object, 'visible'),
+    ]
+    for (const use of uses) {
+      const make = vi.fn(makeEntry)
+      use(createDeferredObject(make))
+      expect(make).toHaveBeenCalledTimes(1)
+    }
+  })
+
+  it('stays extensible when what it stands for is, and keeps its prototype', () => {
+    class Point {
+      x = 1
+    }
+    const object = createDeferredObject(() => new Point())
+    expect(object).toBeInstanceOf(Point)
+    expect(object.x).toBe(1)
+    expect(Object.isExtensible(object)).toBe(true)
+  })
+
+  it('tries again on the next use when make throws', () => {
+    let calls = 0
+    const object = createDeferredObject(() => {
+      calls++
+      if (calls === 1) throw new Error('not yet')
+      return { done: true }
+    })
+    expect(() => object.done).toThrow('not yet')
+    expect(object.done).toBe(true)
   })
 })

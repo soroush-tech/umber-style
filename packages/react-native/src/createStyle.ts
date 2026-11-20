@@ -6,6 +6,8 @@ import {
   globalStyles,
   isThemedSheet,
   keyframes,
+  readStaticTemplate,
+  rejectFunctions,
 } from '@umber-style/core'
 import { createThemeValue } from './ThemeValue'
 import type {
@@ -70,6 +72,27 @@ function resolveEntries<S extends NativeSheetStyles>(
       : sheet.entries[key],
   ])
   return Object.fromEntries(pairs) as { [K in keyof S]: NativeStyleObject }
+}
+
+/**
+ * `css()` on React Native: the styles (lists flattened, falsy values dropped), or the style of a tagged
+ * template read as CSS text, each turned into a native style as a sheet entry is, merged in order with
+ * the last key winning. Throws a `TypeError` for a function and for anything else that is not a style.
+ */
+function mergeNativeStyles(args: readonly unknown[], remBase: number): NativeStyleObject {
+  const template = readStaticTemplate(args, 'css')
+  if (!template) rejectFunctions(args, 'css')
+  const styles = template ? [template] : args.flat(Infinity).filter(Boolean)
+  // The development warnings name `css()`.
+  const settings = { remBase, name: 'css()' }
+  const merged: NativeStyleObject = {}
+  for (const style of styles) {
+    if (typeof style !== 'object') {
+      throw new TypeError(`css(): ${JSON.stringify(style)} is not a style: give style objects.`)
+    }
+    Object.assign(merged, toNativeStyle(style as Record<string, unknown>, undefined, settings))
+  }
+  return merged
 }
 
 /** `Global` on React Native: there are no global styles, so it renders nothing and does nothing. */
@@ -158,6 +181,7 @@ export function bindHolder<T extends object>(
     StyleSheet: { ...platformStyleSheet, create },
     useStyle,
     apply: (...entries) => ({ style: entries.filter((entry) => !!entry) as NativeStyleObject[] }),
+    css: ((...args: unknown[]) => mergeNativeStyles(args, remBase)) as NativeStyle<T>['css'],
     ThemeProvider,
     ThemeScope,
     ThemeContext,

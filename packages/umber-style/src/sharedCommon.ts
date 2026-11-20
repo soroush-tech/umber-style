@@ -13,7 +13,7 @@ import type {
   SchemeKey,
   SchemeName,
   SheetEntry,
-  Theme,
+  StaticTemplateValue,
   ThemeKey,
   WebNested,
   WebProperties,
@@ -23,6 +23,7 @@ import type {
   DefaultStyleOptions,
   GlobalProps,
   StyledOptions,
+  Theme,
   ThemeProviderProps,
 } from '@umber-style/react'
 import type { NativeStyleObject } from '@umber-style/react-native'
@@ -111,6 +112,25 @@ export interface SharedApplied {
   style?: readonly SharedEntry[]
 }
 
+/** What `css()` takes in shared code: shared style objects, entries and `css()` results, nothing, and lists of them. */
+export type SharedCssArgument =
+  | SharedStyleObject
+  | SharedEntry
+  | false
+  | null
+  | undefined
+  | readonly SharedCssArgument[]
+
+/**
+ * `css()` in shared code: one style made once and passed around, from styles or from a tagged template. On
+ * the web it is a sheet entry (its text is its class name), on React Native the merged native style.
+ */
+export interface SharedCss {
+  // The styles last, so that a mistake in a style object is reported against a style.
+  (template: TemplateStringsArray, ...values: StaticTemplateValue[]): SharedEntry
+  (...styles: SharedCssArgument[]): SharedEntry
+}
+
 export type SharedApply = (
   ...entries: (SharedEntry | string | null | undefined | false)[]
 ) => SharedApplied
@@ -127,6 +147,8 @@ export interface SharedStyleBase<T> {
     sheet: SharedSheetDefinition<S>
   ): { [K in keyof S]: SharedEntry }
   apply: SharedApply
+  /** One style made once and passed around: a sheet entry on the web, the merged native style on React Native. Pass it on; do not read it. */
+  css: SharedCss
   ThemeProvider(props: ThemeProviderProps<T>): ReactElement
   themeClass(theme: DeepPartial<T>, colorScheme?: ColorScheme): string
   /** A style key for "the nearest theme is this theme", at the top of a style or inside `web` or `native`. On the web it needs `@scope`; on React Native it matches the theme object of the nearest provider. */
@@ -160,6 +182,7 @@ export declare const StyleSheet: SharedStyleSheet<Theme>
 export declare const useStyle: SharedStyleBase<Theme>['useStyle']
 export declare const ThemeProvider: SharedStyleBase<Theme>['ThemeProvider']
 export declare const apply: SharedApply
+export declare const css: SharedCss
 export declare const themeClass: SharedStyleBase<Theme>['themeClass']
 export declare const when: SharedStyleBase<Theme>['when']
 export declare const whenScheme: SharedStyleBase<Theme>['whenScheme']

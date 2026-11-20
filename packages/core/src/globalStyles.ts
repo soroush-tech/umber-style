@@ -2,7 +2,10 @@ import type * as CSS from 'csstype'
 import { hashString } from './hash'
 import type { Scoping } from './scope'
 import { compileRules, type StyleObject } from './serialize'
+import { readEntryStyle, type SheetEntry } from './sheetEntry'
 import { createStandIn, readStandIn } from './standIn'
+import type { TemplateValue } from './styleTypes'
+import { isTemplateStrings, parseStyleTemplate } from './templateStyle'
 import type { WebStyleObject } from './webStyle'
 
 /** The descriptors of an at-rule that takes them (`@font-face`, `@page`, `@counter-style`, `@font-palette-values`), by camelCase name. */
@@ -13,15 +16,17 @@ export type AtRuleDescriptors =
   | CSS.AtRule.FontPaletteValues<string | number>
 
 /**
- * What a key of global styles holds: the style of a selector, the styles that an at-rule such as `@media`
- * holds (selectors as keys), the descriptors of an at-rule such as `@font-face`, or a list of those (an
- * at-rule written once for each, because an object cannot hold the same key twice).
+ * What a key of global styles holds: the style of a selector (an object, or a `css()` result or sheet
+ * entry, whose style is used), the styles that an at-rule such as `@media` holds (selectors as keys), the
+ * descriptors of an at-rule such as `@font-face`, or a list of those (an at-rule written once for each,
+ * because an object cannot hold the same key twice).
  */
 export type GlobalStyleValue =
   | WebStyleObject
+  | SheetEntry
   | GlobalStyleObject
   | AtRuleDescriptors
-  | readonly (WebStyleObject | AtRuleDescriptors)[]
+  | readonly (WebStyleObject | SheetEntry | AtRuleDescriptors)[]
   | null
   | undefined
   | false
@@ -66,9 +71,30 @@ function toText(_key: string, value: unknown): unknown {
  * Makes global styles and returns their handle at once: nothing is written until an engine is given the
  * handle (`insertGlobal`), so a module can call it before there is an engine or a theme. The id is made
  * from the styles alone; a function of the theme is called for it with a stand-in theme whose every token
- * is its own path as text. Throws a `TypeError` for styles that are not an object or a function.
+ * is its own path as text. As a tag, the template is read as CSS text (`parseStyleTemplate`): selectors
+ * and at-rules with their blocks, and a function among the interpolations is called with `{ theme }`.
+ * Throws a `TypeError` for styles that are not an object or a function.
  */
-export function globalStyles<T = never>(styles: GlobalStylesInput<T>): GlobalStyles<T> {
+// A function first, the template, then the styles, last: see the forms of `styled` in a binding.
+export function globalStyles<T = never>(styles: (theme: T) => GlobalStyleObject): GlobalStyles<T>
+export function globalStyles<T = never>(
+  template: TemplateStringsArray,
+  ...values: TemplateValue<unknown, T>[]
+): GlobalStyles<T>
+export function globalStyles<T = never>(styles: GlobalStylesInput<T>): GlobalStyles<T>
+export function globalStyles<T = never>(
+  first: GlobalStylesInput<T> | TemplateStringsArray,
+  ...values: unknown[]
+): GlobalStyles<T> {
+  if (isTemplateStrings(first)) {
+    const parsed = parseStyleTemplate<{ theme: T }>(first, values)
+    return globalStyles<T>(
+      typeof parsed === 'function'
+        ? (theme: T) => parsed({ theme }) as GlobalStyleObject
+        : (parsed as GlobalStyleObject)
+    )
+  }
+  const styles = first
   if (typeof styles === 'function') {
     const shown = JSON.stringify(styles(createStandIn('') as T), toText)
     return Object.freeze({
@@ -123,7 +149,8 @@ export function compileGlobalRules(
   const rules: string[] = []
   for (const [key, value] of Object.entries(styles)) {
     if (value === null || value === undefined || value === false) continue
-    for (const item of Array.isArray(value) ? value : [value]) {
+    for (const each of Array.isArray(value) ? value : [value]) {
+      const item = readEntryStyle(each, 'globalStyles')
       if (typeof item !== 'object' || item === null || Array.isArray(item)) {
         throw new TypeError(`globalStyles(): "${key}" must hold a style object, or a list of them.`)
       }

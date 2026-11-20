@@ -1,4 +1,9 @@
-import { createEngine, createMemorySheet } from '@umber-style/core'
+import {
+  createEngine,
+  createMemorySheet,
+  type UmberCache as CoreUmberCache,
+} from '@umber-style/core'
+import { expectTypeOf } from 'vitest'
 import createCache, { type SerializedRule, type UmberCache } from './index'
 
 afterEach(() => {
@@ -36,6 +41,11 @@ function wrapInsert(cache: UmberCache) {
 }
 
 describe('createCache', () => {
+  it('makes the UmberCache that the core declares and this package re-exports', () => {
+    expectTypeOf<UmberCache>().toEqualTypeOf<CoreUmberCache>()
+    expectTypeOf(createCache).returns.toEqualTypeOf<CoreUmberCache>()
+  })
+
   it('is the engine cache keyed by `key`, and throws for a key the engine refuses', () => {
     const cache = createServerCache('soroush')
     expect(cache.key).toBe('soroush')
