@@ -4,9 +4,9 @@
 // imports this module before anything that loads React.
 import { createRequire } from 'node:module'
 import type * as React from 'react'
-import type { ReactNode } from 'react'
 import type * as ReactDomServer from 'react-dom/server'
 import { prepareBuiltPackages } from '../../../bench/src/built'
+import { keyOf, LAYOUT_PROPS, TONES, type Kind, type Tone } from '../../../bench/src/components'
 import {
   createCombinations,
   createLayoutStyle,
@@ -27,22 +27,9 @@ const { createStyle } = load('../dist/index.cjs') as typeof Binding
 
 export const theme: SmallTheme = createSmallTheme()
 const combinations = createCombinations(48)
-const LAYOUT_PROPS = new Set(['gap', 'direction', 'align', 'justify', 'wrap', 'padding'])
-const TONES = ['a', 'b', 'c', 'd']
-
-/** The five kinds of the 48-element cases, and their names in a case. */
-export const kinds = ['fixed', 'themed', 'flex', 'override', 'entry'] as const
-export type Kind = (typeof kinds)[number]
-export const labels: Record<Kind, string> = {
-  fixed: 'fixed styles only',
-  themed: 'a function of the theme only',
-  flex: 'prop-driven, 48 combinations',
-  override: 'an override through style',
-  entry: 'a single sheet entry in style',
-}
 
 /** A stand-in for a native view: it renders an empty element around its children and drops the rest. */
-const View = ({ children }: { children?: ReactNode }) => h('view', null, children)
+const View = ({ children }: { children?: React.ReactNode }) => h('view', null, children)
 
 /** The components over a fresh style object. */
 export function createSetup() {
@@ -61,7 +48,7 @@ export function createSetup() {
       alignItems: props.align,
     })
   )
-  const Cell = styled(View, { shouldForwardProp: (prop) => prop !== 'tone' })<{ tone: string }>(
+  const Cell = styled(View, { shouldForwardProp: (prop) => prop !== 'tone' })<{ tone: Tone }>(
     ({ theme: view }) => ({ backgroundColor: view.palette.text, padding: view.space[1] }),
     ({ tone }) => ({ opacity: (TONES.indexOf(tone) + 1) / 4 })
   )
@@ -70,12 +57,8 @@ export function createSetup() {
 }
 type Setup = ReturnType<typeof createSetup>
 
-/** A key that tells the combination of props apart: the 48 are distinct. */
-const keyOf = ({ gap, direction, align, justify, wrap }: LayoutProps): string =>
-  [gap, direction, align, justify, wrap].join('|')
-
 /** 48 elements of one component, each a distinct combination for `Flex`. */
-export function createFortyEight(setup: Setup, kind: Kind): ReactNode[] {
+export function createFortyEight(setup: Setup, kind: Kind): React.ReactNode[] {
   const { Fixed, Themed, Flex, sheet } = setup
   return combinations.map((props) => {
     const key = keyOf(props)
@@ -95,7 +78,7 @@ export function createFortyEight(setup: Setup, kind: Kind): ReactNode[] {
 }
 
 /** The tree of 500 styled elements: 100 rows, each a `Flex` with four `Cell`s. */
-export function createTree({ Flex, Cell }: Setup): ReactNode[] {
+export function createTree({ Flex, Cell }: Setup): React.ReactNode[] {
   return Array.from({ length: 100 }, (_, row) =>
     h(
       Flex,
@@ -106,7 +89,7 @@ export function createTree({ Flex, Cell }: Setup): ReactNode[] {
 }
 
 /** The operation: a render of `children` inside a provider, over a fresh setup, after one render before it. */
-export function prepare(children: (setup: Setup) => ReactNode): () => string {
+export function prepare(children: (setup: Setup) => React.ReactNode): () => string {
   const setup = createSetup()
   const element = h(setup.style.ThemeProvider, { theme }, children(setup))
   renderToString(element)

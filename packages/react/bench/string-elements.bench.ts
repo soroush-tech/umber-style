@@ -9,9 +9,10 @@
 // sheet.
 import type { BenchConfig } from '@soroush.tech/bench'
 import { binding, fixtures, renderToString } from './client'
-import { kinds, labels, theme, type Kind } from './fixtures'
+import { kinds, labels, type Kind } from '../../../bench/src/components'
+import { createComponents, theme } from './fixtures'
 
-const { createBenchOptions, createComponents, createFortyEight, provide } = fixtures
+const { createBenchOptions, createFortyEight, provide } = fixtures
 
 /** The operation for one kind: a fresh style object, its components, and a cache made warm. */
 function prepare(kind: Kind): () => string {

@@ -8,9 +8,9 @@
 // Each case has an engine and a cache of its own, with an in-memory sheet.
 import type { BenchConfig } from '@soroush.tech/bench'
 import { binding, fixtures, renderToString } from './client'
-import { otherTheme, theme } from './fixtures'
+import { createComponents, otherTheme, theme } from './fixtures'
 
-const { createBenchOptions, createComponents, createFortyEight, provide, createTreeApp } = fixtures
+const { createBenchOptions, createFortyEight, provide, createTreeApp } = fixtures
 
 /** A fresh style object and its components. */
 function createSetup(hasServerStyleElements = true) {

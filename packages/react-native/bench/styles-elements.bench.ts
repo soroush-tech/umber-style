@@ -9,7 +9,8 @@
 // A render before the measurement made each case's styles. The platform's own cost (native view
 // creation, style registration across the bridge) is not here.
 import type { BenchConfig } from '@soroush.tech/bench'
-import { createFortyEight, createTree, kinds, labels, prepare } from './fixtures'
+import { kinds, labels } from '../../../bench/src/components'
+import { createFortyEight, createTree, prepare } from './fixtures'
 
 export default {
   name: 'react native: resolve the styles of 48 elements and of the tree',

@@ -7,10 +7,11 @@
 // measurement made the classes). The cases are the same as in `string-elements.bench.ts`. Each case has
 // an engine and a cache of its own, with an in-memory sheet.
 import type { BenchConfig } from '@soroush.tech/bench'
-import { kinds, labels, type Kind } from './fixtures'
+import { kinds, labels, type Kind } from '../../../bench/src/components'
+import { createComponents } from './fixtures'
 import { createServerStyle, fixtures, resolveTree } from './server'
 
-const { createComponents, createFortyEight, provide } = fixtures
+const { createFortyEight, provide } = fixtures
 
 /** The operation for one kind, over a fresh style object, after a render that warms the cache. */
 async function prepare(kind: Kind): Promise<() => Promise<unknown>> {

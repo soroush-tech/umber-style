@@ -8,12 +8,12 @@
 // Each case has an engine and a cache of its own, with an in-memory sheet. `renderToString` of Vue is
 // asynchronous, so each operation also pays one turn of the microtask queue.
 import type { BenchConfig } from '@soroush.tech/bench'
-import { createTree, prepare, prepareNested } from './fixtures'
+import { createNested, createTree, prepare } from './fixtures'
 
 export default {
   name: 'vue: render to string, the tree of 500',
   cases: {
     'tree of 500 elements, server render to a string': await prepare(createTree),
-    'nested providers three deep, 48 themed elements': await prepareNested(),
+    'nested providers three deep, 48 themed elements': await prepare(createNested),
   },
 } satisfies BenchConfig

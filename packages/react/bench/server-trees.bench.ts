@@ -6,9 +6,10 @@
 // measurement made the classes of each case. Each case has an engine and a cache of its own, with an
 // in-memory sheet.
 import type { BenchConfig } from '@soroush.tech/bench'
+import { createComponents } from './fixtures'
 import { createServerStyle, fixtures, resolveTree } from './server'
 
-const { createComponents, createTreeApp } = fixtures
+const { createTreeApp } = fixtures
 
 /** The operation for the tree with `shift`, over a fresh style object, after a render that warms the cache. */
 async function prepare(shift: number): Promise<() => Promise<unknown>> {
