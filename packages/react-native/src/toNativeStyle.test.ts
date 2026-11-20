@@ -19,6 +19,22 @@ describe('toNativeStyle', () => {
     ).toEqual({ padding: 8 })
   })
 
+  it('drops the animation and transition properties, also in the native part, and keeps transform', () => {
+    expect(
+      toNativeStyle({
+        animation: 'pulse-1x 1s infinite',
+        animationName: 'pulse-1x',
+        animationDuration: 300,
+        transition: 'opacity 200ms',
+        transitionProperty: 'opacity',
+        transitionDelay: 100,
+        transform: [{ scale: 2 }],
+        opacity: 1,
+        native: { animationTimingFunction: 'linear', transitionDuration: 5, elevation: 1 },
+      })
+    ).toEqual({ transform: [{ scale: 2 }], opacity: 1, elevation: 1 })
+  })
+
   it('keeps the object-valued properties of the platform', () => {
     const style = {
       shadowOffset: { width: 0, height: 2 },

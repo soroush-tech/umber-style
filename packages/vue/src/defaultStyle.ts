@@ -2,6 +2,8 @@ import {
   type BindingOptions,
   createDeferredRecord,
   createLazyEngine,
+  globalStyles,
+  keyframes,
   type Theme,
   type WebStyleObject,
 } from '@umber-style/core'
@@ -62,6 +64,16 @@ export function createDefaultStyle() {
     },
   }) as unknown as Style<Theme>['ThemeProvider']
 
+  // A stand-in that renders the real Global, as the provider does.
+  const Global = defineComponent({
+    name: 'Global',
+    inheritAttrs: false,
+    setup(_props, { attrs }) {
+      const Real = getStyle().Global
+      return () => h(Real, attrs as never)
+    },
+  }) as unknown as Style<Theme>['Global']
+
   return {
     configure,
     getEngine: () => getStyle().engine,
@@ -75,5 +87,9 @@ export function createDefaultStyle() {
     whenScheme: ((scheme) => getStyle().whenScheme(scheme)) as Style<Theme>['whenScheme'],
     themeClass: ((theme, colorScheme) =>
       getStyle().themeClass(theme, colorScheme)) as Style<Theme>['themeClass'],
+    // They need no engine, so a module can call them before `configure`.
+    keyframes: keyframes as Style<Theme>['keyframes'],
+    globalStyles: globalStyles as Style<Theme>['globalStyles'],
+    Global,
   }
 }

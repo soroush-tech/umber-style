@@ -14,6 +14,9 @@ export const {
   themeClass,
   when,
   whenScheme,
+  keyframes,
+  globalStyles,
+  Global,
 } = defaults
 
 export { add, alpha, at, divide, multiply, negate, subtract } from '@umber-style/core'

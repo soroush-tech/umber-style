@@ -5,6 +5,7 @@ import {
   type ColorScheme,
   type DeepPartial,
   type Engine,
+  globalStyles,
   isThemedSheet,
   type ObjectSheet,
   type SheetEntries,
@@ -12,6 +13,7 @@ import {
   type SheetStyles,
   type WebStyleObject,
 } from '@umber-style/core'
+import { createGlobal } from './Global.server'
 import { createServerOnlyContext, readServerContext, type CacheFunction } from './serverContext'
 import { createStyled } from './styled.server'
 import { createThemeProvider } from './ThemeProvider.server'
@@ -85,6 +87,9 @@ export function bindEngine<T extends object>(
     themeClass,
     when: engine.when,
     whenScheme: engine.whenScheme,
+    keyframes: engine.keyframes,
+    globalStyles,
+    Global: createGlobal(engine, readTheme),
   }
 }
 

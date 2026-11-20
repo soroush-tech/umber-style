@@ -4,6 +4,11 @@ import type {
   ColorScheme,
   DeepPartial,
   Engine,
+  GlobalInput,
+  GlobalStyles,
+  GlobalStylesInput,
+  KeyframesInput,
+  KeyframesOptions,
   ObjectSheet,
   SheetEntry,
   SheetStyles,
@@ -15,6 +20,10 @@ import type {
 /** The style types of the core that an app annotates with or uses `satisfies` with. */
 export type {
   AlphaColor,
+  GlobalInput,
+  GlobalStyleObject,
+  GlobalStyles,
+  KeyframesSteps,
   NestedKey,
   SchemeKey,
   SchemeName,
@@ -64,6 +73,15 @@ export interface ThemeProviderProps<T> {
   isRoot?: boolean
 }
 
+export interface GlobalProps<T> {
+  /**
+   * The global styles: a handle that `globalStyles` made, a style object, a function of the theme, or a
+   * list of them, written in the order of the list. A function of the theme reads the nearest provider:
+   * tokens are references, raw keys (`breakpoints`) are its real values.
+   */
+  styles: GlobalInput<T>
+}
+
 export interface Style<T> {
   engine: Engine<T>
   cache: Engine<T>['cache']
@@ -91,4 +109,18 @@ export interface Style<T> {
   when: Engine<T>['when']
   /** A style key for "the nearest color scheme is this one": the nearest theme given that `colorScheme`, else the system preference. */
   whenScheme: Engine<T>['whenScheme']
+  /**
+   * Registers an animation and returns its name, `<label>-<hash>`, for `animation` or `animationName`.
+   * It writes nothing and needs no engine, so a module can call it before `configure()`: the
+   * `@keyframes` rule is written once, when a class that uses the name is first written.
+   */
+  keyframes(steps: KeyframesInput<T>, options?: KeyframesOptions): string
+  /** Makes global styles (selectors and at-rules as keys) and returns their handle, for `Global`. It writes nothing and needs no engine. */
+  globalStyles(styles: GlobalStylesInput<T>): GlobalStyles<T>
+  /**
+   * Writes global styles into the `global` layer while it is mounted, and renders nothing. In the browser
+   * the rules are removed when it unmounts, and replaced when its styles, or what they read of the theme,
+   * change. On a server they are written for good, for `extractPageStyles`.
+   */
+  Global: Component<GlobalProps<T>>
 }

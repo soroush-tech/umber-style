@@ -43,13 +43,45 @@ const PACKAGES = [
 // The names every entry of the package must export, and that the ESM and CJS builds must agree on.
 const ENTRIES = {
   '@umber-style/core': ['createEngine', 'createCache', 'extractPageStyles', 'at'],
-  '@umber-style/react': ['createStyle', 'styled', 'ThemeProvider', 'useTheme', 'StyleSheet', 'at'],
-  '@umber-style/react-native': ['createStyle', 'styled', 'ThemeProvider', 'useTheme', 'StyleSheet'],
-  '@umber-style/vue': ['createStyle', 'styled', 'ThemeProvider', 'useTheme', 'StyleSheet'],
+  '@umber-style/react': [
+    'createStyle',
+    'styled',
+    'ThemeProvider',
+    'useTheme',
+    'StyleSheet',
+    'at',
+    'Global',
+    'keyframes',
+  ],
+  '@umber-style/react-native': [
+    'createStyle',
+    'styled',
+    'ThemeProvider',
+    'useTheme',
+    'StyleSheet',
+    'Global',
+    'keyframes',
+  ],
+  '@umber-style/vue': [
+    'createStyle',
+    'styled',
+    'ThemeProvider',
+    'useTheme',
+    'StyleSheet',
+    'Global',
+    'keyframes',
+  ],
   'umber-style': ['createEngine', 'createCache', 'extractPageStyles'],
-  'umber-style/react': ['createStyle', 'styled', 'ThemeProvider', 'StyleSheet'],
-  'umber-style/react-native': ['createStyle', 'styled', 'ThemeProvider', 'useTheme'],
-  'umber-style/vue': ['createStyle', 'styled', 'ThemeProvider', 'useTheme'],
+  'umber-style/react': [
+    'createStyle',
+    'styled',
+    'ThemeProvider',
+    'StyleSheet',
+    'Global',
+    'keyframes',
+  ],
+  'umber-style/react-native': ['createStyle', 'styled', 'ThemeProvider', 'useTheme', 'Global'],
+  'umber-style/vue': ['createStyle', 'styled', 'ThemeProvider', 'useTheme', 'Global'],
 }
 
 const windows = process.platform === 'win32'

@@ -3,11 +3,19 @@ import { createNativeThemeKey, type NativeCondition } from './conditions'
 import {
   createLazyRecord,
   createSchemeKey,
+  globalStyles,
   isThemedSheet,
+  keyframes,
   NO_THEME_MESSAGE,
 } from '@umber-style/core'
 import { createThemeValue } from './ThemeValue'
-import type { NativeStyle, SheetDefinition, StyleOptions, ThemeProviderProps } from './types'
+import type {
+  GlobalProps,
+  NativeStyle,
+  SheetDefinition,
+  StyleOptions,
+  ThemeProviderProps,
+} from './types'
 import type { NativeObjectSheet, NativeSheetStyles, NativeStyleObject } from './nativeStyle'
 import { createStyled } from './styled'
 import { platformStyleSheet } from './platform'
@@ -51,6 +59,11 @@ function resolveEntries<S extends NativeSheetStyles>(
     hasConditions(style) ? toNativeStyle(style, condition) : sheet.entries[key],
   ])
   return Object.fromEntries(pairs) as { [K in keyof S]: NativeStyleObject }
+}
+
+/** `Global` on React Native: there are no global styles, so it renders nothing and does nothing. */
+function Global<T>(_props: GlobalProps<T>): null {
+  return null
 }
 
 /** Where the base theme lives: set by the outermost provider, or by the app. */
@@ -122,6 +135,9 @@ export function bindHolder<T extends object>(holder: NativeHolder<T>): NativeSty
     themeClass: () => '',
     when: createNativeThemeKey,
     whenScheme: createSchemeKey,
+    keyframes,
+    globalStyles,
+    Global,
   }
 }
 

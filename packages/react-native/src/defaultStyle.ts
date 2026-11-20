@@ -1,8 +1,8 @@
-import { createDeferredRecord, type Theme } from '@umber-style/core'
+import { createDeferredRecord, globalStyles, keyframes, type Theme } from '@umber-style/core'
 import type { NativeStyleObject } from './nativeStyle'
 import { bindHolder, type NativeHolder } from './createStyle'
 import { platformStyleSheet } from './platform'
-import type { NativeStyle, Styled, StyleOptions, ThemeProviderProps } from './types'
+import type { GlobalProps, NativeStyle, Styled, StyleOptions, ThemeProviderProps } from './types'
 
 export interface DefaultStyleOptions extends StyleOptions<Theme> {
   /** The base theme, for an app that has no provider at all. */
@@ -48,6 +48,10 @@ export function createDefaultStyle() {
     return getStyle().ThemeProvider(props)
   }
 
+  function Global(props: GlobalProps<Theme>) {
+    return getStyle().Global(props)
+  }
+
   return {
     configure,
     styled,
@@ -61,5 +65,8 @@ export function createDefaultStyle() {
     whenScheme: ((scheme) => getStyle().whenScheme(scheme)) as NativeStyle<Theme>['whenScheme'],
     themeClass: ((theme, colorScheme) =>
       getStyle().themeClass(theme, colorScheme)) as NativeStyle<Theme>['themeClass'],
+    keyframes: keyframes as NativeStyle<Theme>['keyframes'],
+    globalStyles: globalStyles as NativeStyle<Theme>['globalStyles'],
+    Global,
   }
 }

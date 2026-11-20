@@ -8,9 +8,12 @@ function isNested(value: unknown): boolean {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
-/** Whether the key `name` exists only on the web: a selector, an at-rule, a custom property or `label`. */
+/**
+ * Whether the key `name` exists only on the web: a selector, an at-rule, a custom property, `label`, or
+ * an `animation*` or `transition*` property (running an animation on React Native is not built yet).
+ */
 function isWebOnlyKey(name: string): boolean {
-  return name === 'label' || name.includes('&') || /^(?::|@|--)/.test(name)
+  return name === 'label' || name.includes('&') || /^(?::|@|--|animation|transition)/.test(name)
 }
 
 /** Whether `style`, or its native part, has a `when()` or `whenScheme()` key: then the result depends on the providers above. */
@@ -22,7 +25,7 @@ export function hasConditions(style: Record<string, unknown>): boolean {
 
 /**
  * `style` without the web-only keys: `label`, selectors (a key with `&` or one that starts with `:`),
- * at-rules and custom properties, each dropped whole. Objects and arrays under any other key are kept
+ * at-rules, custom properties, and the `animation*` and `transition*` properties, each dropped whole. Objects and arrays under any other key are kept
  * (`shadowOffset`, `transform`). A style written for both platforms has a `native` part, which is merged
  * over the rest, and a `web` part, which is dropped. A `when()` or `whenScheme()` key is a part that
  * applies when it matches `condition` (the nearest provider): it is merged over the rest, in order; with no

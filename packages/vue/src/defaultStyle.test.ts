@@ -33,6 +33,21 @@ function mount(component: Component) {
 }
 
 describe('the default style', () => {
+  it('makes keyframes and global styles before configure, and writes them through Global with no theme', () => {
+    const style = createDefaultStyle()
+    const fade = style.keyframes({ from: { opacity: 0 } }, { label: 'fade' })
+    const reset = style.globalStyles({ body: { margin: 0, animation: `${fade} 1s` } })
+    const sheet = createMemorySheet()
+    style.configure({ prefix: 'k', cache: createCache({ hasLayers: false, prefix: 'k', sheet }) })
+    expect(style.getEngine().hasTheme).toBe(false)
+    const app = createApp(() => h(style.Global, { styles: reset }))
+    app.mount(document.createElement('div'))
+    const keyframesRule = `@keyframes ${fade}{0%{opacity:0;}}`
+    expect(sheet.rules).toEqual([keyframesRule, `body{margin:0;animation:${fade} 1s;}`])
+    app.unmount()
+    expect(sheet.rules).toEqual([keyframesRule])
+  })
+
   it('lets styled run before any theme, and takes the tokens from the first provider', () => {
     const { styled, ThemeProvider, getEngine, ruleOf } = setup()
     const Button = styled('button', { name: 'Button' })(({ theme }) => ({

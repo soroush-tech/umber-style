@@ -3,6 +3,7 @@ import {
   createEngine,
   type DeepPartial,
   type Engine,
+  globalStyles,
   isThemedSheet,
   type ObjectSheet,
   type SheetEntries,
@@ -10,7 +11,8 @@ import {
   type SheetStyles,
   type WebStyleObject,
 } from '@umber-style/core'
-import { createStampElement, createStyleElements } from './styleElements'
+import { createGlobal } from './Global'
+import { createGlobalElements, createStampElement, createStyleElements } from './styleElements'
 import { createStyled } from './styled'
 import { createThemeProvider } from './ThemeProvider'
 import { createThemeValue } from './ThemeValue'
@@ -87,6 +89,11 @@ export function bindEngine<T extends object>(
     themeClass,
     when: engine.when,
     whenScheme: engine.whenScheme,
+    keyframes: engine.keyframes,
+    globalStyles,
+    Global: createGlobal(engine, useThemeValue, (sets) =>
+      hasStyleElements() ? createGlobalElements(engine.cache, sets) : []
+    ),
   }
 }
 

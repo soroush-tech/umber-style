@@ -2,6 +2,11 @@ import type {
   BindingOptions,
   ColorScheme,
   DeepPartial,
+  GlobalInput,
+  GlobalStyles,
+  GlobalStylesInput,
+  KeyframesInput,
+  KeyframesOptions,
   SchemeKey,
   SchemeName,
   StylerOptions,
@@ -55,6 +60,11 @@ export interface ThemeProviderProps<T> {
   readonly children?: ReactNode
 }
 
+/** The props of `Global`: the same as on the web, so one source runs on both; they are not used. */
+export interface GlobalProps<T> {
+  readonly styles: GlobalInput<T>
+}
+
 /** The platform StyleSheet, with a `create` that registers the styles, and resolves them with the theme when they are a function of it. */
 export type NativeStyleSheet<T> = Omit<typeof platformStyleSheet, 'create'> & {
   /** A sheet given as an object is registered with the platform on first read and is its registered styles, usable at once, with no hook and no theme. */
@@ -90,4 +100,10 @@ export interface NativeStyle<T> {
   when(theme: DeepPartial<T>, colorScheme?: ColorScheme): ThemeKey
   /** A style key for "the nearest provider's `colorScheme` is this one"; with none above, the platform's color scheme. */
   whenScheme(scheme: SchemeName): SchemeKey
+  /** The name of an animation, as on the web, so one source runs on both. Nothing runs it on React Native: the `animation*` and `transition*` keys are dropped from a style. */
+  keyframes(steps: KeyframesInput<T>, options?: KeyframesOptions): string
+  /** A handle of global styles, as on the web; React Native has no global styles, and `Global` does nothing with it. */
+  globalStyles(styles: GlobalStylesInput<T>): GlobalStyles<T>
+  /** Renders nothing and does nothing: React Native has no global styles. It exists so that one source runs on both. */
+  Global(props: GlobalProps<T>): ReactElement | null
 }

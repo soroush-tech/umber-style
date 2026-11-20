@@ -13,6 +13,9 @@ export const {
   themeClass,
   when,
   whenScheme,
+  keyframes,
+  globalStyles,
+  Global,
 } = defaults
 
 export { at } from '@umber-style/core'

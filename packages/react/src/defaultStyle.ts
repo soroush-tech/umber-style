@@ -1,11 +1,19 @@
 import {
   createDeferredRecord,
   createLazyEngine,
+  globalStyles,
+  keyframes,
   type Theme,
   type WebStyleObject,
 } from '@umber-style/core'
 import { bindEngine } from './createStyle'
-import type { DefaultStyleOptions, Styled, WebStyle, WebThemeProviderProps } from './types'
+import type {
+  DefaultStyleOptions,
+  GlobalProps,
+  Styled,
+  WebStyle,
+  WebThemeProviderProps,
+} from './types'
 
 /** Makes the default styling: one engine, made on first use, behind `styled`, `ThemeProvider` and the rest. */
 export function createDefaultStyle() {
@@ -49,6 +57,10 @@ export function createDefaultStyle() {
     return getStyle().ThemeProvider(props)
   }
 
+  function Global(props: GlobalProps<Theme>) {
+    return getStyle().Global(props)
+  }
+
   return {
     configure,
     getEngine: () => getStyle().engine,
@@ -62,5 +74,9 @@ export function createDefaultStyle() {
     whenScheme: ((scheme) => getStyle().whenScheme(scheme)) as WebStyle<Theme>['whenScheme'],
     themeClass: ((theme, colorScheme) =>
       getStyle().themeClass(theme, colorScheme)) as WebStyle<Theme>['themeClass'],
+    // They need no engine, so a module can call them before `configure`.
+    keyframes: keyframes as WebStyle<Theme>['keyframes'],
+    globalStyles: globalStyles as WebStyle<Theme>['globalStyles'],
+    Global,
   }
 }

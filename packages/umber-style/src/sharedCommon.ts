@@ -5,6 +5,10 @@ import type { ComponentProps, ElementType, FunctionComponent, ReactElement } fro
 import type {
   ColorScheme,
   DeepPartial,
+  GlobalStyles,
+  GlobalStylesInput,
+  KeyframesInput,
+  KeyframesOptions,
   NestedKey,
   SchemeKey,
   SchemeName,
@@ -15,7 +19,12 @@ import type {
   WebProperties,
   WebStyleObject,
 } from '@umber-style/core'
-import type { DefaultStyleOptions, StyledOptions, ThemeProviderProps } from '@umber-style/react'
+import type {
+  DefaultStyleOptions,
+  GlobalProps,
+  StyledOptions,
+  ThemeProviderProps,
+} from '@umber-style/react'
 import type { NativeStyleObject } from '@umber-style/react-native'
 
 /** The keys that the web style and the native style both have. */
@@ -124,12 +133,25 @@ export interface SharedStyleBase<T> {
   when(theme: DeepPartial<T>, colorScheme?: ColorScheme): ThemeKey
   /** A style key for "the nearest color scheme is this one": the nearest theme given that `colorScheme`, else the system preference. */
   whenScheme(scheme: SchemeName): SchemeKey
+  /** Registers an animation and returns its name, for `animationName` or `animation` in the `web` part. On React Native the name only: nothing runs it. */
+  keyframes(steps: KeyframesInput<T>, options?: KeyframesOptions): string
+  /** Makes global styles and returns their handle, for `Global`. */
+  globalStyles(styles: GlobalStylesInput<T>): GlobalStyles<T>
+  /** Writes global styles while it is rendered, on the web; renders nothing and does nothing on React Native. */
+  Global(props: GlobalProps<T>): ReactElement | null
 }
 
-export type { DefaultStyleOptions, StyledOptions, ThemeProviderProps }
+export type { DefaultStyleOptions, GlobalProps, StyledOptions, ThemeProviderProps }
 export type { StyleOptions } from '@umber-style/react'
 export type { SheetEntry, Theme }
-export type { AlphaColor, StyleObject } from '@umber-style/core'
+export type {
+  AlphaColor,
+  GlobalInput,
+  GlobalStyleObject,
+  GlobalStyles,
+  KeyframesSteps,
+  StyleObject,
+} from '@umber-style/core'
 export type { NestedKey, SchemeKey, SchemeName, ThemeKey, WebNested, WebProperties, WebStyleObject }
 
 export declare const configure: (options: DefaultStyleOptions) => void
@@ -141,6 +163,9 @@ export declare const apply: SharedApply
 export declare const themeClass: SharedStyleBase<Theme>['themeClass']
 export declare const when: SharedStyleBase<Theme>['when']
 export declare const whenScheme: SharedStyleBase<Theme>['whenScheme']
+export declare const keyframes: SharedStyleBase<Theme>['keyframes']
+export declare const globalStyles: SharedStyleBase<Theme>['globalStyles']
+export declare const Global: SharedStyleBase<Theme>['Global']
 /** `color` at `opacity` (0 to 1): a CSS mix on the web, rgba() on React Native. */
 export declare const alpha: (color: string, opacity: number) => string
 /** `{ [key]: style }` typed so that it spreads into a web style, for a key that is computed: `web: { ...at(`@media (width >= ${bp})`, { gap: 16 }) }`. */

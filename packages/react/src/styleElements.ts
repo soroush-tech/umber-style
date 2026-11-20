@@ -1,12 +1,35 @@
 import { createElement, type ReactElement } from 'react'
-import type { Cache } from '@umber-style/core'
+import type { Cache, GlobalRules } from '@umber-style/core'
+
+/**
+ * The `<style href precedence>` elements of the animations in `names` that `sent` does not hold yet, which
+ * it adds them to: the `@keyframes` rule that the cache wrote, with the animation name as `href`, so that
+ * React sends an animation that many classes use once. The rule is outside every layer, so the element
+ * needs no order statement.
+ */
+function createKeyframesElements(
+  cache: Cache,
+  names: readonly string[],
+  sent: Set<string>
+): ReactElement[] {
+  const elements: ReactElement[] = []
+  for (const name of names) {
+    if (sent.has(name)) continue
+    sent.add(name)
+    const props = { key: name, href: name, precedence: cache.prefix }
+    elements.push(createElement('style', props, cache.getRules(name).join('')))
+  }
+  return elements
+}
 
 /**
  * The `<style href precedence>` elements for the classes in `className`: React 19 moves them to the
  * head and renders each `href` once. The precedence is the prefix of the cache. Each one starts with the order statement of the layers (none without layers), so that it is right on its own: declaring a layer again does not change the order. A name that the
  * cache made no rules for (a class of someone else) gets none. A theme class comes with every variable it has, used or not: its element is sent before the elements that use them, so it cannot know which are used.
+ * A class that uses animations comes after the element of each of them, once.
  */
 export function createStyleElements(cache: Cache, className: string | undefined): ReactElement[] {
+  const sent = new Set<string>()
   return (className ?? '')
     .split(/\s+/)
     .filter(Boolean)
@@ -14,8 +37,29 @@ export function createStyleElements(cache: Cache, className: string | undefined)
       const rules = cache.getFullRules(name)
       if (rules.length === 0) return []
       const props = { key: name, href: name, precedence: cache.prefix }
-      return [createElement('style', props, [cache.layerOrder, ...rules].join(''))]
+      return [
+        ...createKeyframesElements(cache, cache.getAnimations(name), sent),
+        createElement('style', props, [cache.layerOrder, ...rules].join('')),
+      ]
     })
+}
+
+/**
+ * The `<style href precedence>` elements of global rules that the cache wrote (`insertGlobal`): for each set
+ * with rules, the elements of the animations it uses, then its own, with its id as `href` and the order
+ * statement of the layers first. Each `href` once.
+ */
+export function createGlobalElements(cache: Cache, sets: readonly GlobalRules[]): ReactElement[] {
+  const sent = new Set<string>()
+  return sets.flatMap(({ id, rules, animations }) => {
+    if (rules.length === 0 || sent.has(id)) return []
+    sent.add(id)
+    const props = { key: id, href: id, precedence: cache.prefix }
+    return [
+      ...createKeyframesElements(cache, animations, sent),
+      createElement('style', props, [cache.layerOrder, ...rules].join('')),
+    ]
+  })
 }
 
 /**

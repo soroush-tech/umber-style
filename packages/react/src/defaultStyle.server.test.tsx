@@ -32,6 +32,21 @@ describe('the default style for server components', () => {
     expect(findAll(tree, 'style')).toHaveLength(3)
   })
 
+  it('makes keyframes and global styles before configure, and renders them through Global', async () => {
+    const style = createDefaultStyle()
+    const fade = style.keyframes({ from: { opacity: 0 } }, { label: 'fade' })
+    const base = style.globalStyles((view) => ({ body: { color: view.palette.primary } }))
+    style.configure({ prefix: 'k', theme })
+    const tree = await resolveTree(
+      <style.Global styles={[base, { i: { animation: `${fade} 1s` } }]} />
+    )
+    expect(findAll(tree, 'style').map((element) => element.props.href)).toEqual([
+      expect.stringMatching(/^k-global-/),
+      fade,
+      expect.stringMatching(/^k-global-/),
+    ])
+  })
+
   it('has a sheet, useStyle, apply and themeClass, and the base theme of configure', () => {
     const { configure, StyleSheet, useStyle, apply, themeClass, when, whenScheme, readTheme } =
       createDefaultStyle()

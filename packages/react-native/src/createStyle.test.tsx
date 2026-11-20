@@ -62,6 +62,28 @@ describe('styled on React Native', () => {
     expect(second.calls[0]).toEqual({ id: 'a', style: [{ margin: 1 }] })
   })
 
+  it('drops the animation of a styled component, whose name keyframes gives, and has a Global that renders nothing', () => {
+    const { styled, keyframes, globalStyles, Global } = createStyle(baseTheme)
+    const pulse = keyframes((theme) => ({ '50%': { opacity: 0.4, color: theme.palette.primary } }))
+    expect(pulse).toMatch(/^keyframes-[a-z0-9]+$/)
+    const { View, calls } = createStandIn()
+    // The native style type has no animation key; a style that is not checked against it can hold one.
+    const webStyle: object = {
+      animation: `${pulse} 1.5s ease-in-out infinite`,
+      transitionDuration: 200,
+    }
+    const Skeleton = styled(View)({ ...webStyle, opacity: 1 })
+    const base = globalStyles((theme) => ({ body: { color: theme.palette.primary } }))
+    const { container } = render(
+      <>
+        <Global styles={[base, { html: { margin: 0 } }]} />
+        <Skeleton />
+      </>
+    )
+    expect(calls[0].style).toEqual([{ opacity: 1 }])
+    expect(container.innerHTML).toBe('<view></view>')
+  })
+
   it('throws for a string tag when it is created', () => {
     const { styled } = createStyle(baseTheme)
     expect(() => styled('div')).toThrow(TypeError)

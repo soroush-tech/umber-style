@@ -35,6 +35,7 @@ describe('the entries of umber-style', () => {
 
   it('the react-server entry exposes createStyle too (it re-exports the package, which picks its own build)', () => {
     expect(reactServer).toHaveProperty('createStyle')
+    expect(reactServer).toHaveProperty('Global')
   })
 
   it('each binding exposes createStyle and the default style', () => {
@@ -48,6 +49,9 @@ describe('the entries of umber-style', () => {
       'apply',
       'themeClass',
       'configure',
+      'keyframes',
+      'globalStyles',
+      'Global',
     ]
     for (const binding of [react, reactNative, vue]) {
       for (const name of names) expect(binding).toHaveProperty(name)

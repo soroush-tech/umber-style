@@ -113,6 +113,20 @@ describe('the default style', () => {
     expect(screen.getByText('#0000ff')).toBeTruthy()
   })
 
+  it('makes keyframes and global styles before configure, and writes them through Global with no theme', () => {
+    const style = createDefaultStyle()
+    const fade = style.keyframes({ from: { opacity: 0 } }, { label: 'fade' })
+    const reset = style.globalStyles({ body: { margin: 0, animation: `${fade} 1s` } })
+    const sheet = createMemorySheet()
+    style.configure({ prefix: 'k', cache: createCache({ hasLayers: false, prefix: 'k', sheet }) })
+    expect(style.getEngine().hasTheme).toBe(false)
+    const { unmount } = render(<style.Global styles={reset} />)
+    const keyframesRule = `@keyframes ${fade}{0%{opacity:0;}}`
+    expect(sheet.rules).toEqual([keyframesRule, `body{margin:0;animation:${fade} 1s;}`])
+    unmount()
+    expect(sheet.rules).toEqual([keyframesRule])
+  })
+
   it('throws from configure once the default style was used', () => {
     const { configure, getEngine } = setup()
     getEngine()

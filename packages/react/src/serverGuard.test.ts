@@ -40,6 +40,7 @@ describe('the server build', () => {
       file.slice(SOURCE.length + 1).replaceAll(sep, '/')
     )
     expect(names.sort()).toEqual([
+      'Global.server.ts',
       'ThemeProvider.server.ts',
       'createStyle.server.ts',
       'defaultStyle.server.ts',
@@ -60,7 +61,7 @@ describe('the server build', () => {
   })
 
   it('does not import the client files of the package', () => {
-    const client = ['createStyle', 'defaultStyle', 'styled', 'ThemeProvider', 'index']
+    const client = ['createStyle', 'defaultStyle', 'styled', 'ThemeProvider', 'Global', 'index']
     for (const [file, text] of files) {
       for (const [, specifier] of text.matchAll(IMPORT_PATTERN)) {
         expect(client, `${file}: ${specifier}`).not.toContain(specifier.replace('./', ''))

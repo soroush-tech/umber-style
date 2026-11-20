@@ -2,12 +2,14 @@ import { computed, inject, type ComputedRef, type InjectionKey } from 'vue'
 import {
   createEngine,
   type Engine,
+  globalStyles,
   isThemedSheet,
   NO_THEME_MESSAGE,
   type ObjectSheet,
   type SheetEntries,
   type WebStyleObject,
 } from '@umber-style/core'
+import { createGlobal } from './Global'
 import { createStyled } from './styled'
 import { createThemeProvider } from './ThemeProvider'
 import type { Sheet, Style, StyleOptions } from './types'
@@ -53,6 +55,9 @@ export function bindEngine<T extends object>(engine: Engine<T>): Style<T> {
     themeClass: engine.themeClass,
     when: engine.when,
     whenScheme: engine.whenScheme,
+    keyframes: engine.keyframes,
+    globalStyles,
+    Global: createGlobal(engine, key),
   }
 }
 
