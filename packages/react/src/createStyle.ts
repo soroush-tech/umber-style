@@ -16,6 +16,7 @@ import {
 } from '@umber-style/core'
 import { useProvidedCache } from './CacheProvider'
 import { createGlobal } from './Global'
+import { readPrefixStyle } from './ProviderScope'
 import {
   createGlobalElements,
   createGlobalMarkerElements,
@@ -24,7 +25,7 @@ import {
 } from './styleElements'
 import { createStyled } from './styled'
 import { createThemeProvider } from './ThemeProvider'
-import { createThemeContexts, createThemeValue, type ThemeContexts } from './ThemeValue'
+import { createThemeValue, type ThemeContexts } from './ThemeValue'
 import type { ServerStyleOptions, SheetDefinition, StyleOptions, WebStyle } from './types'
 
 export type { StyleOptions } from './types'
@@ -34,11 +35,18 @@ interface WebSheet<S extends SheetStyles> extends SheetDefinition<S, SheetEntry>
   resolve(theme?: unknown): { [K in keyof S]: SheetEntry }
 }
 
-/** Makes the React styling over an engine: `styled`, sheets, the theme provider and `useTheme`; `contexts` are made here unless given. */
+/** The contexts of the prefix of `engine`, which every style of that prefix shares; this engine's base theme is the one a provider of the server build merges over, unless another style of the prefix gave one. */
+function readSharedContexts<T>(engine: Engine<T>): ThemeContexts<T> {
+  const shared = readPrefixStyle(engine.cache.prefix)
+  shared.holder ??= engine
+  return shared.contexts as ThemeContexts<T>
+}
+
+/** Makes the React styling over an engine: `styled`, sheets, the theme provider and `useTheme`; `contexts` are those of its prefix unless given. */
 export function bindEngine<T extends object>(
   engine: Engine<T>,
   { hasServerStyleElements = true }: ServerStyleOptions = {},
-  contexts: ThemeContexts<T> = createThemeContexts<T>()
+  contexts: ThemeContexts<T> = readSharedContexts(engine)
 ): WebStyle<T> {
   const { useTheme, useThemeView, useThemeClass, ThemeScope } = createThemeValue(engine, contexts)
 

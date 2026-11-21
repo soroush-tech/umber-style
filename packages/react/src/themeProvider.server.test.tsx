@@ -22,7 +22,7 @@ function setup() {
 
 describe('the outermost provider of the server build', () => {
   it('renders no element and sends the rule of its theme on :root', async () => {
-    const { ThemeProvider, readTheme } = setup()
+    const { ThemeProvider, useTheme } = setup()
     const tree = playScopes(
       await resolveTree(
         <ThemeProvider theme={{ palette: { text: '#222222' } }} colorScheme="dark">
@@ -37,10 +37,11 @@ describe('the outermost provider of the server build', () => {
       // The base theme, then the theme given, which wins where both declare a variable.
       ':where(:root){--q-palette-primary:#0000ff;--q-palette-text:#111111;--q-palette-text:#222222;color-scheme:dark;}'
     )
-    expect(readTheme().palette.text).toBe('#222222')
+    // A server component reads the base theme, not the theme of the provider.
+    expect(useTheme().palette.text).toBe('#111111')
   })
 
-  it('takes a function theme of the base theme, and a nested one of the root theme', async () => {
+  it('calls a function theme with the base theme, outermost and nested alike', async () => {
     const { ThemeProvider } = setup()
     const tree = playScopes(
       await resolveTree(
@@ -55,7 +56,8 @@ describe('the outermost provider of the server build', () => {
     expect(texts[0]).toContain(
       ':where(:root){--q-palette-primary:#0000ff;--q-palette-text:#111111;--q-palette-text:#0000ff;}'
     )
-    expect(texts[1]).toMatch(/\.q-theme-\w+\{--q-palette-primary:#0000ff;\}/)
+    // The nested one gets the base theme too, not the theme of the provider above it.
+    expect(texts[1]).toMatch(/\.q-theme-\w+\{--q-palette-primary:#111111;\}/)
     expect(findAll(tree, 'div')[0].props.className).toMatch(/^q-theme-\w+ q-boundary q-scope$/)
   })
 })

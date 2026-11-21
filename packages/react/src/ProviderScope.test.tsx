@@ -1,12 +1,12 @@
-import { act, StrictMode, type ReactNode } from 'react'
+import { act, StrictMode, use, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { createRoot, hydrateRoot, type Root } from 'react-dom/client'
 import { renderToString } from 'react-dom/server'
-import { createCache, createEngine, createMemorySheet } from '@umber-style/core'
+import { at, createCache, createEngine, createMemorySheet, mergeTheme } from '@umber-style/core'
 import { CacheProvider } from './CacheProvider'
 import { bindEngine as bindClient } from './createStyle'
 import { bindEngine as bindServer } from './createStyle.server'
-import { keepRootRule, ProviderScope } from './ProviderScope'
+import { keepRootRule, ProviderScope, readPrefixStyle } from './ProviderScope'
 import type { CacheFunction } from './serverContext'
 
 // The server build of the provider, rendered by the client build of React as a server of server
@@ -244,7 +244,7 @@ describe('the browser part of a provider of the server build', () => {
     expect(hrefs).not.toContain(`${p}-theme-0`)
   })
 
-  it('gives a function theme the root theme of its request: in a partial render, the base theme', () => {
+  it('gives a function theme the base theme, in a full and in a partial render', () => {
     const { request } = setup()
     const layout = request()
     const page = request()
@@ -263,7 +263,7 @@ describe('the browser part of a provider of the server build', () => {
         </page.ThemeProvider>
       </layout.ThemeProvider>
     )
-    expect(seen).toEqual(['#101114', '#ffffff'])
+    expect(seen).toEqual(['#ffffff', '#ffffff'])
   })
 
   it('renders its children with no element and no style for a provider with isRoot and nothing above', () => {
@@ -294,7 +294,7 @@ describe('the browser part of a provider of the server build, with the client bu
     expect(liveRoots()).toEqual([])
   })
 
-  it('makes a provider of the client build below it nested, with the theme class of its own theme only', () => {
+  it('makes a provider of the client build below it nested, with the class of its theme merged over the server provider', () => {
     const { request, client, engine } = setup()
     const { ThemeProvider } = request()
     let below: string | undefined
@@ -310,8 +310,9 @@ describe('the browser part of a provider of the server build, with the client bu
       </ThemeProvider>
     )
     const [wrapper] = wrappers(container)
-    // No class of a merged theme: the theme of the server provider above is not in the client context.
-    expect(wrapper.className).toBe(`${engine.themeClass(brand)} ${p}-scope`)
+    // The theme of the server provider above is in the client context: the merged theme has a class.
+    const full = engine.themeId(mergeTheme(dark, brand))
+    expect(wrapper.className).toBe(`${engine.themeClass(brand)} ${full} ${p}-scope`)
     expect(below).toBe(wrapper.className)
     expect(liveRoots()).toHaveLength(1)
   })
@@ -353,8 +354,11 @@ describe('the browser part of a provider of the server build, with the client bu
       brandClass
     )
     expect(target.querySelector('[data-testid="bare"]')?.parentElement).toBe(target)
+    const full = engine.themeId(
+      mergeTheme<typeof light>(mergeTheme<typeof light>(light, brand), accent)
+    )
     expect(target.querySelector('[data-testid="provided"]')?.parentElement?.className).toBe(
-      `${engine.themeClass(accent)} ${p}-scope`
+      `${engine.themeClass(accent)} ${full} ${p}-scope`
     )
   })
 
@@ -417,6 +421,161 @@ describe('the browser part of a provider of the server build, with the client bu
     const hrefs = styleElements().map((element) => element.dataset.href)
     expect(new Set(hrefs).size).toBe(hrefs.length)
     expect(liveRoots()).toHaveLength(1)
+  })
+})
+
+describe('useTheme of a client component under providers of the server build', () => {
+  /** A client component that prints what `useTheme()` gives, and what a function style of it reads. */
+  function createProbe(client: ReturnType<typeof setup>['client']) {
+    const Box = client.styled('i')(({ theme }) => ({
+      ...at(`@media (min-width: ${theme.breakpoints[0]})`, { order: 1 }),
+    }))
+    return function Probe({ id }: { id: string }) {
+      const { palette, breakpoints } = client.useTheme()
+      return (
+        <Box data-testid={id} data-bp={breakpoints.join(',')}>
+          {`${palette.primary} ${palette.text} ${palette.surface}`}
+        </Box>
+      )
+    }
+  }
+  const read = (container: HTMLElement, id: string) =>
+    container.querySelector(`[data-testid="${id}"]`)?.textContent
+
+  it('gives the theme of the nearest one, merged over the ones above, at one, two and three levels', () => {
+    const { request, client } = setup()
+    const { ThemeProvider } = request()
+    const Probe = createProbe(client)
+    const { container } = mount(
+      <ThemeProvider theme={dark}>
+        <Probe id="one" />
+        <ThemeProvider theme={brand}>
+          <Probe id="two" />
+          <ThemeProvider theme={{ ...accent, breakpoints: ['300px'] }}>
+            <Probe id="three" />
+          </ThemeProvider>
+        </ThemeProvider>
+      </ThemeProvider>
+    )
+    expect(read(container, 'one')).toBe('#8ab4ff #f2f2f2 #101114')
+    expect(read(container, 'two')).toBe('#8ab4ff #f2f2f2 #fff4d6')
+    expect(read(container, 'three')).toBe('#0b7a4b #f2f2f2 #fff4d6')
+    // A function style of a client component reads the real values of the nearest one too.
+    const three = container.querySelector('[data-testid="three"]') as HTMLElement
+    expect(three.dataset.bp).toBe('300px')
+    expect(three.className).not.toBe(container.querySelector('[data-testid="two"]')?.className)
+  })
+
+  it('in a partial render: a page provider of its own request merges over the layout provider mounted in the browser', () => {
+    const { request, client } = setup()
+    const Probe = createProbe(client)
+    const layout = request()
+    const tree = (page: typeof layout, theme: object) => (
+      <layout.ThemeProvider theme={dark}>
+        <page.ThemeProvider theme={theme}>
+          <page.ThemeProvider theme={accent}>
+            <Probe id="deep" />
+          </page.ThemeProvider>
+        </page.ThemeProvider>
+      </layout.ThemeProvider>
+    )
+    const { container, render } = mount(tree(request(), brand))
+    expect(read(container, 'deep')).toBe('#0b7a4b #f2f2f2 #fff4d6')
+    // A navigation renders the page again, in a request of its own, with another theme.
+    render(tree(request(), { palette: { text: '#333333' } }))
+    expect(read(container, 'deep')).toBe('#0b7a4b #333333 #101114')
+  })
+
+  it('with providers of both builds, each merges over the nearest one above, of either build', () => {
+    const { request, client } = setup()
+    const { ThemeProvider } = request()
+    const Probe = createProbe(client)
+    const { container } = mount(
+      <client.ThemeProvider theme={dark}>
+        <ThemeProvider theme={brand}>
+          <client.ThemeProvider theme={(outer) => ({ palette: { text: outer.palette.surface } })}>
+            <Probe id="client" />
+            <ThemeProvider theme={accent}>
+              <Probe id="server" />
+            </ThemeProvider>
+          </client.ThemeProvider>
+        </ThemeProvider>
+      </client.ThemeProvider>
+    )
+    // The function theme of the client provider gets the theme of the server provider above it.
+    expect(read(container, 'client')).toBe('#8ab4ff #fff4d6 #fff4d6')
+    expect(read(container, 'server')).toBe('#0b7a4b #fff4d6 #fff4d6')
+  })
+
+  it('gives the nested theme to portal content, with ThemeScope and without it', () => {
+    const { request, client } = setup()
+    const { ThemeProvider } = request()
+    const Probe = createProbe(client)
+    const target = document.createElement('section')
+    document.body.appendChild(target)
+    const Dialog = () =>
+      createPortal(
+        <>
+          <client.ThemeScope>
+            <Probe id="scoped" />
+          </client.ThemeScope>
+          <Probe id="bare" />
+        </>,
+        target
+      )
+    mount(
+      <ThemeProvider theme={light}>
+        <ThemeProvider theme={brand}>
+          <Dialog />
+        </ThemeProvider>
+      </ThemeProvider>
+    )
+    expect(read(target, 'scoped')).toBe('#0000ff #111111 #fff4d6')
+    expect(read(target, 'bare')).toBe('#0000ff #111111 #fff4d6')
+  })
+
+  it('keeps the value of the theme above for a member that cannot cross: the base theme of the client build', () => {
+    const engine = createEngine(
+      { ...light, label: (name: string) => `base ${name}` },
+      { prefix: p }
+    )
+    const client = bindClient(engine)
+    const { ThemeProvider } = bindServer(engine, requestCache)
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    let label = ''
+    const Probe = () => {
+      label = client.useTheme().label('x')
+      return null
+    }
+    mount(
+      <ThemeProvider theme={{ label: (name: string) => `server ${name}` }}>
+        <Probe />
+      </ThemeProvider>
+    )
+    expect(label).toBe('base x')
+  })
+
+  it('gives the theme given as it is where no client style has the prefix, and still renders the wrapper and the rules', () => {
+    const engine = createEngine(light, { prefix: `${p}-alone` })
+    const { ThemeProvider } = bindServer(engine, requestCache)
+    const { ThemeContext } = readPrefixStyle(`${p}-alone`).contexts
+    let seen: unknown
+    const Probe = () => {
+      seen = use(ThemeContext)
+      return null
+    }
+    const { container } = mount(
+      <ThemeProvider theme={light}>
+        <ThemeProvider theme={brand}>
+          <Probe />
+        </ThemeProvider>
+      </ThemeProvider>
+    )
+    expect(seen).toEqual({ ...light, palette: { ...light.palette, ...brand.palette } })
+    expect(container.querySelectorAll(`.${p}-alone-scope`)).toHaveLength(1)
+    expect(liveRoots().some((rule) => rule.includes(`--${p}-alone-palette-surface:#ffffff`))).toBe(
+      true
+    )
   })
 })
 
@@ -497,7 +656,7 @@ describe('one live root rule', () => {
 
 describe('the first HTML and hydration', () => {
   it('chooses on the server as in the browser, and hydrates with no warning and the same markup', async () => {
-    const { request } = setup()
+    const { request, engine } = setup()
     const App = ({ style }: { style: ReturnType<typeof request> }) => (
       <html>
         <body>
@@ -519,6 +678,9 @@ describe('the first HTML and hydration', () => {
       )
     )
     expect(html.match(/:where\(:root\)/g)).toHaveLength(1)
+    // The rules made from the values are the text the engine of the server gives for those themes.
+    expect(html).toContain(`.${engine.themeId(brand)}{${engine.readThemeText(brand).declarations}}`)
+    expect(html).toContain(`:where(:root){${engine.readThemeText(light).declarations}}`)
     document.documentElement.innerHTML = html.replace(/^<html>|<\/html>$/g, '')
     const wrapper = document.querySelector(`.${p}-scope`)
     const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
@@ -547,7 +709,7 @@ describe('a theme with no variable', () => {
 describe('ProviderScope alone', () => {
   it('renders the children of a provider with isRoot under no other one', () => {
     const { container } = mount(
-      <ProviderScope prefix={p}>
+      <ProviderScope prefix={p} given={{}}>
         <b />
       </ProviderScope>
     )

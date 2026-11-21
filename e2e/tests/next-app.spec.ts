@@ -107,10 +107,12 @@ test('(iii) a component has the same class names as a server component and as a 
   expect(client).toBe(server)
 })
 
-test('(iv) a server component reads the root theme of the request', async ({ page }) => {
+test('(iv) a server component reads the base theme, not the theme of the root provider', async ({
+  page,
+}) => {
   await page.goto('/probe')
   // The root layout of this route gives 641px; the base theme of the engine has 600px.
-  await expect(page.getByTestId('read-theme')).toHaveText('641px')
+  await expect(page.getByTestId('read-theme')).toHaveText('600px')
 })
 
 test('(v) client-side navigation between routes keeps everything styled', async ({

@@ -6,8 +6,8 @@ import type { GlobalProps } from './types'
 
 /**
  * Makes `Global` for server components: no hook, no context. A function of the theme reads the view of
- * the theme that `readTheme` gives, the root theme of the request (references for tokens, real values for
- * raw keys), or of an empty theme while there is none. The rules are written into the cache
+ * the theme that `readTheme` gives: the base theme (references for tokens, real values for raw keys), else
+ * the theme of the first provider of the request, else an empty theme. The rules are written into the cache
  * for good, as a server unmounts nothing, and sent as the style elements of each set and of the
  * animations it uses: React sends each `href` once. After them comes `GlobalRelease`, a client component
  * (an import of a `'use client'` file is a reference to it here), with the sets as plain data: in the

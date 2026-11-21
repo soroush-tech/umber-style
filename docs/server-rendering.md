@@ -181,12 +181,31 @@ Without a `document`, the cache keeps its rules in memory (`createMemorySheet`),
 
 The second map is that of `umber-style`: under the `react-server` condition, the compiler and the bundler both take the server entry, and the compiler reads the server declarations. The first was traced with `tsc --traceResolution`: with `customConditions: ["react-server"]` it resolves to `index.server.ts`, without to `index.ts`. A published package needs the same shape, with a `types` file for each build, in its `publishConfig`; none is published yet.
 
-| Build                   | Theme reaches a component by      | Style elements                                                             | Hooks                                     |
-| ----------------------- | --------------------------------- | -------------------------------------------------------------------------- | ----------------------------------------- |
-| Client (the default)    | A React context                   | In the browser none: the cache inserts rules. On a server, yes (see below) | `useTheme`, `useStyle`                    |
-| Server (`react-server`) | A slot that lives for one request | `<style href precedence>` per element                                      | None: `readTheme()` instead of `useTheme` |
+| Build                   | `useTheme()` gives                                 | Style elements                                                             | Hooks                                         |
+| ----------------------- | -------------------------------------------------- | -------------------------------------------------------------------------- | --------------------------------------------- |
+| Client (the default)    | The theme of the nearest provider, of either build | In the browser none: the cache inserts rules. On a server, yes (see below) | `useTheme`, `useStyle`                        |
+| Server (`react-server`) | The base theme, the same in every render           | `<style href precedence>` per element                                      | None: `useTheme` and `useStyle` are functions |
 
-Both builds export `configure`, `getEngine`, `styled`, `StyleSheet`, `useStyle`, `ThemeProvider`, `apply`, `themeClass`, `when`, `whenScheme`, `createStyle`, `at`, the arithmetic helpers and `alpha`, and the style types. The server build has `readTheme` and no `useTheme`, and no `ThemeContext`, `ThemeScope` or `useThemeClass`: it has no context and no portal.
+Both builds export `configure`, `getEngine`, `styled`, `StyleSheet`, `useStyle`, `useTheme`, `ThemeProvider`, `apply`, `themeClass`, `when`, `whenScheme`, `createStyle`, `at`, the arithmetic helpers and `alpha`, and the style types. A component that calls `useTheme()` is written once and runs unchanged as a server component and as a client component. The server build also has `readTheme`, another name of its `useTheme`, and has no `ThemeContext`, `ThemeScope` or `useThemeClass`: it has no context and no portal. The client build has no `readTheme`: a hook under a name that does not start with `use` would hide from the rules of hooks that it is one.
+
+### `useTheme()`: one name, one rule
+
+- **In a client component** it gives the real theme of the nearest provider, merged over the ones above, whichever build rendered them: a provider of a server component puts its theme into the same context as a provider of a client file (see [What crosses to the browser](#what-crosses-to-the-browser)).
+- **In a server component** it gives the base theme: the theme given to `createStyle(theme)` or `configure({ theme })`. It is the same value in a full render and in a partial render (a client-side navigation renders only the segment that changed), whatever providers render in the request, and never the theme of a provider. With no base theme it returns an empty object, and warns once in development that the theme should be given to `createStyle` or `configure`.
+- **A component that needs the nearest provider's values in a server tree** is marked `'use client'`, its code unchanged.
+
+The same component as both (`packages/react/src/vitest.themeProbe.tsx`, which `useTheme.server.test.tsx` renders as a server component and `useTheme.test.tsx` as a client component):
+
+```tsx
+export function createThemeProbe(style: { useTheme(): typeof probeTheme }) {
+  return function ThemeProbe({ id }: { id: string }) {
+    const theme = style.useTheme()
+    return <code data-id={id}>{`${theme.palette.surface} ${theme.breakpoints[0]}`}</code>
+  }
+}
+```
+
+Under `<ThemeProvider theme={{ ...probeTheme, breakpoints: ['900px'] }}>` and a nested `<ThemeProvider theme={{ palette: { surface: '#fff4d6' } }}>`, both of the server build, the server component prints `#ffffff 600px` (the base theme) and the client component prints `#fff4d6 900px` (the nearest provider's theme over the outer one's). The App Router fixture renders one component both ways on its brand page (`fixtures/next-app/app/(scheme)/theme-probe.tsx`).
 
 A server component page:
 
@@ -199,7 +218,7 @@ const theme = {
   breakpoints: ['600px', '900px'],
 }
 
-const { styled, ThemeProvider, readTheme, themeClass } = createStyle(theme, { prefix: 'umber' })
+const { styled, ThemeProvider, useTheme, themeClass } = createStyle(theme, { prefix: 'umber' })
 
 // The class for <html>, which the layout puts there. Asking for it makes the rule that the root provider sends.
 export const htmlClass = themeClass(theme)
@@ -211,7 +230,7 @@ const Hero = styled('section', { name: 'Hero' })(({ theme }) => ({
 }))
 
 function FirstBreakpoint() {
-  const { breakpoints } = readTheme()
+  const { breakpoints } = useTheme()
   return <code>{breakpoints[0]}</code>
 }
 
@@ -231,12 +250,13 @@ Without `isRoot` the outermost provider declares its theme on `:root` instead, a
 
 What this renders, and what each part means:
 
-- **The request-scoped root theme.** A server component has no React context. The server `ThemeProvider` writes its theme into a slot that `React.cache` keeps for the length of one request. Only the first provider that renders in a request writes it: server components can render out of order, and a nested provider must not change what the root gave. Both `FirstBreakpoint` components read `600px`, the root's breakpoint, because the nested provider's `300px` is not written. A nested provider still changes the variables below it, through its theme class.
+- **The base theme.** A server component has no React context, and in a partial render the providers of the layouts above it do not render, so a server component cannot know the providers above it. `useTheme()` there returns the base theme: both `FirstBreakpoint` components read `600px`, not the nested provider's `300px`. A nested provider still changes the variables below it, through its theme class, and the theme that client components below it read.
 - **The outermost provider.** The outermost provider is the one with no provider of its engine above it in the page, of either build. The server cannot see that: a client-side navigation renders only the segment that changed, so the provider of a layout above is mounted in the browser and does not render in that request. The server provider decides nothing. It renders `ProviderScope`, a client component of the package (an app never writes it), with the data of its theme as plain props. That component reads a context that each provider of either build fills for the ones below, and renders one of two outcomes. It renders on the server as any client component does, so the first HTML already holds the choice, and a page without script is right on a full load.
   - Outermost (nothing above): no element, and the rule that declares its theme on `:root`, a style element keyed `umber-root-<hash>` with every variable: the base theme, then the theme it was given, which wins where both declare a variable.
-  - Nested: its wrapper, with the theme class of the theme it was given (only those variables: it cannot know the providers between it and the root), the markers and `umber-scope`, and their style elements. A function theme gets the root theme of the request.
-- **What is sent.** The declarations of the theme go once, as text: the variables of the theme given and its `color-scheme`, the ids of both rules, the layer order, and the style of the other classes of the wrapper. The component builds the rule of the outcome it picks. A theme that does not declare every variable of the base theme needs the base theme under it for a root rule: the first provider of a request sends it, as one object for each base theme, which a payload holds once however many providers name it. A provider that renders after another one in the same request is below or beside it, and sends none; if nothing is above it in the page (a second provider beside the outermost one), it renders its wrapper.
-- **What a server component gets.** A function style gets the tokens as variables everywhere, and the real values (breakpoints, functions, your own settings) of the root theme of the request. `readTheme()` returns the real values of the root theme merged over the base theme; with no provider it returns the base theme, and an empty object if there is none. In a request that renders a part of the page, the root theme of the request is that of the first provider that renders there (the provider of the page, not of the layout above it, which does not render), merged over the base theme: `readTheme()` and a function theme read that one, which differs from a full render of the same page where the two themes differ in a real value. Keep the real values that server components read (breakpoints) in the base theme, or read them in a client component.
+  - Nested: its wrapper, with the theme class of the theme it was given (only those variables: it cannot know the providers between it and the root), the markers and `umber-scope`, and their style elements.
+- **A function theme** (`theme={(outer) => ...}`) of a provider in a server component is called with the base theme, in every render, outermost or nested: no server component can see the provider above it.
+- **What is sent.** The theme the provider was given (after a function theme was called) goes once, as plain data: the values, not the declarations. With it go the token options of the engine (one object for the engine), the ids of both rules, the layer order, the `color-scheme`, the `@property` rules of its registered variables, and the style of the other classes of the wrapper. `ProviderScope` makes the declarations from the values with the tokens of the core, which name the variables from the token options alone: the text is the one the engine of the server writes for that theme, and the server's render of it and the browser's are the same text, so hydration does not mismatch and a page without script is right. It needs no engine of the client build. A theme that does not declare every variable of the base theme needs the base theme under it for a root rule: the first provider of a request sends the values of the base theme, as one object for each base theme, which a payload holds once however many providers name it. A provider that renders after another one in the same request is below or beside it, and sends none; if nothing is above it in the page (a second provider beside the outermost one), it renders its wrapper.
+- **What a server component gets.** A function style gets the tokens as variables everywhere, and the real values (breakpoints, functions, your own settings) of the base theme. `useTheme()` returns the base theme, and an empty object if there is none. Read the real values of the nearest provider in a client component.
 - **Style elements.** Each styled element and each provider renders `<style href precedence>` elements for its classes. React 19 moves them to the head and renders each `href` once. The `precedence` is the cache prefix. Each one starts with the layer order statement, so it is right on its own. For the page above the elements are `umber-theme-b2oxy9` (the theme class with every variable), `umber-hero-root-1gepzxb` (the Hero rule) and `umber-scope`.
 - **`isRoot`.** A root provider renders no wrapper element and makes no theme class. It sends the `<style>` of the theme classes that `themeClass(theme, colorScheme)` already made for its `theme` (one for each colour scheme you asked with), so call `themeClass` for the class you put on an ancestor you control, in a component that renders before the provider (the layout that renders `<html>`), as in [The root theme and switching](root-theme.md). Without that call nothing is sent for the root theme.
 - **`apply()` and sheets.** They make classes and rules, but nothing renders those rules: `apply(entry)` returns a class name and no `<style>` element comes with it. Use them through `styled` (a sheet entry in `style`), or add the rules yourself with `createStyleTag`.
@@ -245,7 +265,13 @@ The element of a theme class carries every variable of that theme (`cache.getFul
 
 ### Client components
 
-A client component uses the client build, which reads the theme from a React context. That context is not filled by a server component's provider: a theme holds functions, which cannot cross to a client component as a prop. A client component that calls `useTheme()` or uses `styled` with a function style needs a `ThemeProvider` that is imported in a client file:
+A client component uses the client build, which reads the theme from a React context. A provider of a server component fills that context too: `ProviderScope`, its browser part, merges the theme it was given over the theme of the provider above it in the page (of either build), else over the base theme of the client bundle, and gives it to the context that every style of its prefix shares. So `useTheme()` and a function style of a client component below a provider of the server build read that provider's theme, on a full load and after a client-side navigation, and a provider of a client file below it merges over it and carries the class of its whole merged theme.
+
+#### What crosses to the browser
+
+Only plain data crosses from a server component to a client component: a function, a class instance and a symbol do not (the framework throws for a function). A provider of a server component sends the part of its theme that is plain data: strings, numbers, booleans, `null`, lists and plain objects, deeply. A member that is a function, a symbol or an object that is not plain (a class instance, a `Date`, a `Map`) is left out, and the provider warns once in development with the paths it left out. A theme's tokens are plain values, so no variable is affected; what can be left out are members under raw keys (helpers of `breakpoints`, `components` with style functions). A client component below reads such a member from the theme above: the provider above it in the page, else the base theme of the client bundle, which holds it when the same `createStyle(theme)` module is loaded in the browser. A raw key that a provider of a server component changed with a function or a class instance cannot reach a client component: there it keeps the value of the theme above.
+
+A provider in a client file is the way to give client components a theme whose own functions they read:
 
 ```tsx
 // providers.tsx
@@ -275,7 +301,7 @@ export function Breakpoint() {
 }
 ```
 
-The file imports the theme itself instead of receiving it as a prop. Use the same `prefix` and options as in the server file: classes are named from the hash of the rules and the prefix, so the two builds then make the same class name for the same style (a test compares the two).
+The file imports the theme itself instead of receiving it as a prop. Use the same `prefix` and options as in the server file: classes are named from the hash of the rules and the prefix, so the two builds then make the same class name for the same style (a test compares the two). Every style of one prefix in the client build (the default style, each `createStyle`) shares one theme context, as they share the marks that say which provider is above.
 
 #### The server render of a client component
 
@@ -287,7 +313,7 @@ React treats these elements as resources, not as part of the tree, so rendering 
 
 ### Types
 
-A server component file needs the `react-server` custom condition in its TypeScript configuration to see `readTheme`:
+`useTheme` is typed in both builds. A server component file needs the `react-server` custom condition in its TypeScript configuration to see `readTheme`, and to have `ThemeContext`, `ThemeScope` and `useThemeClass` reported as missing:
 
 ```json
 {
@@ -297,18 +323,20 @@ A server component file needs the `react-server` custom condition in its TypeScr
 }
 ```
 
-The condition applies to the whole program, so a project that also type-checks client components uses the condition only for the server files: a second `tsconfig` that extends the first and includes the server component files. Without the condition the types are those of the client build: `readTheme` is reported as missing and `useTheme` is typed although it does not exist there. `@umber-style/react` and `umber-style/react` both follow it (the exports map of each names its own types under `react-server`): under it, `umber-style/react` types `readTheme` and has no `useTheme`. `readTheme` is typed in that entry only under the condition, because the React Native binding has no `readTheme` and no server build: shared code that has to run on React Native does not call it.
+The condition applies to the whole program, so a project that also type-checks client components uses the condition only for the server files: a second `tsconfig` that extends the first and includes the server component files. Without the condition the types are those of the client build: `readTheme` is reported as missing, and `ThemeContext` is typed although it does not exist there. `@umber-style/react` and `umber-style/react` both follow it (the exports map of each names its own types under `react-server`): under it, `umber-style/react` types `useTheme` and `readTheme`. `readTheme` is typed in that entry only under the condition, because the React Native binding has no `readTheme` and no server build: shared code calls `useTheme`.
 
 ## Limits
 
 - `extractPageStyles` takes the root theme that the cache declared last. Two pages rendered at the same time with different root themes need the style elements of the React builds, which carry their root theme, or a render and an extraction that do not interleave.
 - Vue has no style elements: its server render is extracted with `extractPageStyles`, so the same holds for it.
 
-- In a request that renders a part of the page, `readTheme()` and the theme a function theme gets are those of the first provider that renders there, over the base theme, not those of the layout above it, which the server does not render. The end-to-end suite marks the difference as a known failure.
-- A payload in which the first provider that renders has a theme that does not declare every variable of the base theme (the page provider of a client-side navigation) holds the base theme once: about 0.6 kB with the fixture's theme of 22 variables, about 20 kB with a theme of 500 variables, before compression. A full render whose outermost provider has the whole theme sends none.
-- The first HTML holds the data of each provider of the server build twice: in the payload of server components that the framework puts in the page, and as the style element of the outcome chosen.
+- `useTheme()` of a server component never gives the theme of a provider, by design: in a partial render the providers above it do not render. Read the nearest provider's values in a client component.
+- With no base theme (the default style without `configure({ theme })`) the server build has none to give: a provider never makes its theme the base theme there, so what a request reads does not depend on which request came first. A function style, a function sheet and `Global` then read the shape of the theme of the first provider that renders in the request (tokens are references either way, and the real values are that theme's); in a request where no provider renders before them (a partial render of a page with no provider) they get an empty theme, and one that reads a token throws a `TypeError`. `themeClass` and `when` still make their theme the base theme when there is none, as the engine does in every build: give the base theme to `createStyle` or `configure`.
+- A provider of a server component sends the plain data of its theme only (see [What crosses to the browser](#what-crosses-to-the-browser)). Members that are not enumerable, and members of a list other than its items, are not read.
+- A payload in which the first provider that renders has a theme that does not declare every variable of the base theme (the page provider of a client-side navigation) holds the values of the base theme once: about 0.3 kB with the fixture's theme of 22 variables, about 10 kB with a theme of 500 variables, before compression. A full render whose outermost provider has the whole theme sends none.
+- The first HTML holds the theme of each provider of the server build twice: as values in the payload of server components that the framework puts in the page, and as declarations in the style element of the outcome chosen.
 - The server components build runs in the Next.js App Router fixture (Turbopack, production build) and the end-to-end suite checks it. Other frameworks with server components were not run.
-- `React.cache` keeps nothing outside a render: called elsewhere it makes a new slot each time, so `readTheme()` there returns the base theme.
+- `React.cache` keeps nothing outside a render: called elsewhere it makes a new slot each time, so each provider called there is the first of its request and sends the stamp.
 - The rules are read from the text of the style elements. A class name that a hand-written rule of yours puts after the first class of a selector marks that class as present; an engine class used only as a descendant of another is the one case that could make the cache skip a rule it needs. The engine writes no such rule.
 - A style element that is added to the body, or whose text is added after the element is, is not read by the observer; React's elements are complete when they are inserted into the head.
 - `hasServerStyleElements` does not know the framework: it is on wherever the client build runs with no `document`.

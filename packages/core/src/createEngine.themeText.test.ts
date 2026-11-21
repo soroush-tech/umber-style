@@ -1,6 +1,6 @@
 // @vitest-environment node
-import { createEngine } from './createEngine'
-import { createThemeRule, ROOT_SELECTOR } from './theme'
+import { createEngine, createLazyEngine } from './createEngine'
+import { createThemeId, createThemeRule, ROOT_SELECTOR } from './theme'
 
 const theme = {
   palette: { primary: '#1b5fd1', text: '#1a1a1a' },
@@ -40,6 +40,37 @@ describe('readThemeText', () => {
       '@property --u-palette-primary{syntax:"<color>";inherits:true;initial-value:#1b5fd1;}'
     )
     expect(engine.readThemeText({ palette: { text: '#000' } }).properties).toBe('')
+  })
+})
+
+describe('readThemeText with no base theme', () => {
+  it('gives the same variables from the token options alone, keeps no base theme and keeps no text', () => {
+    const engine = createLazyEngine<typeof theme>({
+      prefix: 'u',
+      registered: { 'palette.primary': true },
+    })
+    const brand = { palette: { primary: '#2a6f8a' }, space: [0, 4] }
+    const text = engine.readThemeText(brand)
+    expect(text.declarations).toBe('--u-palette-primary:#2a6f8a;--u-space-0:0;--u-space-1:4px;')
+    // The @property rule is made from the theme itself: its initial value is that theme's.
+    expect(text.properties).toBe(
+      '@property --u-palette-primary{syntax:"<color>";inherits:true;initial-value:#2a6f8a;}'
+    )
+    expect(engine.hasTheme).toBe(false)
+    expect(engine.readThemeText(brand)).not.toBe(text)
+    expect(engine.readThemeText(brand)).toEqual(text)
+    expect(createEngine(theme, { prefix: 'u' }).readThemeText(brand).declarations).toBe(
+      text.declarations
+    )
+  })
+
+  it('names the theme class of the text as themeId does, and exposes its token options', () => {
+    const engine = createEngine(theme, { prefix: 'u', rawKeys: ['space'] })
+    const brand = { palette: { primary: '#2a6f8a' } }
+    const { declarations } = engine.readThemeText(brand)
+    expect(createThemeId('u', declarations, 'dark')).toBe(engine.themeId(brand, 'dark'))
+    expect(createThemeId('u', declarations)).toBe(engine.themeId(brand))
+    expect(engine.tokenOptions).toMatchObject({ prefix: 'u', rawKeys: ['space'] })
   })
 })
 

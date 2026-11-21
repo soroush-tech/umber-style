@@ -8,6 +8,7 @@ export const {
   styled,
   StyleSheet,
   useStyle,
+  useTheme,
   readTheme,
   ThemeProvider,
   apply,

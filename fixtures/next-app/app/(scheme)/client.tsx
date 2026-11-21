@@ -3,9 +3,10 @@
 import { useRouter } from 'next/navigation'
 import { useEffect, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { Button, Card, Muted } from '@umber-fixtures/shared/components'
+import { Button, Card } from '@umber-fixtures/shared/components'
 import { style } from '@umber-fixtures/shared/style'
 import { accentTheme, clientTheme, ROOT_COOKIE, type RootScheme } from '../client-themes'
+import { ThemeProbe } from './theme-probe'
 
 // The client components of the routes under /s: the client build of the binding.
 
@@ -29,9 +30,9 @@ export function ClientProvided({ children }: { children: ReactNode }) {
   return <style.ThemeProvider theme={clientTheme}>{children}</style.ThemeProvider>
 }
 
-/** The surface that `useTheme` gives a client component. */
-export function UseThemeProbe() {
-  return <Muted data-testid="s-use-theme">{style.useTheme().palette.surface}</Muted>
+/** `ThemeProbe` as a client component: what `useTheme` gives there, the theme of the nearest provider. */
+export function ClientThemeProbe({ testId }: { testId: string }) {
+  return <ThemeProbe testId={testId} />
 }
 
 /** Content in a portal under <body>, once mounted: with `ThemeScope`, without it, and with a provider inside. */

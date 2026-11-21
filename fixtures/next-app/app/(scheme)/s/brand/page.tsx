@@ -12,8 +12,9 @@ import {
   rootDark,
   rootLight,
 } from '../../../scheme-themes'
-import { ClientProvided, PortalProbe, UseThemeProbe } from '../../client'
-import { Beat, brandGlobal, Late, ReadThemeProbe, WhenProbe } from '../../parts'
+import { ClientProvided, ClientThemeProbe, PortalProbe } from '../../client'
+import { Beat, brandGlobal, Late, WhenProbe } from '../../parts'
+import { ThemeProbe } from '../../theme-probe'
 
 // A nested provider and what reads its theme: its theme and scheme follow the cookie of the root.
 export default async function BrandPage() {
@@ -23,8 +24,8 @@ export default async function BrandPage() {
       <ThemeProvider theme={scheme === 'dark' ? brandDark : brandLight} colorScheme={scheme}>
         <Card data-testid="s-brand-card">
           <WhenProbe data-testid="s-when">When</WhenProbe>
-          <ReadThemeProbe />
-          <UseThemeProbe />
+          <ThemeProbe testId="s-server-theme" />
+          <ClientThemeProbe testId="s-client-theme" />
           <Global styles={brandGlobal} />
           <Muted data-testid="s-global-target">Outlined by a global rule</Muted>
           <Beat data-testid="s-beat" />

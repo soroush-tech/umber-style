@@ -28,6 +28,18 @@ export const RGB = {
   clientSurface: 'rgb(224, 247, 250)',
 } as const
 
+/**
+ * What `ThemeProbe` prints (its surface and its primary colour), as a server component and as a client
+ * component: the base theme of the shared style, and the themes of the providers above the client one.
+ */
+export const PROBE = {
+  base: '#f4f1ee #8a4b2a',
+  brandLight: '#fff4d6 #2a6f8a',
+  brandDark: '#2a2410 #7ab8d0',
+  deepOne: '#f3e8fd #6a1b9a',
+  deepTwo: '#f3e8fd #ad1457',
+} as const
+
 /** What a scenario may do besides driving the page: let the console problems that it caused on purpose go. */
 export interface ScenarioTools {
   /** Marks the console problems seen so far, and returns what forgets those seen since: the ones that the scenario causes on purpose. */
@@ -148,11 +160,22 @@ async function expectBrandReaders(page: Page): Promise<void> {
   await expect(page.getByTestId('s-beat')).toHaveCSS('outline-color', RGB.brandLightPrimary)
   await expect(page.getByTestId('s-when')).toHaveCSS('outline-style', 'dashed')
   await expect(page.getByTestId('s-when')).not.toHaveCSS('text-decoration-line', 'underline')
-  await expect(page.getByTestId('s-use-theme')).toHaveText('#f4f1ee')
+  await expectProbes(page, PROBE.brandLight)
   await page.getByTestId('s-portal').waitFor()
   await expectThemed(page, 's-portal-scoped', RGB.brandLightSurface, 1)
   await expectThemed(page, 's-portal-bare', RGB.rootLightSurface, 0)
   await expectThemed(page, 's-portal-provided', RGB.accentSurface, 1)
+}
+
+/**
+ * What reads the theme in JavaScript on the brand page: a client component under the brand provider of
+ * the server build shows that theme (`client`); the same component as a server component, and the
+ * function theme of a server provider, show the base theme, in every render.
+ */
+async function expectProbes(page: Page, client: string): Promise<void> {
+  await expect(page.getByTestId('s-client-theme')).toHaveText(client)
+  await expect(page.getByTestId('s-server-theme')).toHaveText(PROBE.base)
+  await expect(page.getByTestId('s-function-card')).toHaveCSS('color', RGB.rootLightSurface)
 }
 
 /** How many rules of the global layer hold the rule of the brand page. */
@@ -235,6 +258,7 @@ export const PROVIDER_SCENARIOS: readonly ProviderScenario[] = [
       await page.goBack()
       await page.getByTestId('page-s-brand').waitFor()
       await expectBrandPage(page)
+      await expectProbes(page, PROBE.brandLight)
       await page.goForward()
       await page.getByTestId('page-s-accent').waitFor()
       await expectAccent()
@@ -401,28 +425,43 @@ export const PROVIDER_SCENARIOS: readonly ProviderScenario[] = [
     },
   },
   {
-    title: 'C19, E29: a function theme and readTheme in a full render and in a partial render',
+    title:
+      'C19, E29: a function theme and useTheme() of a server component read the base theme, in a full and in a partial render',
     async run(page) {
-      // In a full render the root theme of the request is the root layout's.
+      // In a full render the root layout's provider renders in the request; in a partial render the
+      // brand provider of the page is the first that renders. Neither changes what they read.
       await load(page, '/s/brand', 'page-s-brand')
-      await expect(page.getByTestId('s-function-card')).toHaveCSS('color', RGB.rootLightSurface)
-      await expect(page.getByTestId('s-read-theme')).toHaveText('#f4f1ee')
-      // In a partial render it is the first provider that renders: the brand provider of the page.
+      await expectProbes(page, PROBE.brandLight)
       await load(page, '/s', 'page-s-home')
       await navigateInBrowser(page, 's-brand')
-      await expect(page.getByTestId('s-function-card')).toHaveCSS('color', RGB.brandLightSurface)
-      await expect(page.getByTestId('s-read-theme')).toHaveText('#fff4d6')
-      await expect(page.getByTestId('s-use-theme')).toHaveText('#f4f1ee')
+      await expectProbes(page, PROBE.brandLight)
     },
   },
   {
     title:
-      'C19, E29: a function theme and readTheme read the same theme in a full and a partial render',
-    knownKey: 'partial-root-theme',
+      'C19, E29: useTheme() of a client component under nested providers of the server build, after a full load, navigations, back and forward, and another root theme',
     async run(page) {
-      await load(page, '/s', 'page-s-home')
+      await load(page, '/s/deep/one', 'page-s-one')
+      // Two providers of the server build above it: the page's, over the nested layout's.
+      await expect(page.getByTestId('s-one-theme')).toHaveText(PROBE.deepOne)
+      // The page alone is rendered: its provider merges over the layout's, mounted in the browser.
+      await navigateInBrowser(page, 's-two')
+      await expect(page.getByTestId('s-two-theme')).toHaveText(PROBE.deepTwo)
+      await page.goBack()
+      await page.getByTestId('page-s-one').waitFor()
+      await expect(page.getByTestId('s-one-theme')).toHaveText(PROBE.deepOne)
+      await page.goForward()
+      await page.getByTestId('page-s-two').waitFor()
+      await expect(page.getByTestId('s-two-theme')).toHaveText(PROBE.deepTwo)
       await navigateInBrowser(page, 's-brand')
-      await expect(page.getByTestId('s-read-theme')).toHaveText('#f4f1ee', { timeout: 2000 })
+      await expectProbes(page, PROBE.brandLight)
+      // The root theme changes from the server: the cookie, and a refresh of the server components.
+      await page.getByTestId('root-switch').click()
+      await expect(page.getByTestId('root-switch')).toHaveAttribute('data-scheme', 'dark')
+      await expectProbes(page, PROBE.brandDark)
+      await page.getByTestId('root-switch').click()
+      await expect(page.getByTestId('root-switch')).toHaveAttribute('data-scheme', 'light')
+      await expectProbes(page, PROBE.brandLight)
     },
   },
   {

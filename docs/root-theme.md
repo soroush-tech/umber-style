@@ -35,7 +35,7 @@ What the default does not give: a marker class at the root. `when(theme)` and `w
 
 ## The class on `<html>`: `isRoot`
 
-With `isRoot` the provider renders no element, no class and no rule. It does two things: it gives the engine its base theme (when the engine has none yet) and it feeds the context for `useTheme` and function styles. You put the class on an ancestor you control, usually `<html>`, and the call that gives you the class, `themeClass`, makes the rule: see below.
+With `isRoot` the provider renders no element, no class and no rule. It does two things: it gives the engine its base theme (when the engine has none yet; a provider of the server components build never does) and it feeds the context for `useTheme` and function styles of client components (in the server components build, through its browser part). You put the class on an ancestor you control, usually `<html>`, and the call that gives you the class, `themeClass`, makes the rule: see below.
 
 ```tsx
 const App = () => (

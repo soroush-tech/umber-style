@@ -292,7 +292,11 @@ export interface Style<T, E> {
   useStyle<K extends string>(sheet: { readonly [P in K]: E }): { readonly [P in K]: E }
   useStyle<S extends SheetStyles>(sheet: SheetDefinition<S, E>): { [K in keyof S]: E }
   ThemeProvider(props: ThemeProviderProps<T>): ReactElement
-  /** The real theme values, for JavaScript that needs a number or a name: of the nearest provider, else the base theme, else an empty object. */
+  /**
+   * The real theme values, for JavaScript that needs a number or a name. In a client component: of the
+   * nearest provider, else the base theme, else an empty object. In a server component (the server
+   * components build): the base theme, the same in every render, else an empty object.
+   */
   useTheme(): T
   /** The class that declares the variables of `theme`; '' on React Native. */
   themeClass(theme: DeepPartial<T>, colorScheme?: ColorScheme): string
@@ -327,12 +331,21 @@ export interface Style<T, E> {
   Global(props: GlobalProps<T>): ReactElement | null
 }
 
-/** The styling for server components: the root theme of the request is read with readTheme, not with a hook. There is no context, and so no `ThemeContext`, `ThemeScope` or `useThemeClass`. */
+/**
+ * The styling for server components. `useTheme` is a plain function there, not a hook: it returns the base
+ * theme. There is no context, and so no `ThemeContext`, `ThemeScope` or `useThemeClass`.
+ */
 export interface ServerStyle<T> extends Omit<
   WebStyle<T>,
   'useTheme' | 'ThemeContext' | 'ThemeScope' | 'useThemeClass'
 > {
-  /** The root theme of the request, or the base theme of the engine, or an empty object when there is neither. */
+  /**
+   * The base theme: the one given to `createStyle(theme)` or `configure({ theme })`, the same in every
+   * render, whatever providers render; never the theme of a provider. With none, an empty object, and a
+   * warning in development. A component that needs the nearest provider's values is a client component.
+   */
+  useTheme(): T
+  /** Another name of `useTheme` in this build. */
   readTheme(): T
 }
 

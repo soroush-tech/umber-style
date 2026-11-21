@@ -55,8 +55,8 @@ export function createDefaultStyle() {
 
   const useStyle = ((sheet: never) => getStyle().useStyle(sheet)) as ServerStyle<Theme>['useStyle']
 
-  function readTheme(): Theme {
-    return getStyle().readTheme()
+  function useTheme(): Theme {
+    return getStyle().useTheme()
   }
 
   function ThemeProvider(props: WebThemeProviderProps<Theme>) {
@@ -73,7 +73,8 @@ export function createDefaultStyle() {
     styled,
     StyleSheet,
     useStyle,
-    readTheme,
+    useTheme,
+    readTheme: useTheme,
     ThemeProvider,
     apply: ((...entries) => getStyle().apply(...entries)) as ServerStyle<Theme>['apply'],
     // The entry is made on first use, so a module can call it before `configure`.

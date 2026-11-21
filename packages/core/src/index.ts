@@ -5,6 +5,7 @@ export { findCache } from './cacheRegistry'
 export * from './calc'
 export * from './createEngine'
 export * from './css'
+export { isDevelopment } from './devChecks'
 export * from './extractStyles'
 export * from './findMissingStyles'
 export {

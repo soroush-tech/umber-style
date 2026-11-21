@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react'
 import { createCache, createLazyEngine, createMemorySheet, isSheetEntry } from '@umber-style/core'
 import { createStyle } from './createStyle'
 import { createDefaultStyle } from './defaultStyle'
+import { readPrefixStyle } from './ProviderScope'
 
 const light = { palette: { primary: '#0000ff', onPrimary: '#ffffff' }, space: [0, 4, 8] }
 const other = { palette: { primary: '#ff0000', onPrimary: '#000000' }, space: [0, 2, 4] }
@@ -179,6 +180,52 @@ describe('the default style', () => {
     expect(themeClass(light, 'dark')).toMatch(/^d-theme-[a-z0-9]+ d-boundary d-scheme-dark$/)
     expect(when(light)).toBe(`@theme ${getEngine().themeId(light)}`)
     expect(whenScheme('light')).toBe('@scheme light')
+  })
+})
+
+describe('the contexts of the prefix of the default style', () => {
+  // A provider of the server build finds the contexts of its prefix with no engine: the default style
+  // claims the prefix it will have, read from its options until it is first used.
+  it('claims the prefix of its options and gives their base theme, before it is used', () => {
+    const style = createDefaultStyle()
+    style.configure({ prefix: 'claim-a', theme: light })
+    const found = readPrefixStyle('claim-a')
+    expect(found.contexts.ThemeContext).toBe(style.ThemeContext)
+    expect(found.holder?.baseTheme).toBe(light)
+    expect(readPrefixStyle('claim-a')).toBe(found)
+  })
+
+  it('reads the prefix of the cache or of the engine it is given, and the base theme of that engine', () => {
+    const fromCache = createDefaultStyle()
+    fromCache.configure({ cache: createCache({ prefix: 'claim-b', sheet: createMemorySheet() }) })
+    expect(readPrefixStyle('claim-b').contexts.ThemeContext).toBe(fromCache.ThemeContext)
+    expect(readPrefixStyle('claim-b').holder?.baseTheme).toBeUndefined()
+    const engine = createLazyEngine({ prefix: 'claim-c' })
+    engine.setTheme(other)
+    const fromEngine = createDefaultStyle()
+    fromEngine.configure({ engine })
+    expect(readPrefixStyle('claim-c').contexts.ThemeContext).toBe(fromEngine.ThemeContext)
+    expect(readPrefixStyle('claim-c').holder?.baseTheme).toBe(other)
+  })
+
+  it('claims css with no options, and the prefix and base theme of its engine once used', () => {
+    const style = createDefaultStyle()
+    expect(readPrefixStyle('claim-none').contexts.ThemeContext).not.toBe(style.ThemeContext)
+    style.configure({ prefix: 'claim-d' })
+    style.getEngine().setTheme(light)
+    expect(readPrefixStyle('claim-d').contexts.ThemeContext).toBe(style.ThemeContext)
+    expect(readPrefixStyle('claim-d').holder?.baseTheme).toBe(light)
+  })
+
+  it('shares the contexts of a prefix with each createStyle of that prefix', () => {
+    const style = createDefaultStyle()
+    style.configure({ prefix: 'claim-e' })
+    const own = createStyle(light, { prefix: 'claim-e' })
+    expect(own.ThemeContext).toBe(style.ThemeContext)
+    expect(createStyle(other, { prefix: 'claim-f' }).ThemeContext).toBe(
+      createStyle(light, { prefix: 'claim-f' }).ThemeContext
+    )
+    expect(readPrefixStyle('claim-f').holder?.baseTheme).toBe(other)
   })
 })
 

@@ -13,13 +13,11 @@ function setup() {
 }
 
 describe('the default style for server components', () => {
-  it('has styled run before any theme, and renders its classes and style elements', async () => {
-    const { styled, ThemeProvider, getEngine, readTheme } = setup()
-    const Box = styled('div', { name: 'Box' })(({ theme: view }) => ({
-      color: view.palette.primary,
-    }))
+  it('has styled run with no base theme, and a provider does not give one', async () => {
+    const { styled, ThemeProvider, getEngine, useTheme } = setup()
+    const Box = styled('div', { name: 'Box' })({ color: 'red' })
     expect(getEngine().hasTheme).toBe(false)
-    expect(readTheme()).toBe(EMPTY_THEME)
+    expect(useTheme()).toBe(EMPTY_THEME)
     const tree = playScopes(
       await resolveTree(
         <ThemeProvider theme={theme}>
@@ -27,7 +25,7 @@ describe('the default style for server components', () => {
         </ThemeProvider>
       )
     )
-    expect(getEngine().baseTheme).toBe(theme)
+    expect(getEngine().hasTheme).toBe(false)
     // The outermost provider renders no element: one style element for its root theme, one for the Box.
     expect(findAll(tree, 'div').map((element) => element.props.className)).toEqual([
       expect.stringMatching(/^d-box-root-/),
@@ -66,7 +64,7 @@ describe('the default style for server components', () => {
   })
 
   it('has a sheet, useStyle, apply and themeClass, and the base theme of configure', () => {
-    const { configure, StyleSheet, useStyle, apply, themeClass, when, whenScheme, readTheme } =
+    const { configure, StyleSheet, useStyle, apply, themeClass, when, whenScheme, useTheme } =
       createDefaultStyle()
     configure({ theme })
     const classes = useStyle(StyleSheet.create((view) => ({ box: { padding: view.space[1] } })))
@@ -74,7 +72,7 @@ describe('the default style for server components', () => {
     expect(themeClass(theme)).toMatch(/^css-theme-[a-z0-9]+ css-boundary$/)
     expect(when(theme)).toMatch(/^@theme css-theme-/)
     expect(whenScheme('dark')).toBe('@scheme dark')
-    expect(readTheme()).toBe(theme)
+    expect(useTheme()).toBe(theme)
   })
 
   it('throws from configure once it was used, and shares the engine it is given', () => {

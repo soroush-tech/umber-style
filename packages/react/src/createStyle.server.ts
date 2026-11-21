@@ -2,7 +2,7 @@ import {
   createCssEntry,
   createEngine,
   EMPTY_THEME,
-  mergeDeep,
+  isDevelopment,
   type ColorScheme,
   type DeepPartial,
   type Engine,
@@ -15,7 +15,7 @@ import {
   type WebStyleObject,
 } from '@umber-style/core'
 import { createGlobal } from './Global.server'
-import { createServerOnlyContext, readServerContext, type CacheFunction } from './serverContext'
+import { createRequestSlot, type CacheFunction } from './serverContext'
 import { createStyled } from './styled.server'
 import { createThemeProvider } from './ThemeProvider.server'
 import type { ServerStyle, SheetDefinition, StyleOptions } from './types'
@@ -32,31 +32,32 @@ export function bindEngine<T extends object>(
   engine: Engine<T>,
   cache?: CacheFunction
 ): ServerStyle<T> {
-  const root = createServerOnlyContext<DeepPartial<T> | undefined>(undefined, cache)
-  // Whether the stamp of the cache options was sent in this request.
-  const stamp = createServerOnlyContext<boolean>(false, cache)
+  // The theme of the first provider of the request, and whether one has rendered.
+  const first = createRequestSlot<DeepPartial<T> | undefined>(undefined, cache)
+  let hasWarned = false
 
-  // The root theme over the base theme, made once for each root.
-  const merged = new WeakMap<object, T>()
+  const readBaseTheme = (): T => engine.baseTheme ?? (EMPTY_THEME as T)
 
-  /** `rootTheme` over the base theme. A provider gives the engine its base theme before it gives the root, so the base exists here. */
-  const mergeRoot = (rootTheme: DeepPartial<T>): T => {
-    const base = engine.baseTheme as T
-    if ((rootTheme as unknown) === base) return base
-    let theme = merged.get(rootTheme)
-    if (theme === undefined) {
-      theme = mergeDeep<T>(base, rootTheme)
-      merged.set(rootTheme, theme)
+  /**
+   * The base theme: the one given to `createStyle(theme)` or `configure({ theme })`, the same in every
+   * render of every request, whatever providers render. With none, an empty object, and one warning in
+   * development. A server component cannot see the providers above it: what needs the nearest theme's
+   * values is a client component, whose `useTheme()` reads them.
+   */
+  const useTheme = (): T => {
+    if (engine.baseTheme === undefined && !hasWarned && isDevelopment()) {
+      hasWarned = true
+      console.warn(
+        `[${engine.cache.prefix}] useTheme() in a server component returns the base theme, and there is none: give the theme to createStyle(theme) or configure({ theme }) to read it in server components. It returns an empty object.`
+      )
     }
-    return theme
+    return readBaseTheme()
   }
 
-  /** The root theme of the request, or the base theme of the engine, or an empty object when there is neither. */
-  const readTheme = (): T => {
-    const rootTheme = readServerContext(root)
-    if (rootTheme === undefined) return engine.baseTheme ?? (EMPTY_THEME as T)
-    return mergeRoot(rootTheme)
-  }
+  // The theme whose view function styles read: the base theme. With none, the theme of the first provider
+  // of the request gives the shape (tokens are references either way), else there is none.
+  const readViewTheme = (): T =>
+    engine.baseTheme ?? (first().current as T | undefined) ?? (EMPTY_THEME as T)
 
   const themeClass = (partial: DeepPartial<T>, colorScheme?: ColorScheme) =>
     engine.themeClass(partial, colorScheme)
@@ -64,7 +65,7 @@ export function bindEngine<T extends object>(
   // An object sheet is its own entries: it reads no theme, so it works with none.
   const useStyle = ((sheet: object) =>
     isThemedSheet(sheet)
-      ? sheet.resolve(engine.createThemeView(readTheme()))
+      ? sheet.resolve(engine.createThemeView(readViewTheme()))
       : sheet) as ServerStyle<T>['useStyle']
 
   function create<K extends string>(styles: ObjectSheet<K>): SheetEntries<K>
@@ -80,19 +81,20 @@ export function bindEngine<T extends object>(
   return {
     engine,
     cache: engine.cache,
-    styled: createStyled(engine, readTheme),
+    styled: createStyled(engine, readViewTheme),
     StyleSheet: { create },
     useStyle,
     apply: (...entries) => ({ className: engine.css(...entries) || undefined }),
     css: ((...args: unknown[]) => createCssEntry(engine.cache, args)) as ServerStyle<T>['css'],
-    ThemeProvider: createThemeProvider(engine, { root, stamp, readTheme }),
-    readTheme,
+    ThemeProvider: createThemeProvider(engine, { first, readBaseTheme }),
+    useTheme,
+    readTheme: useTheme,
     themeClass,
     when: engine.when,
     whenScheme: engine.whenScheme,
     keyframes: engine.keyframes,
     globalStyles,
-    Global: createGlobal(engine, readTheme),
+    Global: createGlobal(engine, readViewTheme),
   }
 }
 

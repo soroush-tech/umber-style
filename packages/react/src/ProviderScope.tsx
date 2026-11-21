@@ -4,7 +4,15 @@
 // loads the server build of this package with no bundler (which would make this module a reference)
 // still loads this module. So nothing here calls React when the module loads.
 import * as React from 'react'
-import { createThemeRule, ROOT_SELECTOR } from '@umber-style/core'
+import {
+  createThemeRule,
+  createTokens,
+  mergeTheme,
+  ROOT_SELECTOR,
+  toDeclarationText,
+  type ColorScheme,
+  type TokenOptions,
+} from '@umber-style/core'
 import type { StyleText } from './styleElements'
 
 /** The wrapper of a nested provider: its element and its class string, which `ThemeScope` repeats. */
@@ -17,8 +25,6 @@ export interface ThemeScopeValue {
 export interface ProviderMark {
   /** The wrapper of the nearest nested provider, or null when there is none below the outermost one. */
   readonly scope: ThemeScopeValue | null
-  /** Whether a provider of the server build is above: the theme context of the client build lacks its theme. */
-  readonly hasServerAbove: boolean
 }
 
 /**
@@ -42,13 +48,66 @@ export function addMark(marks: ProviderMarks, key: unknown, mark: ProviderMark):
   return new Map(marks).set(key, mark)
 }
 
-/** The variables of a theme as text: `--name:value;` for each (and its color-scheme), and the `@property` rules of the registered ones. */
-export interface SentTheme {
-  readonly declarations: string
+/**
+ * The contexts of one prefix. `ThemeContext` holds the real theme of the nearest provider (its theme
+ * merged over the ones above), of either build. `ViewContext` holds its view (references for tokens),
+ * which stays the same object while only the values of variables change; a provider of the server build
+ * sets it to undefined, and what reads it below makes the view of `ThemeContext`.
+ */
+export interface ThemeContexts<T> {
+  ThemeContext: React.Context<T | undefined>
+  ViewContext: React.Context<T | undefined>
+}
+
+/** Makes the contexts of one style. */
+export function createThemeContexts<T>(): ThemeContexts<T> {
+  return {
+    ThemeContext: React.createContext<T | undefined>(undefined),
+    ViewContext: React.createContext<T | undefined>(undefined),
+  }
+}
+
+/** The styles of the client build of one prefix: the contexts they share, and the engine whose base theme a provider of the server build merges over. */
+export interface PrefixStyle {
+  readonly contexts: ThemeContexts<unknown>
+  holder?: { readonly baseTheme: unknown }
+}
+
+const prefixStyles = new Map<string, PrefixStyle>()
+let claim: { readPrefix(): string; style: PrefixStyle } | undefined
+
+/**
+ * The default style's claim on a prefix: its contexts exist before its engine and its prefix, which
+ * `readPrefix` gives on demand. The prefix is the one it will have when its options are set.
+ */
+export function claimPrefixStyle(readPrefix: () => string, style: PrefixStyle): void {
+  claim = { readPrefix, style }
+}
+
+/**
+ * The styles of `prefix`, recorded on first use: the default style's when it claims that prefix, else
+ * new contexts. Every style of one prefix (the default one, each `createStyle`) shares them, as they
+ * share its marks, and so does the browser part of a provider of the server build, which needs no engine.
+ */
+export function readPrefixStyle(prefix: string): PrefixStyle {
+  let style = prefixStyles.get(prefix)
+  if (style === undefined) {
+    style = claim?.readPrefix() === prefix ? claim.style : { contexts: createThemeContexts() }
+    prefixStyles.set(prefix, style)
+  }
+  return style
+}
+
+/** The token options that name the variables of a theme, as plain data; the prefix is that of the provider. */
+export type SentTokens = Pick<TokenOptions, 'rawKeys' | 'lengthKeys' | 'modes'>
+
+/** The base theme as a provider of the server build sends it: plain data, and the `@property` rules of its registered variables. */
+export interface ScopeBase {
+  readonly theme: object
   readonly properties: string
 }
 
-/** What a provider of the server build sends of its theme: the browser makes the rule of the outcome it picks. */
+/** What a provider of the server build sends of its rules, besides the theme it was given: the browser makes the rule of the outcome it picks. */
 export interface ScopeTheme {
   /** The element of the wrapper. */
   readonly as: string
@@ -60,47 +119,74 @@ export interface ScopeTheme {
   readonly rootId: string
   /** The order statement of the layers of the cache, or '' without layers. */
   readonly layerOrder: string
-  /** The given theme. */
-  readonly own: SentTheme
+  /** The color scheme that the rule of the given theme sets. */
+  readonly colorScheme?: ColorScheme
+  /** The token options of the engine: one object for each engine, which a payload holds once. */
+  readonly tokens: SentTokens
+  /** The `@property` rules of the registered variables of the given theme, or ''. */
+  readonly properties: string
   /** Whether the given theme declares every variable of the base theme: its root rule needs no base theme. */
   readonly isWhole: boolean
   /**
-   * The base theme, which the root rule declares before `own`, when `own` does not declare all of it and the
-   * provider was the first of its request. It is one object for each base theme, which a payload of server
-   * components holds once however many providers name it. A provider that has neither can only be nested.
+   * The base theme, which the root rule declares before the given theme, when that one does not declare
+   * all of it and the provider was the first of its request. It is one object for each base theme, which a
+   * payload of server components holds once however many providers name it. A provider that has neither
+   * can only be nested.
    */
-  readonly base?: SentTheme
+  readonly base?: ScopeBase
   /** The style elements of the other classes of the wrapper: the scope class, and the classes in `className`. */
   readonly styles: readonly StyleText[]
 }
 
 export interface ProviderScopeProps {
-  /** The prefix of the engine's cache: the key of its mark. */
+  /** The prefix of the engine's cache: the key of its mark, and of its contexts. */
   readonly prefix: string
-  /** The theme, and the wrapper; none for a provider with `isRoot`, which renders neither. */
+  /** The theme the provider was given (after a function theme was called), as plain data. */
+  readonly given: object
+  /** The rules and the wrapper; none for a provider with `isRoot`, which renders neither. */
   readonly theme?: ScopeTheme
   readonly children?: React.ReactNode
 }
 
-/** The style element of the root rule of `theme` (the base theme, then the given one, on `:root`) and that rule alone; none when it declares nothing. */
+/** The declarations of the variables of `values`, `--name:value;` for each: the text that the engine's `readThemeText` gives. */
+export function declareValues(prefix: string, values: object, tokens: SentTokens): string {
+  const declared = createTokens(values, { ...tokens, prefix }).declare(values)
+  return toDeclarationText(Object.entries(declared))
+}
+
+/** The declarations of the given theme, and its color-scheme. */
+function declareOwn(prefix: string, given: object, theme: ScopeTheme): string {
+  const { colorScheme, tokens } = theme
+  return declareValues(prefix, given, tokens) + (colorScheme ? `color-scheme:${colorScheme};` : '')
+}
+
+/** The style element of the root rule (the base theme, then the given one, on `:root`) and that rule alone; none when it declares nothing. */
 export function createRootStyle(
   prefix: string,
+  given: object,
   theme: ScopeTheme
 ): { style: StyleText; rule: string } | undefined {
-  const { own, base, layerOrder, rootId } = theme
-  const body = (base?.declarations ?? '') + own.declarations
+  const { base, layerOrder, rootId, tokens, properties } = theme
+  const body =
+    (base === undefined ? '' : declareValues(prefix, base.theme, tokens)) +
+    declareOwn(prefix, given, theme)
   if (body === '') return undefined
   const rule = createThemeRule(prefix, layerOrder !== '', ROOT_SELECTOR, body)
-  const text = layerOrder + (base?.properties ?? '') + own.properties + rule
+  const text = layerOrder + (base?.properties ?? '') + properties + rule
   return { style: { href: rootId, text }, rule }
 }
 
 /** The style elements of a nested provider: of its theme class (none when it declares nothing), then of its other classes. */
-export function createNestedStyles(prefix: string, theme: ScopeTheme): readonly StyleText[] {
-  const { classId, own, layerOrder, styles } = theme
-  if (own.declarations === '') return styles
-  const rule = createThemeRule(prefix, layerOrder !== '', `.${classId}`, own.declarations)
-  return [{ href: classId, text: layerOrder + own.properties + rule }, ...styles]
+export function createNestedStyles(
+  prefix: string,
+  given: object,
+  theme: ScopeTheme
+): readonly StyleText[] {
+  const { classId, layerOrder, properties, styles } = theme
+  const own = declareOwn(prefix, given, theme)
+  if (own === '') return styles
+  const rule = createThemeRule(prefix, layerOrder !== '', `.${classId}`, own)
+  return [{ href: classId, text: layerOrder + properties + rule }, ...styles]
 }
 
 /**
@@ -131,23 +217,31 @@ export function keepRootRule(prefix: string, rootId: string, rule: string, page:
 }
 
 /**
- * The browser part of a provider of the server build, which renders it with the data of its theme. Whether
- * a provider of the same engine is above is decided here, in the tree as it is rendered: a server render of
- * a part of the page (a client-side navigation renders only the segment that changed) does not render the
- * providers of the layouts above it, which are mounted in the browser. Rendered on the server as any client
- * component is, it makes the same choice in the first HTML.
+ * The browser part of a provider of the server build, which renders it with the theme it was given, as
+ * plain data, and the data of its rules. Whether a provider of the same engine is above is decided here,
+ * in the tree as it is rendered: a server render of a part of the page (a client-side navigation renders
+ * only the segment that changed) does not render the providers of the layouts above it, which are mounted
+ * in the browser. Rendered on the server as any client component is, it makes the same choice in the
+ * first HTML. The rules are made here from the values, with the core's tokens, so the server and the
+ * browser write the same text from the same props, with or without an engine of the client build.
  *
  * - Nested: it renders the style element of the theme class of its theme, those of its other classes, and
  *   its wrapper.
  * - Outermost: no element; the style element of its root rule (the base theme, then its theme, on
  *   `:root`), and, once committed in the browser, it leaves that root rule alone in the document. A
  *   provider that has no base theme for that rule (see `ScopeTheme.base`) is nested instead.
- * - With no theme (`isRoot`): nothing but the mark, which passes on the wrapper and the kind of the
- *   provider above.
+ * - With no rules (`isRoot`): no element, no rule.
  *
- * It marks its prefix for the providers below, of both builds.
+ * In each case it marks its prefix for the providers below, of both builds, and gives the contexts of
+ * its prefix the theme merged over the theme of the provider above it in the page, of either build, else
+ * over the base theme of the client build: `useTheme()` of a client component below reads it.
  */
-export function ProviderScope({ prefix, theme, children }: ProviderScopeProps): React.ReactElement {
+export function ProviderScope({
+  prefix,
+  given,
+  theme,
+  children,
+}: ProviderScopeProps): React.ReactElement {
   const MarksContext = getMarksContext()
   const marks = React.use(MarksContext)
   const above = marks.get(prefix)
@@ -163,30 +257,37 @@ export function ProviderScope({ prefix, theme, children }: ProviderScopeProps): 
     [isNested, as, className]
   )
   // With isRoot the theme is the class on an ancestor, as for a provider of the client build with isRoot:
-  // it passes on what is above. Otherwise its theme is one that the client context does not hold.
+  // it passes on the wrapper above.
   const scope = theme === undefined ? (above?.scope ?? null) : (wrapper ?? null)
-  const hasServerAbove = theme === undefined ? (above?.hasServerAbove ?? false) : true
-  const below = React.useMemo(
-    () => addMark(marks, prefix, { scope, hasServerAbove }),
-    [marks, prefix, scope, hasServerAbove]
-  )
-  const root = React.useMemo(
-    () => (theme === undefined || isNested ? undefined : createRootStyle(prefix, theme)),
-    [prefix, theme, isNested]
-  )
-  const rootRule = root?.rule
+  const below = React.useMemo(() => addMark(marks, prefix, { scope }), [marks, prefix, scope])
+  const { contexts, holder } = readPrefixStyle(prefix)
+  const outer = (React.use(contexts.ThemeContext) ?? holder?.baseTheme) as object | undefined
+  const merged = React.useMemo(() => mergeTheme(outer, given), [outer, given])
+  const styles = React.useMemo(() => {
+    if (theme === undefined) return { list: [] as readonly StyleText[], rule: undefined }
+    if (isNested) return { list: createNestedStyles(prefix, given, theme), rule: undefined }
+    const root = createRootStyle(prefix, given, theme)
+    return { list: root === undefined ? [] : [root.style], rule: root?.rule }
+  }, [prefix, given, theme, isNested])
+  const rootRule = styles.rule
   const rootId = theme?.rootId
   React.useLayoutEffect(() => {
     if (rootRule !== undefined) keepRootRule(prefix, rootId as string, rootRule, document)
   }, [prefix, rootId, rootRule])
 
-  let styles: readonly StyleText[] = root === undefined ? [] : [root.style]
-  if (wrapper !== undefined) styles = createNestedStyles(prefix, theme as ScopeTheme)
-  const content = React.createElement(MarksContext.Provider, { value: below }, children)
+  const content = React.createElement(
+    MarksContext.Provider,
+    { value: below },
+    React.createElement(
+      contexts.ThemeContext.Provider,
+      { value: merged },
+      React.createElement(contexts.ViewContext.Provider, { value: undefined }, children)
+    )
+  )
   return React.createElement(
     React.Fragment,
     null,
-    styles.map(({ href, text }) =>
+    styles.list.map(({ href, text }) =>
       React.createElement('style', { key: href, href, precedence: prefix }, text)
     ),
     wrapper === undefined

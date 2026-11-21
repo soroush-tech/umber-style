@@ -6,8 +6,8 @@ import type { Styled, StyledOptions } from './types'
 
 /**
  * Makes `styled` for server components: no hook, no context. A function style reads the view of the
- * theme that `readTheme` gives, which is the root theme of the request. Each element comes with the
- * `<style>` of its class.
+ * theme that `readTheme` gives: the base theme (tokens as references, its real values for the rest), else
+ * the theme of the first provider of the request, else an empty theme. Each element comes with the `<style>` of its class.
  */
 export function createStyled<T>(engine: Engine<T>, readTheme: () => T): Styled<T> {
   const styled =

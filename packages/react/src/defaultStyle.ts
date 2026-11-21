@@ -9,6 +9,7 @@ import {
   type WebStyleObject,
 } from '@umber-style/core'
 import { bindEngine } from './createStyle'
+import { claimPrefixStyle } from './ProviderScope'
 import { createThemeContexts } from './ThemeValue'
 import type {
   DefaultStyleOptions,
@@ -36,6 +37,26 @@ export function createDefaultStyle() {
     }
     return bound
   }
+
+  // The contexts are those of the prefix it will have, for a provider of the server build of that prefix,
+  // which may render before the style is first used: the prefix and the base theme are read from the
+  // options until then.
+  claimPrefixStyle(
+    () =>
+      bound?.cache.prefix ??
+      pending.engine?.cache.prefix ??
+      pending.cache?.prefix ??
+      pending.prefix ??
+      'css',
+    {
+      contexts: contexts as never,
+      holder: {
+        get baseTheme() {
+          return bound?.engine.baseTheme ?? pending.theme ?? pending.engine?.baseTheme
+        },
+      },
+    }
+  )
 
   /** Sets the options of the default engine, and gives it a base theme or an engine to share. Throws once the default style was used. */
   function configure(options: DefaultStyleOptions): void {

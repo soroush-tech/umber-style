@@ -27,10 +27,18 @@ export function toDeclarationText(entries: Iterable<readonly [string, string]>):
   return text
 }
 
-/** The hash of all the declarations of a theme, and of its color-scheme: what names its class or root rule. */
-function hashTheme(declarations: Readonly<Record<string, string>>, colorScheme?: string): string {
-  const variables = toDeclarationText(Object.entries(declarations))
+/** The hash of all the declarations of a theme, as text, and of its color-scheme: what names its class or root rule. */
+function hashTheme(variables: string, colorScheme?: string): string {
   return hashString(colorScheme ? `${variables}color-scheme:${colorScheme};` : variables)
+}
+
+/**
+ * The theme class of the declarations `variables` (the text of `toDeclarationText`, as `readThemeText`
+ * gives it) and of `colorScheme`, `<prefix>-theme-<hash>`, without registering it: the name that
+ * `createThemeClass` gives the same declarations.
+ */
+export function createThemeId(prefix: string, variables: string, colorScheme?: string): string {
+  return `${prefix}-theme-${hashTheme(variables, colorScheme)}`
 }
 
 /**
@@ -43,7 +51,8 @@ export function createThemeClass(
   options: ThemeRuleOptions = {}
 ): string {
   const { colorScheme } = options
-  const className = `${cache.prefix}-theme-${hashTheme(declarations, colorScheme)}`
+  const variables = toDeclarationText(Object.entries(declarations))
+  const className = createThemeId(cache.prefix, variables, colorScheme)
   cache.insertTheme(className, declarations, colorScheme)
   return className
 }
@@ -58,7 +67,8 @@ export function declareRootTheme(
   options: ThemeRuleOptions = {}
 ): string {
   const { colorScheme } = options
-  const id = `${cache.prefix}-root-${hashTheme(declarations, colorScheme)}`
+  const variables = toDeclarationText(Object.entries(declarations))
+  const id = `${cache.prefix}-root-${hashTheme(variables, colorScheme)}`
   cache.insertRoot(id, declarations, colorScheme)
   return id
 }

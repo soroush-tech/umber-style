@@ -21,7 +21,7 @@ function setup() {
 }
 
 describe('an inline token in the server build', () => {
-  it('follows the root theme of the request', async () => {
+  it('follows the base theme, not the theme of a provider of the request', async () => {
     const { styled, ThemeProvider, sheet } = setup()
     const Box = styled('div')(({ theme: view }) => ({
       color: view.palette.primary,
@@ -34,7 +34,7 @@ describe('an inline token in the server build', () => {
     )
     const [box] = findAll(tree, 'div')
     const className = box.props.className as string
-    expect(sheet.rules).toContain(`.${className}{color:var(--s-palette-primary);z-index:300;}`)
+    expect(sheet.rules).toContain(`.${className}{color:var(--s-palette-primary);z-index:100;}`)
   })
 
   it('sends the whole theme class in its style element, whatever the sheet holds', async () => {

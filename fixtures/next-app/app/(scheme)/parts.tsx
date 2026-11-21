@@ -1,20 +1,11 @@
 import { at } from '@umber-style/react'
 import type { ReactNode } from 'react'
-import { Muted } from '@umber-fixtures/shared/components'
 import { globalStyles, keyframes, style, styled } from '@umber-fixtures/shared/style'
 import { brandLight } from '../scheme-themes'
 
 // Server components of the routes under /s that read the theme in the ways a provider must serve.
 
-// `readTheme` exists in the server build only, so the shared style is typed without it.
-const { readTheme, when, whenScheme } = style as unknown as typeof style & {
-  readTheme: () => { palette: { surface: string } }
-}
-
-/** The surface of the root theme of the request, as a server component reads it. */
-export function ReadThemeProbe() {
-  return <Muted data-testid="s-read-theme">{readTheme().palette.surface}</Muted>
-}
+const { when, whenScheme } = style
 
 /** Dashed outline where the nearest theme is the light brand theme; underlined where the nearest scheme is dark. */
 export const WhenProbe = styled('p', { name: 'WhenProbe' })({

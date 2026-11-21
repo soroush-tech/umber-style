@@ -20,7 +20,7 @@ import {
 import { isStyleFunction, splitLeading } from './styleBase'
 import { isSameView } from './sameView'
 import { createThemeClass, declareRootTheme, toDeclarationText } from './theme'
-import { createTokens, type DeepPartial, type Tokens } from './tokens'
+import { createTokens, type DeepPartial, type TokenOptions, type Tokens } from './tokens'
 import type { TemplateValue } from './styleTypes'
 import type { WebStyleObject } from './webStyle'
 import type {
@@ -105,6 +105,8 @@ export interface Engine<T> {
   readonly baseTheme: T | undefined
   /** The view of the base theme: its shape, with a var(--name) reference for each token. Throws while there is no theme. */
   readonly refs: T
+  /** The token options of the engine, with the prefix of its cache: what names the variables of a theme and decides which values are tokens. */
+  readonly tokenOptions: Readonly<TokenOptions>
   /**
    * The view of `realTheme`: each token is a var(--name) reference, every other part (breakpoints,
    * functions, other objects) is taken from `realTheme`. Made once for each theme object; a view that is
@@ -136,7 +138,9 @@ export interface Engine<T> {
   /**
    * The variables of `theme` (a whole theme or a partial one) as text, with the `@property` rules of the
    * registered ones: what a theme class or the root rule of that theme declares, every variable, used or
-   * not. Nothing is written. Made once for each theme object. Throws while there is no base theme.
+   * not. Nothing is written, and the engine's base theme stays as it is. Made once for each theme object.
+   * With no base theme the variables are the same (they depend on the token options only), and the
+   * `@property` rules are made from `theme` itself; that text is not kept.
    */
   readThemeText(theme: DeepPartial<T>): ThemeText
   /** A style key for "the nearest theme is this theme": `{ [when(dark)]: { border: ... } }`. Needs `@scope` (see `hasScope`). */
@@ -263,7 +267,7 @@ function createFamilyEngine<T extends object>(
       hasDevChecks,
       tokenSignature: createTokenSignature([rawKeys, lengthKeys, modes, registered, alwaysDeclare]),
     })
-  const tokenOptions = { prefix, rawKeys, lengthKeys, modes, registered }
+  const tokenOptions: TokenOptions = { prefix, rawKeys, lengthKeys, modes, registered }
   // The base theme is the family's; the tokens are this engine's (its prefix), made from the base theme
   // they were last made from, and made again when the family has another one.
   let tokensTheme: T | undefined
@@ -351,9 +355,11 @@ function createFamilyEngine<T extends object>(
   }
   const themeTexts = new WeakMap<object, ThemeText>()
   const readThemeText = (partial: DeepPartial<T>): ThemeText => {
+    sync()
     let text = themeTexts.get(partial)
     if (text === undefined) {
-      const { declare, registrations } = readTokens()
+      // The declarations need the token options only: with no base theme, the tokens of `partial` give them.
+      const { declare, registrations } = tokens ?? createTokens(partial as T, tokenOptions)
       const declarations = declare(partial)
       const names = Object.keys(declarations)
       text = {
@@ -361,7 +367,7 @@ function createFamilyEngine<T extends object>(
         properties: names.map((name) => registrations[name] ?? '').join(''),
         names,
       }
-      themeTexts.set(partial, text)
+      if (tokens) themeTexts.set(partial, text)
     }
     return text
   }
@@ -572,6 +578,7 @@ function createFamilyEngine<T extends object>(
     get refs() {
       return readTokens().refs
     },
+    tokenOptions,
     scopeClass,
     keyframes,
     insertKeyframes: cache.insertKeyframes,

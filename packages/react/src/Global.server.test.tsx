@@ -21,7 +21,7 @@ const readStyles = (tree: Awaited<ReturnType<typeof resolveTree>>) =>
   findAll(tree, 'style').map((element) => [element.props.href, element.children.join('')])
 
 describe('Global in the server components build', () => {
-  it('renders the style elements of each set and of its animations, with the root theme of the request', async () => {
+  it('renders the style elements of each set and of its animations, with the base theme whatever the provider gives', async () => {
     const { Global, ThemeProvider, keyframes, globalStyles, engine } = setup()
     const fade = keyframes({ from: { opacity: 0 } }, { label: 'fade' })
     const base = globalStyles((view) => ({
@@ -36,14 +36,14 @@ describe('Global in the server components build', () => {
     )
     const [set, other] = engine.resolveGlobal(
       [base, { html: { margin: 0 } }],
-      engine.createThemeView({ ...theme, breakpoints: { md: 1024 } })
+      engine.createThemeView(theme)
     )
     const order = engine.cache.layerOrder
     expect(readStyles(tree)).toEqual([
       [fade, `@keyframes ${fade}{0%{opacity:0;}}`],
       [
         set.id,
-        `${order}@layer r-global{@media (min-width: 1024px){body{color:var(--r-palette-text);animation:${fade} 1s;}}}`,
+        `${order}@layer r-global{@media (min-width: 768px){body{color:var(--r-palette-text);animation:${fade} 1s;}}}`,
       ],
       [other.id, `${order}@layer r-global{html{margin:0;}}`],
     ])

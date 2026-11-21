@@ -6,8 +6,9 @@
 // inspects each tarball, installs them all together into a temporary folder outside the workspace
 // with npm, and then checks, from there:
 //   - every entry and subpath loads with `import` and with `require`, and both give the same names;
-//   - the `react-server` condition gives the server build, the `react-native` condition gives the
-//     React Native binding for `umber-style/react`;
+//   - the `react-server` condition gives the server build (`useTheme` and `readTheme`, no
+//     `ThemeContext`), the `react-native` condition gives the React Native binding for
+//     `umber-style/react`;
 //   - the bindings and the umbrella share one copy of the core;
 //   - a styled React component renders on the server with a class and its CSS;
 //   - TypeScript resolves the declarations of every entry under `moduleResolution` bundler and
@@ -391,7 +392,7 @@ const styledDefault = (await import('@umber-style/styled')).default
 if (styledDefault !== (await import('@umber-style/react')).styled) throw new Error('@umber-style/styled is not the styled of @umber-style/react')
 if (expected === 'server') {
   for (const keys of [react, shared]) {
-    if (!keys.includes('readTheme') || keys.includes('useTheme')) throw new Error('not the server build: ' + keys)
+    if (!keys.includes('readTheme') || !keys.includes('useTheme') || keys.includes('ThemeContext')) throw new Error('not the server build: ' + keys)
   }
 } else if (expected === 'native') {
   const web = await import('@umber-style/react')
@@ -411,7 +412,7 @@ const shared = keys('umber-style/react')
 if (require('@umber-style/styled').default !== require('@umber-style/react').styled) throw new Error('@umber-style/styled is not the styled of @umber-style/react')
 if (expected === 'server') {
   for (const names of [react, shared]) {
-    if (!names.includes('readTheme') || names.includes('useTheme')) throw new Error('not the server build: ' + names)
+    if (!names.includes('readTheme') || !names.includes('useTheme') || names.includes('ThemeContext')) throw new Error('not the server build: ' + names)
   }
 } else if (expected === 'native') {
   if (require('umber-style/react').styled !== require('@umber-style/react-native').styled) throw new Error('not the React Native binding')
@@ -513,9 +514,11 @@ import { createStyle } from 'umber-style/react'
 
 const theme = { palette: { primary: '#1b5fd1' } }
 export const read: () => object = web.readTheme
-// @ts-expect-error the server build has no hook
-export const hook = web.useTheme
-export const shared: { palette: { primary: string } } = createStyle(theme).readTheme()
+export const base: () => object = web.useTheme
+// @ts-expect-error the server build has no context
+export const context = web.ThemeContext
+export const shared: { palette: { primary: string } } = createStyle(theme).useTheme()
+export const sharedRead: { palette: { primary: string } } = createStyle(theme).readTheme()
 export const ServerBox = styled.div({ padding: 4 })
 `
   const ts = join(consumer, 'ts')
@@ -554,7 +557,7 @@ export const ServerBox = styled.div({ padding: 4 })
         customConditions: ['react-server'],
       },
       ['ts/server.ts'],
-      'the react-server condition: readTheme and no useTheme',
+      'the react-server condition: useTheme and readTheme, and no ThemeContext',
     ],
   ]) {
     writeFileSync(join(consumer, file), JSON.stringify({ compilerOptions, include }, null, 2))

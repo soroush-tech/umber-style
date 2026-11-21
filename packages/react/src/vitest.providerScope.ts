@@ -20,12 +20,12 @@ export function playScopes(
   return nodes.flatMap((node): ResolvedNode[] => {
     if (typeof node === 'string') return [node]
     if (!isScope(node)) return [{ ...node, children: playScopes(node.children, above) }]
-    const { prefix, theme } = node.props as unknown as Scope.ProviderScopeProps
+    const { prefix, given, theme } = node.props as unknown as Scope.ProviderScopeProps
     const children = playScopes(node.children, new Set([...above, prefix]))
     if (theme === undefined) return children
     const isNested = above.has(prefix) || (!theme.isWhole && theme.base === undefined)
-    const root = createRootStyle(prefix, theme)
-    const styles = isNested ? createNestedStyles(prefix, theme) : root ? [root.style] : []
+    const root = createRootStyle(prefix, given, theme)
+    const styles = isNested ? createNestedStyles(prefix, given, theme) : root ? [root.style] : []
     const elements = styles.map(({ href, text }): ResolvedNode => ({
       type: 'style',
       props: { href, precedence: prefix },

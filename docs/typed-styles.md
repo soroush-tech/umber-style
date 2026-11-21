@@ -183,7 +183,7 @@ Vue uses the web types for styles. A styled component's props are not typed: `st
 
 ## Server components
 
-Under the `react-server` condition `@umber-style/react` has no `useTheme` and has `readTheme`. The compiler picks the server types when its configuration has the `react-server` custom condition (`"customConditions": ["react-server"]` in `compilerOptions`). Without it the types are those of the client build: `readTheme` is reported as missing. Both `@umber-style/react` and `umber-style/react` follow the condition: under it, `umber-style/react` has `readTheme` and no `useTheme`, because that is what it is at run time. See [Server rendering](server-rendering.md).
+Under the `react-server` condition `@umber-style/react` has `useTheme` (a plain function that returns the base theme), `readTheme` (another name of it), and no `ThemeContext`. The compiler picks the server types when its configuration has the `react-server` custom condition (`"customConditions": ["react-server"]` in `compilerOptions`). Without it the types are those of the client build: `readTheme` is reported as missing, and `useTheme` is typed in both. Both `@umber-style/react` and `umber-style/react` follow the condition: under it, `umber-style/react` has `useTheme` and `readTheme`, because that is what it is at run time. See [Server rendering](server-rendering.md).
 
 ## The type names apps import
 

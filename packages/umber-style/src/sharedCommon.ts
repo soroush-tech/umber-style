@@ -1,6 +1,7 @@
 // What the types of `umber-style/react` share under every export condition: the styling that runs on the
-// web and on React Native, apart from the theme hook (`useTheme` in `shared.ts`, `readTheme` in
-// `shared.server.ts`). This file holds types and declarations only: it is never loaded.
+// web and on React Native, `useTheme` with it, and in server components (`shared.server.ts` adds
+// `readTheme`, `shared.ts` the context and the portal helpers). This file holds types and declarations
+// only: it is never loaded.
 import type { ComponentProps, ElementType, FunctionComponent, ReactElement } from 'react'
 import type {
   ColorScheme,
@@ -135,8 +136,14 @@ export type SharedApply = (
   ...entries: (SharedEntry | string | null | undefined | false)[]
 ) => SharedApplied
 
-/** The styling of one theme shape without its theme hook: the names that both platforms have. */
+/** The styling of one theme shape: the names that both platforms and server components have. */
 export interface SharedStyleBase<T> {
+  /**
+   * The real theme values. In a component of the client: of the nearest provider, else the base theme,
+   * else an empty object. In a server component: the base theme, the same in every render; mark a
+   * component `'use client'` for the nearest provider's values, its code unchanged.
+   */
+  useTheme(): T
   styled: SharedStyled<T>
   StyleSheet: SharedStyleSheet<T>
   /** The entries of a sheet; an object sheet is its own entries and is returned as it is. */
@@ -180,6 +187,7 @@ export declare const configure: (options: DefaultStyleOptions) => void
 export declare const styled: SharedStyled<Theme>
 export declare const StyleSheet: SharedStyleSheet<Theme>
 export declare const useStyle: SharedStyleBase<Theme>['useStyle']
+export declare const useTheme: SharedStyleBase<Theme>['useTheme']
 export declare const ThemeProvider: SharedStyleBase<Theme>['ThemeProvider']
 export declare const apply: SharedApply
 export declare const css: SharedCss

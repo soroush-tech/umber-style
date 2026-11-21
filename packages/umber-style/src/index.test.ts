@@ -81,7 +81,7 @@ describe('the entries of umber-style', () => {
       expect(existsSync(fileURLToPath(new URL(`../${target}`, import.meta.url)))).toBe(true)
     }
     // The `react-server` condition is first, with its own types: under the custom condition the compiler
-    // reads `shared.server.ts` (`readTheme`), else the `types` condition reads the shared types, and a
+    // reads `shared.server.ts` (`useTheme` and `readTheme`), else the `types` condition reads the shared types, and a
     // bundler skips `types`.
     expect(manifest.exports['./react']).toEqual({
       'react-server': { types: './src/shared.server.ts', default: './src/react.server.ts' },

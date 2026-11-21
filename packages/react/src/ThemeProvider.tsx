@@ -55,9 +55,8 @@ export interface ThemeProviderParts<T> {
  *
  * Whether a provider is above is read from the marks that both builds write (`ProviderScope`), by the
  * prefix of the engine's cache: a provider of the server build above makes this one nested too. Its theme
- * is not in the context of this build, so a provider under it declares only the theme it was given, as the
- * server build does, and a function theme gets the theme of the nearest provider of this build, or the
- * base theme.
+ * is in the same context (the browser part of that provider puts it there, as plain data), so the theme
+ * above is the nearest provider's of either build.
  *
  * Under a `CacheProvider` it works with the engine over the cache that the provider gives (the same base
  * theme, the prefix of that cache), sends no style element, and is the outermost one when no provider of
@@ -87,7 +86,6 @@ export function createThemeProvider<T extends object>({
     const outer = useContext(ThemeContext) ?? engine.baseTheme
     const isOutermost = above === undefined && !isRoot
     const isNested = above !== undefined && !isRoot
-    const hasServerAbove = above?.hasServerAbove === true
     const given = useMemo(
       () => resolveThemeInput(theme, outer ?? (EMPTY_THEME as T)),
       [theme, outer]
@@ -98,15 +96,13 @@ export function createThemeProvider<T extends object>({
     const wrapper = useMemo((): ThemeScopeValue | undefined => {
       if (!isNested) return undefined
       const own = engine.themeClass(given, colorScheme)
-      // Under a provider of the server build the merged theme lacks its theme: none is declared.
-      const full = hasServerAbove ? '' : engine.themeId(merged as DeepPartial<T>, colorScheme)
-      const isOwn = full === '' || own.startsWith(`${full} `)
-      const names = [own, isOwn ? '' : full, engine.scopeClass(), className]
+      const full = engine.themeId(merged as DeepPartial<T>, colorScheme)
+      const names = [own, own.startsWith(`${full} `) ? '' : full, engine.scopeClass(), className]
       return { as, className: names.filter(Boolean).join(' ') }
-    }, [engine, isNested, hasServerAbove, given, merged, colorScheme, className, as])
+    }, [engine, isNested, given, merged, colorScheme, className, as])
     const below = useMemo(
-      () => addMark(marks, key, { scope: wrapper ?? above?.scope ?? null, hasServerAbove }),
-      [marks, key, wrapper, above, hasServerAbove]
+      () => addMark(marks, key, { scope: wrapper ?? above?.scope ?? null }),
+      [marks, key, wrapper, above]
     )
     useInsertionEffect(() => {
       if (isOutermost) engine.declareRoot(merged, colorScheme)

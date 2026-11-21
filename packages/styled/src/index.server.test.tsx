@@ -5,7 +5,7 @@ describe('the default export under the react-server condition', () => {
   it('is the styled of the server build', () => {
     expect(styled).toBe(react.styled)
     expect('readTheme' in react).toBe(true)
-    expect('useTheme' in react).toBe(false)
+    expect('ThemeContext' in react).toBe(false)
     expect(typeof styled.div).toBe('function')
   })
 })

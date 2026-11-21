@@ -106,13 +106,14 @@ Until the first `CacheProvider` renders, no component reads it. From then on eac
 
 ## Server components
 
-The package has a second build for server components, picked by the `react-server` condition. It has `readTheme` instead of `useTheme`. See [Server rendering](server-rendering.md).
+The package has a second build for server components, picked by the `react-server` condition. It has `useTheme` too, a plain function there that returns the base theme, and `readTheme`, another name of it; it has no `ThemeContext`, `ThemeScope` or `useThemeClass`. In a client component `useTheme()` gives the theme of the nearest provider, also of one that a server component rendered; in a server component it gives the base theme, the same in every render. A component that needs the nearest theme's values in a server tree is marked `'use client'`, its code unchanged. See [Server rendering](server-rendering.md#usetheme-one-name-one-rule).
 
 ## Limits
 
 - The context part of the binding is a client module (it has the `'use client'` directive). Whether a framework treats it as one was not checked.
 - `useTheme()` returns the real theme, merged: do not mutate it. With no provider and no base theme it returns an empty object.
-- The value of `ThemeContext` is `undefined` with no provider above, where `useTheme()` returns the base theme.
+- The value of `ThemeContext` is `undefined` with no provider above, where `useTheme()` returns the base theme. Every style of one prefix shares one `ThemeContext`, as it shares the marks of the providers: two styles with one prefix see each other's providers.
+- Below a provider of the server build, `useTheme()` reads the plain data of its theme only: a function or a class instance in that theme keeps the value of the theme above. See [Server rendering](server-rendering.md#what-crosses-to-the-browser).
 - Under a nested provider the DOM has one more element; a portal without `ThemeScope` sees the outer theme. See [Themes](themes.md).
 - The default style is a module singleton. Two copies of the package in one app are two engines.
 - An element that is given a plain object in `style` renders a second child next to it, which renders nothing: the element's own state is kept when the object comes and goes (checked in jsdom), but the component's root is then a fragment.

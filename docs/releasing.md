@@ -87,7 +87,7 @@ If a broken version went out, it cannot be overwritten: bump, publish again, the
 `pnpm smoke:packed` (`scripts/smoke-packed.mjs`) does the same check before a release, from outside the workspace. It packs every package with `pnpm pack`, in the order above, and inspects each tarball: not private, `exports`, `main`, `module` and `types` all in `dist` and present, no reference to `src`, no `workspace:` range left in its dependencies, and nothing in it but `dist`, `LICENSE`, `README.md` and `package.json`. It installs all of them together with npm into a temporary folder with `react`, `react-dom` and `vue`, and then checks:
 
 - Every entry and subpath loads with `import` and with `require`, and both give the same names: `@umber-style/cache` and `@umber-style/server/create-instance` give `default`, and `@umber-style/css/create-instance` loads too.
-- The `react-server` condition gives the server build of the React binding (`readTheme`, no `useTheme`), and under the `react-native` condition `umber-style/react` is the React Native binding.
+- The `react-server` condition gives the server build of the React binding (`useTheme` and `readTheme`, no `ThemeContext`), and under the `react-native` condition `umber-style/react` is the React Native binding.
 - The bindings and the umbrella share one copy of `@umber-style/core`, and only one is installed.
 - `@umber-style/css` makes a class whose rule is in its cache, and its `create-instance` makes a class with its own key.
 - A styled component renders on the server with a class, and the cache holds its CSS.

@@ -24,8 +24,6 @@ export interface MediaQueryOptions {
 
 /** The styling of one theme shape, with the names that both platforms have. */
 export interface SharedStyle<T> extends SharedStyleBase<T> {
-  /** The real theme values, in a component: of the nearest provider, else the base theme, else an empty object. */
-  useTheme(): T
   /** The context that holds the real theme of the nearest provider; undefined with no provider above. */
   ThemeContext: Context<T | undefined>
   /** On the web, the wrapper of the nearest nested provider again around its children, for portal content; on React Native, and under the outermost provider, its children. */
@@ -34,7 +32,6 @@ export interface SharedStyle<T> extends SharedStyleBase<T> {
   useThemeClass(): string | undefined
 }
 
-export declare const useTheme: SharedStyle<Theme>['useTheme']
 export declare const ThemeContext: SharedStyle<Theme>['ThemeContext']
 export declare const ThemeScope: SharedStyle<Theme>['ThemeScope']
 export declare const useThemeClass: SharedStyle<Theme>['useThemeClass']
