@@ -97,9 +97,10 @@ export function globalStyles<T = never>(
   const styles = first
   if (typeof styles === 'function') {
     const shown = JSON.stringify(styles(createStandIn('') as T), toText)
+    const hash = hashString(`theme:${shown}`)
     return Object.freeze({
       [BRAND]: true,
-      id: `global-${hashString(`theme:${shown}`)}`,
+      id: `global-${hash}`,
       resolve: (readTheme: () => T) => styles(readTheme()),
     })
   }
@@ -129,6 +130,34 @@ export function readGlobalStyles<T>(
   return typeof item === 'function' ? item(readTheme()) : item
 }
 
+/** The style of one item under `key` (a sheet entry is read as its style); a `TypeError` for anything that is not a style object. */
+function readGlobalItem(key: string, each: unknown): GlobalStyleObject {
+  const item = readEntryStyle(each, 'globalStyles')
+  if (typeof item !== 'object' || item === null || Array.isArray(item)) {
+    throw new TypeError(`globalStyles(): "${key}" must hold a style object, or a list of them.`)
+  }
+  return item as GlobalStyleObject
+}
+
+/** Adds to `rules` the rules of the style `item` under `key`: an at-rule that holds rules around the rules of its keys, any other key compiled as a class's style is. */
+function addGlobalItemRules(
+  rules: string[],
+  key: string,
+  item: GlobalStyleObject,
+  hasColorFallbacks: boolean,
+  scoping: Scoping,
+  hasValueRepair: boolean
+): void {
+  if (!GROUP_AT_RULE.test(key)) {
+    rules.push(
+      ...compileRules(key, item as StyleObject, hasColorFallbacks, scoping, hasValueRepair)
+    )
+    return
+  }
+  const inner = compileGlobalRules(item, hasColorFallbacks, scoping, hasValueRepair)
+  if (inner.length > 0) rules.push(`${key}{${inner.join('')}}`)
+}
+
 /**
  * The flat CSS rules of global styles, in the order of their keys: a selector's style compiled as a
  * class's is, an at-rule that holds rules as one rule around the rules of its keys, any other at-rule as
@@ -150,23 +179,8 @@ export function compileGlobalRules(
   for (const [key, value] of Object.entries(styles)) {
     if (value === null || value === undefined || value === false) continue
     for (const each of Array.isArray(value) ? value : [value]) {
-      const item = readEntryStyle(each, 'globalStyles')
-      if (typeof item !== 'object' || item === null || Array.isArray(item)) {
-        throw new TypeError(`globalStyles(): "${key}" must hold a style object, or a list of them.`)
-      }
-      if (!GROUP_AT_RULE.test(key)) {
-        rules.push(
-          ...compileRules(key, item as StyleObject, hasColorFallbacks, scoping, hasValueRepair)
-        )
-        continue
-      }
-      const inner = compileGlobalRules(
-        item as GlobalStyleObject,
-        hasColorFallbacks,
-        scoping,
-        hasValueRepair
-      )
-      if (inner.length > 0) rules.push(`${key}{${inner.join('')}}`)
+      const item = readGlobalItem(key, each)
+      addGlobalItemRules(rules, key, item, hasColorFallbacks, scoping, hasValueRepair)
     }
   }
   return rules

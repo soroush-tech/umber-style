@@ -158,6 +158,29 @@ function isRootRule(prefix: string, text: string): boolean {
   )
 }
 
+/** Closes the innermost block at `index`, a `}`; when it is a top-level rule (which started at `ruleStart`), records its place in `found`, and whether it is the rule of a root theme or may be a global rule. */
+function closeRule(
+  stack: OpenBlock[],
+  found: StyleFindings,
+  prefix: string,
+  text: string,
+  ruleStart: number,
+  index: number
+): void {
+  const block = closeBlock(stack, found, prefix, text, index)
+  if (!block || stack.length > 0) return
+  const place = found.ruleCount++
+  const rule = text.slice(ruleStart, index + 1).trimStart()
+  if (isRootRule(prefix, rule)) found.roots.push(place)
+  else if (isGlobalPrelude(prefix, block.prelude)) found.globals.push([place, rule])
+}
+
+/** Records the top-level statement `statement` (the text before a `;`, trimmed) in `found`: a rule unless it is empty, and the layer order statement when it is one. */
+function recordStatement(found: StyleFindings, statement: string): void {
+  if (statement.startsWith(LAYER_AT_RULE)) found.hasLayerOrder = true
+  if (statement !== '') found.ruleCount++
+}
+
 /**
  * Reads the CSS that an engine wrote (compact, no comments) in one pass and adds what it holds to
  * `found`: the layer order statement, the classes with a rule, each theme class with the variables it
@@ -185,18 +208,10 @@ export function scanStyleText(
       openBlock(stack, text, boundary, index)
       boundary = index + 1
     } else if (char === '}') {
-      const block = closeBlock(stack, found, prefix, text, index)
-      if (block && stack.length === 0) {
-        const place = found.ruleCount++
-        const rule = text.slice(ruleStart, index + 1).trimStart()
-        if (isRootRule(prefix, rule)) found.roots.push(place)
-        else if (isGlobalPrelude(prefix, block.prelude)) found.globals.push([place, rule])
-      }
+      closeRule(stack, found, prefix, text, ruleStart, index)
       boundary = index + 1
     } else if (char === ';' && stack.length === 0) {
-      const statement = text.slice(boundary, index).trim()
-      if (statement.startsWith(LAYER_AT_RULE)) found.hasLayerOrder = true
-      if (statement !== '') found.ruleCount++
+      recordStatement(found, text.slice(boundary, index).trim())
       boundary = index + 1
     }
     index++

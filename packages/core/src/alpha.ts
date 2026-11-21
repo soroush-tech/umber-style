@@ -12,6 +12,8 @@ export interface AlphaColor {
   readonly fallback: string
   /** The color-mix() value. */
   readonly value: string
+  /** The text of the colour: `value`. */
+  toString(): string
 }
 
 /** The red, green and blue channels (0 to 255) and the opacity (0 to 1) of a colour literal. */

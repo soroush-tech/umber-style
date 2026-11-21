@@ -1073,7 +1073,8 @@ export function createCache(options: CacheOptions = {}): Cache {
 
   /** The rules of the page (the style elements of the engine) that name the class `className`, when there are `count` of them; else undefined. */
   const findPageRules = (className: string, count: number): CSSRule[] | undefined => {
-    const pattern = new RegExp(`\\.${className.replace(/[^\w-]/g, '\\$&')}(?![\\w-])`)
+    const escaped = className.replaceAll(/[^\w-]/g, String.raw`\$&`)
+    const pattern = new RegExp(String.raw`\.${escaped}(?![\w-])`)
     const found: CSSRule[] = []
     for (const element of (page as Document).querySelectorAll<HTMLStyleElement>(
       createStyleSelector(prefix)

@@ -58,15 +58,20 @@ export function collectKeys(
     const condition = isMedia ? undefined : readCondition(key)
     if (!isMedia && condition === undefined) continue
     found ??= { conditional: false, scheme: false, queries: [] }
-    if (condition === undefined) {
-      if (!found.queries.includes(key)) found.queries.push(key)
-    } else {
-      found.conditional = true
-      found.scheme ||= condition.kind === 'scheme'
-    }
+    addKey(found, key, condition)
     found = collectKeys(value, found)
   }
   return found
+}
+
+/** Adds the key `key` of a part to `found`: a media query (no `condition`) once, else that there is a condition, and whether it is a scheme. */
+function addKey(found: StyleKeys, key: string, condition: ReturnType<typeof readCondition>): void {
+  if (condition === undefined) {
+    if (!found.queries.includes(key)) found.queries.push(key)
+  } else {
+    found.conditional = true
+    found.scheme ||= condition.kind === 'scheme'
+  }
 }
 
 /** Whether the key `key` of a part is a media query that holds for `state`; with no `state` none does. */

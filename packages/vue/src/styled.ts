@@ -40,6 +40,19 @@ function createHoldRef(hold: () => () => void) {
   }
 }
 
+/** The attributes that the element is given: all but those of `styled` (`as`, `theme`, `class`, `style`), and of those only what `filter` lets through when there is one. */
+function forwardAttributes(
+  attrs: Readonly<Record<string, unknown>>,
+  filter: StyledOptions['shouldForwardProp']
+): Record<string, unknown> {
+  const forwarded: Record<string, unknown> = {}
+  for (const [key, value] of Object.entries(attrs)) {
+    const isOwn = key === 'as' || key === 'theme' || key === 'class' || key === 'style'
+    if (!isOwn && (!filter || filter(key))) forwarded[key] = value
+  }
+  return forwarded
+}
+
 /**
  * Makes `styled` over an engine: a functional component that renders the tag with one class. A
  * function style gets the view of the theme of the nearest provider, which `useThemeView` reads. In the
@@ -97,11 +110,7 @@ export function createStyled<T>(engine: Engine<T>, useThemeView: (cache?: Cache)
           const element = (attrs.as as string | Component | undefined) ?? baseTag
           const filter = typeof element === 'string' ? shouldForward : undefined
 
-          const forwarded: Record<string, unknown> = {}
-          for (const [key, value] of Object.entries(attrs)) {
-            const isOwn = key === 'as' || key === 'theme' || key === 'class' || key === 'style'
-            if (!isOwn && (!filter || filter(key))) forwarded[key] = value
-          }
+          const forwarded = forwardAttributes(attrs, filter)
           forwarded.class = className || undefined
           if (held?.hold) forwarded.ref = createHoldRef(held.hold)
           return h(element, forwarded, slots)

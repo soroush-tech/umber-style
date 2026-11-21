@@ -49,7 +49,7 @@ function readOffset(part: string, key: string): number {
   if (part === 'from') return 0
   if (part === 'to') return 100
   const offset = OFFSET_PATTERN.test(part) ? Number.parseFloat(part) : Number.NaN
-  if (!(offset <= 100)) {
+  if (Number.isNaN(offset) || offset > 100) {
     throw new TypeError(
       `keyframes(): "${key}" is not a step: use from, to, a percentage from 0% to 100%, or a comma list of them.`
     )

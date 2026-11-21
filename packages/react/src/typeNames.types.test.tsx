@@ -113,6 +113,7 @@ describe('the type names that apps import', () => {
     const fade: Keyframes = keyframes({ from: { opacity: 0 } })
     const spin: Keyframes = keyframes`to { transform: rotate(360deg); }`
     const name: string = fade
+    expectTypeOf<Keyframes>().toEqualTypeOf<string>()
     expect(name).toMatch(/^keyframes-/)
     expect(spin).toMatch(/^keyframes-/)
   })

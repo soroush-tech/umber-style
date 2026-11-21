@@ -11,7 +11,9 @@ import { useProvidedCache } from './CacheProvider'
 import type { GlobalProps } from './types'
 
 /** What is released while nothing is written. */
-function releaseNothing(): void {}
+function releaseNothing(): void {
+  // Nothing was written, so there is nothing to release.
+}
 
 /** Writes `sets` into the cache of `engine`, in order, as rules that a component rendered, and returns the function that releases them all. */
 function insertSets<T>(engine: Engine<T>, sets: readonly GlobalRules[]): () => void {

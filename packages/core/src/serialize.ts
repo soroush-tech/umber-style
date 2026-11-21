@@ -1,5 +1,6 @@
 import { alpha, isAlphaColor, type AlphaColor } from './alpha'
 import { negate } from './calc'
+import { codeAt } from './codeAt'
 import {
   createNoSchemeGuard,
   createScopeRule,
@@ -127,12 +128,12 @@ function findClose(value: string, start: number): number {
  */
 function repairSuffix(value: string, at: number, reference: string): [string, number] {
   const pair = value.slice(at, at + 2)
-  if (HEX_PAIR.test(pair) && !isNameCode(value.charCodeAt(at + 2))) {
+  if (HEX_PAIR.test(pair) && !isNameCode(codeAt(value, at + 2))) {
     return [String(alpha(reference, Number.parseInt(pair, 16) / 255)), at + 2]
   }
   for (const unit of TIME_UNITS) {
     const end = at + unit.length
-    if (value.slice(at, end).toLowerCase() === unit && !isNameCode(value.charCodeAt(end))) {
+    if (value.slice(at, end).toLowerCase() === unit && !isNameCode(codeAt(value, end))) {
       return [`calc(${reference} * 1${unit})`, end]
     }
   }
@@ -152,7 +153,7 @@ function repairValue(value: string): string {
   while (index !== -1) {
     const hasMinus = isLoneMinus(value, index - 1)
     // `xvar(` is another function: what is inside it is read on.
-    if (isNameCode(value.charCodeAt(index - 1)) && !hasMinus) {
+    if (isNameCode(codeAt(value, index - 1)) && !hasMinus) {
       index = value.indexOf(REFERENCE, index + REFERENCE.length)
       continue
     }

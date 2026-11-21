@@ -203,7 +203,7 @@ export function keepRootRule(prefix: string, rootId: string, rule: string, page:
   ]
   const own = elements.find((element) => element.dataset.href?.split(' ').includes(rootId))
   if (own === undefined) return
-  const pattern = new RegExp(`^(@layer ${prefix}-theme\\s*\\{\\s*)?:where\\(:root\\)`)
+  const pattern = new RegExp(String.raw`^(@layer ${prefix}-theme\s*\{\s*)?:where\(:root\)`)
   for (const element of elements) {
     const sheet = element.sheet as CSSStyleSheet
     let isKept = element !== own

@@ -3,6 +3,7 @@ import { createElement, memo } from 'react'
 import { expectTypeOf } from 'vitest'
 import { alpha } from './alpha'
 import { createStyle } from './createStyle'
+import type { NativeTheme } from './nativeTheme'
 
 const baseTheme = {
   palette: { primary: '#0000ff' },
@@ -244,7 +245,7 @@ describe('a theme written for the web on React Native', () => {
     const { rerender } = render(tree())
     rerender(tree())
     expect(seen[1]).toBe(seen[0])
-    expect((seen[0] as typeof webTheme).radii.sm).toBe(3)
+    expect((seen[0] as NativeTheme<typeof webTheme>).radii.sm).toBe(3)
   })
 
   it('converts literals in styles: object styles once, when registered; function styles on each call', () => {

@@ -122,7 +122,12 @@ const CSS_TEXT = /[:{]/
 
 /** Whether `value` is the strings of a tagged template. */
 function isTemplate(value: unknown): value is TemplateStringsArray {
-  return Array.isArray(value) && 'raw' in value
+  return Array.isArray(value) && Object.hasOwn(value, 'raw')
+}
+
+/** The sheet of a cache made here: the style elements of the document, or one in memory where there is no document. */
+function createDefaultSheet(prefix: string): Sheet {
+  return typeof document === 'undefined' ? createMemorySheet() : createDomSheet(prefix)
 }
 
 /** The items of `args`, lists flattened, without `false`, `null`, `undefined`, `''` and `true`. */
@@ -162,13 +167,7 @@ export default function createInstance(options: InstanceOptions = {}): CssInstan
     )
   }
   const prefix = key ?? 'css'
-  const sheet =
-    givenSheet ??
-    (given
-      ? given.sheet
-      : typeof document === 'undefined'
-        ? createMemorySheet()
-        : createDomSheet(prefix))
+  const sheet = givenSheet ?? (given ? given.sheet : createDefaultSheet(prefix))
   if (!sheet) {
     throw new TypeError(
       'createInstance(): the given cache has no `sheet` member: give the sheet it writes to as `sheet` too.'

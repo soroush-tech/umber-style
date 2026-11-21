@@ -88,6 +88,27 @@ describe('findUnsupportedDeclarations', () => {
     ])
   })
 
+  it('asks about a value that ends with the word important but has no "!" as it is', () => {
+    const asked: string[] = []
+    findUnsupportedDeclarations(
+      ['.u-a{color:not important;margin:0 ! IMPORTANT }'],
+      'u',
+      (_, value) => {
+        asked.push(value)
+        return true
+      }
+    )
+    expect(asked).toEqual(['not important', '0'])
+  })
+
+  it('reads a long value of whitespace that almost ends with !important in linear time', () => {
+    const spaces = ' '.repeat(100_000)
+    const started = performance.now()
+    const found = find(`.u-a{elevation:a${spaces}b;display:no !${spaces}x}`)
+    expect(performance.now() - started).toBeLessThan(250)
+    expect(found).toHaveLength(2)
+  })
+
   it('reads values with semicolons in strings and brackets, and skips at-rules with descriptors', () => {
     expect(
       find(

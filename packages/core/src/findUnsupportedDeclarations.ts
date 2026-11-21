@@ -16,7 +16,7 @@ interface OpenBlock {
 }
 
 const KEYFRAMES_AT_RULE = '@keyframes'
-const IMPORTANT = /\s*!\s*important\s*$/i
+const IMPORTANT = 'important'
 /** A value that starts with a vendor prefix: a keyword or a function written for another browser. */
 const VENDOR_VALUE = /^-(?:webkit|moz|ms|o)-/i
 
@@ -47,34 +47,51 @@ function skipString(text: string, index: number): number {
   return position + 1
 }
 
+/** Opens a block at `index`, a `{`: its prelude is the text since `boundary`. */
+function openBlock(stack: OpenBlock[], text: string, boundary: number, index: number): void {
+  const parent = stack.at(-1)
+  if (parent) parent.hasChild = true
+  stack.push({ prelude: text.slice(boundary, index).trim(), bodyStart: index + 1, hasChild: false })
+}
+
+/** Closes the innermost block at `index`, a `}`: a block without a block of its own that is not an at-rule is a rule to add to `rules`. */
+function closeBlock(stack: OpenBlock[], text: string, index: number, rules: StyleRuleText[]): void {
+  const block = stack.pop()
+  if (!block || block.hasChild || block.prelude.startsWith('@')) return
+  const parent = stack.at(-1)?.prelude ?? ''
+  rules.push({ selector: block.prelude, parent, body: text.slice(block.bodyStart, index) })
+}
+
 /** The innermost blocks of `text` that are not at-rules: the rules that hold declarations. */
 function readStyleRules(text: string): StyleRuleText[] {
   const rules: StyleRuleText[] = []
   const stack: OpenBlock[] = []
   let boundary = 0
-  for (let index = 0; index < text.length; index++) {
+  let index = 0
+  while (index < text.length) {
     const char = text[index]
-    if (char === '"' || char === "'") index = skipString(text, index) - 1
-    else if (char === ';') boundary = index + 1
+    if (char === '"' || char === "'") {
+      index = skipString(text, index)
+      continue
+    }
+    if (char === ';') boundary = index + 1
     else if (char === '{') {
-      const parent = stack.at(-1)
-      if (parent) parent.hasChild = true
-      stack.push({
-        prelude: text.slice(boundary, index).trim(),
-        bodyStart: index + 1,
-        hasChild: false,
-      })
+      openBlock(stack, text, boundary, index)
       boundary = index + 1
     } else if (char === '}') {
-      const block = stack.pop()
-      if (block && !block.hasChild && !block.prelude.startsWith('@')) {
-        const parent = stack.at(-1)?.prelude ?? ''
-        rules.push({ selector: block.prelude, parent, body: text.slice(block.bodyStart, index) })
-      }
+      closeBlock(stack, text, index, rules)
       boundary = index + 1
     }
+    index++
   }
   return rules
+}
+
+/** Adds the declaration `declaration` (`property:value`) to `declarations`, unless it has no ':'. */
+function addDeclaration(declarations: Map<string, string>, declaration: string): void {
+  const colon = declaration.indexOf(':')
+  if (colon === -1) return
+  declarations.set(declaration.slice(0, colon).trim(), declaration.slice(colon + 1).trim())
 }
 
 /** The declarations of `body` by property, the last one of each: the items before it in a fallback list are meant to be dropped. */
@@ -82,21 +99,33 @@ function readLastDeclarations(body: string): Map<string, string> {
   const declarations = new Map<string, string>()
   let depth = 0
   let start = 0
-  for (let index = 0; index <= body.length; index++) {
+  let index = 0
+  while (index <= body.length) {
     const char = body[index]
-    if (char === '"' || char === "'") index = skipString(body, index) - 1
-    else if (char === '(') depth++
+    if (char === '"' || char === "'") {
+      index = skipString(body, index)
+      continue
+    }
+    if (char === '(') depth++
     else if (char === ')') depth--
     else if (index === body.length || (char === ';' && depth === 0)) {
-      const declaration = body.slice(start, index)
-      const colon = declaration.indexOf(':')
-      if (colon !== -1) {
-        declarations.set(declaration.slice(0, colon).trim(), declaration.slice(colon + 1).trim())
-      }
+      addDeclaration(declarations, body.slice(start, index))
       start = index + 1
     }
+    index++
   }
   return declarations
+}
+
+/**
+ * `value` without a `!important` at its end (in any case, with whitespace around the `!`), and without
+ * the whitespace before it. A scan from the end: nothing is tried twice, so it takes linear time.
+ */
+function stripImportant(value: string): string {
+  const trimmed = value.trimEnd()
+  if (trimmed.slice(-IMPORTANT.length).toLowerCase() !== IMPORTANT) return value
+  const before = trimmed.slice(0, -IMPORTANT.length).trimEnd()
+  return before.endsWith('!') ? before.slice(0, -1).trimEnd() : value
 }
 
 /** What a message names a rule by: its `@keyframes` rule, the last class of the engine in its selector, or its selector for a global rule. */
@@ -122,19 +151,27 @@ export function findUnsupportedDeclarations(
   prefix: string,
   supports: Supports
 ): string[] {
-  const classPattern = new RegExp(`\\.(${prefix}-[a-z0-9_-]*)`, 'g')
+  const classPattern = new RegExp(String.raw`\.(${prefix}-[a-z0-9_-]*)`, 'g')
   const messages: string[] = []
   for (const text of texts) {
-    for (const rule of readStyleRules(text)) {
-      for (const [name, value] of readLastDeclarations(rule.body)) {
-        const plain = value.replace(IMPORTANT, '')
-        if (name.startsWith('-') || VENDOR_VALUE.test(plain)) continue
-        const asked = plain.includes('var(') ? 'inherit' : plain
-        if (supports(name, asked)) continue
-        const owner = describeRule(rule, classPattern)
-        messages.push(`${owner} declares ${name}:${value}, which this browser does not support`)
-      }
-    }
+    for (const rule of readStyleRules(text)) addRuleMessages(rule, classPattern, supports, messages)
   }
   return messages
+}
+
+/** Adds to `messages` a message for each last declaration of `rule` that the browser does not support (see `findUnsupportedDeclarations`). */
+function addRuleMessages(
+  rule: StyleRuleText,
+  classPattern: RegExp,
+  supports: Supports,
+  messages: string[]
+): void {
+  for (const [name, value] of readLastDeclarations(rule.body)) {
+    const plain = stripImportant(value)
+    if (name.startsWith('-') || VENDOR_VALUE.test(plain)) continue
+    const asked = plain.includes('var(') ? 'inherit' : plain
+    if (supports(name, asked)) continue
+    const owner = describeRule(rule, classPattern)
+    messages.push(`${owner} declares ${name}:${value}, which this browser does not support`)
+  }
 }

@@ -152,15 +152,14 @@ export function createThemeProvider<T extends object>(
     // A root provider renders no element: the app puts the class on an ancestor, and the rules it made are sent.
     if (isRoot) {
       const made = createStyleElements(engine.cache, engine.findThemeIds(given).join(' '))
-      const scope = createElement(ProviderScope, { prefix, given: plain, children })
+      const scope = createElement(ProviderScope, { prefix, given: plain }, children)
       return createElement(Fragment, null, ...stamped, ...made, scope)
     }
-    const scope = createElement(ProviderScope, {
-      prefix,
-      given: plain,
-      theme: readDescription(given, props, isFirst),
-      children,
-    })
+    const scope = createElement(
+      ProviderScope,
+      { prefix, given: plain, theme: readDescription(given, props, isFirst) },
+      children
+    )
     return createElement(Fragment, null, ...stamped, scope)
   }
 }

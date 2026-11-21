@@ -1,4 +1,5 @@
 import type { AlphaColor } from './alpha'
+import type { keyframes } from './keyframes'
 import type { SheetEntry } from './sheetEntry'
 import type { Theme } from './types'
 import type { WebStyleObject } from './webStyle'
@@ -7,7 +8,7 @@ import type { WebStyleObject } from './webStyle'
 export type CSSObject = WebStyleObject
 
 /** What `keyframes` returns: the name of the animation, a plain string. */
-export type Keyframes = string
+export type Keyframes = ReturnType<typeof keyframes>
 
 /**
  * What `css()` of a web binding returns: a sheet entry of the merged style. It prints as its class name,

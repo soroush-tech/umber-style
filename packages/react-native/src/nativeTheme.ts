@@ -50,7 +50,9 @@ function convertLengths(node: unknown, remBase: number): unknown {
     const value = source[key]
     const converted = convertLengths(value, remBase)
     // A copy keeps the other members of an array as well (`space.small` next to the items).
-    if (converted !== value) (copy ??= Object.assign(isArray ? [] : {}, source))[key] = converted
+    if (converted === value) continue
+    copy ??= Object.assign(isArray ? [] : {}, source)
+    copy[key] = converted
   }
   return copy ?? node
 }
@@ -69,7 +71,9 @@ export function toNativeTheme<T extends object>(
   let changes: Record<string, unknown> | undefined
   for (const key of lengthKeys) {
     const converted = convertLengths(source[key], remBase)
-    if (converted !== source[key]) (changes ??= {})[key] = converted
+    if (converted === source[key]) continue
+    changes ??= {}
+    changes[key] = converted
   }
   return (changes ? mergeDeep(theme, changes as DeepPartial<T>) : theme) as NativeTheme<T>
 }

@@ -69,128 +69,246 @@ function join(pieces: readonly Piece[]): Text {
   joined.push(text)
   // The list alternates text and indexes, and starts and ends with text.
   joined[0] = (joined[0] as string).trimStart()
-  joined[joined.length - 1] = (joined[joined.length - 1] as string).trimEnd()
+  joined[joined.length - 1] = (joined.at(-1) as string).trimEnd()
   return joined.length === 1 ? (joined[0] as string) : joined.filter((piece) => piece !== '')
 }
 
+/** Where `parse` is in a template's text: the statements made so far, and the statement being read. */
+interface ParseState {
+  /** The template's strings joined with `HOLE`. */
+  readonly text: string
+  /** The blocks that are open, each with the statements it was opened in and where its `{` is. */
+  readonly open: [parent: TemplateNode[], at: number][]
+  /** The statements of the innermost open block (of the template, at the top). */
+  body: TemplateNode[]
+  // The statement being read: its pieces, the text not yet in them, and where its first ':' is.
+  pieces: Piece[]
+  chunk: string
+  split: number
+  /** The index of the next interpolation. */
+  hole: number
+  /** How many parentheses are open, and where the outermost one opened. */
+  depth: number
+  parenAt: number
+}
+
+/** Ends the text not yet in the pieces of the statement: it becomes a piece unless it is only whitespace at the start. */
+function flush(state: ParseState): void {
+  if (state.pieces.length > 0 || state.chunk.trim()) state.pieces.push(state.chunk)
+  state.chunk = ''
+}
+
+/** Adds a space to the statement, unless it already ends with one. */
+function space(state: ParseState): void {
+  if (!state.chunk.endsWith(' ')) state.chunk += ' '
+}
+
+/** Counts the holes from `from` to `to` as read: they are in a comment, and stand for nothing. */
+function skip(state: ParseState, from: number, to: number): void {
+  state.hole += state.text.slice(from, to).split(HOLE).length - 1
+}
+
+/** Adds the next interpolation to the pieces of the statement. */
+function addHole(state: ParseState): void {
+  flush(state)
+  state.pieces.push(state.hole++)
+}
+
+/** Adds the declaration that was read to the block: the pieces before its first ':' are its key, the rest its value. */
+function endDeclaration(state: ParseState, at: number): void {
+  const key = join(state.pieces.slice(0, state.split))
+  if (key === '') fail(state.text, at, 'a declaration without a property')
+  state.body.push({
+    key: typeof key === 'string' ? toKey(key) : key,
+    value: join(state.pieces.slice(state.split + 1)),
+  })
+}
+
+/** Adds the interpolations that were read without a ':' to the block, each a statement of its own; any other text is a declaration without one. */
+function endInterpolations(state: ParseState, at: number): void {
+  for (const piece of state.pieces) {
+    if (typeof piece === 'number') state.body.push(piece)
+    else if (piece.trim()) fail(state.text, at, 'a declaration without ":"')
+  }
+}
+
+/** Ends the statement being read at `at`, and starts the next one. */
+function end(state: ParseState, at: number): void {
+  flush(state)
+  if (state.split >= 0) endDeclaration(state, at)
+  else endInterpolations(state, at)
+  state.pieces = []
+  state.split = -1
+}
+
+/** Reads the interpolation at `index`; one that starts a statement and stands on its own line ends it. Returns the index after it. */
+function readHole(state: ParseState, index: number): number {
+  addHole(state)
+  if (state.pieces.length === 1) {
+    OWN_LINE.lastIndex = index + 1
+    if (OWN_LINE.test(state.text)) end(state, index)
+  }
+  return index + 1
+}
+
+/** Copies the character at `index` into the statement, and the next one when it is an escape: `HOLE` and past the end are not above it, so a hole is not kept. Returns the index after them. */
+function readEscaped(state: ParseState, index: number): number {
+  const { text } = state
+  const length = text[index] === '\\' && text[index + 1] > HOLE ? 2 : 1
+  state.chunk += text.slice(index, index + length)
+  return index + length
+}
+
+/** Reads the string that starts at `index`, with the interpolations in it. Returns the index after its closing quote. */
+function readString(state: ParseState, index: number): number {
+  const { text } = state
+  const quote = text[index]
+  state.chunk += quote
+  let at = index + 1
+  while (text[at] !== quote) {
+    if (at >= text.length) fail(text, index, 'an unclosed string')
+    if (text[at] === HOLE) {
+      addHole(state)
+      at++
+    } else {
+      at = readEscaped(state, at)
+    }
+  }
+  state.chunk += quote
+  return at + 1
+}
+
+/** Reads the comment that starts at `index`: it is a space. Returns the index after its `*` and `/`. */
+function readComment(state: ParseState, index: number): number {
+  const close = state.text.indexOf('*/', index + 2)
+  if (close < 0) fail(state.text, index, 'an unclosed comment')
+  skip(state, index, close)
+  space(state)
+  return close + 2
+}
+
+/** Reads the line comment that starts at `index`. Returns the index of the newline that ends it, or the end of the text. */
+function readLineComment(state: ParseState, index: number): number {
+  const stop = state.text.indexOf('\n', index)
+  const close = stop < 0 ? state.text.length : stop
+  skip(state, index, close)
+  return close
+}
+
+/** Reads the `/` at `index`: the start of a comment, or a character of the statement. Returns the index after what it read. */
+function readSlash(state: ParseState, index: number): number {
+  const next = state.text[index + 1]
+  if (next === '*') return readComment(state, index)
+  // A line comment, outside parentheses only: `url(http://x)` is not one.
+  if (next === '/' && state.depth === 0) return readLineComment(state, index)
+  state.chunk += '/'
+  return index + 1
+}
+
+/** Reads `char` at `index` inside parentheses, or the `(` that opens them: it is a character of the statement. */
+function readParenthesized(state: ParseState, char: string, index: number): void {
+  if (char === '(' && state.depth++ === 0) state.parenAt = index
+  else if (char === ')') state.depth--
+  state.chunk += char
+}
+
+/** Reads the first ':' of a statement: what is before it is the key of a declaration. */
+function readColon(state: ParseState): void {
+  flush(state)
+  state.split = state.pieces.length
+  state.pieces.push(':')
+}
+
+/** Reads the `{` at `index`: the statement read so far is the prelude of a block, which is open until its `}`. */
+function openBlock(state: ParseState, index: number): void {
+  flush(state)
+  const prelude = join(state.pieces)
+  if (prelude === '') fail(state.text, index, 'a block without a selector')
+  const block: Block = { prelude, body: [] }
+  state.body.push(block)
+  state.open.push([state.body, index])
+  state.body = block.body
+  state.pieces = []
+  state.split = -1
+}
+
+/** Reads the `}` at `index`: it ends the statement being read and the innermost open block. */
+function closeBlock(state: ParseState, index: number): void {
+  end(state, index)
+  const parent = state.open.pop()
+  if (!parent) fail(state.text, index, 'a "}" without a "{"')
+  state.body = parent[0]
+}
+
+/** Reads `char` at `index`, outside strings, comments and parentheses. */
+function readStatementChar(state: ParseState, char: string, index: number): void {
+  switch (char) {
+    case ':':
+      if (state.split < 0) readColon(state)
+      else state.chunk += char
+      break
+    case ';':
+      end(state, index)
+      break
+    case '{':
+      openBlock(state, index)
+      break
+    case '}':
+      closeBlock(state, index)
+      break
+    default:
+      state.chunk += char
+  }
+}
+
+/** Reads `char` at `index`, which starts nothing longer: whitespace, a character in parentheses, or one of a statement. */
+function readChar(state: ParseState, char: string, index: number): void {
+  if (char <= ' ') space(state)
+  else if (state.depth > 0 || char === '(') readParenthesized(state, char, index)
+  else readStatementChar(state, char, index)
+}
+
+/** Reads what starts at `index`: an interpolation, a string, an escape, a comment, or one character. Returns the index after it. */
+function readNext(state: ParseState, index: number): number {
+  const char = state.text[index]
+  switch (char) {
+    case HOLE:
+      return readHole(state, index)
+    case '"':
+    case "'":
+      return readString(state, index)
+    case '\\':
+      return readEscaped(state, index)
+    case '/':
+      return readSlash(state, index)
+    default:
+      readChar(state, char, index)
+      return index + 1
+  }
+}
+
 /**
- * The statements of `text`, a template's strings joined with `HOLE`. Outside strings and comments a run
- * of whitespace is one space; a comment is a space; the holes in a comment are skipped.
+ * The statements of `text`, a template's strings joined with `HOLE`, in one pass. Outside strings and
+ * comments a run of whitespace is one space; a comment is a space; the holes in a comment are skipped.
  */
 function parse(text: string): TemplateNode[] {
   const root: TemplateNode[] = []
-  const open: [parent: TemplateNode[], at: number][] = []
-  let body = root
-  // The statement being read: its pieces, the text not yet in them, and where its first ':' is.
-  let pieces: Piece[] = []
-  let chunk = ''
-  let split = -1
-  let hole = 0
-  let depth = 0
-  let parenAt = 0
-
-  const flush = (): void => {
-    if (pieces.length > 0 || chunk.trim()) pieces.push(chunk)
-    chunk = ''
+  const state: ParseState = {
+    text,
+    open: [],
+    body: root,
+    pieces: [],
+    chunk: '',
+    split: -1,
+    hole: 0,
+    depth: 0,
+    parenAt: 0,
   }
-  const space = (): void => {
-    if (!chunk.endsWith(' ')) chunk += ' '
-  }
-  const skip = (from: number, to: number): void => {
-    hole += text.slice(from, to).split(HOLE).length - 1
-  }
-  const end = (at: number): void => {
-    flush()
-    if (split >= 0) {
-      const key = join(pieces.slice(0, split))
-      if (key === '') fail(text, at, 'a declaration without a property')
-      body.push({
-        key: typeof key === 'string' ? toKey(key) : key,
-        value: join(pieces.slice(split + 1)),
-      })
-    } else {
-      for (const piece of pieces) {
-        if (typeof piece === 'number') body.push(piece)
-        else if (piece.trim()) fail(text, at, 'a declaration without ":"')
-      }
-    }
-    pieces = []
-    split = -1
-  }
-
-  for (let index = 0; index < text.length; index++) {
-    const char = text[index]
-    if (char === HOLE) {
-      flush()
-      pieces.push(hole++)
-      if (pieces.length === 1) {
-        OWN_LINE.lastIndex = index + 1
-        if (OWN_LINE.test(text)) end(index)
-      }
-    } else if (char === '"' || char === "'") {
-      const at = index
-      chunk += char
-      for (index++; text[index] !== char; index++) {
-        if (index >= text.length) fail(text, at, 'an unclosed string')
-        if (text[index] === HOLE) {
-          flush()
-          pieces.push(hole++)
-        } else {
-          // An escape keeps the next character, unless it is a hole: `HOLE` and past the end are not above it.
-          if (text[index] === '\\' && text[index + 1] > HOLE) chunk += text[index++]
-          chunk += text[index]
-        }
-      }
-      chunk += char
-    } else if (char === '\\') {
-      chunk += char
-      if (text[index + 1] > HOLE) chunk += text[++index]
-    } else if (char === '/' && text[index + 1] === '*') {
-      const close = text.indexOf('*/', index + 2)
-      if (close < 0) fail(text, index, 'an unclosed comment')
-      skip(index, close)
-      index = close + 1
-      space()
-    } else if (char === '/' && text[index + 1] === '/' && depth === 0) {
-      // A line comment, outside parentheses only: `url(http://x)` is not one.
-      const stop = text.indexOf('\n', index)
-      const close = stop < 0 ? text.length : stop
-      skip(index, close)
-      index = close - 1
-    } else if (char <= ' ') {
-      space()
-    } else if (depth > 0 || char === '(') {
-      if (char === '(' && depth++ === 0) parenAt = index
-      else if (char === ')') depth--
-      chunk += char
-    } else if (char === ':' && split < 0) {
-      flush()
-      split = pieces.length
-      pieces.push(':')
-    } else if (char === ';') {
-      end(index)
-    } else if (char === '{') {
-      flush()
-      const prelude = join(pieces)
-      if (prelude === '') fail(text, index, 'a block without a selector')
-      const block: Block = { prelude, body: [] }
-      body.push(block)
-      open.push([body, index])
-      body = block.body
-      pieces = []
-      split = -1
-    } else if (char === '}') {
-      end(index)
-      const parent = open.pop()
-      if (!parent) fail(text, index, 'a "}" without a "{"')
-      body = parent[0]
-    } else {
-      chunk += char
-    }
-  }
-  if (depth > 0) fail(text, parenAt, 'an unclosed "("')
-  end(text.length)
-  const unclosed = open.pop()
+  let index = 0
+  while (index < text.length) index = readNext(state, index)
+  if (state.depth > 0) fail(text, state.parenAt, 'an unclosed "("')
+  end(state, text.length)
+  const unclosed = state.open.pop()
   if (unclosed) fail(text, unclosed[1], 'an unclosed block')
   return root
 }
@@ -217,6 +335,9 @@ function isPlainObject(value: unknown): value is StyleObject {
   return typeof value === 'object' && value !== null && value.toString === Object.prototype.toString
 }
 
+/** What an interpolation is once lists, nothing and plain objects are taken out: a value that prints as text of its own. */
+type Printable = string | number | bigint | symbol | { toString(): string }
+
 /** An interpolation as text in a value, a selector or a property name. */
 function toText(value: unknown, props: unknown): string {
   const resolved = resolve(value, props)
@@ -227,7 +348,7 @@ function toText(value: unknown, props: unknown): string {
       'parseStyleTemplate(): a style object can stand only between declarations, not in a value, a selector or a property name.'
     )
   }
-  return String(resolved)
+  return String(resolved as Printable)
 }
 
 /** `text` with its interpolations filled in, trimmed. */
@@ -283,7 +404,7 @@ function include(style: StyleObject, value: unknown, props: unknown): StyleObjec
     return mergeStyles([style, source.style])
   }
   if (isPlainObject(resolved)) return mergeStyles([style, resolved])
-  return build(parse(String(resolved)), [], props, style)
+  return build(parse(String(resolved as Printable)), [], props, style)
 }
 
 /** The style of `nodes`, with `values` for the interpolations and `props` for the functions among them, added to `style`. */
@@ -308,7 +429,7 @@ function build(
 
 /** Whether `value` is the strings of a tagged template: an array with `raw`, which a call with styles never is. */
 export function isTemplateStrings(value: unknown): value is TemplateStringsArray {
-  return Array.isArray(value) && 'raw' in value
+  return Array.isArray(value) && Object.hasOwn(value, 'raw')
 }
 
 /**

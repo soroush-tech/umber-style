@@ -93,7 +93,7 @@ export function createComponentSelector(
   styler: Pick<Styler, 'isDynamic' | 'getClassName'>
 ): () => string {
   return () => {
-    if (target) return `.${target.trim().split(/\s+/).join('.')}`
+    if (target) return `.${target.trim().replaceAll(/\s+/g, '.')}`
     const className = styler.isDynamic ? '' : styler.getClassName({})
     if (className === '') {
       throw new TypeError(

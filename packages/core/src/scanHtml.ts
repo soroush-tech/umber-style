@@ -87,33 +87,49 @@ function addMarked(found: HtmlTokens, name: string, content: string): void {
   if (name.endsWith(MARKER_END)) addTokens(found.rendered, content)
 }
 
+/** The `name` and the `content` attributes of a tag, kept for the marker of global rules that a `<meta>` is. */
+interface MetaAttributes {
+  name: string
+  content: string
+}
+
+/** Adds what the attribute `name` with `value` says to `found`, or keeps it in `meta`. */
+function addAttribute(found: HtmlTokens, meta: MetaAttributes, name: string, value: string): void {
+  if (name === 'class' || name === 'classname') addTokens(found.classes, value)
+  else if (name === 'data-href') addTokens(found.carried, value)
+  else if (name === 'name') meta.name = value
+  else if (name === 'content') meta.content = value
+}
+
+/** Reads the attribute that starts at `index`, adds what matters to `found` or `meta`, and returns the index after it. */
+function readAttribute(
+  html: string,
+  index: number,
+  found: HtmlTokens,
+  meta: MetaAttributes
+): number {
+  let position = readNameEnd(html, index)
+  if (position === index) position++
+  const name = html.slice(index, position).toLowerCase()
+  position = skipSpaces(html, position)
+  if (html[position] !== '=') return position
+  const { value, end } = readValue(html, skipSpaces(html, position + 1))
+  addAttribute(found, meta, name, value)
+  return end
+}
+
 /** Reads the attributes of the tag whose name ended at `index`, adds what matters to `found`, and returns the index after the `>`. A `<meta>` (`isMeta`) is read for the marker of global rules too. */
 function readAttributes(html: string, index: number, found: HtmlTokens, isMeta: boolean): number {
+  const meta: MetaAttributes = { name: '', content: '' }
   let position = index
-  let metaName = ''
-  let metaContent = ''
   while (position < html.length) {
     const code = codeAt(html, position)
     if (code === 62) {
-      if (isMeta) addMarked(found, metaName, metaContent)
+      if (isMeta) addMarked(found, meta.name, meta.content)
       return position + 1
     }
-    if (isSpace(code) || code === 47) {
-      position++
-      continue
-    }
-    const nameStart = position
-    while (position < html.length && !isNameEnd(codeAt(html, position))) position++
-    if (position === nameStart) position++
-    const name = html.slice(nameStart, position).toLowerCase()
-    position = skipSpaces(html, position)
-    if (html[position] !== '=') continue
-    const { value, end } = readValue(html, skipSpaces(html, position + 1))
-    position = end
-    if (name === 'class' || name === 'classname') addTokens(found.classes, value)
-    else if (name === 'data-href') addTokens(found.carried, value)
-    else if (name === 'name') metaName = value
-    else if (name === 'content') metaContent = value
+    position =
+      isSpace(code) || code === 47 ? position + 1 : readAttribute(html, position, found, meta)
   }
   return html.length
 }
@@ -135,8 +151,8 @@ function findClosingTag(html: string, index: number, name: string): number {
   return at === -1 ? html.length : at
 }
 
-/** The index of the end of the tag name that starts at `index`. */
-function readTagNameEnd(html: string, index: number): number {
+/** The index of the end of the name (of a tag or an attribute) that starts at `index`. */
+function readNameEnd(html: string, index: number): number {
   let end = index
   while (end < html.length && !isNameEnd(codeAt(html, end))) end++
   return end
@@ -160,7 +176,7 @@ export function scanHtml(html: string): HtmlTokens {
       readComment(html, at + 4, end, found)
       at = end + 3
     } else if (isLetter(codeAt(html, at + 1))) {
-      const nameEnd = readTagNameEnd(html, at + 1)
+      const nameEnd = readNameEnd(html, at + 1)
       const name = html.slice(at + 1, nameEnd).toLowerCase()
       at = readAttributes(html, nameEnd, found, name === 'meta')
       if (RAW_TEXT_ELEMENTS.has(name)) at = findClosingTag(html, at, name)

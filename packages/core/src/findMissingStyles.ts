@@ -29,19 +29,21 @@ const STATE_PATTERN = /:(hover|focus|active|focus-visible|focus-within)\b/
 const NAME_CODES = /[a-z0-9_-]/
 /** A selector that names the root element or the body: `html`, `body` or `:root` as a whole word. */
 const ROOT_PATTERN = /(?:^|[\s>+~(,])(?:html|body)(?![\w-])|:root(?![\w-])/
-/** The type of a style rule (`CSSRule.STYLE_RULE`). */
-const STYLE_RULE = 1
-
 /** The prefix named by the first style element of an engine in `page`, or undefined. */
 function findPrefix(page: Document): string | undefined {
   const element = page.querySelector<HTMLElement>('style[data-style], style[data-precedence]')
   return element?.dataset.style ?? element?.dataset.precedence
 }
 
-/** The style rules under `list`, groups included. A rule of another document (an iframe's) is not an instance of this window's `CSSStyleRule`, so its type is read instead. */
+/** Whether `rule` is a style rule. A rule of another document (an iframe's) is not an instance of this window's `CSSStyleRule`, so the name of its class is read instead. */
+function isStyleRule(rule: CSSRule): rule is CSSStyleRule {
+  return rule.constructor.name === 'CSSStyleRule'
+}
+
+/** The style rules under `list`, groups included. */
 function collectStyleRules(list: CSSRuleList, found: CSSStyleRule[]): CSSStyleRule[] {
   for (const rule of list) {
-    if (rule.type === STYLE_RULE) found.push(rule as CSSStyleRule)
+    if (isStyleRule(rule)) found.push(rule)
     else if ('cssRules' in rule) collectStyleRules((rule as CSSGroupingRule).cssRules, found)
   }
   return found

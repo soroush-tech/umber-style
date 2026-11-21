@@ -143,6 +143,18 @@ describe('readMediaQuery', () => {
     }
   })
 
+  it('reads a feature with long runs of white space in linear time', () => {
+    const spaces = ' '.repeat(100_000)
+    const started = performance.now()
+    const text = readMediaQuery(`(width${spaces}x)`)
+    const range = readMediaQuery(`(width${spaces}>=${spaces}600px)`)
+    expect(performance.now() - started).toBeLessThan(250)
+    expect(text.problem).toBe(`the text "(width${spaces}x)"`)
+    expect(range.problem).toBeUndefined()
+    expect(range.matches(tablet, 16)).toBe(true)
+    expect(range.matches(phone, 16)).toBe(false)
+  })
+
   it('reads each text once', () => {
     expect(readMediaQuery('(min-width: 1px)')).toBe(readMediaQuery('(min-width: 1px)'))
     expect(readMediaQuery('(min-width: 1px)')).not.toBe(readMediaQuery('(min-width:1px)'))
