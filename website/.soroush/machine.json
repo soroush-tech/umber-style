@@ -1,0 +1,14 @@
+{
+  "madeBy": "setup",
+  "name": "umber-style",
+  "framework": "vike",
+  "routes": [
+    "/",
+    "/about"
+  ],
+  "router": "vike",
+  "theme": "src/theme/themes.ts",
+  "devCommand": "pnpm dev --host 0.0.0.0 --port 5173",
+  "devPort": 5173,
+  "install": "pnpm install --frozen-lockfile --ignore-workspace --dir website"
+}
