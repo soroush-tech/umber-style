@@ -22,10 +22,10 @@ for (const scenario of PROVIDER_SCENARIOS) {
       browser,
       fixture: { ...fixture, port: fixture.devPort as number },
       markProblems: () => {
-        const at = [messages.all.length, watcher.problems.length]
+        const marks = [messages.all.length, watcher.problems.length]
         return () => {
-          messages.all.splice(at[0])
-          watcher.problems.splice(at[1])
+          messages.all.splice(marks[0])
+          watcher.problems.splice(marks[1])
         }
       },
     })

@@ -56,7 +56,7 @@ interface RegisteredSheet<S extends NativeSheetStyles> {
 }
 
 const NO_QUERIES: readonly string[] = []
-const NO_KEYS: StyleKeys = { conditional: false, scheme: false, queries: [] }
+const NO_KEYS: StyleKeys = { isConditional: false, hasScheme: false, queries: [] }
 
 /** The name of the sheet entry `key` in the development warnings. */
 const toEntryName = (key: string) => `sheet entry "${key}"`
@@ -79,9 +79,9 @@ function register<S extends NativeSheetStyles>(source: S, remBase: number): Regi
     entries,
     source,
     keys,
-    isConditional: all?.conditional ?? false,
+    isConditional: all?.isConditional ?? false,
     queries: all?.queries ?? NO_QUERIES,
-    hasScheme: all?.scheme ?? false,
+    hasScheme: all?.hasScheme ?? false,
   }
 }
 
@@ -91,18 +91,19 @@ function readWindowEntries<S extends NativeSheetStyles>(
   key: string,
   remBase: number
 ): { [K in keyof S]: NativeStyleObject } {
-  const windowKey = key.slice(0, sheet.queries.length)
-  sheet.byWindow ??= new Map()
-  let found = sheet.byWindow.get(windowKey)
+  const { entries, keys, queries, source } = sheet
+  const windowKey = key.slice(0, queries.length)
+  const byWindow = (sheet.byWindow ??= new Map())
+  let found = byWindow.get(windowKey)
   if (found === undefined) {
     const state = readWindowState()
-    const pairs = Object.entries(sheet.source).flatMap(([name, style]) =>
-      sheet.keys[name].queries.length > 0 && !sheet.keys[name].conditional
+    const pairs = Object.entries(source).flatMap(([name, style]) =>
+      keys[name].queries.length > 0 && !keys[name].isConditional
         ? [[name, toNativeStyle(style, undefined, { remBase, name: toEntryName(name) }, state)]]
         : []
     )
-    found = { ...sheet.entries, ...platformStyleSheet.create(Object.fromEntries(pairs)) }
-    sheet.byWindow.set(windowKey, found)
+    found = { ...entries, ...platformStyleSheet.create(Object.fromEntries(pairs)) }
+    byWindow.set(windowKey, found)
   }
   return found
 }
@@ -118,13 +119,14 @@ function resolveEntries<S extends NativeSheetStyles>(
   key: string,
   remBase: number
 ): { [K in keyof S]: NativeStyleObject } {
-  const hasQueries = sheet.queries.length > 0
+  const { isConditional, keys, queries, source } = sheet
+  const hasQueries = queries.length > 0
   const entries = hasQueries ? readWindowEntries(sheet, key, remBase) : sheet.entries
-  if (!sheet.isConditional) return entries
+  if (!isConditional) return entries
   const state = hasQueries ? readWindowState() : undefined
-  const pairs = Object.entries(sheet.source).map(([name, style]) => [
+  const pairs = Object.entries(source).map(([name, style]) => [
     name,
-    sheet.keys[name].conditional
+    keys[name].isConditional
       ? toNativeStyle(style, condition, { remBase, name: toEntryName(name) }, state)
       : entries[name],
   ])
@@ -242,8 +244,8 @@ export function bindHolder<T extends object>(
     const prepared = isThemedSheet(sheet)
       ? (sheet as unknown as NativeSheet<NativeSheetStyles, NativeTheme<T>>).prepare(theme)
       : undefined
-    const watchesScheme = !!prepared?.hasScheme && condition.colorScheme === undefined
-    const key = useMediaKey(prepared?.queries ?? NO_QUERIES, watchesScheme, remBase)
+    const shouldWatchScheme = !!prepared?.hasScheme && condition.colorScheme === undefined
+    const key = useMediaKey(prepared?.queries ?? NO_QUERIES, shouldWatchScheme, remBase)
     return prepared === undefined ? sheet : resolveEntries(prepared, condition, key, remBase)
   }) as NativeStyle<T>['useStyle']
 

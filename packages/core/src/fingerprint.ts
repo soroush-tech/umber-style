@@ -1,13 +1,22 @@
 /** The options of a cache that change the CSS it writes or the classes it names: the server and the browser must agree on all of them. */
 export interface FingerprintOptions {
+  /** The first part of every class name and variable. */
   prefix: string
+  /** What is appended to every class name. */
   suffix: string
+  /** Whether a style's label is part of its class name. */
   hasLabels: boolean
+  /** Whether every rule goes into a cascade layer. */
   hasLayers: boolean
+  /** Whether a theme class declares only the variables that rules refer to. */
   hasPruning: boolean
+  /** Whether a styled component's styles are split into a base class and a props class. */
   hasBaseClass: boolean
+  /** Whether a style written with `when()` or `whenScheme()` is scoped with `@scope`. */
   hasScope: boolean
+  /** Whether an `alpha()` value is written with a fallback declaration before it. */
   hasColorFallbacks: boolean
+  /** Whether the string forms of token maths that are not valid CSS are rewritten. */
   hasValueRepair: boolean
   /** A hash of the token options (modes, raw and length keys, registered tokens, always-declared paths). */
   tokens: string
@@ -49,8 +58,8 @@ export function createFingerprint(options: FingerprintOptions): string {
 function parseFingerprint(stamp: string): Map<string, string> {
   return new Map(
     stamp.split(';').map((part) => {
-      const at = part.indexOf('=')
-      return [part.slice(0, at), part.slice(at + 1)] as const
+      const position = part.indexOf('=')
+      return [part.slice(0, position), part.slice(position + 1)] as const
     })
   )
 }

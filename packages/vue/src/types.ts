@@ -73,8 +73,10 @@ export interface Theme extends CoreTheme {
  */
 export type Interpolation<Props = Record<string, unknown>, T = Theme> = CoreInterpolation<Props, T>
 
+/** The options of `createStyle`: the engine options of the core, or an engine to bind. */
 export type StyleOptions<T = never> = BindingOptions<T>
 
+/** The options of `styled(tag, options)`: the label of the class, what reaches the element, a class name of your own. */
 export interface StyledOptions extends StylerOptions {
   /** Whether an attribute is forwarded to a string tag. Default: every attribute but `as`, `theme`, `class` and `style`, which the component handles itself. */
   shouldForwardProp?: (prop: string) => boolean
@@ -94,6 +96,7 @@ export interface FilteringStyledOptions<
   Props = Record<string, unknown>,
   Forwarded extends keyof Props & string = keyof Props & string,
 > extends StyledOptions {
+  /** Whether an attribute is forwarded to a string tag, as a type guard over the names it forwards. */
   shouldForwardProp?: (prop: string) => prop is Forwarded
 }
 
@@ -119,6 +122,7 @@ export interface StyledStatics {
   toString(): string
 }
 
+/** A component that `styled` made: it takes any attribute, and keeps its styles for a component that wraps it. */
 export type StyledComponent = FunctionalComponent<Record<string, unknown>> & StyledStatics
 
 /**
@@ -143,6 +147,7 @@ export interface StyledFactory<T> {
 /** The shorthand of each HTML and SVG tag: `styled.div(...styles)` is `styled('div')(...styles)`. */
 export type StyledTags<T> = { readonly [K in keyof IntrinsicElementAttributes]: StyledFactory<T> }
 
+/** `styled` over the theme `T`: a function of a tag or a component and its options, with the tag shorthands. */
 export type Styled<T> = ((tag: string | Component, options?: StyledOptions) => StyledFactory<T>) &
   StyledTags<T>
 
@@ -158,15 +163,18 @@ export interface CssFunction {
 
 /** A set of named styles made from a function of the theme: it has no entries until `useStyle` resolves it. */
 export interface Sheet<S extends SheetStyles> {
+  /** The entries of the sheet for a theme view, which `useStyle` passes. */
   resolve(theme?: unknown): { [K in keyof S]: SheetEntry }
 }
 
+/** The props of `ThemeProvider`. */
 export interface ThemeProviderProps<T> {
   /**
    * The theme, or the part of it that this subtree changes; or a function of the theme above (the base
    * theme, or an empty object, for the outermost provider) that returns it. It is merged over the theme above.
    */
   theme: ThemeInput<T>
+  /** The color scheme of this subtree, which `whenScheme()` matches and the theme class carries. Default: none, the system preference. */
   colorScheme?: ColorScheme
   /** The element of the wrapper of a nested provider. Default 'div'. */
   as?: string
@@ -177,6 +185,7 @@ export interface ThemeProviderProps<T> {
   isRoot?: boolean
 }
 
+/** The props of `Global`. */
 export interface GlobalProps<T> {
   /**
    * The global styles: a handle that `globalStyles` made, a style object, a function of the theme, or a
@@ -186,10 +195,15 @@ export interface GlobalProps<T> {
   styles: GlobalInput<T>
 }
 
+/** What `createStyle` and `bindEngine` return: the Vue styling of one engine. */
 export interface Style<T> {
+  /** The engine every member writes through. */
   engine: Engine<T>
+  /** The cache of the engine: its rules and sheet. */
   cache: Engine<T>['cache']
+  /** Makes a styled component of a tag or a component; `styled.div` and the other tag shorthands too. */
   styled: Styled<T>
+  /** Makes sheets of named styles. */
   StyleSheet: {
     /** A sheet given as an object is its entries, usable at once, with no hook and no theme. */
     create<K extends string>(styles: ObjectSheet<K>): { readonly [P in K]: SheetEntry }
@@ -202,6 +216,7 @@ export interface Style<T> {
   useStyle<K extends string>(sheet: { readonly [P in K]: SheetEntry }): {
     readonly [P in K]: SheetEntry
   }
+  /** The entries of a sheet made from a function of the theme, resolved against the nearest provider. Call it in `setup`. */
   useStyle<S extends SheetStyles>(sheet: Sheet<S>): { [K in keyof S]: SheetEntry }
   /** The attributes that apply entries of a sheet: a class. */
   apply(...entries: (SheetEntry | string | null | undefined | false)[]): { class?: string }
@@ -213,6 +228,7 @@ export interface Style<T> {
    * global styles. Equal styles give the same class. A function is a `TypeError`: there are no props.
    */
   css: CssFunction
+  /** Gives its slot a theme, merged over the theme above: the outermost one on `:root`, a nested one on its wrapper. */
   ThemeProvider: Component<ThemeProviderProps<T>>
   /**
    * Renders the wrapper of the nearest nested provider again (the same element and classes) around its
@@ -224,6 +240,7 @@ export interface Style<T> {
   useTheme(): ComputedRef<T>
   /** The class string of the wrapper of the nearest nested provider, reactive; undefined under the outermost provider, or none. Call it in `setup`. */
   useThemeClass(): ComputedRef<string | undefined>
+  /** The class string of a theme (and a color scheme), for an element the app renders itself, such as `<html>`. */
   themeClass: Engine<T>['themeClass']
   /** A style key for "the nearest theme is this theme"; it needs `@scope`. */
   when: Engine<T>['when']
@@ -237,6 +254,7 @@ export interface Style<T> {
   keyframes(steps: (theme: T) => KeyframesSteps, options?: KeyframesOptions): Keyframes
   /** As a tag: the steps written as CSS text (`from { ... } to { ... }`); a function among the interpolations is called with `{ theme }`. */
   keyframes(template: TemplateStringsArray, ...values: TemplateValue<unknown, T>[]): Keyframes
+  /** The steps as an object, or a function of the theme. */
   keyframes(steps: KeyframesInput<T>, options?: KeyframesOptions): Keyframes
   /** Makes global styles (selectors and at-rules as keys) and returns their handle, for `Global`. It writes nothing and needs no engine. */
   globalStyles(styles: (theme: T) => GlobalStyleObject): GlobalStyles<T>
@@ -245,6 +263,7 @@ export interface Style<T> {
     template: TemplateStringsArray,
     ...values: TemplateValue<unknown, T>[]
   ): GlobalStyles<T>
+  /** The styles as an object, or a function of the theme. */
   globalStyles(styles: GlobalStylesInput<T>): GlobalStyles<T>
   /**
    * Writes global styles into the `global` layer while it is mounted, and renders nothing. In the browser

@@ -8,15 +8,15 @@
 // in-memory sheet. `renderToString` of Vue is asynchronous, so each operation also pays one turn of the
 // microtask queue.
 import type { BenchConfig } from '@soroush.tech/bench'
-import { kinds, labels } from '../../../bench/src/components'
+import { KINDS, LABELS } from '../../../bench/src/components'
 import { createFortyEight, prepare } from './fixtures'
 
 const cases = Object.fromEntries(
   await Promise.all(
-    kinds.map(
+    KINDS.map(
       async (kind) =>
         [
-          `48 elements, ${labels[kind]}`,
+          `48 elements, ${LABELS[kind]}`,
           await prepare((setup) => createFortyEight(setup, kind)),
         ] as const
     )

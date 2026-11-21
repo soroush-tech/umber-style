@@ -1,6 +1,6 @@
 import { collectComputedStyles, expectSameStyles } from '../helpers/computedStyles'
 import { loadPage, navigateInBrowser, PAGE_NAMES, storeScheme } from '../helpers/navigation'
-import { scenario, test, expect } from '../helpers/test'
+import { requireScenario, test, expect } from '../helpers/test'
 
 const pairs = PAGE_NAMES.flatMap((target) =>
   PAGE_NAMES.filter((from) => from !== target).map((from) => ({ from, target }))
@@ -12,7 +12,7 @@ for (const { from, target } of pairs) {
     page,
     fixture,
   }, info) => {
-    scenario('B', fixture, info)
+    requireScenario('B', fixture, info)
     await loadPage(page, fixture, target)
     const direct = await collectComputedStyles(page)
     expect(Object.keys(direct).length).toBeGreaterThan(10)
@@ -30,7 +30,7 @@ for (const { from, target } of pairs) {
     browser,
     fixture,
   }, info) => {
-    scenario('C', fixture, info, `C:${target}:${from}`)
+    requireScenario('C', fixture, info, `C:${target}:${from}`)
     // Direct: the dark choice was stored by an earlier visit.
     await storeScheme(page, 'dark')
     await loadPage(page, fixture, target)

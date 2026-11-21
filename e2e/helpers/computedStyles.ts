@@ -81,28 +81,32 @@ export async function collectComputedStyles(
 }
 
 /** The differences between two collections, one readable line each. */
-export function diffStyles(a: ComputedStyles, b: ComputedStyles): string[] {
+export function diffStyles(first: ComputedStyles, second: ComputedStyles): string[] {
   const lines: string[] = []
-  for (const key of Object.keys(a)) {
-    if (!(key in b)) {
+  for (const key of Object.keys(first)) {
+    if (!(key in second)) {
       lines.push(`${key}: only in the first`)
       continue
     }
-    for (const property of Object.keys(a[key])) {
-      if (a[key][property] !== b[key][property]) {
-        lines.push(`${key} ${property}: ${a[key][property]}  !=  ${b[key][property]}`)
+    for (const property of Object.keys(first[key])) {
+      if (first[key][property] !== second[key][property]) {
+        lines.push(`${key} ${property}: ${first[key][property]}  !=  ${second[key][property]}`)
       }
     }
   }
-  for (const key of Object.keys(b)) {
-    if (!(key in a)) lines.push(`${key}: only in the second`)
+  for (const key of Object.keys(second)) {
+    if (!(key in first)) lines.push(`${key}: only in the second`)
   }
   return lines
 }
 
 /** Fails with the list of differences when the two collections are not equal. */
-export function expectSameStyles(a: ComputedStyles, b: ComputedStyles, label = 'styles'): void {
-  const lines = diffStyles(a, b)
+export function expectSameStyles(
+  first: ComputedStyles,
+  second: ComputedStyles,
+  label = 'styles'
+): void {
+  const lines = diffStyles(first, second)
   expect(
     lines,
     `${label}: ${lines.length} difference(s)\n${lines.slice(0, 40).join('\n')}`

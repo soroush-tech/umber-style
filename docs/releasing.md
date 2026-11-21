@@ -2,7 +2,7 @@
 
 After this page you can publish the packages to npm, try a change in a real app before it reaches everyone, install a prerelease as a consumer, and check that what npm holds is what you meant to ship.
 
-The packages are `@umber-style/core`, `@umber-style/cache`, `@umber-style/server`, `@umber-style/css`, `@umber-style/react`, `@umber-style/react-native`, `@umber-style/vue` and `umber-style`: every folder of `packages/` that is not private. They are published by one workflow, by hand, never from a push or a merge.
+The packages are `@umber-style/core`, `@umber-style/cache`, `@umber-style/server`, `@umber-style/css`, `@umber-style/react`, `@umber-style/react-native`, `@umber-style/vue`, `@umber-style/styled` and `umber-style`: every folder of `packages/` that is not private. They are published by one workflow, by hand, never from a push or a merge.
 
 ## Channels
 
@@ -37,7 +37,7 @@ The packages depend on each other, so they go out dependencies first:
 
 1. `@umber-style/core`
 2. `@umber-style/cache`, `@umber-style/server`, `@umber-style/css`, `@umber-style/react`, `@umber-style/react-native`, `@umber-style/vue`: each depends on the core alone
-3. `umber-style`, which depends on the core and the three bindings
+3. `@umber-style/styled`, which depends on `@umber-style/react` alone, and `umber-style`, which depends on the core and the three bindings
 
 The cache, server and css packages are not in `umber-style`: `@umber-style/server` uses `@umber-style/cache` in its tests only (a `devDependency`), so the two can go out in either order.
 
@@ -101,6 +101,8 @@ Node cannot load `react-native`, so the test installs a small stand-in with the 
 - The `cd-packages` environment (Settings, Environments, Deployment branches) must allow the branches that alphas come from, such as `feat/*` and `fix/*`. With `main` alone, every alpha from a branch is blocked before it starts.
 - Each package has a trusted publisher on npm for `soroush-tech/umber-style`, workflow `cd-packages.yml`, environment `cd-packages`.
 - A new package under `packages/` appears in the workflow's `package` list after `pnpm gen:publish-options`, which CI and the pre-commit hook check.
+- A package's first version on npm becomes `latest` whatever its tag, so a new package gets a real `0.0.0` placeholder, published by hand, before its first prerelease: a staged or pending placeholder is not enough. The workflow refuses a prerelease for a package that has no release on `latest`.
+- When `latest` already points at a prerelease, publish `0.0.0` for the package (a plain publish puts it on `latest`), then run the workflow again: a version already on npm is skipped.
 
 ## Limits
 

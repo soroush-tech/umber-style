@@ -18,6 +18,7 @@ export type KeyframesSteps = Record<string, KeyframesStep>
 /** What `keyframes` is given: the steps, or a function of the theme that returns them. */
 export type KeyframesInput<T> = KeyframesSteps | ((theme: T) => KeyframesSteps)
 
+/** How `keyframes` names an animation. */
 export interface KeyframesOptions {
   /** The first part of the name, for a readable name in the developer tools. Default `keyframes`. */
   label?: string

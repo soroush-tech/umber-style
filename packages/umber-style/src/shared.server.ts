@@ -14,10 +14,12 @@ export interface SharedServerStyle<T> extends SharedStyleBase<T> {
 }
 
 export declare const readTheme: SharedServerStyle<Theme>['readTheme']
+/** Makes the styling of one theme shape for server components, apart from the default one. */
 export declare function createStyle<T extends object>(
   theme: T,
   options?: StyleOptions<T>
 ): SharedServerStyle<T>
+/** Makes one default style for server components, with `configure` for its options and base theme before first use. */
 export declare function createDefaultStyle(): SharedServerStyle<Theme> & {
   configure: (options: DefaultStyleOptions) => void
 }

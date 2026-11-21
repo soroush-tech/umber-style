@@ -7,7 +7,7 @@ export interface WindowState {
   /** The system color scheme as the platform reports it; anything but `dark` counts as light. */
   readonly colorScheme: string | null | undefined
   /** Whether the system asks for reduced motion. */
-  readonly reducedMotion: boolean
+  readonly isReducedMotion: boolean
 }
 
 /** A media query read once: whether it holds for a window, and what the binding cannot evaluate in it. */
@@ -66,13 +66,13 @@ const KEYWORD_FEATURES = new Map<string, Map<string, Test>>([
   [
     'prefers-reduced-motion',
     new Map<string, Test>([
-      ['reduce', (state) => state.reducedMotion],
-      ['no-preference', (state) => !state.reducedMotion],
+      ['reduce', (state) => state.isReducedMotion],
+      ['no-preference', (state) => !state.isReducedMotion],
     ]),
   ],
 ])
 
-const never: Test = () => false
+const matchNever: Test = () => false
 
 /** Whether `key` is a media query key: `@media (...)`. */
 export function isMediaKey(key: string): boolean {
@@ -236,7 +236,7 @@ function parseMediaQuery(text: string): MediaQuery {
   const tests: Test[] = []
   for (const part of list.split(',')) {
     const test = readQuery(part.trim())
-    if (test instanceof Unsupported) return { matches: never, problem: test.problem }
+    if (test instanceof Unsupported) return { matches: matchNever, problem: test.problem }
     tests.push(test)
   }
   return { matches: (state, remBase) => tests.some((test) => test(state, remBase)) }

@@ -7,9 +7,10 @@ import type { LayoutProps } from './styles'
 import type { SmallTheme } from './themes'
 
 /** The five kinds of the 48-element cases, and their names in a case. */
-export const kinds = ['fixed', 'themed', 'flex', 'override', 'entry'] as const
-export type Kind = (typeof kinds)[number]
-export const labels: Record<Kind, string> = {
+export const KINDS = ['fixed', 'themed', 'flex', 'override', 'entry'] as const
+/** The name of one kind of the 48-element cases. */
+export type Kind = (typeof KINDS)[number]
+export const LABELS: Record<Kind, string> = {
   fixed: 'fixed styles only',
   themed: 'a function of the theme only',
   flex: 'prop-driven, 48 combinations',
@@ -28,11 +29,12 @@ export const LAYOUT_PROPS: ReadonlySet<string> = new Set([
 ])
 
 /** A key that tells the combination of props apart: the 48 are distinct. */
-export const keyOf = ({ gap, direction, align, justify, wrap }: LayoutProps): string =>
+export const createLayoutKey = ({ gap, direction, align, justify, wrap }: LayoutProps): string =>
   [gap, direction, align, justify, wrap].join('|')
 
 /** The four tones of a cell of the tree. */
 export const TONES = ['a', 'b', 'c', 'd'] as const
+/** The tone of one cell of the tree. */
 export type Tone = (typeof TONES)[number]
 
 /** The style of the web component with fixed styles only: no function, so no theme is read. */

@@ -4,7 +4,13 @@ export * from './cache'
 export { findCache } from './cacheRegistry'
 export * from './calc'
 export * from './createEngine'
-export * from './css'
+export {
+  createComponentSelector,
+  createCssEntry,
+  readStaticTemplate,
+  readStyleArguments,
+  rejectFunctions,
+} from './css'
 export { isDevelopment } from './devChecks'
 export * from './extractStyles'
 export * from './findMissingStyles'
@@ -31,10 +37,26 @@ export type { RegisteredSyntax } from './registered'
 export { createGlobalMarker, type GlobalMarker } from './scanHtml'
 export * from './scope'
 export * from './serialize'
-export * from './sheetEntry'
+export {
+  createSheetEntry,
+  findEntryCache,
+  flattenStyle,
+  isSheetEntry,
+  readEntrySource,
+  type EntryRole,
+  type EntrySource,
+  type SheetEntry,
+} from './sheetEntry'
 export * from './styleTypes'
 export * from './tagShorthands'
-export * from './theme'
+export {
+  createThemeClass,
+  createThemeId,
+  createThemeRule,
+  ROOT_SELECTOR,
+  toDeclarationText,
+  type ThemeRuleOptions,
+} from './theme'
 export * from './themeInput'
 export * from './tokens'
 export * from './types'

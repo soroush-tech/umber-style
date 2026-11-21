@@ -73,7 +73,9 @@ const HUES = [
 
 /** `count` entries named `<prefix><index>`, each from `make`. */
 function createScale<V>(prefix: string, count: number, make: (index: number) => V) {
-  return Object.fromEntries(Array.from({ length: count }, (_, i) => [`${prefix}${i}`, make(i)]))
+  return Object.fromEntries(
+    Array.from({ length: count }, (_, index) => [`${prefix}${index}`, make(index)])
+  )
 }
 
 /** The large theme: about 280 tokens across colours, spaces, sizes, radii, type, shadows, motion and more. */
@@ -88,20 +90,24 @@ export function createLargeTheme(): LargeTheme {
   }
   return {
     palette,
-    space: Array.from({ length: 24 }, (_, i) => i * 4),
-    sizes: createScale('s', 20, (i) => 16 * (i + 1)),
-    radii: createScale('r', 12, (i) => i * 2),
-    fontSizes: createScale('f', 16, (i) => 10 + i * 2),
-    fontWeights: createScale('w', 9, (i) => 100 * (i + 1)),
-    lineHeights: createScale('l', 8, (i) => 1 + i * 0.1),
-    letterSpacings: createScale('t', 6, (i) => `${i * 0.01}em`),
-    typography: createScale('font', 6, (i) => `Family${i}, system-ui, sans-serif`),
-    shadows: createScale('shadow', 12, (i) => `0 ${i}px ${i * 2}px rgba(0, 0, 0, 0.${i + 1})`),
-    zIndices: createScale('z', 10, (i) => i * 100),
-    borderWidths: createScale('b', 6, (i) => i),
-    durations: createScale('d', 8, (i) => `${(i + 1) * 50}ms`),
-    easings: createScale('e', 6, (i) => `cubic-bezier(0.${i}, 0, 0.${i + 2}, 1)`),
-    opacities: createScale('o', 11, (i) => i / 10),
+    space: Array.from({ length: 24 }, (_, index) => index * 4),
+    sizes: createScale('s', 20, (index) => 16 * (index + 1)),
+    radii: createScale('r', 12, (index) => index * 2),
+    fontSizes: createScale('f', 16, (index) => 10 + index * 2),
+    fontWeights: createScale('w', 9, (index) => 100 * (index + 1)),
+    lineHeights: createScale('l', 8, (index) => 1 + index * 0.1),
+    letterSpacings: createScale('t', 6, (index) => `${index * 0.01}em`),
+    typography: createScale('font', 6, (index) => `Family${index}, system-ui, sans-serif`),
+    shadows: createScale(
+      'shadow',
+      12,
+      (index) => `0 ${index}px ${index * 2}px rgba(0, 0, 0, 0.${index + 1})`
+    ),
+    zIndices: createScale('z', 10, (index) => index * 100),
+    borderWidths: createScale('b', 6, (index) => index),
+    durations: createScale('d', 8, (index) => `${(index + 1) * 50}ms`),
+    easings: createScale('e', 6, (index) => `cubic-bezier(0.${index}, 0, 0.${index + 2}, 1)`),
+    opacities: createScale('o', 11, (index) => index / 10),
     breakpoints: ['30em', '40em', '52em', '64em', '80em'],
   }
 }

@@ -12,6 +12,7 @@ import { defineComponent, h, type Component, type ComputedRef } from 'vue'
 import { bindEngine } from './createStyle'
 import type { Style, StyledOptions, Theme } from './types'
 
+/** The options of `configure`: the engine options of the core, and the base theme. */
 export interface DefaultStyleOptions extends BindingOptions<Theme> {
   /** The base theme, for an app that has no provider at all. */
   theme?: Theme

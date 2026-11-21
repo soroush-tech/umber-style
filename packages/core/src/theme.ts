@@ -15,6 +15,7 @@ export function createThemeRule(
   return hasLayers ? `@layer ${prefix}-theme{${rule}}` : rule
 }
 
+/** How `createThemeRule` writes the rule of a theme class or of the root theme. */
 export interface ThemeRuleOptions {
   /** Sets the color-scheme property in the scope. */
   colorScheme?: 'light' | 'dark' | 'light dark'

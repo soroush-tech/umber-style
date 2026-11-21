@@ -29,8 +29,11 @@ export interface ServerStyleParts {
   createStamp(): ReactElement
 }
 
+/** What `createThemeProvider` makes the web `ThemeProvider` from. */
 export interface ThemeProviderParts<T> {
+  /** The engine of the style: its base theme, and the engine over the cache of a `CacheProvider`. */
   engine: Engine<T>
+  /** The contexts that the provider gives its theme and its view to. */
   contexts: ThemeContexts<T>
   /** Read at each render: the parts of a render that sends style elements, or undefined where the build inserts into its sheet (the browser). */
   getServerStyle(): ServerStyleParts | undefined

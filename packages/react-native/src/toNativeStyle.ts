@@ -16,9 +16,9 @@ export interface NativeSettings {
 /** What a style depends on besides itself, at any depth of its `native` part and of its condition and media parts. */
 export interface StyleKeys {
   /** Whether it has a `when()` or `whenScheme()` key: then it depends on the providers above. */
-  conditional: boolean
+  isConditional: boolean
   /** Whether it has a `whenScheme()` key, which the system color scheme decides when no provider does. */
-  scheme: boolean
+  hasScheme: boolean
   /** Its media query keys, each once, in the order they are met. */
   queries: string[]
 }
@@ -57,7 +57,7 @@ export function collectKeys(
     const isMedia = isMediaKey(key)
     const condition = isMedia ? undefined : readCondition(key)
     if (!isMedia && condition === undefined) continue
-    found ??= { conditional: false, scheme: false, queries: [] }
+    found ??= { isConditional: false, hasScheme: false, queries: [] }
     addKey(found, key, condition)
     found = collectKeys(value, found)
   }
@@ -69,8 +69,8 @@ function addKey(found: StyleKeys, key: string, condition: ReturnType<typeof read
   if (condition === undefined) {
     if (!found.queries.includes(key)) found.queries.push(key)
   } else {
-    found.conditional = true
-    found.scheme ||= condition.kind === 'scheme'
+    found.isConditional = true
+    found.hasScheme ||= condition.kind === 'scheme'
   }
 }
 
@@ -97,25 +97,25 @@ export function toNativeStyle(
   state?: WindowState
 ): NativeStyleObject {
   const { web: _web, native, ...rest } = style
+  const { name, remBase } = settings
   const merged = isNested(native) ? { ...rest, ...native } : rest
   const resolved = Object.fromEntries(
     Object.entries(merged).filter(([key]) => {
       if (!isWebOnlyKey(key)) return true
-      warnAboutDroppedKey(key, settings.name)
+      warnAboutDroppedKey(key, name)
       return false
     })
   )
   const matching = Object.entries(merged).filter(
     ([key, part]) =>
-      isNested(part) &&
-      (matchesCondition(key, condition) || matchesMedia(key, state, settings.remBase))
+      isNested(part) && (matchesCondition(key, condition) || matchesMedia(key, state, remBase))
   )
   for (const [, part] of matching)
     Object.assign(
       resolved,
       toNativeStyle(part as Record<string, unknown>, condition, settings, state)
     )
-  convertValues(resolved, settings.remBase)
-  warnAboutValues(resolved, settings.name)
+  convertValues(resolved, remBase)
+  warnAboutValues(resolved, name)
   return resolved as NativeStyleObject
 }

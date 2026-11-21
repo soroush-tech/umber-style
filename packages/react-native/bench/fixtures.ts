@@ -6,7 +6,13 @@ import { createRequire } from 'node:module'
 import type * as React from 'react'
 import type * as ReactDomServer from 'react-dom/server'
 import { prepareBuiltPackages } from '../../../bench/src/built'
-import { keyOf, LAYOUT_PROPS, TONES, type Kind, type Tone } from '../../../bench/src/components'
+import {
+  createLayoutKey,
+  LAYOUT_PROPS,
+  TONES,
+  type Kind,
+  type Tone,
+} from '../../../bench/src/components'
 import {
   createCombinations,
   createLayoutStyle,
@@ -61,7 +67,7 @@ type Setup = ReturnType<typeof createSetup>
 export function createFortyEight(setup: Setup, kind: Kind): React.ReactNode[] {
   const { Fixed, Themed, Flex, sheet } = setup
   return combinations.map((props) => {
-    const key = keyOf(props)
+    const key = createLayoutKey(props)
     switch (kind) {
       case 'fixed':
         return h(Fixed, { key })

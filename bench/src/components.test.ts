@@ -2,9 +2,9 @@ import {
   cellStyle,
   createFixedStyle,
   createSheetEntries,
-  keyOf,
-  kinds,
-  labels,
+  createLayoutKey,
+  KINDS,
+  LABELS,
   LAYOUT_PROPS,
   themedStyle,
   TONES,
@@ -14,15 +14,15 @@ import { createSmallTheme } from './themes'
 
 describe('the components of the binding benchmarks', () => {
   it('names each of the five kinds', () => {
-    expect(kinds).toHaveLength(5)
-    expect(Object.keys(labels)).toEqual([...kinds])
+    expect(KINDS).toHaveLength(5)
+    expect(Object.keys(LABELS)).toEqual([...KINDS])
   })
 
   it('keeps the six layout props, and tells the 48 combinations apart by key', () => {
     const combinations = createCombinations(48)
     expect([...LAYOUT_PROPS].sort()).toEqual(Object.keys(combinations[0]).sort())
-    expect(new Set(combinations.map(keyOf)).size).toBe(48)
-    expect(keyOf(combinations[0])).toBe('0|row|flex-start|flex-start|nowrap')
+    expect(new Set(combinations.map(createLayoutKey)).size).toBe(48)
+    expect(createLayoutKey(combinations[0])).toBe('0|row|flex-start|flex-start|nowrap')
   })
 
   it('has four tones', () => {

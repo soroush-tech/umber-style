@@ -1,6 +1,11 @@
 import type { Page } from '@playwright/test'
 import type { FixtureConfig } from '../fixtures'
-import { navigateInBrowser, PAGE_NAMES, pageTestId, waitForHydrated } from '../helpers/navigation'
+import {
+  navigateInBrowser,
+  PAGE_NAMES,
+  createPageTestId,
+  waitForHydrated,
+} from '../helpers/navigation'
 import {
   expectNoOverride,
   expectOverride,
@@ -10,7 +15,7 @@ import {
   readHeader,
   readHeaderShape,
 } from '../helpers/pageGlobal'
-import { scenario, test, expect } from '../helpers/test'
+import { requireScenario, test, expect } from '../helpers/test'
 
 // Scenario M: a page renders a `Global` whose rule is for the bar of the shell, outside the page (an
 // outline in the accent colour). Leaving the page unmounts it: the bar must lose the outline, and no
@@ -44,7 +49,7 @@ const hasVariant = (fixture: FixtureConfig, variant: Variant) =>
 
 /** Waits until the page of `variant` is complete. */
 async function waitForVariant(page: Page, variant: Variant): Promise<void> {
-  await page.getByTestId(variant.ready ?? pageTestId(variant.name)).waitFor()
+  await page.getByTestId(variant.ready ?? createPageTestId(variant.name)).waitFor()
 }
 
 /** Loads the page of `variant` with a document load, and waits until it is complete and hydrated. */
@@ -60,7 +65,7 @@ for (const variant of VARIANTS) {
     fixture,
   }, info) => {
     info.skip(!hasVariant(fixture, variant), `${fixture.name} has no ${variant.name} page`)
-    scenario('M', fixture, info, `M:${variant.name}:left`)
+    requireScenario('M', fixture, info, `M:${variant.name}:left`)
     await loadVariant(page, variant)
     await expectOverride(page, `${variant.name}, loaded directly`)
 
@@ -77,9 +82,9 @@ for (const variant of VARIANTS) {
     fixture,
   }, info) => {
     info.skip(!hasVariant(fixture, variant), `${fixture.name} has no ${variant.name} page`)
-    scenario('M', fixture, info, `M:${variant.name}:reached`)
+    requireScenario('M', fixture, info, `M:${variant.name}:reached`)
     await page.goto(fixture.routes.home)
-    await page.getByTestId(pageTestId('home')).waitFor()
+    await page.getByTestId(createPageTestId('home')).waitFor()
     await waitForHydrated(page)
     // Not asserted here: whether home came with the rule is the subject of the test with no script.
     const { outlineStyle } = await readHeaderShape(page)
@@ -98,7 +103,7 @@ for (const variant of VARIANTS) {
     fixture,
   }, info) => {
     info.skip(!hasVariant(fixture, variant), `${fixture.name} has no ${variant.name} page`)
-    scenario('M', fixture, info, `M:${variant.name}:theme`)
+    requireScenario('M', fixture, info, `M:${variant.name}:theme`)
     await loadVariant(page, variant)
     await expect.poll(() => readHeader(page), 'the bar in light').toEqual(OVERRIDE.light)
     await page.getByTestId('theme-switch').click()
@@ -111,7 +116,7 @@ test('M: with scripting disabled, no page without the rule carries it, after the
   browser,
   fixture,
 }, info) => {
-  scenario('M', fixture, info, 'M:no-script')
+  requireScenario('M', fixture, info, 'M:no-script')
   info.skip(!fixture.hasHtml, `${fixture.name} sends no HTML of its pages`)
   const context = await browser.newContext({
     javaScriptEnabled: false,
@@ -122,12 +127,12 @@ test('M: with scripting disabled, no page without the rule carries it, after the
   // event waits for the content that streams late; without script it stays hidden.
   for (const variant of VARIANTS.filter((each) => hasVariant(fixture, each))) {
     await page.goto(`/${variant.name}`)
-    await page.getByTestId(pageTestId(variant.name)).waitFor()
+    await page.getByTestId(createPageTestId(variant.name)).waitFor()
   }
   const found: Record<string, unknown> = {}
   for (const name of PAGE_NAMES) {
     await page.goto(fixture.routes[name])
-    await page.getByTestId(pageTestId(name)).waitFor()
+    await page.getByTestId(createPageTestId(name)).waitFor()
     found[name] = { header: await readHeaderShape(page), ...(await findOverrideRules(page)) }
   }
   await context.close()

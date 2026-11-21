@@ -2,14 +2,14 @@ name: Label Affected Area
 on:
   issues:
     types: [opened]
-permissions:
-  issues: write
 concurrency:
   group: label-area-${{ github.event.issue.number }}
   cancel-in-progress: true
 jobs:
   label:
     runs-on: ubuntu-latest
+    permissions:
+      issues: write
     timeout-minutes: 5
     steps:
       - name: Sync the `area:` label from the Affected area field

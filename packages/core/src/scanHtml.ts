@@ -19,7 +19,9 @@ const MARKER_END = '-global'
 
 /** What a marker of global rules says: its name, `<prefix>-global`, and the ids of the sets, separated by spaces. */
 export interface GlobalMarker {
+  /** `<prefix>-global`: the name of the `<meta>` element, or the first word of the comment. */
   name: string
+  /** The ids of the sets of global rules, separated by spaces. */
   ids: string
 }
 
@@ -144,11 +146,14 @@ function readComment(html: string, start: number, end: number, found: HtmlTokens
 
 /** The index of the `</name` that closes a raw text element, or the end of the document. */
 function findClosingTag(html: string, index: number, name: string): number {
-  let at = html.indexOf('</', index)
-  while (at !== -1 && html.slice(at + 2, at + 2 + name.length).toLowerCase() !== name) {
-    at = html.indexOf('</', at + 2)
+  let position = html.indexOf('</', index)
+  while (
+    position !== -1 &&
+    html.slice(position + 2, position + 2 + name.length).toLowerCase() !== name
+  ) {
+    position = html.indexOf('</', position + 2)
   }
-  return at === -1 ? html.length : at
+  return position === -1 ? html.length : position
 }
 
 /** The index of the end of the name (of a tag or an attribute) that starts at `index`. */
@@ -168,22 +173,22 @@ function readNameEnd(html: string, index: number): number {
  */
 export function scanHtml(html: string): HtmlTokens {
   const found: HtmlTokens = { classes: new Set(), carried: new Set(), rendered: new Set() }
-  let at = html.indexOf('<')
-  while (at !== -1) {
-    if (html.startsWith('<!--', at)) {
-      const close = html.indexOf('-->', at + 4)
+  let position = html.indexOf('<')
+  while (position !== -1) {
+    if (html.startsWith('<!--', position)) {
+      const close = html.indexOf('-->', position + 4)
       const end = close === -1 ? html.length : close
-      readComment(html, at + 4, end, found)
-      at = end + 3
-    } else if (isLetter(codeAt(html, at + 1))) {
-      const nameEnd = readNameEnd(html, at + 1)
-      const name = html.slice(at + 1, nameEnd).toLowerCase()
-      at = readAttributes(html, nameEnd, found, name === 'meta')
-      if (RAW_TEXT_ELEMENTS.has(name)) at = findClosingTag(html, at, name)
+      readComment(html, position + 4, end, found)
+      position = end + 3
+    } else if (isLetter(codeAt(html, position + 1))) {
+      const nameEnd = readNameEnd(html, position + 1)
+      const name = html.slice(position + 1, nameEnd).toLowerCase()
+      position = readAttributes(html, nameEnd, found, name === 'meta')
+      if (RAW_TEXT_ELEMENTS.has(name)) position = findClosingTag(html, position, name)
     } else {
-      at++
+      position++
     }
-    at = html.indexOf('<', at)
+    position = html.indexOf('<', position)
   }
   return found
 }

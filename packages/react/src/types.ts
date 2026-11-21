@@ -99,13 +99,16 @@ export interface Theme extends CoreTheme {
  */
 export type Interpolation<Props = unknown, T = Theme> = CoreInterpolation<Props, T>
 
+/** The options of `createStyle(theme, options)`: those of the engine it makes, or the engine to use, and the server options. */
 export interface StyleOptions<T = never> extends BindingOptions<T>, ServerStyleOptions {}
 
+/** The options of `configure()`: those of `StyleOptions` for the engine of the default style, and its base theme. */
 export interface DefaultStyleOptions extends BindingOptions<Theme>, ServerStyleOptions {
   /** The base theme, for an app that has no provider at all. */
   theme?: Theme
 }
 
+/** The options of `styled(tag, options)`: the label of the class, which props reach the element, and a class of your own. */
 export interface StyledOptions extends StylerOptions {
   /**
    * Whether a prop is forwarded to a string tag. It replaces the default, which forwards the attributes
@@ -130,6 +133,7 @@ export interface FilteringStyledOptions<
   Props = Record<string, unknown>,
   Forwarded extends keyof Props & string = keyof Props & string,
 > extends StyledOptions {
+  /** A type guard of the props that are forwarded to a string tag: the component takes only the props of the tag that it names. */
   shouldForwardProp?: (prop: string) => prop is Forwarded
 }
 
@@ -216,6 +220,7 @@ export interface StyledCall<T> {
   <C extends ElementType>(tag: C, options?: StyledOptions): StyledFactory<T, C>
 }
 
+/** `styled` of a theme `T`: a call with a tag and options, and the shorthand of each tag. */
 export type Styled<T> = StyledCall<T> & StyledTags<T>
 
 /** The type of `styled` itself, with the tag shorthands: `Styled` of this binding's `Theme` unless another is given. */
@@ -234,6 +239,7 @@ export interface SheetDefinition<S extends SheetStyles, E> {
   readonly entries?: { [K in keyof S]: E }
 }
 
+/** The props of `ThemeProvider`: the theme of the subtree, and on the web its color scheme and wrapper. */
 export interface ThemeProviderProps<T> {
   /**
    * The theme, or the part of it that this subtree changes; or a function of the theme above (the base
@@ -250,10 +256,13 @@ export interface ThemeProviderProps<T> {
    * declares its theme on `:root`, and renders no element either.
    */
   readonly isRoot?: boolean
+  /** The subtree that the theme applies to. */
   readonly children?: ReactNode
 }
 
+/** The props of `ThemeScope`. */
 export interface ThemeScopeProps {
+  /** The content to wrap in the wrapper of the nearest nested provider: what a portal renders elsewhere. */
   readonly children?: ReactNode
 }
 
@@ -261,9 +270,11 @@ export interface ThemeScopeProps {
 export interface CacheProviderProps {
   /** The cache of the subtree: one that `createCache` of `@umber-style/cache` (or of the core) made. */
   readonly value: Cache
+  /** The subtree whose rules go to `value`. */
   readonly children?: ReactNode
 }
 
+/** The props of `Global`. */
 export interface GlobalProps<T> {
   /**
    * The global styles: a handle that `globalStyles` made, a style object, a function of the theme, or a
@@ -273,13 +284,20 @@ export interface GlobalProps<T> {
   readonly styles: GlobalInput<T>
 }
 
+/** The props of `ThemeProvider` on the web: those of every platform, and the element of the wrapper. */
 export interface WebThemeProviderProps<T> extends ThemeProviderProps<T> {
   /** The element of the wrapper of a nested provider. Default 'div'. */
   readonly as?: string
 }
 
+/**
+ * What every platform's styling has, with `E` the entry of a sheet (a class name on the web, a style
+ * object on React Native): the exports of the binding of the same names.
+ */
 export interface Style<T, E> {
+  /** Makes a styled component from a tag or a component and its styles. */
   styled: Styled<T>
+  /** Makes sheets: named styles, from an object or from a function of the theme. */
   StyleSheet: {
     /** A sheet given as an object is its entries, usable at once, with no hook and no theme. */
     create<K extends string>(styles: ObjectSheet<K>): { readonly [P in K]: E }
@@ -291,6 +309,7 @@ export interface Style<T, E> {
   /** The entries of a sheet; an object sheet is its own entries and is returned as it is. */
   useStyle<K extends string>(sheet: { readonly [P in K]: E }): { readonly [P in K]: E }
   useStyle<S extends SheetStyles>(sheet: SheetDefinition<S, E>): { [K in keyof S]: E }
+  /** Gives the subtree below it its theme, merged over the theme above. */
   ThemeProvider(props: ThemeProviderProps<T>): ReactElement
   /**
    * The real theme values, for JavaScript that needs a number or a name. In a client component: of the
@@ -349,6 +368,7 @@ export interface ServerStyle<T> extends Omit<
   readTheme(): T
 }
 
+/** The styling of the client build of the web binding: what `createStyle` returns, and the default style. */
 export interface WebStyle<T> extends Omit<Style<T, SheetEntry>, 'ThemeProvider' | 'apply'> {
   /** The props that apply sheet entries (or class names) to a plain element: a class name. */
   apply(...entries: (SheetEntry | string | null | undefined | false)[]): { className?: string }
@@ -360,6 +380,7 @@ export interface WebStyle<T> extends Omit<Style<T, SheetEntry>, 'ThemeProvider' 
    * global styles. Equal styles give the same class. A function is a `TypeError`: there are no props.
    */
   css: CssFunction
+  /** Gives the subtree below it its theme: the outermost one declares it on `:root`, a nested one renders a wrapper with its theme class. */
   ThemeProvider(props: WebThemeProviderProps<T>): ReactElement
   /**
    * Renders the wrapper of the nearest nested provider again (the same element and classes) around its
@@ -371,6 +392,8 @@ export interface WebStyle<T> extends Omit<Style<T, SheetEntry>, 'ThemeProvider' 
   useThemeClass(): string | undefined
   /** The context that holds the real theme of the nearest provider (merged over the ones above); undefined with no provider above. */
   ThemeContext: Context<T | undefined>
+  /** The engine that writes the rules of this style. */
   engine: Engine<T>
+  /** The cache of the engine, which holds the rules. */
   cache: Cache
 }

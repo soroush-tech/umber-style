@@ -3,6 +3,7 @@ import type { SheetEntry } from './sheetEntry'
 import type { WebStyleObject } from './webStyle'
 import type { TokenOptions } from './tokens'
 
+/** The options of `createEngine`: the token options, and the options of the cache it makes. */
 export interface EngineOptions extends TokenOptions {
   /** First part of every class name and variable name. Default 'css'. */
   prefix?: string
@@ -30,6 +31,7 @@ export interface EngineOptions extends TokenOptions {
   cache?: Cache
 }
 
+/** The value of the CSS `color-scheme` property that a theme declares: light, dark, or both. */
 export type ColorScheme = 'light' | 'dark' | 'light dark'
 
 /** What a style function may return. */
@@ -49,6 +51,7 @@ export interface StylerOptions {
   slot?: string
 }
 
+/** The styles of a sheet, one style object for each name. */
 export type SheetStyles = Record<string, WebStyleObject>
 
 /**

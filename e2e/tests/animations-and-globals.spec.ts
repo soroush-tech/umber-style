@@ -1,7 +1,7 @@
 import type { Page } from '@playwright/test'
 import { loadPage, navigateInBrowser } from '../helpers/navigation'
 import { collectKeyframesAndGlobals, type KeyframesAndGlobals } from '../helpers/rules'
-import { scenario, test, expect } from '../helpers/test'
+import { requireScenario, test, expect } from '../helpers/test'
 
 // Scenarios I to L: the animations of the home page (`Spinner` names its animation in the `animation`
 // shorthand, `Pulse` in `animationName`) and the global styles of the shell (the base styles, always
@@ -100,7 +100,7 @@ test('I: the first HTML holds the global rules and the @keyframes rules, with sc
   browser,
   fixture,
 }, info) => {
-  scenario('I', fixture, info)
+  requireScenario('I', fixture, info)
   const context = await browser.newContext({
     javaScriptEnabled: false,
     baseURL: `http://localhost:${fixture.port}`,
@@ -119,7 +119,7 @@ test('J: after hydration and a round trip through the pages, each rule is there 
   page,
   fixture,
 }, info) => {
-  scenario('J', fixture, info)
+  requireScenario('J', fixture, info)
   await loadPage(page, fixture, 'home')
   let rules = await collectKeyframesAndGlobals(page)
   expectGlobalRules(rules, true)
@@ -143,7 +143,7 @@ test('K: the global rules of a Global are removed when it unmounts, and written 
   page,
   fixture,
 }, info) => {
-  scenario('K', fixture, info)
+  requireScenario('K', fixture, info)
   await loadPage(page, fixture, 'home')
   expect(await readBody(page)).toEqual(expectedBody(LIGHT, true))
 
@@ -165,10 +165,10 @@ test('L: a global rule that reads a token follows a theme switch, with no reload
   page,
   fixture,
 }, info) => {
-  scenario('L', fixture, info)
+  requireScenario('L', fixture, info)
   await loadPage(page, fixture, 'home')
   await page.evaluate(() => {
-    ;(window as unknown as { __stayed: boolean }).__stayed = true
+    ;(window as unknown as { __hasStayed: boolean }).__hasStayed = true
   })
   expect(await readBody(page)).toEqual(expectedBody(LIGHT, true))
 
@@ -179,7 +179,9 @@ test('L: a global rule that reads a token follows a theme switch, with no reload
   await page.getByTestId('theme-switch').click()
   await expect(page.locator('html')).toHaveClass(/scheme-light/)
   await expect.poll(() => readBody(page), 'the body in light').toEqual(expectedBody(LIGHT, true))
-  const stayed = await page.evaluate(() => (window as unknown as { __stayed?: boolean }).__stayed)
-  expect(stayed, 'the page did not reload').toBe(true)
+  const hasStayed = await page.evaluate(
+    () => (window as unknown as { __hasStayed?: boolean }).__hasStayed
+  )
+  expect(hasStayed, 'the page did not reload').toBe(true)
   expectGlobalRules(await collectKeyframesAndGlobals(page), true)
 })

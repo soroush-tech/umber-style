@@ -22,9 +22,9 @@ function toPlain(value: unknown, path: string, dropped: string[]): unknown {
     return DROPPED
   }
   if (typeof value !== 'object' || value === null) return value
-  const at = (key: string | number) => (path === '' ? String(key) : `${path}.${key}`)
+  const joinPath = (key: string | number) => (path === '' ? String(key) : `${path}.${key}`)
   if (Array.isArray(value)) {
-    const items = value.map((item: unknown, index) => toPlain(item, at(index), dropped))
+    const items = value.map((item: unknown, index) => toPlain(item, joinPath(index), dropped))
     // A member left out of a list stays a place in it, with nothing in it.
     const plain = items.map((item) => (item === DROPPED ? undefined : item))
     return plain.every((item, index) => item === value[index]) ? value : plain
@@ -34,7 +34,7 @@ function toPlain(value: unknown, path: string, dropped: string[]): unknown {
     return DROPPED
   }
   const entries = Object.entries(value).map(
-    ([key, member]) => [key, toPlain(member, at(key), dropped)] as const
+    ([key, member]) => [key, toPlain(member, joinPath(key), dropped)] as const
   )
   const kept = entries.filter(([, member]) => member !== DROPPED)
   const isSame =

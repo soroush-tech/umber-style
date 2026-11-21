@@ -32,7 +32,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..')
-const keep = process.argv.includes('--keep')
+const shouldKeep = process.argv.includes('--keep')
 // Where each package lives, in the order they are published.
 const PACKAGES = [
   { dir: 'core', name: '@umber-style/core' },
@@ -116,7 +116,7 @@ const ENTRIES = {
   'umber-style/vue': ['createStyle', 'styled', 'ThemeProvider', 'useTheme', 'Global', 'css'],
 }
 
-const windows = process.platform === 'win32'
+const isWindows = process.platform === 'win32'
 const failures = []
 const fail = (message) => {
   failures.push(message)
@@ -130,27 +130,27 @@ const check = (condition, message) => (condition ? pass(message) : fail(message)
  * are scripts, which only a shell starts: the line is quoted here, as one string.
  */
 const run = (command, args, options = {}) => {
-  const shell = windows && ['npm', 'npx', 'pnpm'].includes(command)
-  const result = shell
+  const needsShell = isWindows && ['npm', 'npx', 'pnpm'].includes(command)
+  const result = needsShell
     ? spawnSync([command, ...args.map((arg) => JSON.stringify(arg))].join(' '), {
         encoding: 'utf8',
         shell: true,
         ...options,
       })
     : spawnSync(command, args, { encoding: 'utf8', ...options })
-  return { ok: result.status === 0, out: `${result.stdout ?? ''}${result.stderr ?? ''}` }
+  return { isOk: result.status === 0, out: `${result.stdout ?? ''}${result.stderr ?? ''}` }
 }
-const must = (result, what) => {
-  if (result.ok) return result.out
+const readOutput = (result, what) => {
+  if (result.isOk) return result.out
   console.error(result.out)
   throw new Error(`${what} failed`)
 }
 
 /** Every string in a package.json field (an exports map, a path), with its place. */
-const leaves = (value, place = []) =>
+const listLeaves = (value, place = []) =>
   typeof value === 'string'
     ? [{ place: place.join('.'), path: value }]
-    : Object.entries(value ?? {}).flatMap(([key, child]) => leaves(child, [...place, key]))
+    : Object.entries(value ?? {}).flatMap(([key, child]) => listLeaves(child, [...place, key]))
 
 for (const { dir } of PACKAGES) {
   if (!existsSync(join(repoRoot, 'packages', dir, 'dist'))) {
@@ -171,7 +171,7 @@ try {
   // 1. Pack, and inspect what is in each tarball.
   const files = {}
   for (const { dir, name } of PACKAGES) {
-    must(
+    readOutput(
       run('pnpm', ['pack', '--pack-destination', tarballs], {
         cwd: join(repoRoot, 'packages', dir),
       }),
@@ -184,11 +184,14 @@ try {
     const into = join(extracted, dir)
     mkdirSync(into)
     // Relative paths: a drive letter in an argument makes GNU tar look for a remote host.
-    must(run('tar', ['-xzf', file, '-C', `../extracted/${dir}`], { cwd: tarballs }), `tar ${file}`)
+    readOutput(
+      run('tar', ['-xzf', file, '-C', `../extracted/${dir}`], { cwd: tarballs }),
+      `tar ${file}`
+    )
     const root = join(into, 'package')
     const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'))
     const paths = [
-      ...leaves(pkg.exports),
+      ...listLeaves(pkg.exports),
       ...['main', 'module', 'types'].map((key) => ({ place: key, path: pkg[key] })),
     ]
     check(pkg.private !== true, `${name}: not private`)
@@ -220,7 +223,7 @@ try {
   }
 
   // 2. A consumer outside the workspace: the tarballs, resolving each other, and their peers.
-  const version = (dir, field, name) =>
+  const readVersion = (dir, field, name) =>
     JSON.parse(readFileSync(join(repoRoot, 'packages', dir, 'package.json'), 'utf8'))[field][name]
   const direct = Object.fromEntries(
     Object.entries(files).map(([name, file]) => [name, `file:./tarballs/${file}`])
@@ -271,13 +274,13 @@ try {
         private: true,
         dependencies: {
           ...direct,
-          react: version('react', 'devDependencies', 'react'),
-          'react-dom': version('react', 'devDependencies', 'react-dom'),
-          vue: version('vue', 'devDependencies', 'vue'),
+          react: readVersion('react', 'devDependencies', 'react'),
+          'react-dom': readVersion('react', 'devDependencies', 'react-dom'),
+          vue: readVersion('vue', 'devDependencies', 'vue'),
           'react-native': 'file:./react-native-stub',
-          '@types/react': version('react', 'devDependencies', '@types/react'),
-          '@types/node': version('react', 'devDependencies', '@types/node'),
-          typescript: version('react', 'devDependencies', 'typescript'),
+          '@types/react': readVersion('react', 'devDependencies', '@types/react'),
+          '@types/node': readVersion('react', 'devDependencies', '@types/node'),
+          typescript: readVersion('react', 'devDependencies', 'typescript'),
         },
         // The tarballs name each other with exact versions that npm does not hold yet: resolve
         // them to the tarballs given above.
@@ -287,7 +290,7 @@ try {
       2
     )
   )
-  must(
+  readOutput(
     run('npm', ['install', '--no-audit', '--no-fund', '--ignore-scripts'], { cwd: consumer }),
     'npm install in the consumer'
   )
@@ -302,7 +305,7 @@ try {
   check(nested.length === 0, 'one copy of @umber-style/core is installed')
 
   // 3. Node: import and require of every entry, in one script for each format.
-  const body = (format) => `
+  const createBody = (format) => `
 const results = {}
 const need = async (specifier, names) => {
   const mod = await load(specifier)
@@ -356,28 +359,31 @@ writeFileSync('keys-${format}.json', JSON.stringify(results, null, 2))
 `
   writeFileSync(
     join(consumer, 'check.mjs'),
-    `const load = (specifier) => import(specifier)\n${body('esm')}`
+    `const load = (specifier) => import(specifier)\n${createBody('esm')}`
   )
   writeFileSync(
     join(consumer, 'check.cjs'),
-    `const load = async (specifier) => require(specifier)\n;(async () => {${body('cjs')}})().catch((error) => { console.error(error); process.exit(1) })\n`
+    `const load = async (specifier) => require(specifier)\n;(async () => {${createBody('cjs')}})().catch((error) => { console.error(error); process.exit(1) })\n`
   )
   const esm = run('node', ['check.mjs'], { cwd: consumer })
-  check(esm.ok, 'ESM: every entry loads, one core, a styled component renders')
-  if (!esm.ok) console.error(esm.out)
+  check(esm.isOk, 'ESM: every entry loads, one core, a styled component renders')
+  if (!esm.isOk) console.error(esm.out)
   const cjs = run('node', ['check.cjs'], { cwd: consumer })
-  check(cjs.ok, 'CJS: every entry loads, one core, a styled component renders')
-  if (!cjs.ok) console.error(cjs.out)
-  if (esm.ok && cjs.ok) {
-    const a = JSON.parse(readFileSync(join(consumer, 'keys-esm.json'), 'utf8'))
-    const b = JSON.parse(readFileSync(join(consumer, 'keys-cjs.json'), 'utf8'))
+  check(cjs.isOk, 'CJS: every entry loads, one core, a styled component renders')
+  if (!cjs.isOk) console.error(cjs.out)
+  if (esm.isOk && cjs.isOk) {
+    const esmKeys = JSON.parse(readFileSync(join(consumer, 'keys-esm.json'), 'utf8'))
+    const cjsKeys = JSON.parse(readFileSync(join(consumer, 'keys-cjs.json'), 'utf8'))
     for (const specifier of Object.keys(ENTRIES)) {
       check(
-        JSON.stringify(a[specifier]) === JSON.stringify(b[specifier]),
-        `${specifier}: import and require give the same names (${a[specifier].length})`
+        JSON.stringify(esmKeys[specifier]) === JSON.stringify(cjsKeys[specifier]),
+        `${specifier}: import and require give the same names (${esmKeys[specifier].length})`
       )
     }
-    check(a.html === b.html, 'the server render is the same from import and from require')
+    check(
+      esmKeys.html === cjsKeys.html,
+      'the server render is the same from import and from require'
+    )
   }
 
   // 4. The export conditions.
@@ -435,8 +441,8 @@ if (expected === 'server') {
       ['conditions.cjs', 'require'],
     ]) {
       const result = run('node', [...flags, file, expected], { cwd: consumer })
-      check(result.ok, `${label}, ${what}`)
-      if (!result.ok) console.error(result.out)
+      check(result.isOk, `${label}, ${what}`)
+      if (!result.isOk) console.error(result.out)
     }
   }
 
@@ -562,11 +568,11 @@ export const ServerBox = styled.div({ padding: 4 })
   ]) {
     writeFileSync(join(consumer, file), JSON.stringify({ compilerOptions, include }, null, 2))
     const result = run('npx', ['--no-install', 'tsc', '-p', file], { cwd: consumer })
-    check(result.ok, `types: ${what}`)
-    if (!result.ok) console.error(result.out)
+    check(result.isOk, `types: ${what}`)
+    if (!result.isOk) console.error(result.out)
   }
 } finally {
-  if (keep) console.log(`kept ${work}`)
+  if (shouldKeep) console.log(`kept ${work}`)
   else rmSync(work, { recursive: true, force: true })
 }
 

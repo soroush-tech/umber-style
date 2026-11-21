@@ -2,7 +2,9 @@ import { cache as reactCache } from 'react'
 
 /** The state of one request: the value, and whether a provider has written it. */
 export interface ServerSlot<T> {
+  /** The value of the request, the default until a provider writes it. */
   current: T
+  /** Whether a provider has written `current` in this request. */
   isSet: boolean
 }
 

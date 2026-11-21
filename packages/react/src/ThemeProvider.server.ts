@@ -18,7 +18,7 @@ import type { WebThemeProviderProps } from './types'
 /** What the provider of the server build reads of the request and of the style. */
 export interface ServerProviderParts<T> {
   /** The slot of the request: the theme of the first provider that renders in it, and whether one has. */
-  first(): ServerSlot<DeepPartial<T> | undefined>
+  readFirstSlot(): ServerSlot<DeepPartial<T> | undefined>
   /** The base theme of the style, or an empty object when it has none. */
   readBaseTheme(): T
 }
@@ -46,7 +46,7 @@ export interface ServerProviderParts<T> {
  */
 export function createThemeProvider<T extends object>(
   engine: Engine<T>,
-  { first, readBaseTheme }: ServerProviderParts<T>
+  { readFirstSlot, readBaseTheme }: ServerProviderParts<T>
 ) {
   const prefix = engine.cache.prefix
   // The token options as plain data, one object for the engine.
@@ -125,7 +125,8 @@ export function createThemeProvider<T extends object>(
     props: WebThemeProviderProps<T>,
     isFirst: boolean
   ): ScopeTheme => {
-    const key = [props.colorScheme, props.className, props.as, isFirst].join('|')
+    const { colorScheme, className, as } = props
+    const key = [colorScheme, className, as, isFirst].join('|')
     const known = described.get(given) ?? new Map()
     described.set(given, known)
     let made = known.get(key)
@@ -141,7 +142,7 @@ export function createThemeProvider<T extends object>(
     const given = resolveThemeInput(theme, readBaseTheme())
     // The first provider of the request sends the stamp, and its theme gives the shape of the view of
     // function styles where the style has no base theme.
-    const slot = first()
+    const slot = readFirstSlot()
     const isFirst = !slot.isSet
     if (isFirst) {
       slot.isSet = true

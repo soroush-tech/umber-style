@@ -4,20 +4,27 @@ import { extractPageStyleParts, type Cache } from '@umber-style/core'
 export interface StyleChunk {
   /** `<key>-global` for the rules that no class stands for, `<key>` for the rules of the classes. */
   key: string
+  /** What the rules of the chunk stand for: theme classes and global ids, or class names. */
   ids: string[]
+  /** The CSS text of the chunk. */
   css: string
 }
 
 /** What `extractCritical` returns: the HTML it was given, the CSS of the page, and the ids it covers. */
 export interface CriticalStyles {
+  /** The HTML of the page, as it was given. */
   html: string
+  /** The CSS that the page needs: the rules that no class stands for, then those of its classes. */
   css: string
+  /** What the rules stand for: theme classes, global ids and class names. */
   ids: string[]
 }
 
 /** What `extractCriticalToChunks` returns: the HTML it was given, and the CSS of the page in chunks. */
 export interface CriticalChunks {
+  /** The HTML of the page, as it was given. */
   html: string
+  /** The `<key>-global` chunk, then the `<key>` chunk. */
   styles: StyleChunk[]
 }
 
@@ -85,8 +92,8 @@ export default function createInstance(cache: Cache): ServerInstance {
       const tags = constructStyleTagsFromChunks(extractCriticalToChunks(html))
       const head = HEAD_PATTERN.exec(html)
       if (head === null) return tags + html
-      const at = head.index + head[0].length
-      return html.slice(0, at) + tags + html.slice(at)
+      const headEnd = head.index + head[0].length
+      return html.slice(0, headEnd) + tags + html.slice(headEnd)
     },
   }
 }

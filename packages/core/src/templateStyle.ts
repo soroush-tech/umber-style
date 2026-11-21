@@ -38,11 +38,11 @@ type TemplateNode = number | Declaration | Block
 // same strings array, so its text is split once, and each call only fills in the values.
 const templates = new WeakMap<readonly string[], TemplateNode[]>()
 
-/** Throws the `TypeError` of a template that cannot be read: `problem`, with the line and the text around `at`. */
-function fail(text: string, at: number, problem: string): never {
-  const line = text.slice(0, at).split('\n').length
+/** Throws the `TypeError` of a template that cannot be read: `problem`, with the line and the text around `index`. */
+function fail(text: string, index: number, problem: string): never {
+  const line = text.slice(0, index).split('\n').length
   const around = text
-    .slice(Math.max(0, at - 30), at + 10)
+    .slice(Math.max(0, index - 30), index + 10)
     .replaceAll(HOLE, `\${}`)
     .replace(/\s+/g, ' ')
     .trim()
@@ -78,7 +78,7 @@ interface ParseState {
   /** The template's strings joined with `HOLE`. */
   readonly text: string
   /** The blocks that are open, each with the statements it was opened in and where its `{` is. */
-  readonly open: [parent: TemplateNode[], at: number][]
+  readonly open: [parent: TemplateNode[], index: number][]
   /** The statements of the innermost open block (of the template, at the top). */
   body: TemplateNode[]
   // The statement being read: its pieces, the text not yet in them, and where its first ':' is.
@@ -99,7 +99,7 @@ function flush(state: ParseState): void {
 }
 
 /** Adds a space to the statement, unless it already ends with one. */
-function space(state: ParseState): void {
+function addSpace(state: ParseState): void {
   if (!state.chunk.endsWith(' ')) state.chunk += ' '
 }
 
@@ -115,9 +115,9 @@ function addHole(state: ParseState): void {
 }
 
 /** Adds the declaration that was read to the block: the pieces before its first ':' are its key, the rest its value. */
-function endDeclaration(state: ParseState, at: number): void {
+function endDeclaration(state: ParseState, index: number): void {
   const key = join(state.pieces.slice(0, state.split))
-  if (key === '') fail(state.text, at, 'a declaration without a property')
+  if (key === '') fail(state.text, index, 'a declaration without a property')
   state.body.push({
     key: typeof key === 'string' ? toKey(key) : key,
     value: join(state.pieces.slice(state.split + 1)),
@@ -125,18 +125,18 @@ function endDeclaration(state: ParseState, at: number): void {
 }
 
 /** Adds the interpolations that were read without a ':' to the block, each a statement of its own; any other text is a declaration without one. */
-function endInterpolations(state: ParseState, at: number): void {
+function endInterpolations(state: ParseState, index: number): void {
   for (const piece of state.pieces) {
     if (typeof piece === 'number') state.body.push(piece)
-    else if (piece.trim()) fail(state.text, at, 'a declaration without ":"')
+    else if (piece.trim()) fail(state.text, index, 'a declaration without ":"')
   }
 }
 
-/** Ends the statement being read at `at`, and starts the next one. */
-function end(state: ParseState, at: number): void {
+/** Ends the statement being read at `index`, and starts the next one. */
+function end(state: ParseState, index: number): void {
   flush(state)
-  if (state.split >= 0) endDeclaration(state, at)
-  else endInterpolations(state, at)
+  if (state.split >= 0) endDeclaration(state, index)
+  else endInterpolations(state, index)
   state.pieces = []
   state.split = -1
 }
@@ -164,18 +164,18 @@ function readString(state: ParseState, index: number): number {
   const { text } = state
   const quote = text[index]
   state.chunk += quote
-  let at = index + 1
-  while (text[at] !== quote) {
-    if (at >= text.length) fail(text, index, 'an unclosed string')
-    if (text[at] === HOLE) {
+  let position = index + 1
+  while (text[position] !== quote) {
+    if (position >= text.length) fail(text, index, 'an unclosed string')
+    if (text[position] === HOLE) {
       addHole(state)
-      at++
+      position++
     } else {
-      at = readEscaped(state, at)
+      position = readEscaped(state, position)
     }
   }
   state.chunk += quote
-  return at + 1
+  return position + 1
 }
 
 /** Reads the comment that starts at `index`: it is a space. Returns the index after its `*` and `/`. */
@@ -183,7 +183,7 @@ function readComment(state: ParseState, index: number): number {
   const close = state.text.indexOf('*/', index + 2)
   if (close < 0) fail(state.text, index, 'an unclosed comment')
   skip(state, index, close)
-  space(state)
+  addSpace(state)
   return close + 2
 }
 
@@ -263,7 +263,7 @@ function readStatementChar(state: ParseState, char: string, index: number): void
 
 /** Reads `char` at `index`, which starts nothing longer: whitespace, a character in parentheses, or one of a statement. */
 function readChar(state: ParseState, char: string, index: number): void {
-  if (char <= ' ') space(state)
+  if (char <= ' ') addSpace(state)
   else if (state.depth > 0 || char === '(') readParenthesized(state, char, index)
   else readStatementChar(state, char, index)
 }

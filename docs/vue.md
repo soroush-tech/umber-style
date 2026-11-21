@@ -6,7 +6,7 @@ After this page you can use the Vue binding: the provider, a reactive `useTheme`
 
 ## Getting the API
 
-`createStyle(theme, options)` and the direct imports work as in [React](react.md): `configure({ prefix, theme })` before first use, or `createStyle(theme)` for a typed, separate engine. The result of `createStyle` also has `engine` and `cache`, and the default style has `getEngine()`.
+`createStyle(theme, options)` and the direct imports work as in [React](react.md): `configure({ prefix, theme })` before first use, or `createStyle(theme)` for a typed, separate engine. The result of `createStyle` also has `engine` and `cache`, and the default style has `getEngine()`. `bindEngine(engine)` gives the same API over an engine you made yourself with `createEngine` of the core.
 
 ## A themed component and a sheet
 

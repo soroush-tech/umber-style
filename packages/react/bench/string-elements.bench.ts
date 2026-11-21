@@ -9,7 +9,7 @@
 // sheet.
 import type { BenchConfig } from '@soroush.tech/bench'
 import { binding, fixtures, renderToString } from './client'
-import { kinds, labels, type Kind } from '../../../bench/src/components'
+import { KINDS, LABELS, type Kind } from '../../../bench/src/components'
 import { createComponents, theme } from './fixtures'
 
 const { createBenchOptions, createFortyEight, provide } = fixtures
@@ -24,5 +24,5 @@ function prepare(kind: Kind): () => string {
 
 export default {
   name: 'react: render to string, 48 elements',
-  cases: Object.fromEntries(kinds.map((kind) => [`48 elements, ${labels[kind]}`, prepare(kind)])),
+  cases: Object.fromEntries(KINDS.map((kind) => [`48 elements, ${LABELS[kind]}`, prepare(kind)])),
 } satisfies BenchConfig

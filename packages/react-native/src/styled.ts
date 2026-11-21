@@ -17,7 +17,7 @@ type StyleFunction = (props: Record<string, unknown>) => StyleResult
  */
 type Kind = 'function' | 'fixed' | 'window' | 'conditional'
 
-const NO_KEYS: StyleKeys = { conditional: false, scheme: false, queries: [] }
+const NO_KEYS: StyleKeys = { isConditional: false, hasScheme: false, queries: [] }
 
 /** The name a component is known by: its `displayName`, else the name of its function; undefined when it has neither. */
 function readComponentName(component: Exclude<ElementType, string>): string | undefined {
@@ -59,12 +59,12 @@ export function createStyled<T>(
       )
       const kinds = styles.map((style, index): Kind => {
         if (typeof style === 'function') return 'function'
-        if (keys[index].conditional) return 'conditional'
+        if (keys[index].isConditional) return 'conditional'
         return keys[index].queries.length > 0 ? 'window' : 'fixed'
       })
       // The queries of the object styles come first, so that the key of a render starts with theirs.
       const queries = joinQueries(keys.map((found) => found.queries))
-      const hasScheme = keys.some((found) => found.scheme)
+      const hasScheme = keys.some((found) => found.hasScheme)
 
       /** The object styles of `kind`, resolved for `state` and registered with the platform. */
       const register = (kind: Kind, state?: WindowState): Record<string, NativeStyleObject> => {
@@ -147,8 +147,9 @@ export function createStyled<T>(
           if (result) found = collectKeys(result, found)
         }
         const all = found === undefined ? queries : joinQueries([queries, found.queries])
-        const watchesScheme = (hasScheme || !!found?.scheme) && condition.colorScheme === undefined
-        const key = useMediaKey(all, watchesScheme, remBase)
+        const shouldWatchScheme =
+          (hasScheme || !!found?.hasScheme) && condition.colorScheme === undefined
+        const key = useMediaKey(all, shouldWatchScheme, remBase)
         return render(props, key, condition, results, readStateFor(all))
       }
       if (kinds.includes('function')) return DynamicStyled

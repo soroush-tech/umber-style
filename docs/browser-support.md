@@ -28,15 +28,15 @@ A rule that a browser rejects is skipped when it is inserted (`createDomSheet` c
 
 ## Platforms and tools
 
-| Part              | What the packages declare or were tested with                                                                                  |
-| ----------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| React             | Peer dependency `^19.2.8`. Tested with 19.3.1                                                                                  |
-| Vue               | Peer dependency `^3.5.0`. Tested with 3.5.45                                                                                   |
-| React Native      | Optional peer dependency `>=0.76.0`. Compiled against 0.88.1 types. Never run in an app                                        |
-| TypeScript        | Tested with 7.0.2                                                                                                              |
-| Node              | The core and the bindings render on a server in Node. The repository's `.nvmrc` names Node 26 for development                  |
-| Server components | React 19, using `React.cache` and `<style href precedence>`. Never run in a bundler                                            |
-| Module format     | The packages are consumed as TypeScript source inside the repository. Nothing is published, so no built format is promised yet |
+| Part              | What the packages declare or were tested with                                                                                                                          |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| React             | Peer dependency `^19.2.8`. Tested with 19.3.1                                                                                                                          |
+| Vue               | Peer dependency `^3.5.0`. Tested with 3.5.45                                                                                                                           |
+| React Native      | Optional peer dependency `>=0.76.0`. Compiled against 0.88.1 types. Never run in an app                                                                                |
+| TypeScript        | Tested with 7.0.2                                                                                                                                                      |
+| Node              | The core and the bindings render on a server in Node. The repository's `.nvmrc` names Node 26 for development                                                          |
+| Server components | React 19, using `React.cache` and `<style href precedence>`. Never run in a bundler                                                                                    |
+| Module format     | Published as ESM (`.mjs`) and CommonJS (`.cjs`), each with its declarations (`.d.mts`, `.d.cts`). Inside the repository the packages are consumed as TypeScript source |
 
 ## Limits
 

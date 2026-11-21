@@ -3,7 +3,9 @@ import { createGlobalMarker, type Cache, type GlobalRules } from '@umber-style/c
 
 /** A `<style href precedence>` element, as data: what a server component can hand to a client component. */
 export interface StyleText {
+  /** The `href` of the element, which React renders once however many elements name it. */
   readonly href: string
+  /** The CSS text of the element. */
   readonly text: string
 }
 

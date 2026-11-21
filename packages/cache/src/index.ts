@@ -10,6 +10,7 @@ import {
 
 export type { SerializedRule, UmberCache, UmberSheet } from '@umber-style/core'
 
+/** The options of `createCache`: those of the engine's cache, with `key` in place of its `prefix`. */
 export interface UmberCacheOptions extends Omit<CacheOptions, 'prefix' | 'onInsert'> {
   /** The first part of every class name and variable, and the key of the style elements: the `prefix` of the engine's cache. Lowercase letters, digits and hyphens, starting with a letter. */
   key: string

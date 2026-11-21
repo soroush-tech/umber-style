@@ -3,7 +3,9 @@ import type { StyleObject } from './serialize'
 
 /** A group of rules that the cache wrote: its name, and its CSS text as written (layer included). */
 export interface SerializedRule {
+  /** The name of the group, as `CacheOptions.onInsert` gets it: a class, a theme class, a global id, `@keyframes:<name>`. */
   name: string
+  /** The CSS text of the group, as the sheet got it. */
   styles: string
 }
 
@@ -30,6 +32,7 @@ export interface UmberCache extends Cache {
   inserted: Record<string, string | true>
   /** The style object of each class this cache made (a map), also readable by class name: `registered[className]` is `true` for such a class. */
   readonly registered: ReadonlyMap<string, StyleObject> & { readonly [className: string]: unknown }
+  /** The style elements of the cache, which its `tags` lists. */
   readonly sheet: UmberSheet
   /**
    * Called by the cache after it writes a group of rules (`selector` is '', `serialized` the name and

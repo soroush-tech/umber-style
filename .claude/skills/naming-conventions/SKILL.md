@@ -37,6 +37,11 @@ const hasEncryption = true
 The same holds for boolean options and fields: the engine's options and arguments are named
 `hasDevChecks`, `hasValueRepair`, `isRendered`, and a type guard is `isAlphaColor`.
 
+A name that mirrors a platform term, or an interface kept for compatibility, keeps that name:
+`compat` on the cache object, `defaultMatches` (it mirrors the browser's `matches`), and a prop or
+option that carries a CSS or platform word (`wrap`, `reducedMotion`, `colorScheme`). Every other
+boolean takes the prefix.
+
 ## Functions & Methods - camelCase + verb prefix
 
 ```ts
@@ -63,9 +68,12 @@ const isNotSize = (prop: string) => prop !== 'size'
 const shouldForwardInputProps = (prop: string) => prop !== 'size'
 ```
 
-The public names that every binding shares (`styled`, `css`, `keyframes`, `globalStyles`, `alpha`,
-`at`, `apply`) are API, kept the same in each binding (`AGENTS.md`); they are not renamed to fit
-this rule.
+The public API of the engine and its bindings is exempt: a public name that is established is not
+renamed to fit this rule. That covers the names every binding shares (`styled`, `css`, `keyframes`,
+`globalStyles`, `alpha`, `at`, `apply`; `AGENTS.md`) and the exports and methods that users call by
+a noun or a short name (`themeClass`, `themeId`, `scopeClass`, `when`, `whenScheme`, `refs`, `cssIn`,
+`cssWith`, `cssHeld`, `cx`, and the like). An internal helper, exported from its file or not,
+follows the rule.
 
 ## Classes - PascalCase
 
@@ -115,8 +123,11 @@ const secondsInDay = 86400
 const SECONDS_IN_DAY = 86400
 ```
 
-Use `UPPER_SNAKE_CASE` for truly fixed, non-reassignable module-level values (`ROOT_SELECTOR`,
-`HEX_PATTERN` in `@umber-style/core`). Mutable module-level variables stay camelCase.
+Use `UPPER_SNAKE_CASE` for the fixed values at module scope that are data: a primitive, a regular
+expression, a list of keys, a lookup table (`ROOT_SELECTOR`, `HEX_PATTERN` in `@umber-style/core`,
+a `Set` of property names, a map from a name to a value). A fixed object that is a thing with a
+name of its own stays camelCase: a theme (`lightTheme`), a `keyframes` or `globalStyles` handle, a
+sheet. Mutable module-level variables stay camelCase.
 
 ## Private - \_ prefix
 
@@ -136,7 +147,8 @@ reports every other one.
 
 - `snake_case` for variables or functions
 - `kebab-case` in identifiers (`first-name` is a syntax error)
-- Single-letter or cryptic names (`val`, `tmp`, `x`) outside loop counters
+- Single-letter or cryptic names (`val`, `tmp`, `x`) outside loop counters, and `at` for a
+  position in a string or a list (it is also the name of a public helper): `index`, `position`
 - Adding a comment to explain what a name means - rename instead
 
 If the arguments name a file, read it and apply these rules. Otherwise apply to the code being

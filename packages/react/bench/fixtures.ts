@@ -8,7 +8,7 @@ import {
   cellStyle,
   createFixedStyle,
   createSheetEntries,
-  keyOf,
+  createLayoutKey,
   LAYOUT_PROPS,
   themedStyle,
   TONES,
@@ -87,7 +87,7 @@ export function createFixtures(react: typeof React, core: typeof Core) {
   function createFortyEight(components: Components, kind: Kind): React.ReactNode[] {
     const { Fixed, Themed, Flex, sheet } = components
     return combinations.map((props) => {
-      const key = keyOf(props)
+      const key = createLayoutKey(props)
       switch (kind) {
         case 'fixed':
           return h(Fixed, { key })

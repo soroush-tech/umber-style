@@ -14,7 +14,7 @@ export interface MediaQueryOptions {
  * preference, the platform's default) until it does: the answer is asked for when the first component
  * subscribes, and a change re-renders the components whose queries it changes.
  */
-let reducedMotion = false
+let isReducedMotion = false
 const listeners = new Set<() => void>()
 const subscriptions: { remove(): void }[] = []
 
@@ -24,15 +24,15 @@ function notify(): void {
 }
 
 function setReducedMotion(value: boolean): void {
-  if (value === reducedMotion) return
-  reducedMotion = value
+  if (value === isReducedMotion) return
+  isReducedMotion = value
   notify()
 }
 
 /** The window and the system settings now: the size and the color scheme are read from the platform, reduced motion is the last answer. */
 export function readWindowState(): WindowState {
   const { width, height } = platformDimensions.get('window')
-  return { width, height, colorScheme: platformAppearance.getColorScheme(), reducedMotion }
+  return { width, height, colorScheme: platformAppearance.getColorScheme(), isReducedMotion }
 }
 
 /**

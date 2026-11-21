@@ -3,6 +3,7 @@ import { chromium } from '@playwright/test'
 import lighthouse from 'lighthouse'
 import desktopConfig from 'lighthouse/core/config/desktop-config.js'
 
+/** The numbers of one Lighthouse run of a page. */
 export interface LighthouseNumbers {
   /** The performance score, 0 to 1. */
   score: number
@@ -16,7 +17,7 @@ export interface LighthouseNumbers {
   transferBytes: number
 }
 
-async function freePort(): Promise<number> {
+async function findFreePort(): Promise<number> {
   return new Promise((resolve, reject) => {
     const server = createServer()
     server.listen(0, () => {
@@ -35,7 +36,7 @@ async function freePort(): Promise<number> {
  * driving the same Chromium that Playwright installs: Playwright launches it with a debugging port.
  */
 export async function runLighthouse(url: string): Promise<LighthouseNumbers> {
-  const port = await freePort()
+  const port = await findFreePort()
   const browser = await chromium.launch({ args: [`--remote-debugging-port=${port}`] })
   try {
     const run = await lighthouse(
@@ -45,7 +46,7 @@ export async function runLighthouse(url: string): Promise<LighthouseNumbers> {
     )
     if (!run) throw new Error('Lighthouse returned no result')
     const { lhr } = run
-    const savings = (id: string) =>
+    const readSavings = (id: string) =>
       Number(
         (lhr.audits[id]?.details as { overallSavingsBytes?: number } | undefined)
           ?.overallSavingsBytes ?? 0
@@ -53,8 +54,8 @@ export async function runLighthouse(url: string): Promise<LighthouseNumbers> {
     return {
       score: lhr.categories.performance.score ?? 0,
       totalBlockingTime: Number(lhr.audits['total-blocking-time'].numericValue ?? 0),
-      unusedCssBytes: savings('unused-css-rules'),
-      unusedJavaScriptBytes: savings('unused-javascript'),
+      unusedCssBytes: readSavings('unused-css-rules'),
+      unusedJavaScriptBytes: readSavings('unused-javascript'),
       transferBytes: Number(lhr.audits['total-byte-weight'].numericValue ?? 0),
     }
   } finally {

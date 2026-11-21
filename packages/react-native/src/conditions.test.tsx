@@ -86,7 +86,7 @@ describe('toNativeStyle with conditions', () => {
   })
 
   it('tells a style that has a condition key, in its native part too', () => {
-    const hasConditions = (style: Record<string, unknown>) => !!collectKeys(style)?.conditional
+    const hasConditions = (style: Record<string, unknown>) => !!collectKeys(style)?.isConditional
     expect(hasConditions({ padding: 1 })).toBe(false)
     expect(hasConditions({ native: { padding: 1 } })).toBe(false)
     expect(hasConditions({ '@scheme dark': {} })).toBe(true)

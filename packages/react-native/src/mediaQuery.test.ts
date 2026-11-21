@@ -1,7 +1,7 @@
 import { isMediaKey, readMediaQuery, type WindowState } from './mediaQuery'
 
-const phone: WindowState = { width: 400, height: 800, colorScheme: 'light', reducedMotion: false }
-const tablet: WindowState = { width: 1024, height: 768, colorScheme: 'dark', reducedMotion: true }
+const phone: WindowState = { width: 400, height: 800, colorScheme: 'light', isReducedMotion: false }
+const tablet: WindowState = { width: 1024, height: 768, colorScheme: 'dark', isReducedMotion: true }
 
 /** Whether `query` matches `state`, with `1rem` 16 pixels unless `remBase` is given. */
 const matches = (query: string, state: WindowState, remBase = 16) =>

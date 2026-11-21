@@ -23,7 +23,9 @@ import { injectCache } from './CacheProvider'
 
 /** The wrapper of a nested provider: its element and its class string, which `ThemeScope` repeats. */
 export interface ThemeScopeValue {
+  /** The element of the wrapper. */
   readonly as: string
+  /** The class string of the wrapper: its theme class and markers. */
   readonly className: string
 }
 
@@ -35,9 +37,13 @@ export interface ThemeScopeValue {
  * another cache) is the outermost one of its cache.
  */
 export interface ThemeKeys<T> {
+  /** The real theme of the nearest provider. */
   theme: InjectionKey<ComputedRef<T>>
+  /** Its view: references for tokens. */
   view: InjectionKey<ComputedRef<T>>
+  /** The wrapper of the nearest nested provider, or null under the outermost one. */
   scope: InjectionKey<ComputedRef<ThemeScopeValue | null>>
+  /** The engine of the nearest provider. */
   engine: InjectionKey<Engine<T>>
 }
 

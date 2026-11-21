@@ -31,7 +31,7 @@ In the server components build the root theme can change from the server: a cook
 
 An engine has one root theme. Two outermost providers that share an engine (two React roots on one page, or two providers side by side with nothing above them) share the rule: the theme of the one that was written last is there, for both. See [Themes](themes.md).
 
-What the default does not give: a marker class at the root. `when(theme)` and `whenScheme()` work with classes (see [Theme conditions](theme-conditions.md)), and `:root` has none, so below the outermost provider and outside any nested one, `when(rootTheme)` does not match and `whenScheme()` follows the system preference, whatever `colorScheme` the provider has. A page that needs either at the root uses the class on `<html>`, below.
+The default gives no marker class at the root. `when(theme)` and `whenScheme()` work with classes (see [Theme conditions](theme-conditions.md)), and `:root` has none, so below the outermost provider and outside any nested one, `when(rootTheme)` does not match and `whenScheme()` follows the system preference, whatever `colorScheme` the provider has. A page that needs either at the root uses the class on `<html>`, below.
 
 ## The class on `<html>`: `isRoot`
 

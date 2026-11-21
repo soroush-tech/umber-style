@@ -56,7 +56,9 @@ if (isDisabled) {
 Every module exports by name. A default export exists only where a package's API is one function,
 as the default export of its entry or of a subpath (`@umber-style/cache`,
 `@umber-style/css/create-instance`, `@umber-style/server/create-instance`), and in
-`@umber-style/styled`, whose purpose is `styled` as a default export (`packages/packages.md`).
+`@umber-style/styled`, whose purpose is `styled` as a default export (`packages/packages.md`). A
+file in `fixtures/` whose default export a framework requires (a page, a layout, the config of
+Next.js, Vike or Vite) is exempt.
 
 Export a type by name next to the value it describes.
 
@@ -78,8 +80,10 @@ export { isDevelopment } from './devChecks'
 
 ### Doc comments on what is exported
 
-Exported functions, interfaces, types and their fields carry a `/** ... */` comment that says what
-the thing is or returns, in a sentence. An ordinary comment explains why the code is the way it is
+Every exported function, interface and type carries a `/** ... */` comment that says what the
+thing is or returns, in a sentence. A field carries one when its name and type do not say
+everything a caller needs: every field of an option bag or a props type does; a field such as
+`readonly id: string` on a type whose own comment explains it does not. An ordinary comment explains why the code is the way it is
 (a constraint, a browser's behaviour, the reason for an import form), never what the next line
 does.
 
@@ -108,11 +112,17 @@ that shape code here:
 
 ---
 
-### `react-refresh/only-export-components` - extract, never disable
+### `react-refresh/only-export-components` - extract, never disable inline
 
-In the React layer, a file that mixes components with other exports (factories, plain functions,
-values) triggers `react-refresh/only-export-components`. Extract each non-component export into its
-own colocated file; never suppress the rule.
+The React layer (`.oxlintrc.react.json`) sets `react-refresh/only-export-components`: a file that
+mixes components with other exports (factories, plain functions, values) triggers it. The
+`.oxlintrc.json` of the four packages that extend that layer switches it off: `@umber-style/react`,
+whose `CacheProvider.tsx`, `ProviderScope.tsx` and `ThemeValue.tsx` hold a component (or the
+factory of one) together with the module state it shares with the rest of the binding (a context
+made once, the `isProvided` flag, the marks of the providers): a module variable is assigned only
+in its own module, so the component and the functions that read that state stay in one file; and `@umber-style/react-native`, `@umber-style/styled` and `umber-style`, which
+no file of theirs trips today. No linted file has the rule on. Where it is on, a file is split
+rather than the rule disabled, and an inline disable comment is never used anywhere.
 
 ```ts
 // Bad - Badge.tsx exports a component and a factory

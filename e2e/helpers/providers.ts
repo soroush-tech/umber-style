@@ -44,15 +44,19 @@ export const PROBE = {
 export interface ScenarioTools {
   /** Marks the console problems seen so far, and returns what forgets those seen since: the ones that the scenario causes on purpose. */
   markProblems(): () => void
+  /** The browser of the test, for a scenario that opens a context of its own. */
   browser: Browser
+  /** The fixture app the scenario runs on. */
   fixture: FixtureConfig
 }
 
+/** One scenario of the theme providers, which the production and the development tiers both run. */
 export interface ProviderScenario {
   /** The number of the scenario in the matrix, and what it checks. */
   title: string
   /** The key of a known failure in `fixture.known`, for a scenario that a real limit makes fail. */
   knownKey?: string
+  /** Drives `page` through the scenario and makes its assertions. */
   run(page: Page, tools: ScenarioTools): Promise<void>
 }
 

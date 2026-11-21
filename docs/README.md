@@ -38,16 +38,17 @@ These pages are the one set of documentation for every package below. A document
 
 ## The packages
 
-| Package                     | What it is                                                                                         |
-| --------------------------- | -------------------------------------------------------------------------------------------------- |
-| `@umber-style/core`         | The engine: tokens, the class cache, theme classes. It knows no framework                          |
-| `@umber-style/react`        | `styled`, `ThemeProvider`, `useTheme`, `StyleSheet`, `useStyle`, `apply` for React                 |
-| `@umber-style/react-native` | The same names for React Native, over the real theme values                                        |
-| `@umber-style/vue`          | The same names for Vue, with a reactive `useTheme`                                                 |
-| `umber-style`               | Re-exports the core at its root and each binding as `umber-style/react`, `/react-native`, `/vue`   |
-| `@umber-style/css`          | Class names from styles, with no framework and no theme: `css`, `cx`, `keyframes`, `injectGlobal`  |
-| `@umber-style/cache`        | `createCache({ key })`: the engine's cache with the members a server-rendering set-up reads        |
-| `@umber-style/server`       | `@umber-style/server/create-instance`: the CSS of one page as chunks and `<style data-umber>` tags |
+| Package                     | What it is                                                                                          |
+| --------------------------- | --------------------------------------------------------------------------------------------------- |
+| `@umber-style/core`         | The engine: tokens, the class cache, theme classes. It knows no framework                           |
+| `@umber-style/react`        | `styled`, `ThemeProvider`, `useTheme`, `StyleSheet`, `useStyle`, `apply` for React                  |
+| `@umber-style/react-native` | The same names for React Native, over the real theme values                                         |
+| `@umber-style/vue`          | The same names for Vue, with a reactive `useTheme`                                                  |
+| `umber-style`               | Re-exports the core at its root and each binding as `umber-style/react`, `/react-native`, `/vue`    |
+| `@umber-style/css`          | Class names from styles, with no framework and no theme: `css`, `cx`, `keyframes`, `injectGlobal`   |
+| `@umber-style/cache`        | `createCache({ key })`: the engine's cache with the members a server-rendering set-up reads         |
+| `@umber-style/server`       | `@umber-style/server/create-instance`: the CSS of one page as chunks and `<style data-umber>` tags  |
+| `@umber-style/styled`       | Legacy: the `styled` of `@umber-style/react` as a default export, for code that imports it that way |
 
 ## How these pages were checked
 
@@ -55,11 +56,13 @@ The CSS and HTML that these pages show as output come from real runs, with the p
 
 Every code example was compiled with the repository's TypeScript and run against the packages, or copied from a passing test. Where a statement rests on reasoning only, or on something that no test in the repository runs, the page says so in its "Limits" section.
 
-Some things have never been run: the React Native binding in a real app; `@umber-style/cache` and `@umber-style/server` in a real app or a real browser (the registry of [The cache and server packages](cache-and-server.md) runs in a unit test, with stand-ins for the framework's hook); and `@umber-style/css` in a real browser. The pages that depend on them say it.
-
 The server components build runs in the Next.js App Router fixture, and `Global` and `keyframes` run end to end in every fixture app (see [Testing](testing.md)). These run in a real browser (`pnpm test:browser`):
 
 - The transitions of registered tokens: `registered.browser.test.ts` checks that `@property` is accepted and a registered colour computes to a colour, that a colour transition on an element that uses the token is half way between both ends after a theme class change, that the token itself transitions on the element that carries the theme class, and that without registration the colour jumps.
 - The theme of the outermost provider on `:root`: `themeProvider.browser.test.tsx` checks that `<html>`, `<body>` and a `Global` rule for `body` see it, that a change of the theme switches every element, that a theme class on `<html>` wins over it, and that portal content reaches a nested provider's theme through `ThemeScope`.
 - Global rules and animations: `global.browser.test.ts`, `Global.browser.test.tsx` and `keyframes.browser.test.ts` check that a rule for `body` applies, loses to a component and is gone after its release, that a rule from a server page is taken over and not written again, and that a registered animation runs.
 - `hasValueRepair` (`valueRepair.browser.test.ts`: the repaired forms compute, the raw forms are dropped) and the development checker's question to `CSS.supports` (`unsupported.browser.test.ts`).
+
+## Limits
+
+Some things have never been run: the React Native binding in a real app; `@umber-style/cache` and `@umber-style/server` in a real app or a real browser (the registry of [The cache and server packages](cache-and-server.md) runs in a unit test, with stand-ins for the framework's hook); and `@umber-style/css` in a real browser. The pages that depend on them say it.

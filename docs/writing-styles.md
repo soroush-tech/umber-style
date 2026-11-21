@@ -85,7 +85,7 @@ const Box = styled.div<{ tone?: string }>(({ tone }) => ({ color: tone }))
 const Icon = styled.svg({ fill: 'red' })
 ```
 
-`@umber-style/styled` has the same `styled` of the default style as its default export, for code that imports it that way: `import styled from '@umber-style/styled'`. Under the `react-server` condition it is the `styled` of the server build.
+`@umber-style/styled` has the same `styled` of the default style as its default export, for code that imports it that way: `import styled from '@umber-style/styled'`. Under the `react-server` condition it is the `styled` of the server build. It is a legacy entry for React only: it holds one line, a re-export of the `styled` of `@umber-style/react`, so that code written for a default export changes only the name of the package. New code imports `styled` from `@umber-style/react` and does not need it: the two are the same function, with the same engine, cache and theme.
 
 ## Name and slot labels
 

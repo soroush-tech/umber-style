@@ -5,6 +5,7 @@
 import * as React from 'react'
 import { findCache } from '@umber-style/core'
 
+/** The props of `GlobalRelease`: the sets of global rules that a server component wrote, by its prefix. */
 export interface GlobalReleaseProps {
   /** The prefix of the cache that wrote the sets on the server. */
   prefix: string

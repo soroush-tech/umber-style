@@ -25,7 +25,7 @@ const packagesDir = join(repoRoot, 'packages')
 const isDryRun = process.argv.includes('--dry-run')
 
 /** The names of the packages this repo publishes. */
-const publishableNames = () =>
+const readPublishableNames = () =>
   readdirSync(packagesDir, { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
     .map((entry) => join(packagesDir, entry.name, 'package.json'))
@@ -46,7 +46,7 @@ const fetchPackument = async (name) => {
 
 const toDeprecate = []
 const waiting = []
-const names = publishableNames()
+const names = readPublishableNames()
 const packuments = await Promise.all(names.map(fetchPackument))
 for (const [index, name] of names.entries()) {
   const packument = packuments[index]

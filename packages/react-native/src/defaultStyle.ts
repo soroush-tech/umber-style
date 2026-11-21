@@ -21,6 +21,7 @@ import type {
 import { DEFAULT_REM_BASE } from './units'
 import { useMediaMatch, type MediaQueryOptions } from './windowState'
 
+/** The options of `configure()`: those of `createStyle` for the default style, and its base theme. */
 export interface DefaultStyleOptions extends StyleOptions<Theme> {
   /** The base theme, for an app that has no provider at all. */
   theme?: Theme

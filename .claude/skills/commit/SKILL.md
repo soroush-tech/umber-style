@@ -10,7 +10,8 @@ metadata:
 ## The subject line is the whole message
 
 Every commit is one line in the [Conventional Commits](https://www.conventionalcommits.org) form,
-with no body and no footer:
+with no body and no footer (the merge commit that GitHub creates for a pull request is exempt from
+this form and from signing):
 
 ```text
 <type>[(<scope>)]: <what is true after the commit> - #<issue>
@@ -30,7 +31,8 @@ with no body and no footer:
   | `chore`    | Maintenance that fits no other type                           |
 
 - **Scope** - the folder of the one package the change is in (`core`, `react`, `react-native`,
-  `vue`, `umber-style`, ...). No scope when the change spans packages or is not in one.
+  `vue`, `umber-style`, ...). A scope names the one package a commit touches, and is left out
+  when the commit touches several packages or none.
 - **Description** - a statement of what holds after the commit, not the action taken: lower case
   first word, plain words, no trailing period. It may be long; a colon may introduce the parts.
   "the result of reading a media query has one named type", not "add MediaQueryResult type".

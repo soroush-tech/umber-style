@@ -7,7 +7,7 @@
 // measurement made the classes). The cases are the same as in `string-elements.bench.ts`. Each case has
 // an engine and a cache of its own, with an in-memory sheet.
 import type { BenchConfig } from '@soroush.tech/bench'
-import { kinds, labels, type Kind } from '../../../bench/src/components'
+import { KINDS, LABELS, type Kind } from '../../../bench/src/components'
 import { createComponents } from './fixtures'
 import { createServerStyle, fixtures, resolveTree } from './server'
 
@@ -23,7 +23,7 @@ async function prepare(kind: Kind): Promise<() => Promise<unknown>> {
 
 const cases = Object.fromEntries(
   await Promise.all(
-    kinds.map(async (kind) => [`48 elements, ${labels[kind]}`, await prepare(kind)] as const)
+    KINDS.map(async (kind) => [`48 elements, ${LABELS[kind]}`, await prepare(kind)] as const)
   )
 )
 

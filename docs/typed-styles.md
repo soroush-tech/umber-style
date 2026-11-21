@@ -187,7 +187,7 @@ Under the `react-server` condition `@umber-style/react` has `useTheme` (a plain 
 
 ## The type names apps import
 
-These names describe the same shapes as the types that apps of the design system import today, so that code written against them compiles with only the scope of its imports changed. They are UmberStyle's own types: code that mixes them with types of another library may not line up.
+These names describe the same shapes as the types that existing apps import today (the list of names comes from the issue), so that code written against them compiles with only the scope of its imports changed. They are UmberStyle's own types: code that mixes them with types of another library may not line up.
 
 | Name                     | What it is                                                                                                                                      | Declared in                                        |
 | ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
@@ -294,5 +294,5 @@ An engine made for the default style of a binding (`configure({ engine })`) is t
 - Types do not know which props of a host element `shouldForwardProp` forwards, unless it is a type guard: then they narrow the props to the ones it names, also for a component tag, which receives every prop at run time.
 - `styled(tag)` has three call forms (a function first, a template, styles). A mistake in a style is reported against the styles form, and an error message can list the other forms too.
 - The props of a template are not inferred from its functions: give them with the type argument.
-- The examples were compiled by the type tests of `packages/react/src/typeNames.types.test.tsx`, `packages/react/src/augmentation.test.tsx` and `packages/vue/src/css.test.ts`. The design system itself was not compiled against these types: the list of names comes from the issue, not from its build output.
+- The examples were compiled by the type tests of `packages/react/src/typeNames.types.test.tsx`, `packages/react/src/augmentation.test.tsx` and `packages/vue/src/css.test.ts`. No existing app was compiled against these types: the list of names comes from the issue, not from the build output of an app.
 - The examples were compiled with TypeScript 7.0.2. Other versions were not tried.

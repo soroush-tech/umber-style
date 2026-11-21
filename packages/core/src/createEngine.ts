@@ -54,6 +54,7 @@ export interface BindingOptions<T> extends EngineOptions {
   engine?: Engine<T>
 }
 
+/** What `createStyler` makes for one styled component: its style list and the class names of a render. */
 export interface Styler {
   /** The full style list, for a component that wraps this one. */
   styles: readonly StyleInput[]
@@ -97,7 +98,9 @@ export interface ThemeText {
   readonly names: readonly string[]
 }
 
+/** An engine of one theme shape over one cache: theme classes, classes from styles, sheets, animations and global styles. */
 export interface Engine<T> {
+  /** The cache that every rule of the engine is written to. */
   cache: Cache
   /** Whether a base theme is known: it is given by `setTheme`, or by the first `themeClass`. */
   readonly hasTheme: boolean
@@ -116,6 +119,7 @@ export interface Engine<T> {
   createThemeView(realTheme: T): T
   /** Gives the engine its base theme. The same object again does nothing; another one replaces the base. */
   setTheme(theme: T): void
+  /** `css` of the cache: one class in the `components` layer for style objects, sheet entries and class names. */
   css: Cache['css']
   /**
    * The classes of a theme, made once for each theme object and color scheme: the theme class (the
@@ -245,13 +249,13 @@ function createFamilyEngine<T extends object>(
   const { cache: given, suffix, hasLabels, hasLayers, hasPruning, hasColorFallbacks } = options
   const { hasScope, hasBaseClass, hasDevChecks, hasValueRepair } = options
   const { alwaysDeclare = [] } = options
-  const { rawKeys, lengthKeys, modes, registered } = options
-  if (given && options.prefix !== undefined && options.prefix !== given.prefix) {
+  const { rawKeys, lengthKeys, modes, registered, prefix: optionPrefix } = options
+  if (given && optionPrefix !== undefined && optionPrefix !== given.prefix) {
     throw new TypeError(
-      `the engine options give the prefix "${options.prefix}", which differs from the prefix "${given.prefix}" of the given cache; variables and classes would use two prefixes. Leave out \`prefix\`, or give the same one.`
+      `the engine options give the prefix "${optionPrefix}", which differs from the prefix "${given.prefix}" of the given cache; variables and classes would use two prefixes. Leave out \`prefix\`, or give the same one.`
     )
   }
-  const prefix = given?.prefix ?? options.prefix ?? 'css'
+  const prefix = given?.prefix ?? optionPrefix ?? 'css'
   const cache =
     given ??
     createCache({
@@ -491,10 +495,11 @@ function createFamilyEngine<T extends object>(
 
     /** The classes of the styles: the base, then the props class that is made after it. */
     const getOwn = (plan: Plan, props: Record<string, unknown>, theme: unknown) => {
-      if (plan.propsStyles.length === 0) return plan.baseClass
-      const resolved = resolveAll(plan.propsStyles, props, theme)
-      const second = cache.cssWith({ after: plan.baseClass }, ...resolved)
-      return [plan.baseClass, second].filter(Boolean).join(' ')
+      const { baseClass, propsStyles } = plan
+      if (propsStyles.length === 0) return baseClass
+      const resolved = resolveAll(propsStyles, props, theme)
+      const second = cache.cssWith({ after: baseClass }, ...resolved)
+      return [baseClass, second].filter(Boolean).join(' ')
     }
 
     /** Without layers there is no override class and no order between classes to rely on: what comes in is merged with all of the styles, into the one class. */

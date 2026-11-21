@@ -30,6 +30,7 @@ export async function readHeaderShape(page: Page) {
   return { outlineStyle }
 }
 
+/** Where the global rule for the bar is found in the document. */
 export interface OverrideRules {
   /** One entry for each rule for the bar that a style sheet of the document holds: its element. */
   sheets: string[]

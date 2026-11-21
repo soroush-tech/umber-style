@@ -130,7 +130,7 @@ describe('the window store', () => {
       width: 1000,
       height: 500,
       colorScheme: 'light',
-      reducedMotion: false,
+      isReducedMotion: false,
     })
     stopFirst()
     expect(platform.countListeners()).toBe(3)

@@ -53,13 +53,15 @@ async function loadBrand(page: Page): Promise<void> {
   await page.getByTestId('page-s-brand').waitFor()
   await waitForHydrated(page)
   await page.evaluate(() => {
-    ;(window as unknown as { __stayed: boolean }).__stayed = true
+    ;(window as unknown as { __hasStayed: boolean }).__hasStayed = true
   })
 }
 
 async function expectStayed(page: Page): Promise<void> {
-  const stayed = await page.evaluate(() => (window as unknown as { __stayed?: boolean }).__stayed)
-  expect(stayed, 'the page did not reload').toBe(true)
+  const hasStayed = await page.evaluate(
+    () => (window as unknown as { __hasStayed?: boolean }).__hasStayed
+  )
+  expect(hasStayed, 'the page did not reload').toBe(true)
 }
 
 test('hot replacement: the theme of the root layout is edited', async ({ page }) => {

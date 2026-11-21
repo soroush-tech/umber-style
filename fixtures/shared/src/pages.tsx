@@ -53,6 +53,7 @@ export function HomePage({ extra }: { extra?: ReactNode }) {
   )
 }
 
+/** The catalog page: a grid of product cards. */
 export function CatalogPage() {
   return (
     <Page data-testid="page-catalog">
@@ -92,6 +93,7 @@ export function PromoPage({
   )
 }
 
+/** The settings page: a callout in the accent colour, a panel, and a card inside the brand theme. */
 export function SettingsPage() {
   return (
     <Page data-testid="page-settings">

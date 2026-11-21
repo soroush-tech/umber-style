@@ -124,13 +124,13 @@ export const NUMBER_KEYS = [
   'aspectRatio',
 ] as const
 
-const lengthKeys = new Set<string>(LENGTH_KEYS)
-const numberKeys = new Set<string>(NUMBER_KEYS)
+const LENGTH_KEY_SET = new Set<string>(LENGTH_KEYS)
+const NUMBER_KEY_SET = new Set<string>(NUMBER_KEYS)
 
 /** The string `value` of `key` as React Native takes it: a number for a key that takes one and a value it can read, else `value` itself. */
 function toNativeValue(key: string, value: string, remBase: number): string | number {
-  if (lengthKeys.has(key)) return toLength(value, remBase) ?? value
-  if (!numberKeys.has(key)) return value
+  if (LENGTH_KEY_SET.has(key)) return toLength(value, remBase) ?? value
+  if (!NUMBER_KEY_SET.has(key)) return value
   const reading = readNumber(value)
   return reading?.unit === '' ? reading.value : value
 }

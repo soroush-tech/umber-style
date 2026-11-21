@@ -35,7 +35,7 @@ const at = (width: number, height = 800): WindowState => ({
   width,
   height,
   colorScheme: 'light',
-  reducedMotion: false,
+  isReducedMotion: false,
 })
 
 const resize = (width: number, height = 800) => act(() => platform.resize(width, height))
@@ -100,13 +100,13 @@ describe('the order of the media blocks', () => {
       '&:hover': { [darkSystem]: { margin: 3 } },
     }
     expect(collectKeys(style)).toEqual({
-      conditional: true,
-      scheme: true,
+      isConditional: true,
+      hasScheme: true,
       queries: [wide, portrait],
     })
     expect(collectKeys({ [darkSystem]: { padding: 1 } })).toEqual({
-      conditional: false,
-      scheme: false,
+      isConditional: false,
+      hasScheme: false,
       queries: [darkSystem],
     })
   })

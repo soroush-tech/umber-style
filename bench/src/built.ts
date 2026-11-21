@@ -4,6 +4,7 @@
 // `exports` name `dist` only in `publishConfig`). This sets all three from inside the process.
 import { registerHooks } from 'node:module'
 
+/** The options of `prepareBuiltPackages`. */
 export interface BuiltOptions {
   /** Bare specifiers loaded from another file instead, as file URLs: a stand-in for a platform module. */
   redirects?: Readonly<Record<string, string>>

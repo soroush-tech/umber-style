@@ -83,11 +83,13 @@ export type SharedStyleProp =
   | undefined
   | readonly SharedStyleProp[]
 
+/** A component that `styled` made in shared code: the props of its tag and its own, with `as` and a shared `style`. */
 export type SharedStyledComponent<C extends ElementType, P extends object> = FunctionComponent<
   Omit<ComponentProps<C>, keyof P | 'as' | 'style'> &
     P & { as?: ElementType; style?: SharedStyleProp }
 >
 
+/** `styled` in shared code: a tag or a component and its options, then the styles of the component. */
 export type SharedStyled<T> = <C extends ElementType>(
   tag: C,
   options?: StyledOptions
@@ -95,9 +97,11 @@ export type SharedStyled<T> = <C extends ElementType>(
 
 /** A set of named styles; it only carries the types. */
 export interface SharedSheetDefinition<S extends SharedSheetStyles> {
+  /** Never set: it only gives the sheet the names of its entries. */
   readonly entries?: { [K in keyof S]: SharedEntry }
 }
 
+/** `StyleSheet` in shared code: it makes sheets of named styles. */
 export interface SharedStyleSheet<T> {
   /** A sheet given as an object is its entries, usable at once, with no hook and no theme. */
   create<K extends string>(styles: SharedObjectSheet<K>): { readonly [P in K]: SharedEntry }
@@ -109,7 +113,9 @@ export interface SharedStyleSheet<T> {
 
 /** The props that apply entries to a styled component: a class name on the web, a style array on React Native. */
 export interface SharedApplied {
+  /** The class names of the entries, on the web. */
   className?: string
+  /** The entries, on React Native. */
   style?: readonly SharedEntry[]
 }
 
@@ -132,6 +138,7 @@ export interface SharedCss {
   (...styles: SharedCssArgument[]): SharedEntry
 }
 
+/** `apply` in shared code: the props that put sheet entries and class names on a styled component. */
 export type SharedApply = (
   ...entries: (SharedEntry | string | null | undefined | false)[]
 ) => SharedApplied
@@ -144,19 +151,25 @@ export interface SharedStyleBase<T> {
    * component `'use client'` for the nearest provider's values, its code unchanged.
    */
   useTheme(): T
+  /** Makes a styled component of a tag or a component. */
   styled: SharedStyled<T>
+  /** Makes sheets of named styles. */
   StyleSheet: SharedStyleSheet<T>
   /** The entries of a sheet; an object sheet is its own entries and is returned as it is. */
   useStyle<K extends string>(sheet: { readonly [P in K]: SharedEntry }): {
     readonly [P in K]: SharedEntry
   }
+  /** The entries of a sheet made from a function of the theme, resolved against the nearest provider. */
   useStyle<S extends SharedSheetStyles>(
     sheet: SharedSheetDefinition<S>
   ): { [K in keyof S]: SharedEntry }
+  /** The props that put sheet entries on a styled component: a class name on the web, a style array on React Native. */
   apply: SharedApply
   /** One style made once and passed around: a sheet entry on the web, the merged native style on React Native. Pass it on; do not read it. */
   css: SharedCss
+  /** Gives the subtree a theme, merged over the theme above. */
   ThemeProvider(props: ThemeProviderProps<T>): ReactElement
+  /** On the web, the class string of a theme (and a color scheme), for an element the app renders itself; on React Native, an empty string. */
   themeClass(theme: DeepPartial<T>, colorScheme?: ColorScheme): string
   /** A style key for "the nearest theme is this theme", at the top of a style or inside `web` or `native`. On the web it needs `@scope`; on React Native it matches the theme object of the nearest provider. */
   when(theme: DeepPartial<T>, colorScheme?: ColorScheme): ThemeKey

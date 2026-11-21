@@ -24,7 +24,7 @@ function tidy(value: number): number {
 }
 
 /** The error for a `value` that React Native cannot compute: the helper and the value are in the message. */
-function unsupported(name: string, value: unknown): TypeError {
+function createUnsupportedError(name: string, value: unknown): TypeError {
   return new TypeError(
     `@umber-style/react-native: ${name}() cannot compute ${JSON.stringify(value)}; it takes a number, a numeric string ("8", "8px") or a percentage ("50%"), and a percentage cannot be mixed with a number`
   )
@@ -54,7 +54,7 @@ function read(name: string, operand: unknown): Reading {
     return { value: operand, isPercent: false }
   }
   const reading = readNumber(operand)
-  if (reading === undefined || reading.unit === 'rem') throw unsupported(name, operand)
+  if (reading === undefined || reading.unit === 'rem') throw createUnsupportedError(name, operand)
   return { value: reading.value, isPercent: reading.unit === '%' }
 }
 
@@ -85,7 +85,7 @@ function sum(name: string, terms: readonly Term[]): number | Percent {
   const isPercent = readings.some((reading) => reading.isPercent)
   let total = 0
   for (const { operand, sign, value, isPercent: isPercentValue } of readings) {
-    if (isPercentValue !== isPercent && operand !== 0) throw unsupported(name, operand)
+    if (isPercentValue !== isPercent && operand !== 0) throw createUnsupportedError(name, operand)
     total += sign * value
   }
   return isPercent ? toPercent(total) : tidy(total)

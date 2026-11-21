@@ -71,7 +71,7 @@ These are two classes, because one class name cannot be in two layers. Each is w
 
 ## The `style` prop of a styled component
 
-A component made by `styled()` takes `style`, and this is the engine's own API, not an inline style. It takes sheet entries and style objects, in arrays, with `false`, `null` and `undefined` dropped. All of it is merged, in order, into one class, and **no `style` attribute is rendered**. A string is an error, because a string cannot be merged.
+A component made by `styled()` takes `style`, and this is the engine's own API, not an inline style. It takes sheet entries and style objects, in arrays, with `false`, `null` and `undefined` dropped. All of it is merged, in order, into one class, and no `style` attribute is rendered. A string is an error, because a string cannot be merged.
 
 The rendered `Box` is:
 
@@ -102,7 +102,7 @@ and the rules for the card:
 
 The component has two classes: its own (`umber-card-root-1l5hymm`) and one override class for everything it was given from outside. A component that has props-dependent styles has a base class and a props class instead of the one, see [Cascade layers and overrides](cascade-layers.md). The override class is in a later cascade layer, so it wins.
 
-Here three things were given (two entries and an object), so they are merged into one new class, which keeps the label of the component. When exactly **one** sheet entry is given, and nothing else that needs merging (no plain object, no second entry, no engine class in `className`), the entry's own class is the override class: no second class is made, and the same entry given to ten components is one rule. Class names that are not the engine's do not count: they pass through.
+Here three things were given (two entries and an object), so they are merged into one new class, which keeps the label of the component. When exactly one sheet entry is given, and nothing else that needs merging (no plain object, no second entry, no engine class in `className`), the entry's own class is the override class: no second class is made, and the same entry given to ten components is one rule. Class names that are not the engine's do not count: they pass through.
 
 ### How long a class of `style` lives
 

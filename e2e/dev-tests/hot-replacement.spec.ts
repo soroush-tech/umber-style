@@ -1,7 +1,7 @@
 import type { Page } from '@playwright/test'
 import { loadPage } from '../helpers/navigation'
 import { collectKeyframesAndGlobals, findMissingStyles } from '../helpers/rules'
-import { editSource, engineClasses, expect, SOURCE_FILES, test } from '../helpers/dev'
+import { editSource, readEngineClasses, expect, SOURCE_FILES, test } from '../helpers/dev'
 
 // A style value is edited in a source file while the server runs. The page must take the new value
 // with no document load, and the rule of the old value must not win. Every file is put back after the
@@ -34,17 +34,17 @@ test.afterEach(async ({ page }) => {
 /** Puts a marker on `window` that a document load would remove, and returns the start time of the document. */
 async function markDocument(page: Page): Promise<number> {
   await page.evaluate(() => {
-    ;(window as unknown as { __stayed: boolean }).__stayed = true
+    ;(window as unknown as { __hasStayed: boolean }).__hasStayed = true
   })
   return page.evaluate(() => performance.timeOrigin)
 }
 
 async function expectNoReload(page: Page, origin: number): Promise<void> {
   const now = await page.evaluate(() => ({
-    stayed: (window as unknown as { __stayed?: boolean }).__stayed,
+    hasStayed: (window as unknown as { __hasStayed?: boolean }).__hasStayed,
     origin: performance.timeOrigin,
   }))
-  expect(now.stayed, 'the marker on window survived: the page did not reload').toBe(true)
+  expect(now.hasStayed, 'the marker on window survived: the page did not reload').toBe(true)
   expect(now.origin, 'the document is the one that was loaded').toBe(origin)
 }
 
@@ -55,14 +55,14 @@ test('hot replacement: a styled() component takes a new value without a reload',
   await loadPage(page, fixture, 'home')
   const hero = page.getByTestId('hero')
   await expect(hero).toHaveCSS('padding-top', '24px')
-  const before = await engineClasses(page, 'hero')
+  const before = await readEngineClasses(page, 'hero')
   const origin = await markDocument(page)
 
-  restores.push(editSource(SOURCE_FILES.components, 'padding: theme.space[4],', 'padding: 37,'))
+  restores.push(editSource(SOURCE_FILES.components, 'padding: space[4],', 'padding: 37,'))
 
   await expect(hero).toHaveCSS('padding-top', '37px')
   await expect(hero).toHaveCSS('padding-left', '37px')
-  const after = await engineClasses(page, 'hero')
+  const after = await readEngineClasses(page, 'hero')
   expect(after, 'the class of the old value is gone').not.toContain(before.at(-1))
   expect(after, 'the element has as many classes as before').toHaveLength(before.length)
   await expectNoReload(page, origin)
@@ -76,13 +76,13 @@ test('hot replacement: a StyleSheet.create entry takes a new value without a rel
   await loadPage(page, fixture, 'home')
   const note = page.getByTestId('home-note')
   await expect(note).toHaveCSS('margin-top', '6px')
-  const before = await engineClasses(page, 'home-note')
+  const before = await readEngineClasses(page, 'home-note')
   const origin = await markDocument(page)
 
   restores.push(editSource(SOURCE_FILES.pages, 'note: { marginTop: 6 }', 'note: { marginTop: 18 }'))
 
   await expect(note).toHaveCSS('margin-top', '18px')
-  const after = await engineClasses(page, 'home-note')
+  const after = await readEngineClasses(page, 'home-note')
   expect(after, 'the class of the old value is gone').not.toContain(before.at(-1))
   expect(after, 'the element has as many classes as before').toHaveLength(before.length)
   await expectNoReload(page, origin)

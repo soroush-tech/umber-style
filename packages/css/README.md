@@ -1,6 +1,6 @@
 # @umber-style/css
 
-UmberStyle's plain layer: a style goes to a cache and comes back as a class name. No framework, no theme, no provider.
+UmberStyle's plain layer: a style goes to a cache and comes back as a class name. It needs no framework, no theme and no provider.
 
 Install: `pnpm add @umber-style/css`.
 

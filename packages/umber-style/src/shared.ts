@@ -39,10 +39,12 @@ export declare const useThemeClass: SharedStyle<Theme>['useThemeClass']
 export declare function CacheProvider(props: CacheProviderProps): ReactElement
 /** Whether the media query matches: the window on React Native, `matchMedia` on the web, where a server render gives `defaultMatches`, false when it is not given. */
 export declare function useMediaQuery(query: string, options?: MediaQueryOptions): boolean
+/** Makes the styling of one theme shape, apart from the default one, on either platform. */
 export declare function createStyle<T extends object>(
   theme: T,
   options?: StyleOptions<T>
 ): SharedStyle<T>
+/** Makes one default style, with `configure` for its options and base theme before first use. */
 export declare function createDefaultStyle(): SharedStyle<Theme> & {
   configure: (options: DefaultStyleOptions) => void
 }

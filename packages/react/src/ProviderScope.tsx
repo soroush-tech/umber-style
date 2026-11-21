@@ -17,7 +17,9 @@ import type { StyleText } from './styleElements'
 
 /** The wrapper of a nested provider: its element and its class string, which `ThemeScope` repeats. */
 export interface ThemeScopeValue {
+  /** The element of the wrapper. */
   readonly as: string
+  /** The classes of the wrapper. */
   readonly className: string
 }
 
@@ -55,7 +57,9 @@ export function addMark(marks: ProviderMarks, key: unknown, mark: ProviderMark):
  * sets it to undefined, and what reads it below makes the view of `ThemeContext`.
  */
 export interface ThemeContexts<T> {
+  /** The real theme of the nearest provider. */
   ThemeContext: React.Context<T | undefined>
+  /** The view of the nearest provider (references for tokens), or undefined where a provider of the server build is nearest. */
   ViewContext: React.Context<T | undefined>
 }
 
@@ -69,7 +73,9 @@ export function createThemeContexts<T>(): ThemeContexts<T> {
 
 /** The styles of the client build of one prefix: the contexts they share, and the engine whose base theme a provider of the server build merges over. */
 export interface PrefixStyle {
+  /** The contexts that every style of the prefix reads and its providers give. */
   readonly contexts: ThemeContexts<unknown>
+  /** What holds the base theme of the engine, once a style of the client build has one; undefined before. */
   holder?: { readonly baseTheme: unknown }
 }
 
@@ -103,7 +109,9 @@ export type SentTokens = Pick<TokenOptions, 'rawKeys' | 'lengthKeys' | 'modes'>
 
 /** The base theme as a provider of the server build sends it: plain data, and the `@property` rules of its registered variables. */
 export interface ScopeBase {
+  /** The base theme, as plain data. */
   readonly theme: object
+  /** The `@property` rules of the registered variables of the base theme, or ''. */
   readonly properties: string
 }
 
@@ -138,6 +146,7 @@ export interface ScopeTheme {
   readonly styles: readonly StyleText[]
 }
 
+/** The props of `ProviderScope`: what a provider of the server build hands to its browser part. */
 export interface ProviderScopeProps {
   /** The prefix of the engine's cache: the key of its mark, and of its contexts. */
   readonly prefix: string
@@ -145,6 +154,7 @@ export interface ProviderScopeProps {
   readonly given: object
   /** The rules and the wrapper; none for a provider with `isRoot`, which renders neither. */
   readonly theme?: ScopeTheme
+  /** The subtree that the theme applies to. */
   readonly children?: React.ReactNode
 }
 

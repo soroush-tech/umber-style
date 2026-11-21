@@ -33,7 +33,7 @@ export function bindEngine<T extends object>(
   cache?: CacheFunction
 ): ServerStyle<T> {
   // The theme of the first provider of the request, and whether one has rendered.
-  const first = createRequestSlot<DeepPartial<T> | undefined>(undefined, cache)
+  const readFirstSlot = createRequestSlot<DeepPartial<T> | undefined>(undefined, cache)
   let hasWarned = false
 
   const readBaseTheme = (): T => engine.baseTheme ?? (EMPTY_THEME as T)
@@ -57,7 +57,7 @@ export function bindEngine<T extends object>(
   // The theme whose view function styles read: the base theme. With none, the theme of the first provider
   // of the request gives the shape (tokens are references either way), else there is none.
   const readViewTheme = (): T =>
-    engine.baseTheme ?? (first().current as T | undefined) ?? (EMPTY_THEME as T)
+    engine.baseTheme ?? (readFirstSlot().current as T | undefined) ?? (EMPTY_THEME as T)
 
   const themeClass = (partial: DeepPartial<T>, colorScheme?: ColorScheme) =>
     engine.themeClass(partial, colorScheme)
@@ -86,7 +86,7 @@ export function bindEngine<T extends object>(
     useStyle,
     apply: (...entries) => ({ className: engine.css(...entries) || undefined }),
     css: ((...args: unknown[]) => createCssEntry(engine.cache, args)) as ServerStyle<T>['css'],
-    ThemeProvider: createThemeProvider(engine, { first, readBaseTheme }),
+    ThemeProvider: createThemeProvider(engine, { readFirstSlot, readBaseTheme }),
     useTheme,
     readTheme: useTheme,
     themeClass,

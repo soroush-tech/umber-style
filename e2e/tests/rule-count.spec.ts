@@ -1,6 +1,6 @@
 import { loadPage, navigateInBrowser, waitForHydrated, writeReport } from '../helpers/navigation'
 import { collectEngineRuleCount, countEngineStyleElements } from '../helpers/rules'
-import { scenario, test, expect } from '../helpers/test'
+import { requireScenario, test, expect } from '../helpers/test'
 
 // Scenario D: after hydration the engine's rule count does not grow until something new renders, and
 // going back to a visited page adds nothing.
@@ -8,7 +8,7 @@ test('D: the rule count is stable after hydration and does not grow on a visited
   page,
   fixture,
 }, info) => {
-  scenario('D', fixture, info)
+  requireScenario('D', fixture, info)
   await loadPage(page, fixture, 'home')
   const afterHydration = await collectEngineRuleCount(page)
   expect(afterHydration, 'rules after hydration').toBeGreaterThan(0)

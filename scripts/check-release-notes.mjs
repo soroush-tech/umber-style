@@ -23,7 +23,7 @@ const REGISTRY = 'https://registry.npmjs.org'
 const FETCH_TIMEOUT_MS = 5000
 
 /** Publishable packages as { dir, name, version }. */
-const publishablePackages = () =>
+const readPublishablePackages = () =>
   readdirSync(packagesDir, { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
     .map((entry) => ({ dir: entry.name, manifest: join(packagesDir, entry.name, 'package.json') }))
@@ -39,7 +39,7 @@ const publishablePackages = () =>
  * path is fixed for a regular checkout, which this repo's workflow is.
  * Empty outside a merge.
  */
-const mergeHeadShas = () => {
+const readMergeHeadShas = () => {
   const marker = join(repoRoot, '.git', 'MERGE_HEAD')
   if (!existsSync(marker)) return []
   return readFileSync(marker, 'utf8')
@@ -56,15 +56,15 @@ const runInRepo = (command, args, options) =>
  * Staged file paths differing from `base` - HEAD when omitted.
  * Empty when nothing is staged (e.g. in CI).
  */
-const stagedFiles = (base) =>
+const listStagedFiles = (base) =>
   runInRepo('git', ['diff', '--cached', '--name-only', ...(base ? [base] : [])], {
     encoding: 'utf8',
   }).split('\n')
 
 /** Package dirs whose staged content differs from `base`. */
-const stagedPackageDirs = (base) => {
+const findStagedPackageDirs = (base) => {
   const dirs = new Set()
-  for (const file of stagedFiles(base)) {
+  for (const file of listStagedFiles(base)) {
     // Truthiness, not `!== undefined`: the capture group is `[^/]+`, so a match
     // is always a non-empty string and a miss is always undefined.
     const [, dir] = /^packages\/([^/]+)\//.exec(file) ?? []
@@ -74,17 +74,17 @@ const stagedPackageDirs = (base) => {
 }
 
 /**
- * Compares two semver core versions. Returns a positive number when `a` is newer, 0 when equal.
- * Prereleases are compared by their core only - enough for a "did you bump?" guard, and it never
- * reports a prerelease as newer than the release it precedes.
+ * Compares two versions. Returns a positive number when `left` is newer, 0 when equal. The cores
+ * are compared first; with equal cores a release is newer than its prereleases (0.1.0 is ahead of
+ * 0.1.0-alpha.0), and two prereleases count as equal - enough for a "did you bump?" guard.
  */
-const compareVersions = (a, b) => {
-  const core = (v) => v.split('-')[0].split('.').map(Number)
-  const [aParts, bParts] = [core(a), core(b)]
+const compareVersions = (left, right) => {
+  const readCore = (version) => version.split('-')[0].split('.').map(Number)
+  const [leftParts, rightParts] = [readCore(left), readCore(right)]
   for (let i = 0; i < 3; i += 1) {
-    if (aParts[i] !== bParts[i]) return aParts[i] - bParts[i]
+    if (leftParts[i] !== rightParts[i]) return leftParts[i] - rightParts[i]
   }
-  return 0
+  return Number(right.includes('-')) - Number(left.includes('-'))
 }
 
 /**
@@ -108,7 +108,7 @@ const matchesRelease = (dir, name, version) => {
 }
 
 /** Latest published version, `null` when never published, `undefined` when the registry failed. */
-const latestPublishedVersion = async (name) => {
+const fetchLatestVersion = async (name) => {
   try {
     const response = await fetch(`${REGISTRY}/${name}/latest`, {
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
@@ -121,7 +121,7 @@ const latestPublishedVersion = async (name) => {
   }
 }
 
-const packages = publishablePackages()
+const packages = readPublishablePackages()
 
 // --- Guard 1: notes file exists for the current version -----------------------
 
@@ -150,11 +150,11 @@ console.log('Release notes present for every publishable package version.')
 // this guard on its own branch; only a package differing from HEAD and from
 // every incoming parent - an edit made during conflict resolution - is new to
 // this commit, and that one stays checked.
-const mergeHeads = mergeHeadShas()
-let staged = stagedPackageDirs()
+const mergeHeads = readMergeHeadShas()
+let staged = findStagedPackageDirs()
 if (mergeHeads.length > 0) {
   for (const parent of mergeHeads) {
-    const vsParent = stagedPackageDirs(parent)
+    const vsParent = findStagedPackageDirs(parent)
     staged = new Set([...staged].filter((dir) => vsParent.has(dir)))
   }
   console.log('Merge in progress - checking only changes that match no parent.')
@@ -168,7 +168,7 @@ if (changed.length === 0) {
 }
 
 const results = await Promise.all(
-  changed.map(async (pkg) => ({ ...pkg, published: await latestPublishedVersion(pkg.name) }))
+  changed.map(async (pkg) => ({ ...pkg, published: await fetchLatestVersion(pkg.name) }))
 )
 
 const unreachable = results.filter(({ published }) => published === undefined)

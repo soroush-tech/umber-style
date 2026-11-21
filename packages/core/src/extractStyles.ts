@@ -29,6 +29,7 @@ export interface PageStyles {
   tag: string
 }
 
+/** What `extractPageStyles` is told besides the markup of the page. */
 export interface PageStyleOptions {
   /** Theme classes (`themeClass(...)` results, or their first class) to include although no element of `html` has them: the themes the page offers for switching, and the one on `<html>`, which `html` does not hold when it is the markup of the root only. They get the variables that the page uses, like the others. */
   themes?: readonly string[]

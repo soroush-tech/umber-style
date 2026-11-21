@@ -12,6 +12,7 @@ import {
   type Scoping,
 } from './scope'
 
+/** The value of a key of a style: a CSS value, a falsy value that is left out, a list of values (one declaration each, in order), or a nested style. */
 export type StyleValue =
   | string
   | number
@@ -22,6 +23,7 @@ export type StyleValue =
   | readonly (string | number | AlphaColor)[]
   | StyleObject
 
+/** A style the serializer reads: CSS properties in camelCase or as written, selectors and at-rules, each to its value. */
 export interface StyleObject {
   [key: string]: StyleValue
 }
@@ -106,9 +108,9 @@ function isNameCode(code: number): boolean {
   )
 }
 
-/** Whether the character at `at` is a minus that stands alone before a reference: at the start of the value, or after a space, a comma or `(`. */
-function isLoneMinus(value: string, at: number): boolean {
-  return value[at] === '-' && (at === 0 || ' ,('.includes(value[at - 1]))
+/** Whether the character at `index` is a minus that stands alone before a reference: at the start of the value, or after a space, a comma or `(`. */
+function isLoneMinus(value: string, index: number): boolean {
+  return value[index] === '-' && (index === 0 || ' ,('.includes(value[index - 1]))
 }
 
 /** The index just after the parenthesis that closes the one before `start`, or -1 when none does. */
@@ -126,18 +128,18 @@ function findClose(value: string, start: number): number {
  * digits of alpha are what `alpha()` writes for that opacity, a time unit makes a `calc()` of a time.
  * The digits or the unit must end there: `var(--x)1Fa` is left alone.
  */
-function repairSuffix(value: string, at: number, reference: string): [string, number] {
-  const pair = value.slice(at, at + 2)
-  if (HEX_PAIR.test(pair) && !isNameCode(codeAt(value, at + 2))) {
-    return [String(alpha(reference, Number.parseInt(pair, 16) / 255)), at + 2]
+function repairSuffix(value: string, index: number, reference: string): [string, number] {
+  const pair = value.slice(index, index + 2)
+  if (HEX_PAIR.test(pair) && !isNameCode(codeAt(value, index + 2))) {
+    return [String(alpha(reference, Number.parseInt(pair, 16) / 255)), index + 2]
   }
   for (const unit of TIME_UNITS) {
-    const end = at + unit.length
-    if (value.slice(at, end).toLowerCase() === unit && !isNameCode(codeAt(value, end))) {
+    const end = index + unit.length
+    if (value.slice(index, end).toLowerCase() === unit && !isNameCode(codeAt(value, end))) {
       return [`calc(${reference} * 1${unit})`, end]
     }
   }
-  return [reference, at]
+  return [reference, index]
 }
 
 /**

@@ -23,6 +23,7 @@ export async function collectEngineRuleCount(page: Page): Promise<number> {
   }, ENGINE_STYLE_SELECTOR)
 }
 
+/** The animations and the global rules that the browser holds from the engine's style elements. */
 export interface KeyframesAndGlobals {
   /** The name of each `@keyframes` rule of the engine's style elements, once for each rule. */
   keyframes: string[]
@@ -58,11 +59,13 @@ export async function countEngineStyleElements(page: Page): Promise<number> {
   )
 }
 
+/** A rule of the engine's sheets that matched no element while the page loaded. */
 export interface UnusedRule {
   /** The text of the rule, as the sheet has it. */
   text: string
 }
 
+/** What `collectUnusedRules` reports: the rules counted, the unused ones, and the ones left out. */
 export interface RuleUsageReport {
   /** The rules that can be "used" at load: style rules of the engine's sheets, less the ignored ones. */
   total: number
@@ -139,7 +142,7 @@ export async function collectUnusedRules(
       fontFace: 0,
     },
   }
-  const viewportMatches = (query: string) =>
+  const matchesViewport = (query: string) =>
     page.evaluate((text) => matchMedia(text).matches, query).catch(() => true)
 
   for (const [styleSheetId, header] of headers) {
@@ -147,21 +150,21 @@ export async function collectUnusedRules(
     const { text } = await session.send('CSS.getStyleSheetText', { styleSheetId })
     // The protocol reports the rules that were used, and not the others: a rule is unused when the
     // text of the sheet has it and no used entry starts where it starts.
-    const used = new Set(
+    const usedStarts = new Set(
       (ruleUsage as Entry[])
         .filter((entry) => entry.styleSheetId === styleSheetId && entry.used)
         .map((entry) => entry.startOffset)
     )
     for (const rule of listRules(text)) {
       const around = rule.context.join(' ')
-      const reason = await ignoreReason(rule.text, around, viewportMatches)
+      const reason = await findIgnoreReason(rule.text, around, matchesViewport)
       if (reason) {
         report.ignored[reason] += 1
         continue
       }
       report.total += 1
       report.bytesTotal += rule.text.length
-      if (!used.has(rule.start)) {
+      if (!usedStarts.has(rule.start)) {
         report.unused.push({ text: rule.text })
         report.bytesUnused += rule.text.length
       }
@@ -221,10 +224,10 @@ async function isEngineSheet(session: CDPSession, ownerNode?: number): Promise<b
   }
 }
 
-async function ignoreReason(
+async function findIgnoreReason(
   ruleText: string,
   around: string,
-  viewportMatches: (query: string) => Promise<boolean>
+  matchesViewport: (query: string) => Promise<boolean>
 ): Promise<IgnoreReason | undefined> {
   if (
     /^\s*@property/.test(ruleText) ||
@@ -239,7 +242,7 @@ async function ignoreReason(
   if (/\.umber-theme-[a-z0-9]+\b/.test(selector) && !/\s/.test(selector.trim())) return 'themeClass'
   if (STATE_PATTERN.test(selector)) return 'state'
   const media = /@media\s*([^{]*)\{/.exec(around)
-  if (media && !(await viewportMatches(media[1].trim()))) return 'media'
+  if (media && !(await matchesViewport(media[1].trim()))) return 'media'
   return undefined
 }
 
@@ -253,11 +256,17 @@ function readCheckerSource(): string {
   return checkerSource
 }
 
+/** A problem that `findMissingStyles` finds in the page: a problem of the core's checker. */
 export interface MissingStyle {
+  /** What is missing: a rule for a class, or a value for a variable. */
   kind: 'class-without-rule' | 'variable-without-value'
+  /** The class, or the variable. */
   name: string
+  /** A short description of the element: `tag[test id or id]`. */
   element: string
+  /** What is wrong, in a sentence. */
   message: string
+  /** What makes two problems the same one. */
   key: string
 }
 

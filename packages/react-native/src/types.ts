@@ -42,6 +42,7 @@ export interface StyleOptions<T = never> extends BindingOptions<T> {
   remBase?: number
 }
 
+/** The options of `styled(tag, options)`: the label of the component, and which props reach the element. */
 export interface StyledOptions extends StylerOptions {
   /** Whether a prop is forwarded. Default: every prop but `as`, `theme` and `style`. */
   shouldForwardProp?: (prop: string) => boolean
@@ -49,12 +50,15 @@ export interface StyledOptions extends StylerOptions {
 
 /** What the `style` prop of a styled component takes: style objects (sheet entries are such objects), in arrays, with falsy values dropped. */
 type StyleValue = NativeStyleObject | false | null | readonly StyleProp[]
+/** What the `style` prop of a styled component takes, or nothing. */
 export type StyleProp = StyleValue | undefined
 
+/** A component made by `styled`: it takes the props of the tag, its own props `P`, `as` and `style`. */
 export type StyledComponent<C extends ElementType, P extends object> = FunctionComponent<
   Omit<ComponentProps<C>, keyof P | 'as' | 'style'> & P & { as?: ElementType; style?: StyleValue }
 >
 
+/** `styled` of a theme `T`: a tag and options, then the styles of the component. */
 export type Styled<T> = <C extends ElementType>(
   tag: C,
   options?: StyledOptions
@@ -66,6 +70,7 @@ export interface SheetDefinition<S extends NativeSheetStyles, E> {
   readonly entries?: { [K in keyof S]: E }
 }
 
+/** The props of `ThemeProvider`: the theme of the subtree and its color scheme, and the props of the web that are ignored. */
 export interface ThemeProviderProps<T> {
   /**
    * The theme, or the part of it that this subtree changes; or a function of the theme above (the base
@@ -78,6 +83,7 @@ export interface ThemeProviderProps<T> {
   readonly className?: string
   /** Accepted and ignored: there are no classes on React Native, so the provider never renders an element. */
   readonly isRoot?: boolean
+  /** The subtree that the theme applies to. */
   readonly children?: ReactNode
 }
 
@@ -85,16 +91,19 @@ export interface ThemeProviderProps<T> {
 export interface CacheProviderProps {
   /** A cache of the web engine: React Native writes no CSS, so it is not read. */
   readonly value: Cache
+  /** What it renders, as it is. */
   readonly children?: ReactNode
 }
 
 /** The props of `ThemeScope`: the same as on the web, so one source runs on both. */
 export interface ThemeScopeProps {
+  /** What it renders, as it is. */
   readonly children?: ReactNode
 }
 
 /** The props of `Global`: the same as on the web, so one source runs on both; they are not used. */
 export interface GlobalProps<T> {
+  /** The global styles of the web: accepted, and nothing is written. */
   readonly styles: GlobalInput<T>
 }
 
@@ -129,7 +138,9 @@ export type NativeStyleSheet<T> = Omit<typeof platformStyleSheet, 'create'> & {
  * lengths are numbers. What takes a theme (`ThemeProvider`, `when`) takes `T`.
  */
 export interface NativeStyle<T> {
+  /** Makes a styled component from a component and its styles. */
   styled: Styled<NativeTheme<T>>
+  /** The platform StyleSheet, whose `create` also takes a function of the theme. */
   StyleSheet: NativeStyleSheet<NativeTheme<T>>
   /** The styles of a sheet; an object sheet is its own registered styles and is returned as it is. */
   useStyle<K extends string>(sheet: { readonly [P in K]: NativeStyleObject }): {
@@ -151,6 +162,7 @@ export interface NativeStyle<T> {
    * native style, for `style`. A function is a `TypeError`: there are no props.
    */
   css: NativeCssFunction
+  /** Gives the subtree below it its theme, merged over the theme above; it renders no element. */
   ThemeProvider(props: ThemeProviderProps<T>): ReactElement
   /** Renders its children: there is no wrapper to repeat, and a modal stays inside the tree, under the providers above it. It exists so that one source runs on both. */
   ThemeScope(props: ThemeScopeProps): ReactElement

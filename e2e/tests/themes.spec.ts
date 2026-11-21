@@ -1,7 +1,7 @@
 import { collectComputedStyles } from '../helpers/computedStyles'
 import { loadPage, navigateInBrowser } from '../helpers/navigation'
 import { findMissingStyles } from '../helpers/rules'
-import { scenario, test, expect } from '../helpers/test'
+import { requireScenario, test, expect } from '../helpers/test'
 
 // Scenario H: the theme on <html> is switched by a class, so the engine of the browser did not render a
 // provider for it. A token that no page used so far is first used after the navigation; the theme that
@@ -24,7 +24,7 @@ test('H: dark chosen first, then a navigation to a page with a token that is new
   page,
   fixture,
 }, info) => {
-  scenario('H', fixture, info)
+  requireScenario('H', fixture, info)
   await loadPage(page, fixture, 'home')
   await expect(page.locator('html')).toHaveClass(/scheme-light/)
   await page.getByTestId('theme-switch').click()
@@ -34,7 +34,7 @@ test('H: dark chosen first, then a navigation to a page with a token that is new
 })
 
 test('H: the navigation first, then dark, then back to light', async ({ page, fixture }, info) => {
-  scenario('H', fixture, info)
+  requireScenario('H', fixture, info)
   await loadPage(page, fixture, 'home')
   await navigateInBrowser(page, 'settings')
   await expectAccent(page, LIGHT_ACCENT)

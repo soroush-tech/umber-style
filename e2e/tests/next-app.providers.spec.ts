@@ -11,9 +11,9 @@ for (const scenario of PROVIDER_SCENARIOS) {
       browser,
       fixture,
       markProblems: () => {
-        const at = watcher.problems.length
+        const mark = watcher.problems.length
         return () => {
-          watcher.problems.splice(at)
+          watcher.problems.splice(mark)
         }
       },
     })

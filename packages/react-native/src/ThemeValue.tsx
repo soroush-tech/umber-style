@@ -11,10 +11,13 @@ import {
 import { readSchemeName, type NativeCondition } from './conditions'
 import type { NativeTheme } from './nativeTheme'
 
+/** The props of the provider that `createThemeValue` makes, which `ThemeProvider` renders. */
 export interface ThemeValueProviderProps<T> {
+  /** The theme of this subtree, or a function of the theme above: merged over the theme above. */
   readonly theme: ThemeInput<T>
   /** The color scheme of this subtree, for `whenScheme`; `light dark` and nothing keep the one above. */
   readonly colorScheme?: ColorScheme
+  /** The subtree that the theme applies to. */
   readonly children?: ReactNode
 }
 

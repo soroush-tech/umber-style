@@ -88,11 +88,17 @@ export function createLargeStyle(): WebStyleObject {
 
 /** The props of the layout component: the six that its style reads. */
 export interface LayoutProps {
+  /** The gap between children, in pixels. */
   gap: number
+  /** The `flex-direction`. */
   direction: 'row' | 'column'
+  /** The `align-items`. */
   align: 'flex-start' | 'center'
+  /** The `justify-content`. */
   justify: 'flex-start' | 'space-between'
+  /** The `flex-wrap`. */
   wrap: 'nowrap' | 'wrap'
+  /** The padding, in pixels. */
   padding: number
 }
 

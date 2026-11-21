@@ -2,6 +2,7 @@ import type { ComponentType, ReactNode } from 'react'
 import { BaseStyles, NavBar } from './components'
 import { FrameSwitch, Hydrated, ThemeSwitch } from './interactive'
 
+/** The component the shell renders its links with: a plain `<a>` by default, or the link of a fixture's router. */
 export type LinkComponent = ComponentType<{
   href: string
   children: ReactNode

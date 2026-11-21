@@ -18,6 +18,7 @@ import { createThemeRule, ROOT_SELECTOR, toDeclarationText } from './theme'
 import { scanVariables } from './variables'
 import type { WebStyleObject } from './webStyle'
 
+/** The options of `createCache`: the names it makes, the layers, the checks, and where its rules go. */
 export interface CacheOptions {
   /** First part of every class name. Default 'css'. Must match /^[a-z][a-z0-9-]*$/ or createCache throws. */
   prefix?: string
@@ -82,7 +83,9 @@ export interface CacheOptions {
 
 /** A part of the CSS of a page, and the ids it covers. */
 export interface PagePart {
+  /** The CSS text of the part. */
   css: string
+  /** What the rules of the part stand for: class names, or theme classes and global ids. */
   ids: string[]
 }
 
@@ -120,7 +123,9 @@ export interface GlobalInsertOptions {
   isRendered?: boolean
 }
 
+/** Where a cache writes its rules: a style element of a document (`createDomSheet`) or memory (`createMemorySheet`). */
 export interface Sheet {
+  /** Appends one rule, as text. */
   insert(rule: string): void
   /** Every rule inserted so far and not removed, in order. */
   readonly rules: readonly string[]
@@ -154,11 +159,13 @@ export interface GlobalRules {
 /** The cascade layers of a cache, from the lowest priority to the highest. */
 export const RULE_LAYERS = ['theme', 'global', 'components', 'overrides'] as const
 
+/** One of the cascade layers of a cache, without its prefix. */
 export type RuleLayer = (typeof RULE_LAYERS)[number]
 
 /** The layers that a class can be made in: the styles of a component, and what is given to it from outside. */
 export type ClassLayer = 'components' | 'overrides'
 
+/** What a class is made from: a style object, a sheet entry, a class name, or a falsy value that is left out. */
 export type ClassValue = WebStyleObject | SheetEntry | string | null | undefined | false
 
 /** How `cssWith` makes a class, beyond what is in it. */
@@ -188,7 +195,9 @@ export interface HeldClass {
   readonly hold: (() => () => void) | undefined
 }
 
+/** The cache of an engine: it makes class names, writes their rules once, and gives the CSS of a page. */
 export interface Cache {
+  /** The first part of every class name and variable it makes (`CacheOptions.prefix`). */
   readonly prefix: string
   /** Whether rules go into cascade layers. */
   readonly hasLayers: boolean
@@ -938,7 +947,7 @@ export function createCache(options: CacheOptions = {}): Cache {
   const removeAt = (remove: (index: number) => void, index: number): void => {
     remove(index)
     for (const entry of [...globals.values(), ...held.values()]) {
-      entry.indexes = entry.indexes.map((at) => (at > index ? at - 1 : at))
+      entry.indexes = entry.indexes.map((position) => (position > index ? position - 1 : position))
     }
     for (const entry of themes.values()) {
       if (entry.index !== undefined && entry.index > index) entry.index--
@@ -953,8 +962,8 @@ export function createCache(options: CacheOptions = {}): Cache {
     if (pageRules ? pageRules.includes(undefined) : remove === undefined) return
     globals.delete(id)
     pageRules?.forEach((rule) => deleteCssRule(rule as CSSRule))
-    for (let at = indexes.length - 1; at >= 0; at--) {
-      removeAt(remove as (index: number) => void, indexes[at])
+    for (let position = indexes.length - 1; position >= 0; position--) {
+      removeAt(remove as (index: number) => void, indexes[position])
     }
   }
 
@@ -962,7 +971,8 @@ export function createCache(options: CacheOptions = {}): Cache {
     global: GlobalRules,
     { isRendered = false }: GlobalInsertOptions = {}
   ): (() => void) => {
-    const entry = globals.get(global.id) ?? writeGlobal(global)
+    const { id } = global
+    const entry = globals.get(id) ?? writeGlobal(global)
     const forApp = isRendered ? 0 : 1
     entry.count++
     entry.appCount += forApp
@@ -972,7 +982,7 @@ export function createCache(options: CacheOptions = {}): Cache {
       isReleased = true
       entry.count--
       entry.appCount -= forApp
-      if (entry.count === 0) removeGlobal(global.id, entry)
+      if (entry.count === 0) removeGlobal(id, entry)
     }
   }
 
@@ -1090,8 +1100,8 @@ export function createCache(options: CacheOptions = {}): Cache {
   const removeHeld = (className: string, entry: HeldEntry): void => {
     held.delete(className)
     if (entry.pageRules === undefined) {
-      for (let at = entry.indexes.length - 1; at >= 0; at--) {
-        removeAt(sheet.remove as (index: number) => void, entry.indexes[at])
+      for (let position = entry.indexes.length - 1; position >= 0; position--) {
+        removeAt(sheet.remove as (index: number) => void, entry.indexes[position])
       }
     } else {
       const rules = findPageRules(className, entry.pageRules)
@@ -1145,7 +1155,7 @@ export function createCache(options: CacheOptions = {}): Cache {
     const merged = mergeStyles([style as StyleObject])
     const rules = compileRules('&', merged, hasColorFallbacks, scoping, hasValueRepair)
     const names: Partial<Record<EntryRole, string>> = {}
-    const nameFor = (role: EntryRole): string => {
+    const getRoleName = (role: EntryRole): string => {
       names[role] ??= rules.length === 0 ? '' : nameClass(role, merged, rules, '')
       return names[role]
     }
@@ -1153,7 +1163,7 @@ export function createCache(options: CacheOptions = {}): Cache {
       style: merged,
       cache: self,
       use(role) {
-        const name = nameFor(role)
+        const name = getRoleName(role)
         // The class of an entry is permanent, also when the same style was held.
         if (held.size > 0) held.delete(name)
         if (name !== '' && !registered.has(name)) {
@@ -1163,8 +1173,8 @@ export function createCache(options: CacheOptions = {}): Cache {
         return name
       },
     }
-    const entry = createSheetEntry(nameFor('components'), source)
-    entries.set(nameFor('components'), entry)
+    const entry = createSheetEntry(getRoleName('components'), source)
+    entries.set(getRoleName('components'), entry)
     return entry
   }
 
@@ -1248,7 +1258,7 @@ export function createCache(options: CacheOptions = {}): Cache {
   }
 
   /** What orders the classes of a page: a props class is right after its base class (its `after`), the rest by name. */
-  const sortKey = (id: string): string =>
+  const readSortKey = (id: string): string =>
     `${afters.get(id) ?? id}|${afters.has(id) ? '1' : '0'}${id}`
 
   /** The variables that the theme class `id` declares. */
@@ -1302,7 +1312,7 @@ export function createCache(options: CacheOptions = {}): Cache {
     const classIds = [...wanted]
       .filter((name) => name.startsWith(`${prefix}-`) && !themeNames.has(name))
       .filter((name) => insertedRules.has(name))
-      .sort((first, second) => (sortKey(first) < sortKey(second) ? -1 : 1))
+      .sort((first, second) => (readSortKey(first) < readSortKey(second) ? -1 : 1))
     // The global rules of this page: those of the app, and those of a component that the page rendered.
     const held = [...globals].filter(
       ([id, entry]) => entry.appCount > 0 || rendered.has(id) || carried.has(id)

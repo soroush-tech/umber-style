@@ -9,6 +9,7 @@ export type StyleProblemKind =
 
 /** One thing the page lacks. */
 export interface StyleProblem {
+  /** What is missing: a rule for a class, a value for a variable, or a theme for a rule of the root. */
   kind: StyleProblemKind
   /** The class, or the variable. */
   name: string
@@ -20,6 +21,7 @@ export interface StyleProblem {
   key: string
 }
 
+/** What `findMissingStyles` is told about the page it checks. */
 export interface FindMissingStylesOptions {
   /** The prefix of the engine. Default: the one the style elements of the page say. */
   prefix?: string
@@ -139,10 +141,11 @@ function findVariableProblems(
   const computed = getComputedStyle(element)
   for (const { rule, variables, isState } of rules) {
     if (variables.length === 0 || isState || !isMatched(element, rule)) continue
+    const { selectorText } = rule
     for (const name of variables) {
       if (computed.getPropertyValue(name).trim() !== '') continue
-      const message = `${label} has no value for ${name}, which ${rule.selectorText} uses`
-      const key = `variable:${name}:${rule.selectorText}`
+      const message = `${label} has no value for ${name}, which ${selectorText} uses`
+      const key = `variable:${name}:${selectorText}`
       problems.push({ kind: 'variable-without-value', name, element: label, message, key })
     }
   }
