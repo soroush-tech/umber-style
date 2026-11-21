@@ -191,6 +191,13 @@ export type StyledComponent<
 /** The props that a function style reads: the props of the tag `Base`, with the component's own `P` over them. */
 type StyleFunctionProps<Base extends object, P extends object> = Omit<Base, keyof P> & P
 
+/** The props that the element of a styled component takes: those of the component, of the tag, and the ones only the element takes. */
+type ElementProps<
+  ComponentProps extends object,
+  SpecificComponentProps extends object,
+  JSXProps extends object,
+> = ComponentProps & SpecificComponentProps & JSXProps
+
 /**
  * What `styled(tag, options)` returns, in the form that a wrapper of `styled` names it: the props of the
  * component are `ComponentProps` and `SpecificComponentProps` (a wrapper puts its own, such as `theme`, in
@@ -221,7 +228,7 @@ export interface CreateStyledComponent<
   ): StyledComponent<
     ElementType,
     AdditionalProps,
-    ComponentProps & SpecificComponentProps & JSXProps
+    ElementProps<ComponentProps, SpecificComponentProps, JSXProps>
   >
   // The props are not inferred from the values: a styled component among them is a selector, not a style.
   <AdditionalProps extends object = object>(
@@ -233,7 +240,7 @@ export interface CreateStyledComponent<
   ): StyledComponent<
     ElementType,
     AdditionalProps,
-    ComponentProps & SpecificComponentProps & JSXProps
+    ElementProps<ComponentProps, SpecificComponentProps, JSXProps>
   >
   <AdditionalProps extends object = object>(
     ...styles: Interpolation<
@@ -243,7 +250,7 @@ export interface CreateStyledComponent<
   ): StyledComponent<
     ElementType,
     AdditionalProps,
-    ComponentProps & SpecificComponentProps & JSXProps
+    ElementProps<ComponentProps, SpecificComponentProps, JSXProps>
   >
 }
 
