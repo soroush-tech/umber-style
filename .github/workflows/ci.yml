@@ -207,7 +207,7 @@ jobs:
           flags: ${{ matrix.flag }}
           name: ${{ matrix.flag }}
 
-  # What a pull request must prove about publishing: the five packages build, and the packed
+  # What a pull request must prove about publishing: the packages build, and the packed
   # tarballs work together from outside the workspace (import, require, the export conditions, a
   # server render, the declarations under two module resolutions). The smoke test installs from npm.
   build:
@@ -235,7 +235,7 @@ jobs:
       - name: Smoke-test the packed packages
         run: node scripts/smoke-packed.mjs
 
-  # Tier 1 of docs/testing.md: the engine's own output in real headless Chromium, in the packages that
+  # Tier 2 of docs/testing.md: the engine's own output in real headless Chromium, in the packages that
   # have a `test:browser` script. The default test and coverage runs above need no browser.
   browser:
     needs: [prepare, lint]
@@ -307,7 +307,7 @@ jobs:
       - name: Run real-browser tests
         run: ${{ needs.prepare.outputs.runner }} --filter ${{ matrix.filter }} test:browser
 
-  # Tier 2 of docs/testing.md: one row per fixture app. Each is built, served as in production, and
+  # Tier 3 of docs/testing.md: one row per fixture app. Each is built, served as in production, and
   # driven by Playwright Test. A test marked as a known failure is an expected failure: it does not
   # fail the run, but one that starts to pass does, so the mark gets removed.
   e2e:

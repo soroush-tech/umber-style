@@ -1,7 +1,8 @@
 import type { ComponentType, ReactNode } from 'react'
-import { NavBar } from './components'
-import { Hydrated, ThemeSwitch } from './interactive'
+import { BaseStyles, NavBar } from './components'
+import { FrameSwitch, Hydrated, ThemeSwitch } from './interactive'
 
+/** The component the shell renders its links with: a plain `<a>` by default, or the link of a fixture's router. */
 export type LinkComponent = ComponentType<{
   href: string
   children: ReactNode
@@ -14,30 +15,43 @@ const DefaultLink: LinkComponent = ({ href, children, ...rest }) => (
   </a>
 )
 
-/** The frame around every page: the bar with the links and the theme switch. */
+/**
+ * The frame around every page: the global base styles, the bar with the links, the theme switch and the
+ * frame switch. `links` are more links of a fixture, after the shared ones.
+ */
 export function Shell({
   children,
   Link = DefaultLink,
+  links,
 }: {
   children: ReactNode
   Link?: LinkComponent
+  links?: ReactNode
 }) {
   return (
-    <div id="app-root" data-testid="app-root">
-      <NavBar data-testid="nav">
-        <Link href="/" data-testid="link-home">
-          Home
-        </Link>
-        <Link href="/catalog" data-testid="link-catalog">
-          Catalog
-        </Link>
-        <Link href="/settings" data-testid="link-settings">
-          Settings
-        </Link>
-        <ThemeSwitch />
-      </NavBar>
-      {children}
-      <Hydrated />
-    </div>
+    <>
+      <BaseStyles />
+      <div id="app-root" data-testid="app-root">
+        <NavBar data-testid="nav">
+          <Link href="/" data-testid="link-home">
+            Home
+          </Link>
+          <Link href="/catalog" data-testid="link-catalog">
+            Catalog
+          </Link>
+          <Link href="/settings" data-testid="link-settings">
+            Settings
+          </Link>
+          <Link href="/promo" data-testid="link-promo">
+            Promo
+          </Link>
+          {links}
+          <ThemeSwitch />
+          <FrameSwitch />
+        </NavBar>
+        {children}
+        <Hydrated />
+      </div>
+    </>
   )
 }

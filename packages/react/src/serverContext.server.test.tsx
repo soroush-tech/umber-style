@@ -1,6 +1,5 @@
 import * as React from 'react'
-import { createServerOnlyContext, readServerContext, type CacheFunction } from './serverContext'
-import { resolveTree } from './vitest.resolveTree'
+import { createRequestSlot, type CacheFunction } from './serverContext'
 
 /** One request: a cache that keeps the value it made, like `React.cache` does inside a server render. */
 function createRequest(): CacheFunction {
@@ -10,48 +9,29 @@ function createRequest(): CacheFunction {
   }
 }
 
-describe('createServerOnlyContext', () => {
-  it('has the default until a provider writes, and keeps what the first provider wrote', async () => {
-    const context = createServerOnlyContext('default', createRequest())
-    expect(readServerContext(context)).toBe('default')
-    const seen: string[] = []
-    const Probe = () => {
-      seen.push(readServerContext(context))
-      return null
-    }
-    await resolveTree(
-      <context.Provider value="root">
-        <Probe />
-        <context.Provider value="nested">
-          <Probe />
-        </context.Provider>
-        <Probe />
-      </context.Provider>
-    )
-    expect(seen).toEqual(['root', 'root', 'root'])
-    expect(readServerContext(context)).toBe('root')
+describe('createRequestSlot', () => {
+  it('starts at the default, unset, and keeps what is written for the request', () => {
+    const slot = createRequestSlot('default', createRequest())
+    expect(slot()).toEqual({ current: 'default', isSet: false })
+    slot().current = 'root'
+    slot().isSet = true
+    expect(slot()).toEqual({ current: 'root', isSet: true })
   })
 
   it('keeps a request apart from the next one', () => {
-    const first = createServerOnlyContext('default', createRequest())
-    const second = createServerOnlyContext('default', createRequest())
-    first.Provider({ value: 'a' })
-    expect(readServerContext(first)).toBe('a')
-    expect(readServerContext(second)).toBe('default')
-  })
-
-  it('returns its children', () => {
-    const context = createServerOnlyContext(0, createRequest())
-    const children = React.createElement('i')
-    expect(context.Provider({ value: 1, children })).toBe(children)
+    const first = createRequestSlot('default', createRequest())
+    const second = createRequestSlot('default', createRequest())
+    first().current = 'a'
+    expect(first().current).toBe('a')
+    expect(second().current).toBe('default')
   })
 
   it('uses React.cache, which keeps nothing outside a server render', () => {
     expect(typeof React.cache).toBe('function')
     expect((React as unknown as Record<string, unknown>).useContext).toBeUndefined()
-    const context = createServerOnlyContext('default')
-    context.Provider({ value: 'lost' })
+    const slot = createRequestSlot('default')
+    slot().current = 'lost'
     // Outside a render React.cache calls the function each time: the slot is new on every read.
-    expect(readServerContext(context)).toBe('default')
+    expect(slot().current).toBe('default')
   })
 })

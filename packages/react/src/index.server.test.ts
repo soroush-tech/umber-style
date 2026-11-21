@@ -1,17 +1,22 @@
 import * as entry from './index.server'
 
 describe('the server entry of @umber-style/react', () => {
-  it('exports the default style, createStyle and alpha, and readTheme instead of useTheme', () => {
+  it('exports the default style, createStyle and alpha, and useTheme with readTheme, the same function', () => {
     for (const name of [
       'styled',
       'ThemeProvider',
+      'useTheme',
       'readTheme',
       'StyleSheet',
       'useStyle',
       'apply',
+      'css',
       'themeClass',
       'when',
       'whenScheme',
+      'keyframes',
+      'globalStyles',
+      'Global',
       'getEngine',
       'configure',
       'createStyle',
@@ -25,7 +30,10 @@ describe('the server entry of @umber-style/react', () => {
     ]) {
       expect(entry).toHaveProperty(name)
     }
-    expect(entry).not.toHaveProperty('useTheme')
+    for (const name of ['ThemeScope', 'useThemeClass', 'ThemeContext']) {
+      expect(entry).not.toHaveProperty(name)
+    }
+    expect(entry.readTheme).toBe(entry.useTheme)
   })
 
   it('configures the default engine once, before it is used', () => {

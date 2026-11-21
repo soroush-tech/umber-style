@@ -2,7 +2,10 @@
 
 Conventions for everything under `packages/` - the workspace's code. UmberStyle is a styling engine
 (`core`) with one thin binding per platform (`react`, `react-native`, `vue`) and an umbrella
-(`umber-style`) that re-exports them. `eslint-config` is the private lint config they share. Each
+(`umber-style`) that re-exports them. Three packages build on `core` with no framework: `css`
+(class names with no theme), `cache` (the cache that server-rendering set-ups read and wrap) and
+`server` (the CSS of one page as chunks). `styled` is a legacy entry for React that gives the
+`styled` of `react` as a default export. `eslint-config` is the private lint config they share. Each
 folder is its own pnpm package, globbed by `packages/*` in `pnpm-workspace.yaml` and consumed by the
 other packages via `workspace:*`.
 
@@ -22,8 +25,8 @@ published on its own. Until then, keep the code where it is used - don't pre-ext
 
 ## Folder structure
 
-The folder is the package name without the `@umber-style/` scope: `core`, `react`, `react-native`,
-`vue`. The unscoped package `umber-style` lives in `packages/umber-style`. A private tooling package
+The folder is the package name without the `@umber-style/` scope: `core`, `cache`, `server`, `css`,
+`react`, `react-native`, `vue`, `styled`. The unscoped package `umber-style` lives in `packages/umber-style`. A private tooling package
 follows the same rule (`@umber-style/eslint-config` is `packages/eslint-config`).
 
 ```
@@ -35,7 +38,7 @@ packages/
     package.json
     tsconfig.json         <- bundler resolution, noEmit; NOT in the root solution
     .oxlintrc.json        <- extends @umber-style/eslint-config's base (or React layer) + env
-    vitest.config.ts      <- v8 coverage, reporter ['text', 'lcov'], 100% thresholds
+    vitest.config.ts      <- v8 coverage, reporter ['text', 'lcov'], 100% thresholds (.js in eslint-config)
     tsdown.config.ts      <- the build of a publishable package
     README.md             <- a short stub: what it is, install, one import example, a link to docs/
     LICENSE               <- publishable packages only
@@ -58,6 +61,10 @@ Keep the **public API in `index.ts`**; extract internal helpers into sibling mod
 
 - Internal consumption is **TypeScript source**: `exports: { ".": "./src/index.ts" }`, consumed under
   `moduleResolution: bundler` via `workspace:*`. **No `paths` alias, no build step** for internal use.
+- A package whose API is one function may export it as the default export of its entry or of a
+  subpath (`@umber-style/cache`, `@umber-style/server/create-instance`,
+  `@umber-style/css/create-instance`). A package with no root entry exports only its subpaths
+  (`server` has `./create-instance` and no `.`).
 - A binding that has a server build adds the `react-server` condition ahead of `default`. The umbrella
   re-exports each binding as a subpath (`umber-style/react`, `umber-style/react-native`,
   `umber-style/vue`).
@@ -67,8 +74,8 @@ Keep the **public API in `index.ts`**; extract internal helpers into sibling mod
 
 ## Publishing
 
-The five packages (`core`, `react`, `react-native`, `vue`, `umber-style`) are publishable; `eslint-config`
-stays `"private": true` and is never built. Internal-only packages consume source directly. A
+Every package but `eslint-config` is publishable (`core`, `cache`, `server`, `css`, `react`,
+`react-native`, `vue`, `styled`, `umber-style`); `eslint-config` stays `"private": true` and is never built. Internal-only packages consume source directly. A
 publishable package has:
 
 - No `private`; a `description`, `keywords`, `files: ["dist"]`, `license`, `author`, `homepage`,
@@ -77,13 +84,18 @@ publishable package has:
   its issues. npm verifies a publish's provenance against `repository.url` and refuses one that names
   another repo.
 - Build with **tsdown** (`format: ['esm', 'cjs']`, `dts: true`) -> `dist/`, with `pnpm build` (the root
-  script builds the five). tsdown emits declarations via Oxc/Rolldown and does **not** inject the
+  script builds every package under `packages/`). tsdown emits declarations via Oxc/Rolldown and does **not** inject the
   deprecated `baseUrl` that breaks `.d.ts`. One entry in the config for each file an export points at:
   `react` has `index` and `index.server` (the `react-server` condition), and `umber-style` has one entry
   for the code of each subpath and one for the declarations of `umber-style/react` (`shared`,
   `shared.server`), because its code and its types come from different files. `react` and
   `react-native` build unbundled so the `'use client'` directive of the module that holds the theme
   context stays on that module.
+- An entry whose API is a default export sets **`cjsDefault: false`** (`cache`, `server`, `css`): the
+  CommonJS build then keeps it as `exports.default`, as its declarations (`export default`) say,
+  where the default would make the function `module.exports` itself and a typed `require` would not
+  match it. `pnpm smoke:packed` checks `default` from `require` and the types under `node16` from a
+  CommonJS file.
 - Keep `exports -> ./src/index.ts` for the workspace, and use **`publishConfig`** to swap
   `exports`/`main`/`module`/`types` to `dist/` **only on publish** - so the workspace keeps consuming
   source while npm gets compiled output:
@@ -100,8 +112,9 @@ publishable package has:
 
 - Declare the host framework as a **`peerDependency`** (`react`, `react-native`, `vue`); never bundle
   the peer. `react-native` is an optional peer of its binding.
-- `@umber-style/core` is a `dependency` of the bindings and of the umbrella, never bundled into them: one
-  engine is shared. `workspace:*` is published as the exact version, so the five move together.
+- `@umber-style/core` is a `dependency` of every other publishable package but `styled`, never
+  bundled into them: one engine is shared. `styled` depends on `@umber-style/react` alone, which
+  brings the core. `workspace:*` is published as the exact version, so the packages move together.
   `csstype` is a dependency of `core` because its declarations name it.
 - Keep every export condition of the source exports in `publishConfig.exports`, each split into
   `import` and `require` with their own `types`. The order of the conditions is part of the meaning
@@ -110,7 +123,7 @@ publishable package has:
   deliberately when a new major lands, never `workspace:^`: pnpm freezes `workspace:^` to
   `^<the sibling's version at publish time>`. The `devDependency` stays `workspace:*`.
 - `prepublishOnly: pnpm build`; verify the tarball with `pnpm pack` before publishing: `pnpm smoke:packed`
-  does it for all five (see [Releasing](../docs/releasing.md)).
+  does it for every publishable package (see [Releasing](../docs/releasing.md)).
 
 ### Releasing to npm - always via pnpm, never `npm publish`
 
@@ -131,7 +144,7 @@ channels, the order of the packages and how to verify a published tarball. Every
 coverage-ignore comments.
 
 - Co-locate `index.test.ts` next to `src/index.ts`; vitest with v8 coverage.
-- Every package ships a `vitest.config.ts` with `coverage.reporter: ['text', 'lcov']` (v8 provider,
+- Every package ships a `vitest.config.ts` (`vitest.config.js` in `eslint-config`) with `coverage.reporter: ['text', 'lcov']` (v8 provider,
   `thresholds: { 100: true }`). The `lcov` reporter is **required** - CI reads each package's
   `coverage/lcov.info` to rewrite `SF:` paths and upload to Codecov.
 - Each package exposes `test` and `test:coverage` scripts; the root aggregates with

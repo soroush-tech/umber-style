@@ -9,16 +9,27 @@ export const {
   useStyle,
   useTheme,
   ThemeProvider,
+  ThemeScope,
+  useThemeClass,
+  useMediaQuery,
+  ThemeContext,
   apply,
+  css,
   themeClass,
   when,
   whenScheme,
+  keyframes,
+  globalStyles,
+  Global,
 } = defaults
 
 export { at } from '@umber-style/core'
+export { CacheProvider } from './CacheProvider'
 export * from './alpha'
 export * from './calc'
-export * from './createStyle'
+export { createStyle } from './createStyle'
 export * from './defaultStyle'
 export * from './nativeStyle'
+export type { NativeLength, NativeTheme } from './nativeTheme'
 export * from './types'
+export type { MediaQueryOptions } from './windowState'

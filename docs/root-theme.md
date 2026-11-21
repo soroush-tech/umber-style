@@ -1,12 +1,41 @@
 # The root theme and switching
 
-After this page you can switch light and dark with no render, store the choice and apply it before the first paint, add a theme while the page runs, and render a static page with its CSS.
+After this page you can give the whole page its theme, switch light and dark with no render of a styled component, store the choice and apply it before the first paint, add a theme while the page runs, and render a static page with its CSS.
 
-## Why a root provider
+There are two ways to put the theme of the page on the document. The default needs nothing from you: the outermost provider declares its theme on `:root`. The other is yours to drive: a theme class on `<html>`, with `isRoot` on the provider. Both work in every binding, and on one page they meet in a stated way: a class on `<html>` wins over `:root`.
 
-A normal `ThemeProvider` renders an element that carries its theme's class, and that class declares the whole theme for everything below it. If your app also puts a theme class on `<html>` to switch themes, the wrapper of the outermost provider would override it for the entire page, and the switch would do nothing.
+## The default: the theme on `:root`
 
-So the outermost provider is a root provider. With `isRoot` it renders no element, no class and no rule. It does two things: it gives the engine its base theme (when the engine has none yet) and it feeds the context for `useTheme` and function styles. You put the class on an ancestor you control, usually `<html>`, and the call that gives you the class, `themeClass`, makes the rule: see below.
+The outermost `ThemeProvider` (one with no provider above it) renders no element and puts no class on `<html>`. It declares the variables of its theme on the document root, in one rule in the `theme` layer:
+
+```css
+@layer umber-theme {
+  :where(:root) {
+    --umber-palette-text: #1a1a1a;
+    --umber-palette-surface: #ffffff;
+    --umber-space-3: 16px;
+    color-scheme: light;
+  }
+}
+```
+
+- Everything sees the variables: the elements of the app, plain elements, portal content, and the rules for `html` and `body` that `Global` writes.
+- `colorScheme` sets `color-scheme` in that rule.
+- With pruning (the default) the rule declares only the variables that rules use, and grows as rules come in, like a theme class.
+- A change of the provider's theme rewrites that one rule. No styled component renders again; what reads `useTheme()` does. So switching light and dark is a change of the `theme` you give the provider, for example from state.
+- The selector is `:where(:root)`, whose specificity is 0: a theme class on `<html>` wins over it, whatever the order of the rules.
+
+In the browser the rule is written in an insertion effect (React) or in `setup` and when the theme changes (Vue). On a server it is written during the render: a classic server render gets it from `extractPageStyles`, and the providers of the React builds send it as a `<style href precedence>` element, keyed `umber-root-<hash>`. See [Server rendering](server-rendering.md).
+
+In the server components build the root theme can change from the server: a cookie and `router.refresh()`, after which the root layout renders `<ThemeProvider theme={dark}>`. React keeps a style element for the life of the document, so the element of the earlier root theme is still there. Once the new one is committed, the provider leaves one root rule of its prefix live: the one of its own theme, written again into its element when an earlier change deleted it there, and none in the other elements that React keeps for that prefix. This works with no client-side engine at all; the elements of the browser's cache and of a registry are not touched.
+
+An engine has one root theme. Two outermost providers that share an engine (two React roots on one page, or two providers side by side with nothing above them) share the rule: the theme of the one that was written last is there, for both. See [Themes](themes.md).
+
+The default gives no marker class at the root. `when(theme)` and `whenScheme()` work with classes (see [Theme conditions](theme-conditions.md)), and `:root` has none, so below the outermost provider and outside any nested one, `when(rootTheme)` does not match and `whenScheme()` follows the system preference, whatever `colorScheme` the provider has. A page that needs either at the root uses the class on `<html>`, below.
+
+## The class on `<html>`: `isRoot`
+
+With `isRoot` the provider renders no element, no class and no rule. It does two things: it gives the engine its base theme (when the engine has none yet; a provider of the server components build never does) and it feeds the context for `useTheme` and function styles of client components (in the server components build, through its browser part). You put the class on an ancestor you control, usually `<html>`, and the call that gives you the class, `themeClass`, makes the rule: see below.
 
 ```tsx
 const App = () => (
@@ -16,11 +45,11 @@ const App = () => (
 )
 ```
 
-`isRoot` is a prop of the provider in every binding. React Native accepts it and ignores it, because React Native has no classes. Nested providers stay normal: they change only the tokens they give, below their own element.
+Use it when the page switches its theme by a class on `<html>` (a script that applies a stored choice before the first paint, below), or when conditions must see the theme of the root: the class carries the boundary and scheme markers. `isRoot` is a prop of the provider in every binding. React Native accepts it and ignores it, because React Native has no classes. Providers below it are nested providers, as below any other.
 
 A root provider makes no theme class, so its `colorScheme` makes no rule and changes nothing in the markup: the class that matters is the one you got from `themeClass(theme, colorScheme)` and put on `<html>`. Call `themeClass` for the root theme, at start-up, as for every theme you switch to. An app that never calls it has no rule for its root theme at all, and a root provider does not make one for it.
 
-## The class on `<html>`
+## The class string of a theme
 
 `themeClass(theme, colorScheme)` returns the class string for a theme: the theme class, `umber-boundary`, and `umber-scheme-light` or `umber-scheme-dark` for those two schemes:
 
@@ -131,9 +160,65 @@ const html = [
 
 The `data-options` attribute is the stamp of the options of the cache. A browser cache created later on the same page compares it with its own: see [Server rendering](server-rendering.md).
 
-The head script runs while the document is still being parsed, before the body is painted, so the page has the stored theme from its first frame. The script is an inline script: a strict content security policy needs a nonce or a hash for it. See [No inline styles](no-inline-styles.md).
+The head script runs while the document is still being parsed, before the body is painted, so the page has the stored theme from its first frame.
+
+### The same page with the default provider
+
+A page can also render the default provider (no `isRoot`): its theme is on `:root`, and the themes it offers are classes for `<html>`, as above. A class on `<html>` wins over `:root`, so the script needs to set a class only for a theme other than the default:
+
+```tsx
+const { styled, ThemeProvider, themeClass, cache } = createStyle(lightTheme, {
+  prefix: 'umber',
+  hasServerStyleElements: false,
+})
+
+const dark = themeClass(darkTheme, 'dark')
+
+const body = renderToStaticMarkup(
+  <ThemeProvider theme={lightTheme} colorScheme="light">
+    <Page>Hello</Page>
+  </ThemeProvider>
+)
+
+const { tag } = extractPageStyles(cache, body, { themes: [dark] })
+
+const choose = `if (localStorage.getItem('theme') === 'dark') document.documentElement.className = ${JSON.stringify(dark)}`
+```
+
+The CSS of the page (shown formatted):
+
+```css
+@layer umber-theme, umber-global, umber-components, umber-overrides;
+@layer umber-theme {
+  :where(:root) {
+    --umber-palette-text: #1a1a1a;
+    --umber-palette-surface: #ffffff;
+    --umber-space-3: 16px;
+    color-scheme: light;
+  }
+}
+@layer umber-theme {
+  .umber-theme-tk7v2e {
+    --umber-palette-text: #f2f2f2;
+    --umber-palette-surface: #101114;
+    --umber-space-3: 16px;
+    color-scheme: dark;
+  }
+}
+@layer umber-components {
+  .umber-page-root-1h3tp5s {
+    background-color: var(--umber-palette-surface);
+    color: var(--umber-palette-text);
+    padding: var(--umber-space-3);
+  }
+}
+```
+
+The body is `<main class="umber-page-root-1h3tp5s">Hello</main>`, with no wrapper. That the dark class on `<html>` wins over `:root` was checked in Chromium (`packages/react/src/themeProvider.browser.test.tsx`); the CSS above is asserted in `packages/react/src/providers.docs.ssr.test.tsx`. Under the default light theme, `whenScheme('dark')` at the root follows the system preference (see above); under the dark class it has the scheme marker. The script is an inline script: a strict content security policy needs a nonce or a hash for it. See [No inline styles](no-inline-styles.md).
 
 ## Switching at run time
+
+With the default provider, a switch is a new `theme` for it: the `:root` rule is rewritten, and no styled component renders again, as above.
 
 With the class on `<html>`, a switch is a class change. No component re-renders and no style is recomputed:
 
@@ -187,9 +272,14 @@ The `spa` fixture does exactly this (`fixtures/spa/index.html`), and end-to-end 
 
 ## Limits
 
+- With the default provider, `when(rootTheme)` does not match at the root and `whenScheme()` follows the system preference there: `:root` carries no marker class. Use `isRoot` and a class on `<html>` for conditions at the root.
+- One engine has one `:root` rule. Two outermost providers of one engine with different themes (two React roots) share it: the last one written wins, for both.
+- `extractPageStyles` takes the root theme that the cache declared last, so render and extract one page before the next one starts. The style elements of the React builds carry their root theme with them and do not depend on this.
+- In the server components build, after the root theme changed from the server, the root rule of the earlier theme is deleted from the element that React keeps once the new provider has committed (a layout effect, before the paint); until then both are in the document and the later one wins by its place. The pass reads the elements that React hoisted for the prefix (`data-precedence`) only. Two outermost providers side by side each leave their own rule alone in turn: the one that committed last wins.
+- The `:root` rule of a server render is removed from the page, where the browser kept it as it was sent, when the browser cache declares its own root theme, at hydration. A rule the browser could not tell apart (its style element lost a rule) stays, and a later rule with the same selector wins over it only by its place in the document.
 - "No flash" is reasoned from the order of events (the script runs before the first paint). It was not observed in a browser.
 - The switch was checked in jsdom, which resolves custom properties from classes on an ancestor. A real browser was not used.
 - The inline script needs a content security policy nonce or hash. The engine has no option to produce one.
-- With `isRoot`, the provider renders no `umber-scope` wrapper, no theme class and makes no theme rule. If the class is not on an ancestor, or `themeClass` was not called for it, the variables are not declared and styles that use them have no values.
+- With `isRoot`, the provider renders no wrapper, no theme class and makes no theme rule, and no `:root` rule. If the class is not on an ancestor, or `themeClass` was not called for it, the variables are not declared and styles that use them have no values.
 - Scenario H was run on Chromium only, on the fixtures' own theme switch (a class on `<html>`).
 - The server components build handles `isRoot` too: it sends the `<style>` of the theme classes that `themeClass` already made for its theme object, and makes none; see [Server rendering](server-rendering.md).

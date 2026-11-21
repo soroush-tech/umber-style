@@ -22,8 +22,8 @@ const REGISTRY = 'https://registry.npmjs.org'
 const args = process.argv.slice(2)
 const channel = args.shift()
 const flags = args.filter((arg) => arg.startsWith('--'))
-const skipReleased = flags.includes('--skip-released')
-const dryRun = flags.includes('--dry-run')
+const shouldSkipReleased = flags.includes('--skip-released')
+const isDryRun = flags.includes('--dry-run')
 const names = args.filter((arg) => !arg.startsWith('--'))
 
 const fail = (message) => {
@@ -34,15 +34,15 @@ const fail = (message) => {
 if (!CHANNELS.includes(channel))
   fail(`Unknown channel "${channel}" - expected ${CHANNELS.join(', ')}`)
 
-const packageFile = (dir) => `packages/${dir}/package.json`
+const getPackageFile = (dir) => `packages/${dir}/package.json`
 const workspace = readdirSync('packages', { withFileTypes: true })
-  .filter((entry) => entry.isDirectory() && existsSync(packageFile(entry.name)))
-  .map(({ name: dir }) => ({ dir, pkg: JSON.parse(readFileSync(packageFile(dir), 'utf8')) }))
+  .filter((entry) => entry.isDirectory() && existsSync(getPackageFile(entry.name)))
+  .map(({ name: dir }) => ({ dir, pkg: JSON.parse(readFileSync(getPackageFile(dir), 'utf8')) }))
 const byName = new Map(workspace.map((entry) => [entry.pkg.name, entry]))
 const byDir = new Map(workspace.map((entry) => [entry.dir, entry]))
 
 // Published dependencies only - devDependencies never reach a consumer's install.
-const workspaceDeps = ({ pkg }) =>
+const getWorkspaceDeps = ({ pkg }) =>
   Object.entries({ ...pkg.dependencies, ...pkg.peerDependencies })
     .filter(([, spec]) => spec.startsWith('workspace:'))
     .map(([name]) => byName.get(name))
@@ -65,10 +65,10 @@ const published = new Map(
       .map(async ({ pkg }) => [pkg.name, await fetchVersions(pkg.name)])
   )
 )
-const publishedVersions = (name) => published.get(name) ?? []
+const getPublishedVersions = (name) => published.get(name) ?? []
 
 // The N of every `<target>-<channel>.N` on npm.
-const prereleaseNumbers = (versions, target) => {
+const readPrereleaseNumbers = (versions, target) => {
   const prefix = `${target}-${channel}.`
   return versions
     .filter((version) => version.startsWith(prefix))
@@ -79,7 +79,7 @@ const prereleaseNumbers = (versions, target) => {
 const setVersion = (entry, version) => {
   console.error(`${entry.pkg.name}: ${entry.pkg.version} -> ${version}`)
   entry.pkg.version = version
-  if (!dryRun) writeFileSync(packageFile(entry.dir), `${JSON.stringify(entry.pkg, null, 2)}\n`)
+  if (!isDryRun) writeFileSync(getPackageFile(entry.dir), `${JSON.stringify(entry.pkg, null, 2)}\n`)
 }
 
 const requested = names.includes('all')
@@ -98,8 +98,8 @@ if (channel !== 'stable') {
   const unreleased = []
   for (const entry of run) {
     const { pkg } = entry
-    if (!publishedVersions(pkg.name).includes(pkg.version)) unreleased.push(entry)
-    else if (skipReleased)
+    if (!getPublishedVersions(pkg.name).includes(pkg.version)) unreleased.push(entry)
+    else if (shouldSkipReleased)
       console.error(`${pkg.name}@${pkg.version} is already released - skipped.`)
     else fail(`${pkg.name}@${pkg.version} is already released - bump the version first.`)
   }
@@ -110,7 +110,7 @@ if (channel !== 'stable') {
 const ordered = []
 const visit = (entry) => {
   if (ordered.includes(entry)) return
-  workspaceDeps(entry)
+  getWorkspaceDeps(entry)
     .filter((dep) => run.includes(dep))
     .forEach(visit)
   ordered.push(entry)
@@ -120,18 +120,18 @@ run.forEach(visit)
 if (channel !== 'stable') {
   for (const entry of ordered) {
     const target = entry.pkg.version
-    const numbers = prereleaseNumbers(publishedVersions(entry.pkg.name), target)
+    const numbers = readPrereleaseNumbers(getPublishedVersions(entry.pkg.name), target)
     setVersion(entry, `${target}-${channel}.${numbers.length ? Math.max(...numbers) + 1 : 0}`)
   }
 
   const pointed = new Set()
-  for (const dep of ordered.flatMap(workspaceDeps)) {
+  for (const dep of ordered.flatMap(getWorkspaceDeps)) {
     if (run.includes(dep) || pointed.has(dep) || dep.pkg.private) continue
     pointed.add(dep)
     const target = dep.pkg.version
-    const versions = publishedVersions(dep.pkg.name)
+    const versions = getPublishedVersions(dep.pkg.name)
     if (versions.includes(target)) continue
-    const numbers = prereleaseNumbers(versions, target)
+    const numbers = readPrereleaseNumbers(versions, target)
     if (numbers.length === 0) {
       fail(`${dep.pkg.name}@${target} has no ${channel} on npm yet - publish ${dep.dir} first.`)
     }
@@ -142,9 +142,9 @@ if (channel !== 'stable') {
 // A stable run publishes `^<target>` for each workspace dependency, so that target must
 // already be on npm - or be published earlier in this run.
 if (channel === 'stable') {
-  for (const dep of new Set(ordered.flatMap(workspaceDeps))) {
+  for (const dep of new Set(ordered.flatMap(getWorkspaceDeps))) {
     if (run.includes(dep) || dep.pkg.private) continue
-    if (!publishedVersions(dep.pkg.name).includes(dep.pkg.version)) {
+    if (!getPublishedVersions(dep.pkg.name).includes(dep.pkg.version)) {
       fail(`${dep.pkg.name}@${dep.pkg.version} is not on npm yet - publish ${dep.dir} first.`)
     }
   }

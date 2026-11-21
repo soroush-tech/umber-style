@@ -1,6 +1,7 @@
 import { alpha, createCache, createEngine, createMemorySheet } from '@umber-style/core'
 import { bindEngine } from './createStyle.server'
 import { findAll, resolveTree } from './vitest.resolveTree'
+import { playScopes } from './vitest.providerScope'
 import type { CacheFunction } from './serverContext'
 
 const theme = { palette: { primary: '#0000ff', surface: '#ffffff' } }
@@ -30,22 +31,33 @@ function setup(options: { hasColorFallbacks?: boolean } = {}) {
 describe('registered properties in the server build', () => {
   it('sends the @property rule with the element of the theme class, after the order and before the rule', async () => {
     const { ThemeProvider } = setup()
-    const tree = await resolveTree(<ThemeProvider theme={theme}>x</ThemeProvider>)
-    const [themeElement] = findAll(tree, 'style')
+    const tree = playScopes(
+      await resolveTree(
+        <ThemeProvider theme={theme}>
+          <ThemeProvider theme={theme}>x</ThemeProvider>
+        </ThemeProvider>
+      )
+    )
+    const [rootElement, themeElement] = findAll(tree, 'style')
     const [text] = themeElement.children as string[]
     expect(text.startsWith(`${ORDER}${PRIMARY}@layer p-theme{.p-theme-`)).toBe(true)
     expect(text).toContain('--p-palette-primary:#0000ff;')
     expect(text.match(/@property/g)).toHaveLength(1)
+    // The element of the root theme of the outermost provider, the same way.
+    const [rootText] = rootElement.children as string[]
+    expect(rootText.startsWith(`${ORDER}${PRIMARY}@layer p-theme{:where(:root){`)).toBe(true)
   })
 
   it('sends it for a root provider too, and not with the element of a component class', async () => {
     const { ThemeProvider, Box, themeClass } = setup()
     // The app makes the rule of the class it puts on <html>; a root provider only sends it.
     themeClass(theme)
-    const tree = await resolveTree(
-      <ThemeProvider theme={theme} isRoot>
-        <Box />
-      </ThemeProvider>
+    const tree = playScopes(
+      await resolveTree(
+        <ThemeProvider theme={theme} isRoot>
+          <Box />
+        </ThemeProvider>
+      )
     )
     const texts = findAll(tree, 'style').map((element) => (element.children as string[])[0])
     expect(texts.filter((text) => text.includes('@property'))).toHaveLength(1)
@@ -55,7 +67,7 @@ describe('registered properties in the server build', () => {
 
   it('writes the mix alone in the element of a component without color fallbacks', async () => {
     const { Box } = setup({ hasColorFallbacks: false })
-    const tree = await resolveTree(<Box />)
+    const tree = playScopes(await resolveTree(<Box />))
     const [text] = findAll(tree, 'style').map((element) => (element.children as string[])[0])
     expect(text).toContain(
       '{background:color-mix(in srgb, var(--p-palette-primary) 10%, transparent);}'

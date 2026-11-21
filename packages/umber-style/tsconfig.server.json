@@ -3,5 +3,20 @@
   "compilerOptions": {
     "customConditions": ["react-server"]
   },
-  "files": ["src/sharedServerTypes.test.tsx"]
+  "files": ["src/sharedServerTypes.test.tsx"],
+  // The exclusions of tsconfig.json, and the providers' type tests: the server build has no
+  // `ThemeScope`, `useThemeClass` or `ThemeContext`.
+  "exclude": [
+    "../core/src/**/*.test.ts",
+    "../core/src/**/*.test.tsx",
+    "../react/src/**/*.test.ts",
+    "../react/src/**/*.test.tsx",
+    "../react-native/src/**/*.test.ts",
+    "../react-native/src/**/*.test.tsx",
+    "../vue/src/**/*.test.ts",
+    "../vue/src/**/*.test.tsx",
+    "src/platformParts.test.tsx",
+    "src/sharedSource.test.tsx",
+    "src/sharedProviders.test.tsx"
+  ]
 }

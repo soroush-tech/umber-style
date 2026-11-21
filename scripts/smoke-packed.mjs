@@ -1,13 +1,14 @@
-// Proves that the five packages work as npm will hand them out, not as the workspace sees them.
+// Proves that the publishable packages work as npm will hand them out, not as the workspace sees them.
 //
 //   pnpm build && node scripts/smoke-packed.mjs [--keep]
 //
 // It packs each package with `pnpm pack` (which applies `publishConfig`, as `pnpm publish` does),
-// inspects each tarball, installs all five together into a temporary folder outside the workspace
+// inspects each tarball, installs them all together into a temporary folder outside the workspace
 // with npm, and then checks, from there:
 //   - every entry and subpath loads with `import` and with `require`, and both give the same names;
-//   - the `react-server` condition gives the server build, the `react-native` condition gives the
-//     React Native binding for `umber-style/react`;
+//   - the `react-server` condition gives the server build (`useTheme` and `readTheme`, no
+//     `ThemeContext`), the `react-native` condition gives the React Native binding for
+//     `umber-style/react`;
 //   - the bindings and the umbrella share one copy of the core;
 //   - a styled React component renders on the server with a class and its CSS;
 //   - TypeScript resolves the declarations of every entry under `moduleResolution` bundler and
@@ -31,11 +32,15 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..')
-const keep = process.argv.includes('--keep')
+const shouldKeep = process.argv.includes('--keep')
 // Where each package lives, in the order they are published.
 const PACKAGES = [
   { dir: 'core', name: '@umber-style/core' },
+  { dir: 'cache', name: '@umber-style/cache' },
+  { dir: 'server', name: '@umber-style/server' },
+  { dir: 'css', name: '@umber-style/css' },
   { dir: 'react', name: '@umber-style/react' },
+  { dir: 'styled', name: '@umber-style/styled' },
   { dir: 'react-native', name: '@umber-style/react-native' },
   { dir: 'vue', name: '@umber-style/vue' },
   { dir: 'umber-style', name: 'umber-style' },
@@ -43,16 +48,75 @@ const PACKAGES = [
 // The names every entry of the package must export, and that the ESM and CJS builds must agree on.
 const ENTRIES = {
   '@umber-style/core': ['createEngine', 'createCache', 'extractPageStyles', 'at'],
-  '@umber-style/react': ['createStyle', 'styled', 'ThemeProvider', 'useTheme', 'StyleSheet', 'at'],
-  '@umber-style/react-native': ['createStyle', 'styled', 'ThemeProvider', 'useTheme', 'StyleSheet'],
-  '@umber-style/vue': ['createStyle', 'styled', 'ThemeProvider', 'useTheme', 'StyleSheet'],
+  '@umber-style/cache': ['default'],
+  '@umber-style/server/create-instance': ['default'],
+  '@umber-style/css': [
+    'css',
+    'cx',
+    'keyframes',
+    'injectGlobal',
+    'cache',
+    'sheet',
+    'flush',
+    'hydrate',
+    'getRegisteredStyles',
+    'merge',
+  ],
+  '@umber-style/css/create-instance': [],
+  '@umber-style/react': [
+    'createStyle',
+    'styled',
+    'ThemeProvider',
+    'useTheme',
+    'StyleSheet',
+    'at',
+    'Global',
+    'keyframes',
+    'css',
+  ],
+  '@umber-style/styled': ['default'],
+  '@umber-style/react-native': [
+    'createStyle',
+    'styled',
+    'ThemeProvider',
+    'useTheme',
+    'StyleSheet',
+    'Global',
+    'keyframes',
+    'css',
+  ],
+  '@umber-style/vue': [
+    'createStyle',
+    'styled',
+    'ThemeProvider',
+    'useTheme',
+    'StyleSheet',
+    'Global',
+    'keyframes',
+    'css',
+  ],
   'umber-style': ['createEngine', 'createCache', 'extractPageStyles'],
-  'umber-style/react': ['createStyle', 'styled', 'ThemeProvider', 'StyleSheet'],
-  'umber-style/react-native': ['createStyle', 'styled', 'ThemeProvider', 'useTheme'],
-  'umber-style/vue': ['createStyle', 'styled', 'ThemeProvider', 'useTheme'],
+  'umber-style/react': [
+    'createStyle',
+    'styled',
+    'ThemeProvider',
+    'StyleSheet',
+    'Global',
+    'keyframes',
+    'css',
+  ],
+  'umber-style/react-native': [
+    'createStyle',
+    'styled',
+    'ThemeProvider',
+    'useTheme',
+    'Global',
+    'css',
+  ],
+  'umber-style/vue': ['createStyle', 'styled', 'ThemeProvider', 'useTheme', 'Global', 'css'],
 }
 
-const windows = process.platform === 'win32'
+const isWindows = process.platform === 'win32'
 const failures = []
 const fail = (message) => {
   failures.push(message)
@@ -66,27 +130,27 @@ const check = (condition, message) => (condition ? pass(message) : fail(message)
  * are scripts, which only a shell starts: the line is quoted here, as one string.
  */
 const run = (command, args, options = {}) => {
-  const shell = windows && ['npm', 'npx', 'pnpm'].includes(command)
-  const result = shell
+  const needsShell = isWindows && ['npm', 'npx', 'pnpm'].includes(command)
+  const result = needsShell
     ? spawnSync([command, ...args.map((arg) => JSON.stringify(arg))].join(' '), {
         encoding: 'utf8',
         shell: true,
         ...options,
       })
     : spawnSync(command, args, { encoding: 'utf8', ...options })
-  return { ok: result.status === 0, out: `${result.stdout ?? ''}${result.stderr ?? ''}` }
+  return { isOk: result.status === 0, out: `${result.stdout ?? ''}${result.stderr ?? ''}` }
 }
-const must = (result, what) => {
-  if (result.ok) return result.out
+const readOutput = (result, what) => {
+  if (result.isOk) return result.out
   console.error(result.out)
   throw new Error(`${what} failed`)
 }
 
 /** Every string in a package.json field (an exports map, a path), with its place. */
-const leaves = (value, place = []) =>
+const listLeaves = (value, place = []) =>
   typeof value === 'string'
     ? [{ place: place.join('.'), path: value }]
-    : Object.entries(value ?? {}).flatMap(([key, child]) => leaves(child, [...place, key]))
+    : Object.entries(value ?? {}).flatMap(([key, child]) => listLeaves(child, [...place, key]))
 
 for (const { dir } of PACKAGES) {
   if (!existsSync(join(repoRoot, 'packages', dir, 'dist'))) {
@@ -107,7 +171,7 @@ try {
   // 1. Pack, and inspect what is in each tarball.
   const files = {}
   for (const { dir, name } of PACKAGES) {
-    must(
+    readOutput(
       run('pnpm', ['pack', '--pack-destination', tarballs], {
         cwd: join(repoRoot, 'packages', dir),
       }),
@@ -120,11 +184,14 @@ try {
     const into = join(extracted, dir)
     mkdirSync(into)
     // Relative paths: a drive letter in an argument makes GNU tar look for a remote host.
-    must(run('tar', ['-xzf', file, '-C', `../extracted/${dir}`], { cwd: tarballs }), `tar ${file}`)
+    readOutput(
+      run('tar', ['-xzf', file, '-C', `../extracted/${dir}`], { cwd: tarballs }),
+      `tar ${file}`
+    )
     const root = join(into, 'package')
     const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'))
     const paths = [
-      ...leaves(pkg.exports),
+      ...listLeaves(pkg.exports),
       ...['main', 'module', 'types'].map((key) => ({ place: key, path: pkg[key] })),
     ]
     check(pkg.private !== true, `${name}: not private`)
@@ -155,8 +222,8 @@ try {
     )
   }
 
-  // 2. A consumer outside the workspace: the five tarballs, resolving each other, and their peers.
-  const version = (dir, field, name) =>
+  // 2. A consumer outside the workspace: the tarballs, resolving each other, and their peers.
+  const readVersion = (dir, field, name) =>
     JSON.parse(readFileSync(join(repoRoot, 'packages', dir, 'package.json'), 'utf8'))[field][name]
   const direct = Object.fromEntries(
     Object.entries(files).map(([name, file]) => [name, `file:./tarballs/${file}`])
@@ -181,6 +248,8 @@ try {
     [
       'exports.Appearance = { getColorScheme: () => "light", addChangeListener: () => ({ remove() {} }) }',
       'exports.StyleSheet = { create: (styles) => styles, flatten: (style) => style, hairlineWidth: 1 }',
+      'exports.Dimensions = { get: () => ({ width: 400, height: 800, scale: 1, fontScale: 1 }), addEventListener: () => ({ remove() {} }) }',
+      'exports.AccessibilityInfo = { isReduceMotionEnabled: () => Promise.resolve(false), addEventListener: () => ({ remove() {} }) }',
       '',
     ].join('\n')
   )
@@ -192,6 +261,8 @@ try {
       'export interface ImageStyle extends ViewStyle { resizeMode?: string }',
       'export const Appearance: { getColorScheme(): "light" | "dark" | null | undefined; addChangeListener(listener: (preferences: { colorScheme: "light" | "dark" | null | undefined }) => void): { remove(): void } }',
       'export const StyleSheet: { create<T>(styles: T): T; flatten<T>(style: T): T; hairlineWidth: number }',
+      'export const Dimensions: { get(dimension: string): { width: number; height: number; scale: number; fontScale: number }; addEventListener(type: "change", handler: Function): { remove(): void } }',
+      'export const AccessibilityInfo: { isReduceMotionEnabled(): Promise<boolean>; addEventListener(eventName: "reduceMotionChanged", handler: (isEnabled: boolean) => void): { remove(): void } }',
       '',
     ].join('\n')
   )
@@ -203,13 +274,13 @@ try {
         private: true,
         dependencies: {
           ...direct,
-          react: version('react', 'devDependencies', 'react'),
-          'react-dom': version('react', 'devDependencies', 'react-dom'),
-          vue: version('vue', 'devDependencies', 'vue'),
+          react: readVersion('react', 'devDependencies', 'react'),
+          'react-dom': readVersion('react', 'devDependencies', 'react-dom'),
+          vue: readVersion('vue', 'devDependencies', 'vue'),
           'react-native': 'file:./react-native-stub',
-          '@types/react': version('react', 'devDependencies', '@types/react'),
-          '@types/node': version('react', 'devDependencies', '@types/node'),
-          typescript: version('react', 'devDependencies', 'typescript'),
+          '@types/react': readVersion('react', 'devDependencies', '@types/react'),
+          '@types/node': readVersion('react', 'devDependencies', '@types/node'),
+          typescript: readVersion('react', 'devDependencies', 'typescript'),
         },
         // The tarballs name each other with exact versions that npm does not hold yet: resolve
         // them to the tarballs given above.
@@ -219,11 +290,11 @@ try {
       2
     )
   )
-  must(
+  readOutput(
     run('npm', ['install', '--no-audit', '--no-fund', '--ignore-scripts'], { cwd: consumer }),
     'npm install in the consumer'
   )
-  pass('the five tarballs install together with react, react-dom and vue')
+  pass('the tarballs install together with react, react-dom and vue')
 
   // One copy of the core on disk.
   const nested = PACKAGES.filter(({ dir }) => dir !== 'core').filter(({ name }) =>
@@ -234,7 +305,7 @@ try {
   check(nested.length === 0, 'one copy of @umber-style/core is installed')
 
   // 3. Node: import and require of every entry, in one script for each format.
-  const body = (format) => `
+  const createBody = (format) => `
 const results = {}
 const need = async (specifier, names) => {
   const mod = await load(specifier)
@@ -252,8 +323,15 @@ const same = (a, b, what) => { if (a !== b) throw new Error('two copies: ' + wha
 same(mods['umber-style'].createEngine, mods['@umber-style/core'].createEngine, 'umber-style and core')
 same(mods['@umber-style/react'].at, mods['@umber-style/core'].at, 'react and core')
 same(mods['umber-style/react'].styled, mods['@umber-style/react'].styled, 'umber-style/react and react')
+same(mods['@umber-style/styled'].default, mods['@umber-style/react'].styled, '@umber-style/styled and react')
 same(mods['umber-style/react-native'].styled, mods['@umber-style/react-native'].styled, 'umber-style/react-native')
 same(mods['umber-style/vue'].styled, mods['@umber-style/vue'].styled, 'umber-style/vue')
+// The plain layer: a class name from a style, its rule in the cache, and a separate instance.
+const plain = mods['@umber-style/css']
+const card = plain.css({ padding: 8 })
+if (!plain.cache.extract().css.includes('.' + card + '{padding:8px;}')) throw new Error('no rule for ' + card)
+const createInstance = mods['@umber-style/css/create-instance'].default
+if (!createInstance({ key: 'plain' }).css({ color: 'red' }).startsWith('plain-')) throw new Error('no class from create-instance')
 // Server rendering of a styled component: a class, and its CSS.
 const React = await load('react')
 const { renderToStaticMarkup } = await load('react-dom/server')
@@ -269,33 +347,43 @@ const { css } = cache.extract()
 if (!css.includes('.' + match[1] + '{color:var(--smoke-palette-primary);')) throw new Error('no rule for ' + match[1] + ' in ' + css)
 if (!css.includes('--smoke-palette-primary:#1b5fd1;')) throw new Error('no token in ' + css)
 results.html = html
+// The cache package and the server functions over it: a page's CSS as data-umber tags.
+const umberCache = mods['@umber-style/cache'].default({ key: 'smoke' })
+const page = createStyle(theme, { cache: umberCache, hasServerStyleElements: false })
+const Card = page.styled('div', { name: 'Card' })({ margin: 2 })
+const cardHtml = renderToStaticMarkup(React.createElement(Card, null, 'x'))
+const tags = mods['@umber-style/server/create-instance'].default(umberCache).renderStylesToString(cardHtml)
+if (!/^<style data-umber="smoke-global">@layer [^<]+<\\/style><style data-umber="smoke smoke-card-root-\\w+">@layer smoke-components/.test(tags)) throw new Error('no data-umber tags in ' + tags)
 ${format === 'esm' ? "const { writeFileSync } = await import('node:fs')" : "const { writeFileSync } = require('node:fs')"}
 writeFileSync('keys-${format}.json', JSON.stringify(results, null, 2))
 `
   writeFileSync(
     join(consumer, 'check.mjs'),
-    `const load = (specifier) => import(specifier)\n${body('esm')}`
+    `const load = (specifier) => import(specifier)\n${createBody('esm')}`
   )
   writeFileSync(
     join(consumer, 'check.cjs'),
-    `const load = async (specifier) => require(specifier)\n;(async () => {${body('cjs')}})().catch((error) => { console.error(error); process.exit(1) })\n`
+    `const load = async (specifier) => require(specifier)\n;(async () => {${createBody('cjs')}})().catch((error) => { console.error(error); process.exit(1) })\n`
   )
   const esm = run('node', ['check.mjs'], { cwd: consumer })
-  check(esm.ok, 'ESM: every entry loads, one core, a styled component renders')
-  if (!esm.ok) console.error(esm.out)
+  check(esm.isOk, 'ESM: every entry loads, one core, a styled component renders')
+  if (!esm.isOk) console.error(esm.out)
   const cjs = run('node', ['check.cjs'], { cwd: consumer })
-  check(cjs.ok, 'CJS: every entry loads, one core, a styled component renders')
-  if (!cjs.ok) console.error(cjs.out)
-  if (esm.ok && cjs.ok) {
-    const a = JSON.parse(readFileSync(join(consumer, 'keys-esm.json'), 'utf8'))
-    const b = JSON.parse(readFileSync(join(consumer, 'keys-cjs.json'), 'utf8'))
+  check(cjs.isOk, 'CJS: every entry loads, one core, a styled component renders')
+  if (!cjs.isOk) console.error(cjs.out)
+  if (esm.isOk && cjs.isOk) {
+    const esmKeys = JSON.parse(readFileSync(join(consumer, 'keys-esm.json'), 'utf8'))
+    const cjsKeys = JSON.parse(readFileSync(join(consumer, 'keys-cjs.json'), 'utf8'))
     for (const specifier of Object.keys(ENTRIES)) {
       check(
-        JSON.stringify(a[specifier]) === JSON.stringify(b[specifier]),
-        `${specifier}: import and require give the same names (${a[specifier].length})`
+        JSON.stringify(esmKeys[specifier]) === JSON.stringify(cjsKeys[specifier]),
+        `${specifier}: import and require give the same names (${esmKeys[specifier].length})`
       )
     }
-    check(a.html === b.html, 'the server render is the same from import and from require')
+    check(
+      esmKeys.html === cjsKeys.html,
+      'the server render is the same from import and from require'
+    )
   }
 
   // 4. The export conditions.
@@ -306,9 +394,11 @@ const [, , expected] = process.argv
 const names = async (specifier) => Object.keys(await import(specifier))
 const react = await names('@umber-style/react')
 const shared = await names('umber-style/react')
+const styledDefault = (await import('@umber-style/styled')).default
+if (styledDefault !== (await import('@umber-style/react')).styled) throw new Error('@umber-style/styled is not the styled of @umber-style/react')
 if (expected === 'server') {
   for (const keys of [react, shared]) {
-    if (!keys.includes('readTheme') || keys.includes('useTheme')) throw new Error('not the server build: ' + keys)
+    if (!keys.includes('readTheme') || !keys.includes('useTheme') || keys.includes('ThemeContext')) throw new Error('not the server build: ' + keys)
   }
 } else if (expected === 'native') {
   const web = await import('@umber-style/react')
@@ -325,9 +415,10 @@ const keys = (specifier) => Object.keys(require(specifier))
 const expected = process.argv[2]
 const react = keys('@umber-style/react')
 const shared = keys('umber-style/react')
+if (require('@umber-style/styled').default !== require('@umber-style/react').styled) throw new Error('@umber-style/styled is not the styled of @umber-style/react')
 if (expected === 'server') {
   for (const names of [react, shared]) {
-    if (!names.includes('readTheme') || names.includes('useTheme')) throw new Error('not the server build: ' + names)
+    if (!names.includes('readTheme') || !names.includes('useTheme') || names.includes('ThemeContext')) throw new Error('not the server build: ' + names)
   }
 } else if (expected === 'native') {
   if (require('umber-style/react').styled !== require('@umber-style/react-native').styled) throw new Error('not the React Native binding')
@@ -350,8 +441,8 @@ if (expected === 'server') {
       ['conditions.cjs', 'require'],
     ]) {
       const result = run('node', [...flags, file, expected], { cwd: consumer })
-      check(result.ok, `${label}, ${what}`)
-      if (!result.ok) console.error(result.out)
+      check(result.isOk, `${label}, ${what}`)
+      if (!result.isOk) console.error(result.out)
     }
   }
 
@@ -359,10 +450,18 @@ if (expected === 'server') {
   const typed = `
 import { createEngine } from '@umber-style/core'
 import type { Theme } from '@umber-style/core'
+import { css, cx } from '@umber-style/css'
+import createCssInstance from '@umber-style/css/create-instance'
 import { createStyle } from '@umber-style/react'
+import type { CSSObject, Keyframes, SerializedStyles } from '@umber-style/react'
+import styled from '@umber-style/styled'
+import type { FilteringStyledOptions, StyledOptions } from '@umber-style/styled'
 import { createStyle as createNative } from '@umber-style/react-native'
 import { createStyle as createVue } from '@umber-style/vue'
 import { createEngine as createUmbrellaEngine } from 'umber-style'
+import createCache from '@umber-style/cache'
+import type { UmberCache } from '@umber-style/cache'
+import createInstance from '@umber-style/server/create-instance'
 import { createStyle as createShared } from 'umber-style/react'
 import { createStyle as createUmbrellaNative } from 'umber-style/react-native'
 import { createStyle as createUmbrellaVue } from 'umber-style/vue'
@@ -371,7 +470,13 @@ const theme = { palette: { primary: '#1b5fd1', onPrimary: '#ffffff' }, space: [0
 
 export const engine = createEngine(theme)
 export const umbrellaEngine = createUmbrellaEngine(theme)
+export const umberCache: UmberCache = createCache({ key: 'smoke' })
+export const tags: string = createInstance(umberCache).constructStyleTagsFromChunks(
+  createInstance(umberCache).extractCriticalToChunks('<p></p>')
+)
 export const base: Theme | undefined = undefined
+export const plainClass: string = cx(css({ padding: 4 }), false, { open: true })
+export const ownClass: string = createCssInstance({ key: 'typed' }).css\`color: red;\`
 
 const web = createStyle(theme, { prefix: 'smoke' })
 export const Box = web.styled('div', { name: 'Box' })(({ theme: view }) => {
@@ -381,6 +486,19 @@ export const Box = web.styled('div', { name: 'Box' })(({ theme: view }) => {
   return { color: primary, padding: view.space[1], opacity: missing ? 1 : 0.5 }
 })
 export const color: string = web.useTheme().palette.primary
+const styledOptions: StyledOptions = { name: 'Card', target: 'card' }
+export const Card = styled('section', styledOptions)({ padding: 4 })
+export const Label = styled.span<{ tone?: string }>(({ tone }) => ({ color: tone }))
+const cardStyle: CSSObject = { padding: 4, '&:hover': { opacity: 0.8 } }
+export const card: SerializedStyles = web.css(cardStyle)
+export const fade: Keyframes = web.keyframes\`from { opacity: 0; }\`
+export const Title = web.styled('h1')<{ tone: string }>\`
+  color: \${({ tone }) => tone};
+\`
+const linkOptions = {
+  shouldForwardProp: (prop: string): prop is 'href' => prop === 'href',
+} satisfies FilteringStyledOptions<{ href?: string }, 'href'>
+export const Link = styled('a', linkOptions)({ color: 'red' })
 
 const native = createNative(theme)
 export const nativeColor: string = native.useTheme().palette.primary
@@ -397,13 +515,17 @@ export const umbrellaVue = createUmbrellaVue(theme).useTheme().value.palette.pri
 `
   const server = `
 import * as web from '@umber-style/react'
+import styled from '@umber-style/styled'
 import { createStyle } from 'umber-style/react'
 
 const theme = { palette: { primary: '#1b5fd1' } }
 export const read: () => object = web.readTheme
-// @ts-expect-error the server build has no hook
-export const hook = web.useTheme
-export const shared: { palette: { primary: string } } = createStyle(theme).readTheme()
+export const base: () => object = web.useTheme
+// @ts-expect-error the server build has no context
+export const context = web.ThemeContext
+export const shared: { palette: { primary: string } } = createStyle(theme).useTheme()
+export const sharedRead: { palette: { primary: string } } = createStyle(theme).readTheme()
+export const ServerBox = styled.div({ padding: 4 })
 `
   const ts = join(consumer, 'ts')
   mkdirSync(ts)
@@ -441,16 +563,16 @@ export const shared: { palette: { primary: string } } = createStyle(theme).readT
         customConditions: ['react-server'],
       },
       ['ts/server.ts'],
-      'the react-server condition: readTheme and no useTheme',
+      'the react-server condition: useTheme and readTheme, and no ThemeContext',
     ],
   ]) {
     writeFileSync(join(consumer, file), JSON.stringify({ compilerOptions, include }, null, 2))
     const result = run('npx', ['--no-install', 'tsc', '-p', file], { cwd: consumer })
-    check(result.ok, `types: ${what}`)
-    if (!result.ok) console.error(result.out)
+    check(result.isOk, `types: ${what}`)
+    if (!result.isOk) console.error(result.out)
   }
 } finally {
-  if (keep) console.log(`kept ${work}`)
+  if (shouldKeep) console.log(`kept ${work}`)
   else rmSync(work, { recursive: true, force: true })
 }
 

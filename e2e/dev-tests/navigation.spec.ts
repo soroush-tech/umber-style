@@ -44,3 +44,16 @@ test('navigation: the theme that was chosen is the one that the next page shows'
   await expect(page.getByTestId('callout')).toHaveCSS('color', LIGHT_ACCENT)
   expect(await findMissingStyles(page), 'classes with no rule, variables with no value').toEqual([])
 })
+
+test('navigation: a nested provider keeps its wrapper after a client-side navigation to its page', async ({
+  page,
+  fixture,
+}) => {
+  await loadPage(page, fixture, 'home')
+  await navigateInBrowser(page, 'settings')
+  const wrapper = await page
+    .getByTestId('brand-card')
+    .evaluate((element) => element.closest('.umber-scope')?.className)
+  expect(wrapper, 'the wrapper of the brand provider').toMatch(/umber-theme-\w+ umber-boundary/)
+  await expect(page.getByTestId('brand-card')).toHaveCSS('background-color', 'rgb(255, 244, 214)')
+})

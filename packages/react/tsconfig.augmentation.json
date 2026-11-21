@@ -1,7 +1,8 @@
 {
   "extends": "./tsconfig.json",
   "include": ["src"],
-  "exclude": ["src/**/vitest.*.ts", "src/serverTypes.test.tsx"],
+  // styledWrapper.types.test.tsx types the default style as an app that declares no member of `Theme`.
+  "exclude": ["src/**/vitest.*.ts", "src/serverTypes.test.tsx", "src/styledWrapper.types.test.tsx"],
   "files": [
     "src/augmentation.test.tsx",
     "src/defaultStyle.test.tsx",

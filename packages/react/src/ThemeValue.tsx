@@ -1,41 +1,83 @@
 'use client'
 
-import { createContext, useContext, useMemo, type ReactNode } from 'react'
-import { type DeepPartial, mergeDeep, NO_THEME_MESSAGE } from '@umber-style/core'
+import { createElement, Fragment, use, useContext } from 'react'
+import { EMPTY_THEME, type Cache, type Engine } from '@umber-style/core'
+import { useProvidedCache } from './CacheProvider'
+import { getMarksContext, type ThemeContexts, type ThemeScopeValue } from './ProviderScope'
+import type { ThemeScopeProps } from './types'
 
-export interface ThemeValueProviderProps<T> {
-  readonly theme: DeepPartial<T>
-  readonly children?: ReactNode
+// The contexts of a style are shared by every style of its prefix, and by the browser part of a provider
+// of the server build (`ProviderScope`). Which provider is above, and its wrapper, are in the marks that
+// both builds share.
+export { createThemeContexts, type ThemeContexts } from './ProviderScope'
+
+/**
+ * The key of the marks for `engine` under the cache that a `CacheProvider` gives (`cache`): the prefix of
+ * the engine's cache, which a provider of the server build marks too, or the given cache when it is
+ * another one.
+ */
+export function readMarkKey(
+  engine: Pick<Engine<unknown>, 'cache'>,
+  cache: Cache | undefined
+): unknown {
+  return cache === undefined || cache === engine.cache ? engine.cache.prefix : cache
 }
 
-/** Where the base theme comes from while no provider is above: an engine, or any object with a `baseTheme`. */
-export interface ThemeHolder<T> {
-  readonly baseTheme: T | undefined
-}
+/** What the hooks read where no provider is above: the base theme of the engine, or nothing. */
+export type ThemeHolder<T> = Pick<
+  Engine<T>,
+  'cache' | 'baseTheme' | 'createThemeView' | 'withCache'
+>
 
-/** The one React context of the engine: it holds the real theme values, and the base theme of `holder` is its default. */
-export function createThemeValue<T extends object>(holder: ThemeHolder<T>) {
-  const ThemeContext = createContext<T | undefined>(undefined)
+/** The hooks of one style, and `ThemeScope`, over its contexts. */
+export function createThemeValue<T extends object>(
+  holder: ThemeHolder<T>,
+  { ThemeContext, ViewContext }: ThemeContexts<T>
+) {
+  /** The theme where no provider is above: the base theme, or the empty theme. */
+  const readOwnTheme = () => holder.baseTheme ?? (EMPTY_THEME as T)
 
-  function ThemeValueProvider({ theme, children }: ThemeValueProviderProps<T>) {
-    const outer = useContext(ThemeContext) ?? holder.baseTheme
-    const value = useMemo(
-      () => (outer === undefined ? (theme as T) : mergeDeep(outer, theme)),
-      [outer, theme]
-    )
-    return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>
-  }
-
-  /** The theme above, or the base theme, or undefined when there is none. */
-  function useThemeValue(): T | undefined {
-    return useContext(ThemeContext) ?? holder.baseTheme
-  }
-
+  /** The real theme of the nearest provider, the base theme, or an empty object. */
   function useTheme(): T {
-    const value = useThemeValue()
-    if (value === undefined) throw new Error(NO_THEME_MESSAGE)
-    return value
+    return useContext(ThemeContext) ?? readOwnTheme()
   }
 
-  return { ThemeValueProvider, useTheme, useThemeValue }
+  /**
+   * The view of the theme that function styles read: of the nearest provider, else of the base theme (or
+   * of the empty theme). It is the view that a provider of the client build gives; below a provider of the
+   * server build, which gives none, and under a `CacheProvider` (`cache`, which `useProvidedCache` read),
+   * it is made from the real theme of the nearest provider, by the engine over that cache: its references
+   * name the variables of that cache's prefix. The theme context is read only then, so that a component
+   * that reads a view given renders again only when the view changes.
+   */
+  function useThemeView(cache?: Cache): T {
+    const view = useContext(ViewContext)
+    const local = cache === undefined ? holder : holder.withCache(cache)
+    if (local === holder && view !== undefined) return view
+    return local.createThemeView(use(ThemeContext) ?? readOwnTheme())
+  }
+
+  /** The wrapper of the nearest nested provider of either build: null under the outermost one, undefined with none. */
+  function useScope(): ThemeScopeValue | null | undefined {
+    const marks = use(getMarksContext())
+    return marks.get(readMarkKey(holder, useProvidedCache()))?.scope
+  }
+
+  /** The class string of the wrapper of the nearest nested provider; undefined under the outermost one or none. */
+  function useThemeClass(): string | undefined {
+    return useScope()?.className
+  }
+
+  /**
+   * Renders the wrapper of the nearest nested provider again around its children (the same element and
+   * classes), for content that a portal puts somewhere else in the document; under the outermost provider,
+   * or none, its children alone.
+   */
+  function ThemeScope({ children }: ThemeScopeProps) {
+    const scope = useScope()
+    if (!scope) return createElement(Fragment, null, children)
+    return createElement(scope.as, { className: scope.className }, children)
+  }
+
+  return { useTheme, useThemeView, useThemeClass, ThemeScope }
 }

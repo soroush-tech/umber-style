@@ -49,6 +49,11 @@ describe('multiply on React Native', () => {
     expect(() => multiply('1px 2px', 2)).toThrow(TypeError)
   })
 
+  it('throws for rem, which it has no base for (a theme gives it numbers already)', () => {
+    expect(() => multiply('1rem', 2)).toThrow(/multiply\(\) cannot compute "1rem"/)
+    expect(() => add('1rem', 2)).toThrow(TypeError)
+  })
+
   it('throws on a factor that is not finite, and on the wrong types', () => {
     expect(() => multiply(8, Number.NaN)).toThrow(RangeError)
     expect(() => multiply(8, Number.POSITIVE_INFINITY)).toThrow(

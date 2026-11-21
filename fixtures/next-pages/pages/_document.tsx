@@ -1,4 +1,4 @@
-import { bootScript } from '@umber-fixtures/shared/bootScript'
+import { createBootScript } from '@umber-fixtures/shared/bootScript'
 import { darkClass, lightClass, style } from '@umber-fixtures/shared/style'
 import { extractPageStyles } from '@umber-style/core'
 import Document, {
@@ -37,7 +37,7 @@ export default class AppDocument extends Document<StyleProps> {
             data-options={options}
             dangerouslySetInnerHTML={{ __html: css }}
           />
-          <script dangerouslySetInnerHTML={{ __html: bootScript(lightClass, darkClass) }} />
+          <script dangerouslySetInnerHTML={{ __html: createBootScript(lightClass, darkClass) }} />
         </Head>
         <body>
           <Main />

@@ -1,6 +1,7 @@
 import { createCache, createEngine, createLazyEngine, createMemorySheet } from '@umber-style/core'
 import { bindEngine } from './createStyle.server'
 import { findAll, resolveTree } from './vitest.resolveTree'
+import { playScopes } from './vitest.providerScope'
 import type { CacheFunction } from './serverContext'
 
 const theme = { palette: { primary: '#0000ff' } }
@@ -20,13 +21,15 @@ describe('a server ThemeProvider with isRoot', () => {
     const { ThemeProvider, readTheme, themeClass } = bindEngine(engine, requestCache)
     // The app makes the rule of the class it puts on <html>; a root provider only sends it.
     themeClass(theme)
-    const tree = await resolveTree(
-      <ThemeProvider theme={theme} isRoot>
-        <i />
-        <ThemeProvider theme={{ palette: { primary: '#ff0000' } }}>
-          <b />
+    const tree = playScopes(
+      await resolveTree(
+        <ThemeProvider theme={theme} isRoot>
+          <i />
+          <ThemeProvider theme={{ palette: { primary: '#ff0000' } }}>
+            <b />
+          </ThemeProvider>
         </ThemeProvider>
-      </ThemeProvider>
+      )
     )
     expect(findAll(tree, 'div')).toHaveLength(1)
     expect(findAll(tree, 'i')).toHaveLength(1)
@@ -53,10 +56,12 @@ describe('a server ThemeProvider with isRoot and a color scheme of its own', () 
     const { ThemeProvider, themeClass, sheet, engine } = setupRoot()
     themeClass(theme, 'light')
     const before = [...sheet.rules]
-    const tree = await resolveTree(
-      <ThemeProvider theme={theme} colorScheme="dark" isRoot>
-        <i />
-      </ThemeProvider>
+    const tree = playScopes(
+      await resolveTree(
+        <ThemeProvider theme={theme} colorScheme="dark" isRoot>
+          <i />
+        </ThemeProvider>
+      )
     )
     expect(sheet.rules).toEqual(before)
     expect(findAll(tree, 'div')).toHaveLength(0)
@@ -67,19 +72,23 @@ describe('a server ThemeProvider with isRoot and a color scheme of its own', () 
 
   it('sends one style for each scheme the app asked for, and none when it asked for none', async () => {
     const { ThemeProvider, themeClass, sheet } = setupRoot()
-    const none = await resolveTree(
-      <ThemeProvider theme={theme} isRoot>
-        <i />
-      </ThemeProvider>
+    const none = playScopes(
+      await resolveTree(
+        <ThemeProvider theme={theme} isRoot>
+          <i />
+        </ThemeProvider>
+      )
     )
     expect(findAll(none, 'style')).toHaveLength(0)
     expect(sheet.rules).toEqual([])
     themeClass(theme, 'light')
     themeClass(theme)
-    const some = await resolveTree(
-      <ThemeProvider theme={theme} isRoot>
-        <i />
-      </ThemeProvider>
+    const some = playScopes(
+      await resolveTree(
+        <ThemeProvider theme={theme} isRoot>
+          <i />
+        </ThemeProvider>
+      )
     )
     expect(findAll(some, 'style')).toHaveLength(2)
   })

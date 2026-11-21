@@ -1,6 +1,6 @@
 import { collectComputedStyles, expectSameStyles } from '../helpers/computedStyles'
 import { loadPage, PAGE_NAMES } from '../helpers/navigation'
-import { scenario, test } from '../helpers/test'
+import { requireScenario, test } from '../helpers/test'
 
 // Scenario F: with scripting disabled a prerendered or server rendered page is fully styled.
 // `page.evaluate` still runs in a context without script: the browser is driven through the protocol.
@@ -10,7 +10,7 @@ for (const name of PAGE_NAMES) {
     browser,
     fixture,
   }, info) => {
-    scenario('F', fixture, info, `F:${name}`)
+    requireScenario('F', fixture, info, `F:${name}`)
     await loadPage(page, fixture, name)
     const scripted = await collectComputedStyles(page)
 

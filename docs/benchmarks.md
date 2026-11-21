@@ -1,123 +1,148 @@
 # Benchmarks
 
-After this page you can run the benchmark suite on your machine, read the table it prints, compare two runs, and tell which figures are steady enough to rely on and which are not.
+After this page you can run the benchmark suite on your machine, read the table it prints, and tell which figures are steady enough to rely on and which are not.
 
-The suite measures UmberStyle against itself: it has no other library in it. Its purpose is to notice that a change made something slower, and to show where the time of a render goes.
+The suite measures UmberStyle against itself: it has no other library in it. Its purpose is to notice that a change made something slower, and to show where the time of a render goes. Every benchmark is a file for [soroush-bench](https://soroush.tech/bench/) (the package `@soroush.tech/bench`), which runs it in a Docker sandbox pinned to one CPU and 512 MB.
 
 ## What is measured
 
-Each benchmark file sits next to what it measures, in `packages/<package>/bench/`. One operation of each case is described in a comment at the top of its file.
+Each benchmark file sits next to what it measures, in `packages/<package>/bench/`, and measures the built `dist` of that package. One operation of each case is described in a comment at the top of its file. The cases of a file compare with each other; a file never compares two versions (that is the gate's job, below).
 
-| Package        | File                    | What it measures                                                                                                                                                                                                                     |
-| -------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `core`         | `classes.bench.ts`      | Class creation: a style the cache has not seen (a miss), the same style again (a hit), merging two and five classes, and a style object compiled to rules                                                                            |
-| `core`         | `tokens.bench.ts`       | Tokens and references for a small theme (about 20 tokens) and a large one (about 280), a theme view, a theme class for each, and a nested partial theme                                                                              |
-| `core`         | `helpers.bench.ts`      | Each arithmetic helper on a token and on a literal, and `alpha` on a token and on a literal                                                                                                                                          |
-| `core`         | `pruning.bench.ts`      | Scanning rules for the variables they use, and a newly used variable added to five theme classes                                                                                                                                     |
-| `core`         | `extraction.bench.ts`   | `extract()` of a cache with 400 classes, `extractPageStyles` for one page out of ten, and the scan of that page's HTML                                                                                                               |
-| `core`         | `startup.bench.ts`      | Reading what a page already has from a style element of 400 classes, and one pass of the development checks (jsdom)                                                                                                                  |
-| `core`         | `sheets.bench.ts`       | An object sheet on first and later access, and a function sheet resolved for a theme view                                                                                                                                            |
-| `core`         | `memory.bench.ts`       | Heap growth after 5,000 distinct props classes and after 5,000 repeats of one. Reported, never compared                                                                                                                              |
-| `react`        | `string.bench.tsx`      | `renderToString` of 48 elements (fixed styles, a function of the theme, a prop-driven style over 48 combinations, an override through `style`, a single sheet entry), nested providers three deep, and a tree of 500 styled elements |
-| `react`        | `dom.bench.tsx`         | The tree of 500 rendered into jsdom: first render, re-render with the same props, with changed props, a provider re-rendered with the same theme and with another theme, and hydration of server markup                              |
-| `react`        | `tree.server.bench.tsx` | The same elements and tree resolved with the server components build, under the `react-server` condition                                                                                                                             |
-| `react`        | `options.bench.tsx`     | Each of `hasLayers`, `hasBaseClass`, `hasPruning`, `hasLabels`, `hasColorFallbacks`, `hasScope` and `hasDevChecks` on and off, for three cases                                                                                       |
-| `vue`          | `render.bench.ts`       | The same 48-element cases, nested providers, and the tree of 500, server-rendered                                                                                                                                                    |
-| `react-native` | `styles.bench.tsx`      | The same cases and the tree resolved against the stand-in platform module the tests use, and a sheet per theme                                                                                                                       |
+| Package        | File                            | What it measures                                                                                                                        |
+| -------------- | ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `core`         | `classes-creation.bench.ts`     | Class creation: a small and a large style the cache has not seen (a miss), and the same or an equal style again (a hit)                 |
+| `core`         | `classes-merging.bench.ts`      | Merging two and five classes, and a class with a new style object                                                                       |
+| `core`         | `classes-rules.bench.ts`        | A small and a large style object compiled to rules, and the large one merged                                                            |
+| `core`         | `extraction.bench.ts`           | `extract()` and `createStyleTag` of a cache with 400 classes, `extractPageStyles` for one page out of ten, and the scan of its HTML     |
+| `core`         | `helpers-arithmetic.bench.ts`   | Each arithmetic helper on a token and on a literal                                                                                      |
+| `core`         | `helpers-alpha.bench.ts`        | `alpha` on a token and on a literal colour                                                                                              |
+| `core`         | `pruning-scan.bench.ts`         | Scanning rules for the variables they use                                                                                               |
+| `core`         | `pruning-mark-used.bench.ts`    | A newly used variable added to five theme classes, one that is used already, and the fresh cache the first needs                        |
+| `core`         | `sheets-object.bench.ts`        | An object sheet on first and later access, and an entry used as a class                                                                 |
+| `core`         | `sheets-function.bench.ts`      | A function sheet resolved for a new theme view and for the same one                                                                     |
+| `core`         | `tokens-references.bench.ts`    | Tokens, a theme view and the declarations of a small theme (about 20 tokens) and a large one (about 280)                                |
+| `core`         | `tokens-theme-classes.bench.ts` | A theme class of each theme for a new object and for the same object, and a nested partial theme                                        |
+| `react`        | `string-elements.bench.ts`      | `renderToString` of 48 elements: fixed styles, a function of the theme, a prop-driven style over 48 combinations, an override, an entry |
+| `react`        | `string-trees.bench.ts`         | `renderToString` of nested providers three deep, and of a tree of 500 styled elements with and without style elements                   |
+| `react`        | `server-elements.bench.ts`      | The same 48-element cases resolved with the server components build, under the `react-server` condition                                 |
+| `react`        | `server-trees.bench.ts`         | The tree of 500 resolved with the server components build, with two sets of props                                                       |
+| `vue`          | `render-elements.bench.ts`      | The same 48-element cases, server-rendered with Vue                                                                                     |
+| `vue`          | `render-trees.bench.ts`         | The tree of 500 and nested providers, server-rendered with Vue                                                                          |
+| `react-native` | `styles-elements.bench.ts`      | The same 48-element cases and the tree, resolved against a stand-in for the platform module                                             |
+| `react-native` | `styles-sheets.bench.ts`        | A function sheet resolved for a new theme and for the same one, and an entry of an object sheet                                         |
 
-The helpers the files share (the small and the large theme, the styles, the 48 prop combinations, and the code that runs a group and writes its result) are in `bench/`, a workspace package that is not under `packages/`, so the package matrix of the continuous integration does not see it.
+The inputs the files share (the small and the large theme, the styles, the 48 prop combinations) and the helper that lets a binding's file load built code are in `bench/src/`, a workspace package that is not under `packages/`, so the package matrix of the continuous integration does not see it. The files import them by relative path.
 
 ## Running
 
+Docker has to be running (`docker info`). From the root of the repository:
+
 ```sh
-pnpm bench                  # everything: about a minute and a half
-pnpm bench core             # one package: core, react, vue or react-native
-pnpm bench tokens           # the files whose path has "tokens" in it, in every package
-pnpm bench react options    # a package and a file filter together
+pnpm bench                   # build, then every file
+pnpm bench core              # the files of one package: core, react, vue or react-native
+pnpm bench classes           # the files whose name has "classes" in it
+pnpm bench react string      # a package and a part of a file name together
+pnpm bench --rounds 5 --md   # options go to soroush-bench as they are, for every file
 ```
 
-A run does one package after the other, and one file after the other inside a package, because two files at once would measure each other. For each file it prints the table of its groups; at the end it prints one table of every case and the memory figures.
+`pnpm bench` runs `pnpm build` first, because the files load the built `dist`; then `bench/bin/local.mjs` runs each matching file with soroush-bench, one after the other (two at once would measure each other), and exits with 1 when a file failed. The first run builds the sandbox image. One run of every file, with the build, took a little over 3 minutes on a laptop.
 
-| Variable        | Default               | What it does                                                                                                      |
-| --------------- | --------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| `BENCH_TIME`    | `200`                 | Milliseconds each case is measured for. A larger value is a longer and steadier run: `BENCH_TIME=2000 pnpm bench` |
-| `BENCH_WARMUP`  | a quarter of the time | Milliseconds each case runs before it is measured                                                                 |
-| `BENCH_OUT_DIR` | `bench/results`       | Where the results are written                                                                                     |
+To run one file by hand, build first and run soroush-bench from the root of the repository, which it mounts into the sandbox:
 
-Some groups multiply the time by a factor (the options and the DOM groups run four and three times as long), because their cases are slow or their figures are close.
+```sh
+npx @soroush.tech/bench packages/core/bench/classes-merging.bench.ts --md
+```
 
-The benchmarks are not tests: `pnpm test` and `pnpm test:coverage` never run them, and they do not count toward coverage. `pnpm typecheck` and `pnpm lint` do check them.
+A file of a binding also loads React or Vue through `node_modules`, which pnpm links with absolute paths. Those links resolve in the sandbox only when the repository is mounted a second time at the path they point to: `--mount "<repository>:<path>:ro"`, where the path is the repository's own path, and on Windows the one Docker Desktop sees (`C:\Users\you\umber-style` is `/mnt/host/c/Users/you/umber-style`). `pnpm bench` adds that mount to every file.
 
-### What the form is
+The benchmarks are not tests: `pnpm test` and `pnpm test:coverage` never run them, and they do not count toward coverage. `pnpm typecheck` and `pnpm lint` do check them, and their type check needs no build (see below).
 
-In vitest 5 a benchmark is not an export of `vitest`: importing `bench` from it fails. A benchmark is a test (`it`) in a `*.bench.ts(x)` file, run by `vitest bench`, and it takes `bench` from its test context:
+### What a file is
+
+A file default-exports a config of two cases or more. This is `packages/core/bench/classes-merging.bench.ts` without its top comment:
 
 ```ts
-it('two cases', async ({ bench }) => {
-  const first = bench('first', () => 1 + 1)
-  const second = bench('second', () => Math.sqrt(2))
-  await bench.compare(first, second, { time: 200 })
-})
+import type { BenchConfig } from '@soroush.tech/bench'
+import { core } from './core'
+
+const cache = core.createCache({ prefix: 'b', sheet: core.createMemorySheet() })
+const classes = Array.from({ length: 5 }, (_, index) =>
+  cache.css({ color: 'red', padding: index + 1, '&:hover': { opacity: index / 10 } })
+)
+cache.css(classes[0], classes[1])
+cache.css(...classes)
+
+export default {
+  name: 'core: merging classes',
+  cases: {
+    'merge two classes': () => cache.css(classes[0], classes[1]),
+    'merge five classes': () => cache.css(...classes),
+    'merge a class with a new object': () => cache.css(classes[0], { margin: 4 }),
+  },
+} satisfies BenchConfig
 ```
 
-The files do not call this directly: `runGroup` in `bench/src/harness.ts` registers the cases of a group, runs them, and records what was measured. A package has a `vitest.bench.config.ts` of its own (the default config is for tests).
+`core` is `packages/core/bench/core.ts`: the built `dist/index.cjs`, loaded with `createRequire` and typed by the source (`typeof import('../src/index')`), so that the type check passes on a tree that was never built.
+
+soroush-bench runs a file with tsx in the sandbox, where nothing outside the file sets an environment variable or an export condition, and where the workspace link of `@umber-style/core` points at its TypeScript source. So a binding's file first calls `prepareBuiltPackages` (`bench/src/built.ts`), and loads React, Vue and the built binding after it, with `createRequire`. This is `packages/react/bench/client.ts`, which the client files import first:
+
+```ts
+prepareBuiltPackages()
+const load = createRequire(import.meta.url)
+
+export const { renderToString } = load('react-dom/server') as typeof ReactDomServer
+export const binding = load('../dist/index.cjs') as typeof Binding
+export const fixtures = createFixtures(
+  load('react') as typeof React,
+  load('../../core/dist/index.cjs') as typeof Core
+)
+```
+
+`prepareBuiltPackages` sets `NODE_ENV` to `production`, and registers a resolve hook (`module.registerHooks`) that sends `@umber-style/core` to the built core, sends any other specifier it is given to a file (React Native: `react-native` to the stand-in in `packages/react-native/bench/platform.ts`), and adds export conditions (the server components files: `react-server`). A static `import` of React would be resolved before the hook exists, which is why everything after it is loaded with `createRequire`, and why the files use `createElement` and no JSX.
+
+There is no setup outside the timed operation: what a case needs is made when the file loads. A case that needs fresh input every time walks a pool of inputs and makes a fresh cache or engine each time the pool comes round; that is part of its figure, and the file says how often.
 
 ## Reading the table
 
+Without `--rounds`, soroush-bench prints a report for each file: for each case the average time of one operation, its minimum, maximum, p75 and p99, and the bytes allocated per operation; a box plot; and how much slower each case is than the fastest. `--md` adds a Markdown table after it (the report writes microseconds with the micro sign; here it is `us`):
+
 ```text
-case                                                           ops/s    margin
-core/classes > class creation > hit: the same small style ...  378 414   +-1.16%
+| case | avg | p75 | alloc/iter | vs fastest |
+| --- | ---: | ---: | ---: | :--- |
+| core: merging classes :: merge a class with a new object | 13.97 us | 8.73 us | 10.05 KB (+6766.3%) | fastest |
 ```
 
-- **case** is `<package>/<file> > <group> > <name>`.
-- **ops/s** is operations per second, `1000 / mean`, where the mean is the mean time of one operation in milliseconds. A bigger number is faster. What one operation is, is in the comment at the top of the file: for the render cases it is one render of 48 elements or of the tree, not one element.
-- **margin** is the relative margin of error of the mean at 95% confidence. It says how well this run knows its own mean. It does not say how much two runs differ: that is the noise section below.
+- **case** is `<name of the file's config> :: <case>`.
+- **avg** is the mean time of one operation; **p75** the 75th percentile. If the average is far above p75, a few slow samples (garbage collection, compilation) move the mean: read p75. What one operation is, is in the comment at the top of the file: for the render cases it is one render of 48 elements or of the tree, not one element.
+- **alloc/iter** is the memory allocated by one operation, estimated from the heap. It means something only well above 1 KB; below that it swings from run to run.
 
-Each run writes, in `bench/results/` (ignored by git): `<package>.json` for each package, `all.json` for all of them, and `report.md`, a Markdown table with the mean and the number of samples too. A case in the JSON has its `id`, `hz` (operations per second), `mean` (milliseconds), `rme` (the relative margin of error, in percent) and `samples`. The memory figures are in a `memory` list next to the cases.
-
-## Comparing two versions
-
-This suite shows absolute figures for every scenario. It is not a way to compare two versions: two single runs on one machine differ too much (see "Noise of two runs" below). To compare a change with what came before, or one implementation with another, write a file for [soroush-bench](https://soroush.tech/bench/), which runs both sides in one pinned sandbox and takes the median of rounds. The files of the gate in `bench/gate/` are the model.
+With `--rounds N` the whole file runs N times in the sandbox and one table of the median of each case is printed instead.
 
 ## What the figures include
 
-- **Run on Node, mostly with an in-memory sheet.** The engine runs with `createMemorySheet`, so a figure leaves out the cost of a browser's `insertRule`. Where a file needs a DOM (`startup`, `dom`, `options`) it runs in jsdom, whose elements, style sheet and `getComputedStyle` are not a browser's. The real-browser figures of a page come from the end-to-end fixtures (see below).
-- **Production mode.** The React, Vue and React Native packages run with `NODE_ENV=production`, so React and Vue take their production paths.
-- **Module overhead.** vitest runs the source through its module runner, which reads each export of another module through a getter. That adds a little to every call between two files of the engine. The numbers are comparable from run to run, but they are not the speed of a built bundle.
-- **Warm and cold.** A case says which it is. A "hit" or "warm" case runs over a cache that already holds what it needs. A "miss", "cold" or "first render" case makes a fresh engine for each operation, before the timer starts where the setup is not what is measured; the classes are then made inside the operation.
-- **State is not shared.** Each case makes its own engine and cache. Where a case needs fresh input every time (a style the cache has not seen), it walks a pool of inputs and makes a fresh cache each time the pool comes round; that cache is part of the figure, and the file says how often.
-- **jsdom's DOM work is in the DOM figures.** The render cases of `dom.bench.tsx` include React's render and commit and jsdom's DOM operations. The re-render with the same props is the best measure of the engine's own share, because nothing changes in the DOM.
-- **The platform stand-in.** The React Native figures use the stand-in module of the tests, whose `StyleSheet.create` is a mock that records its calls; the benchmark clears the record after each operation.
-- **Server components.** `tree.server.bench.tsx` resolves the tree with the helper of the tests. It leaves out serialising to HTML, so its numbers compare with the other server numbers by shape and not by sum.
-- **Memory.** The memory figures are the growth of the V8 heap across a piece of work, with a collection forced before and after (the benchmark config passes `--expose-gc`). They are reported and never compared or asserted.
+- **The built packages, in production mode.** Each file measures the `dist` of this checkout, as an app loads it. React and Vue take their production paths (`NODE_ENV` is `production`).
+- **Two internal functions run from the source.** `scanHtml` (in `extraction.bench.ts`) and `scanVariables` (in `pruning-scan.bench.ts`) are not exported by the built core, so those cases import them from `src/`, which tsx compiles in the sandbox. Their case names or file comments say so.
+- **Node in the sandbox, with an in-memory sheet.** The engine runs with `createMemorySheet`, so a figure leaves out the cost of a browser's `insertRule`. Nothing here runs in a DOM: the real-browser figures of a page come from the end-to-end fixtures (see below).
+- **Warm and cold.** A case says which it is. A "hit" or "warm" case runs over a cache that already holds what it needs (a render or a call before the measurement made it). A "miss", "new" or "cold" case makes its classes inside the operation.
+- **State is not shared.** Each case makes its own engine and cache.
+- **Setup that is part of a figure.** Where a case needs fresh state, the fresh cache or engine is made inside an operation once for each pass over a pool, and the file says how often. In `pruning-mark-used.bench.ts` that setup (a cache with five theme classes of the large theme) is large next to the work: it is made once for each 127 operations, and the file has a third case that measures it alone, so that 1/127 of it can be taken off the figure of a new variable.
+- **The platform stand-in.** The React Native figures use `packages/react-native/bench/platform.ts`, whose `StyleSheet.create` is a plain function that returns its input. What the platform does with a style is not in them.
+- **Server components.** `server-elements.bench.ts` and `server-trees.bench.ts` resolve the tree with the helper of the server tests (`src/vitest.resolveTree.ts`, compiled by tsx). It leaves out serialising to HTML, so its numbers compare with the other server numbers by shape and not by sum.
+
+## What is not measured any more
+
+The suite was a vitest benchmark suite until it moved to soroush-bench. These files were dropped then:
+
+- **`core/startup.bench.ts`, `react/dom.bench.tsx` and `react/options.bench.tsx`.** They rendered into jsdom and read a style element from it, so they measured jsdom's DOM, not a browser's, and the sandbox has no DOM. The start-up read, the development checks, the DOM render and hydration, and the options measured on a DOM render are not measured now. What a browser does with a page is measured by the end-to-end fixtures and the browser tests ([Testing](testing.md)).
+- **`core/memory.bench.ts`.** It reported the growth of the heap after 5,000 classes. soroush-bench reports the memory each operation allocates (`alloc/iter`) for every case.
 
 ## Noise
 
-A figure is the mean of many samples, so its own margin is small, but two runs can still differ by more than that: the margin does not include what else the machine does. The noise of this suite on a laptop is in the section "Noise of two runs" below. Rules of thumb:
+The sandbox pins the run to one CPU with a fixed amount of memory and no swap, which removes most of what else the machine does. It does not make a run of one file equal to the next one: the machine's clock and the other virtual machines of Docker Desktop still move it. Rules of thumb:
 
-- Compare runs from one machine, with nothing else busy. A browser, a build or a virus scan during a run moves the figures of the cases that ran at that time.
-- Cases of a few nanoseconds to a microsecond move the most in relative terms; so do the cases that make a fresh engine for each operation.
-- Do not judge a change by a case that is listed as noisy: the gate below gates only operations that proved steady in the sandbox.
-
-What was found to make cases unstable, and what is done about it:
-
-- **The machine drifts between runs.** Whole groups of cases move together, in one direction, for the length of a run (a second run was faster than the first in most of the 139 cases). Nothing in the harness can remove that. The gate runs both sides in the same sandbox, in rounds, and takes the median.
-- **A case settles at its own speed in each process.** The operations of a few nanoseconds (`core/helpers`, `core/sheets`) ran at different speeds in different processes with the same code, which no run time evens out. They are measured and not gated. Files run one after the other, never two at once.
-- **Garbage of the case before.** Each case now starts with a forced collection (`beforeAll` in `runGroup`), so that it does not pay for what the one before left. This lowered the number of cases more than 10% apart between two runs of the same files a little (26 and 29 of 70 before, 17, 19 and 26 of 70 after); the machine's drift is larger than this effect, and it was kept because it costs nothing.
-- **Time and warm-up were left alone.** A longer `BENCH_TIME` was not tried: it makes each figure better known, but not less dependent on the process or the minute it was measured in, and it multiplies the time of every round.
-
-## Noise of two runs
-
-Two runs of the whole suite, one after the other on one Windows laptop (Node 26, vitest 5.1.1, `BENCH_TIME` 200) with other programs open, gave these ratios of the second run to the first, over the 139 cases:
-
-| Package        | Cases | Median ratio | Lowest | Highest | Cases within 0.9 to 1.1 |
-| -------------- | ----- | ------------ | ------ | ------- | ----------------------- |
-| `core`         | 58    | 0.92         | 0.41   | 1.64    | 25                      |
-| `react`        | 65    | 0.94         | 0.44   | 1.64    | 26                      |
-| `vue`          | 7     | 0.91         | 0.72   | 1.51    | 1                       |
-| `react-native` | 9     | 0.76         | 0.65   | 1.54    | 1                       |
-
-80 of the 139 cases were within 0.8 to 1.25, and 42 were below 0.8. The margin of error each run printed (mostly 1% to 10%) was far smaller than that: it does not cover what the machine did between the runs. The cases that moved most (below 0.5 or above 1.5) were the start-up reads, the theme classes made for a new object, and the first and small cases of the React server render, the DOM render of the same props, and the React Native object sheet. So one run of a case from a laptop in this state decides nothing: take the median of rounds in one sandbox, as the gate below does.
+- Compare runs from one machine, with nothing else busy, and use `--rounds` (the median of several runs) before you read a difference of less than a fifth.
+- Cases of a few nanoseconds (`helpers-arithmetic`, the later access of a sheet, the same theme object again) are at the floor of what can be timed; the report may say that such a case was "likely optimized out". Their figures are a floor, not a cost.
+- To know whether a change made something slower than the last release, use the gate below, which runs both sides in one sandbox.
 
 ## The gate
 
@@ -130,27 +155,27 @@ Each file in `bench/gate/` is one scenario with two cases:
 
 `previous` is the baseline: the gate takes `baseline.avg / case.avg` as a percent, and a case below `min-ratio` (80, so anything slower than 1.25 times the release) fails its file. In the job each file is run 5 times and the median of each case is compared (`rounds: '5'`), so that one busy moment of a shared runner does not decide.
 
-The gate files are not part of `pnpm bench`: the vitest suite looks only inside `packages/*/bench/`, and the gate files are in `bench/gate/`, a folder neither the vitest configs nor the unit tests include. The action, for its part, runs only the `*.bench.ts` files of the folder it is given (`bench-dir: bench/gate`), and the two helper files there (`baseline.ts`, `support.ts`) have no such suffix.
+The gate files are not part of `pnpm bench`, which runs only the files in `packages/*/bench/`, and the job runs only the gate: the action runs the `*.bench.ts` files of the folder it is given (`bench-dir: bench/gate`), and the two helper files there (`baseline.ts`, `support.ts`) have no such suffix.
 
 ### What is gated
 
-| File                        | One operation                                                                                         | Same work as               |
-| --------------------------- | ----------------------------------------------------------------------------------------------------- | -------------------------- |
-| `class-miss-small.bench.ts` | `cache.css(style)` of a small style the cache has not seen (a pool of 2000, a fresh cache each pass)  | `core/classes.bench.ts`    |
-| `class-miss-large.bench.ts` | the same for a large style (more than 50 declarations, pseudo selectors, media and supports queries)  | `core/classes.bench.ts`    |
-| `class-hit.bench.ts`        | `cache.css(style)` of the same small style again, over a cache that holds it                          | `core/classes.bench.ts`    |
-| `class-merge.bench.ts`      | `cache.css(a, b, c, d, e)` of five classes the cache made                                             | `core/classes.bench.ts`    |
-| `theme-tokens.bench.ts`     | `createTokens(theme)` and `declare(theme)` of the large theme (about 280 tokens)                      | `core/tokens.bench.ts`     |
-| `theme-class.bench.ts`      | `engine.themeClass(theme)` of a large theme the engine has not seen (a fresh engine each pool of 100) | `core/tokens.bench.ts`     |
-| `extract-page.bench.ts`     | `extractPageStyles` for one page of ten, 300 elements, over a cache of 400 classes                    | `core/extraction.bench.ts` |
+| File                        | One operation                                                                                         | Same work as                         |
+| --------------------------- | ----------------------------------------------------------------------------------------------------- | ------------------------------------ |
+| `class-miss-small.bench.ts` | `cache.css(style)` of a small style the cache has not seen (a pool of 2000, a fresh cache each pass)  | `core/classes-creation.bench.ts`     |
+| `class-miss-large.bench.ts` | the same for a large style (more than 50 declarations, pseudo selectors, media and supports queries)  | `core/classes-creation.bench.ts`     |
+| `class-hit.bench.ts`        | `cache.css(style)` of the same small style again, over a cache that holds it                          | `core/classes-creation.bench.ts`     |
+| `class-merge.bench.ts`      | `cache.css(a, b, c, d, e)` of five classes the cache made                                             | `core/classes-merging.bench.ts`      |
+| `theme-tokens.bench.ts`     | `createTokens(theme)` and `declare(theme)` of the large theme (about 280 tokens)                      | `core/tokens-references.bench.ts`    |
+| `theme-class.bench.ts`      | `engine.themeClass(theme)` of a large theme the engine has not seen (a fresh engine each pool of 100) | `core/tokens-theme-classes.bench.ts` |
+| `extract-page.bench.ts`     | `extractPageStyles` for one page of ten, 300 elements, over a cache of 400 classes                    | `core/extraction.bench.ts`           |
 
 Each side builds its own cache, engine and inputs the first time its case runs (`createSides` in `support.ts`), and the sandbox loads the release from another folder, so the two sides share no module-level state.
 
 Not in the gate, on purpose:
 
-- **Anything that needs a DOM**: the React DOM render and hydration, the Vue mount, the start-up reads and the development checks (they need jsdom, and the sandbox has none). `pnpm bench` still measures them.
-- **The React server render.** It cannot be made like-for-like in the sandbox yet. The built `@umber-style/react` of this checkout requires `@umber-style/core`, which the workspace resolves through its `exports` to the TypeScript source (the published package points at `dist` only in `publishConfig`), so the local side would run built React over unbuilt core against a fully built release. It would also need `react` and `react-dom` for the local side from the workspace and for the release from the sandbox, two copies that must not meet, and the sandbox runs React in its development mode. A gate that is not like-for-like would measure the setup and not the code.
-- **The nanosecond operations** (`core/helpers`, `core/sheets`), which settle at another speed in each process and cannot be told from a change (see "Noise" above), and the memory figures, which are never compared.
+- **Anything that needs a DOM**: the React DOM render and hydration, the Vue mount, the start-up reads and the development checks (they need a DOM, and the sandbox has none). The local suite does not measure them either (see "What is not measured any more").
+- **The React server render.** It cannot be made like-for-like in the sandbox yet. The built `@umber-style/react` of this checkout requires `@umber-style/core`, which the workspace resolves through its `exports` to the TypeScript source (the published package points at `dist` only in `publishConfig`), so the local side would run built React over unbuilt core against a fully built release. It would also need `react` and `react-dom` for the local side from the workspace and for the release from the sandbox, two copies that must not meet. The local files get around the unbuilt core and the development mode of React with `prepareBuiltPackages` (see "What a file is"), but a gate file would still need the two copies of React kept apart. A gate that is not like-for-like would measure the setup and not the code.
+- **The nanosecond operations** (`core/helpers-*`, the later access of a sheet), which settle at another speed in each process and cannot be told from a change.
 
 ### The baseline tag
 
@@ -194,8 +219,11 @@ These benchmarks measure parts. The numbers of a whole page (first HTML, hydrati
 
 ## Limits
 
-- Nothing here runs in a real browser or on a device. jsdom's DOM and Node's V8 are not what a user's browser or phone runs, so an absolute figure is not a promise about a page.
+- Nothing here runs in a real browser or on a device, and nothing runs in a DOM. Node's V8 in a Docker sandbox is not what a user's browser or phone runs, so an absolute figure is not a promise about a page.
+- What a DOM render, hydration, the start-up read of a page and the development checks cost is not measured by any benchmark (see "What is not measured any more").
 - The React Native binding is measured against a stand-in for the platform, so what the platform does with a style is not in it.
-- The module overhead above is not removed, and the size of it was not measured.
-- The memory figures count the heap of one Node process. A browser's style sheet keeps its own copy of each rule outside it.
-- The development checks are measured as one pass over 100 elements in jsdom. In a browser the pass has a different cost, and the option `hasDevChecks` itself costs nothing in the other benchmarks, because the check runs from a timer that a synchronous operation never lets fire.
+- `scanHtml` and `scanVariables` are measured from the source compiled by tsx, not from the build; the difference between the two was not measured.
+- The figure of a new variable in `pruning-mark-used.bench.ts` includes 1/127 of a fresh cache with five theme classes, which is most of it; the cost of the marking alone is the difference of two figures, each with its own noise.
+- How far two runs of this suite differ on one machine was not measured. Under the old vitest suite, two runs on a laptop differed by more than a factor of two in some cases; the sandbox is meant to narrow that, and the gate's own check found up to 10% between two copies of the same code.
+- `pnpm bench` was run on Windows with Docker Desktop only. On Linux and macOS it mounts the repository at its own path for the `node_modules` links; that was not tried.
+- `alloc/iter` is an estimate from the heap. Below about 1 KB it is noise, and it counts the heap of one Node process: a browser's style sheet keeps its own copy of each rule outside it.

@@ -1,4 +1,4 @@
-import { bootScript } from '@umber-fixtures/shared/bootScript'
+import { createBootScript } from '@umber-fixtures/shared/bootScript'
 import { Shell, type LinkComponent } from '@umber-fixtures/shared/shell'
 import { darkClass, lightClass, ThemeProvider } from '@umber-fixtures/shared/style'
 import { lightTheme } from '@umber-fixtures/shared/themes'
@@ -13,12 +13,26 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en" className={lightClass} suppressHydrationWarning>
       <head>
-        <script dangerouslySetInnerHTML={{ __html: bootScript(lightClass, darkClass) }} />
+        <script dangerouslySetInnerHTML={{ __html: createBootScript(lightClass, darkClass) }} />
       </head>
       <body>
         <ThemeProvider theme={lightTheme} colorScheme="light" isRoot>
           <Providers>
-            <Shell Link={Link as LinkComponent}>{children}</Shell>
+            <Shell
+              Link={Link as LinkComponent}
+              links={
+                <>
+                  <Link href="/promo-server" data-testid="link-promo-server">
+                    Promo (server)
+                  </Link>
+                  <Link href="/promo-stream" data-testid="link-promo-stream">
+                    Promo (stream)
+                  </Link>
+                </>
+              }
+            >
+              {children}
+            </Shell>
           </Providers>
         </ThemeProvider>
       </body>

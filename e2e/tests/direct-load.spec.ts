@@ -1,6 +1,6 @@
 import { countEngineElements, findMissingStyles } from '../helpers/rules'
 import { loadPage, PAGE_NAMES } from '../helpers/navigation'
-import { scenario, test, expect } from '../helpers/test'
+import { requireScenario, test, expect } from '../helpers/test'
 
 // Scenario A: a direct load of each page.
 for (const name of PAGE_NAMES) {
@@ -8,7 +8,7 @@ for (const name of PAGE_NAMES) {
     page,
     fixture,
   }, info) => {
-    scenario('A', fixture, info)
+    requireScenario('A', fixture, info)
     await loadPage(page, fixture, name)
     // The whole document, so that the theme class on <html> is looked at too.
     expect(await countEngineElements(page), 'elements with an engine class').toBeGreaterThan(5)

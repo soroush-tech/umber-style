@@ -1,12 +1,8 @@
 import { render, screen } from '@testing-library/react'
-import {
-  createCache,
-  createLazyEngine,
-  createMemorySheet,
-  NO_THEME_MESSAGE,
-} from '@umber-style/core'
+import { createCache, createLazyEngine, createMemorySheet, isSheetEntry } from '@umber-style/core'
 import { createStyle } from './createStyle'
 import { createDefaultStyle } from './defaultStyle'
+import { readPrefixStyle } from './ProviderScope'
 
 const light = { palette: { primary: '#0000ff', onPrimary: '#ffffff' }, space: [0, 4, 8] }
 const other = { palette: { primary: '#ff0000', onPrimary: '#000000' }, space: [0, 2, 4] }
@@ -40,11 +36,14 @@ describe('the default style', () => {
     expect(ruleOf(className)).toBe(`.${className}{color:var(--d-palette-primary);}`)
   })
 
-  it('throws one clear error when a function style runs before any theme', () => {
+  it('gives a function style an empty theme before any theme, so reading a token throws', () => {
     const { styled } = setup()
     const Button = styled('button')(({ theme }) => ({ color: theme.palette.primary }))
+    const Plain = styled('button')(({ theme }) => ({ color: theme.palette ? 'blue' : 'red' }))
+    render(<Plain>plain</Plain>)
+    expect(screen.getByText('plain').className).toMatch(/^d-/)
     vi.spyOn(console, 'error').mockImplementation(() => undefined)
-    expect(() => render(<Button>ok</Button>)).toThrow(NO_THEME_MESSAGE)
+    expect(() => render(<Button>ok</Button>)).toThrow(TypeError)
   })
 
   it('nests providers: one component class, the merged real theme from useTheme', () => {
@@ -77,7 +76,7 @@ describe('the default style', () => {
     expect(getEngine().refs.palette.onPrimary).toBeUndefined()
   })
 
-  it('keeps the first of two full themes as the base; each root merges over it', () => {
+  it('keeps the first of two full themes as the base; each outermost provider merges over it', () => {
     const { ThemeProvider, useTheme, getEngine, sheet } = setup()
     const seen: unknown[] = []
     const Probe = () => {
@@ -96,14 +95,15 @@ describe('the default style', () => {
     )
     expect(getEngine().baseTheme).toBe(light)
     expect(seen).toEqual([light, other])
-    expect(sheet.rules.filter((rule) => rule.startsWith('.d-theme-'))).toHaveLength(2)
+    // Neither renders a wrapper: their themes go to :root, and make no theme class.
+    expect(sheet.rules.filter((rule) => rule.startsWith('.d-theme-'))).toHaveLength(0)
   })
 
-  it('has useTheme throw without a provider, and return the theme of configure({ theme })', () => {
+  it('has useTheme give an empty object without a provider, and the theme of configure({ theme })', () => {
     const bare = setup()
     const Probe = () => <i>{JSON.stringify(bare.useTheme())}</i>
-    vi.spyOn(console, 'error').mockImplementation(() => undefined)
-    expect(() => render(<Probe />)).toThrow(NO_THEME_MESSAGE)
+    render(<Probe />)
+    expect(screen.getByText('{}')).toBeTruthy()
 
     const cache = createCache({ hasLayers: false, prefix: 'e', sheet: createMemorySheet() })
     const configured = createDefaultStyle()
@@ -111,6 +111,55 @@ describe('the default style', () => {
     const Reader = () => <i>{configured.useTheme().palette.primary}</i>
     render(<Reader />)
     expect(screen.getByText('#0000ff')).toBeTruthy()
+  })
+
+  it('makes keyframes and global styles before configure, and writes them through Global with no theme', () => {
+    const style = createDefaultStyle()
+    const fade = style.keyframes({ from: { opacity: 0 } }, { label: 'fade' })
+    const reset = style.globalStyles({ body: { margin: 0, animation: `${fade} 1s` } })
+    const sheet = createMemorySheet()
+    style.configure({ prefix: 'k', cache: createCache({ hasLayers: false, prefix: 'k', sheet }) })
+    expect(style.getEngine().hasTheme).toBe(false)
+    const { unmount } = render(<style.Global styles={reset} />)
+    const keyframesRule = `@keyframes ${fade}{0%{opacity:0;}}`
+    expect(sheet.rules).toEqual([keyframesRule, `body{margin:0;animation:${fade} 1s;}`])
+    unmount()
+    expect(sheet.rules).toEqual([keyframesRule])
+  })
+
+  it('makes css() values and template keyframes before configure, with the options given later', () => {
+    const style = createDefaultStyle()
+    const card = style.css({ padding: 8 })
+    const loud = style.css`
+      ${card}
+      color: red;
+    `
+    const fade = style.keyframes`from { opacity: 0; }`
+    const sheet = createMemorySheet()
+    style.configure({ prefix: 'late', cache: createCache({ prefix: 'late', sheet }) })
+    expect(isSheetEntry(loud)).toBe(true)
+    expect(fade).toBe(style.keyframes({ from: { opacity: 0 } }))
+    const Box = style.styled('div')({ margin: 0 })
+    render(<Box data-testid="box" style={loud} />)
+    const [, override] = screen.getByTestId('box').className.split(' ')
+    expect(override).toMatch(/^late-/)
+    expect(sheet.rules).toContain(`@layer late-overrides{.${override}{padding:8px;color:red;}}`)
+    expect(String(card)).toMatch(/^late-/)
+  })
+
+  it('has its tag shorthands as own members: copying them uses nothing, so configure still works', () => {
+    const style = createDefaultStyle()
+    const wrapper = Object.assign(() => null, style.styled)
+    expect(typeof wrapper.div).toBe('function')
+    const sheet = createMemorySheet()
+    style.configure({ prefix: 'late', cache: createCache({ prefix: 'late', sheet }) })
+    const Box = wrapper.div({ margin: 0 })
+    render(<Box data-testid="copied" />)
+    expect(screen.getByTestId('copied').className).toMatch(/^late-/)
+    const made = createStyle(light, { prefix: 'own', cache: createCache({ prefix: 'own' }) })
+    const Own = Object.assign(() => null, made.styled).em({ margin: 0 })
+    render(<Own data-testid="own" />)
+    expect(screen.getByTestId('own').className).toMatch(/^own-/)
   })
 
   it('throws from configure once the default style was used', () => {
@@ -146,6 +195,52 @@ describe('the default style', () => {
     expect(themeClass(light, 'dark')).toMatch(/^d-theme-[a-z0-9]+ d-boundary d-scheme-dark$/)
     expect(when(light)).toBe(`@theme ${getEngine().themeId(light)}`)
     expect(whenScheme('light')).toBe('@scheme light')
+  })
+})
+
+describe('the contexts of the prefix of the default style', () => {
+  // A provider of the server build finds the contexts of its prefix with no engine: the default style
+  // claims the prefix it will have, read from its options until it is first used.
+  it('claims the prefix of its options and gives their base theme, before it is used', () => {
+    const style = createDefaultStyle()
+    style.configure({ prefix: 'claim-a', theme: light })
+    const found = readPrefixStyle('claim-a')
+    expect(found.contexts.ThemeContext).toBe(style.ThemeContext)
+    expect(found.holder?.baseTheme).toBe(light)
+    expect(readPrefixStyle('claim-a')).toBe(found)
+  })
+
+  it('reads the prefix of the cache or of the engine it is given, and the base theme of that engine', () => {
+    const fromCache = createDefaultStyle()
+    fromCache.configure({ cache: createCache({ prefix: 'claim-b', sheet: createMemorySheet() }) })
+    expect(readPrefixStyle('claim-b').contexts.ThemeContext).toBe(fromCache.ThemeContext)
+    expect(readPrefixStyle('claim-b').holder?.baseTheme).toBeUndefined()
+    const engine = createLazyEngine({ prefix: 'claim-c' })
+    engine.setTheme(other)
+    const fromEngine = createDefaultStyle()
+    fromEngine.configure({ engine })
+    expect(readPrefixStyle('claim-c').contexts.ThemeContext).toBe(fromEngine.ThemeContext)
+    expect(readPrefixStyle('claim-c').holder?.baseTheme).toBe(other)
+  })
+
+  it('claims css with no options, and the prefix and base theme of its engine once used', () => {
+    const style = createDefaultStyle()
+    expect(readPrefixStyle('claim-none').contexts.ThemeContext).not.toBe(style.ThemeContext)
+    style.configure({ prefix: 'claim-d' })
+    style.getEngine().setTheme(light)
+    expect(readPrefixStyle('claim-d').contexts.ThemeContext).toBe(style.ThemeContext)
+    expect(readPrefixStyle('claim-d').holder?.baseTheme).toBe(light)
+  })
+
+  it('shares the contexts of a prefix with each createStyle of that prefix', () => {
+    const style = createDefaultStyle()
+    style.configure({ prefix: 'claim-e' })
+    const own = createStyle(light, { prefix: 'claim-e' })
+    expect(own.ThemeContext).toBe(style.ThemeContext)
+    expect(createStyle(other, { prefix: 'claim-f' }).ThemeContext).toBe(
+      createStyle(light, { prefix: 'claim-f' }).ThemeContext
+    )
+    expect(readPrefixStyle('claim-f').holder?.baseTheme).toBe(other)
   })
 })
 

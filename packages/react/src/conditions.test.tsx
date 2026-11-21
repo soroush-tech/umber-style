@@ -23,13 +23,16 @@ describe('theme conditions in the client build', () => {
       ...at(when(dark, 'dark'), { border: '1px solid white', '&:hover': { borderColor: 'red' } }),
       ...at(whenScheme('dark'), { boxShadow: 'none' }),
     })
+    // The outermost provider renders no element, so A > B > A are nested providers under it.
     render(
-      <ThemeProvider theme={dark} colorScheme="dark">
-        <Card>a</Card>
-        <ThemeProvider theme={other} colorScheme="light">
-          <Card>b</Card>
-          <ThemeProvider theme={dark} colorScheme="dark">
-            <Card>c</Card>
+      <ThemeProvider theme={base}>
+        <ThemeProvider theme={dark} colorScheme="dark">
+          <Card>a</Card>
+          <ThemeProvider theme={other} colorScheme="light">
+            <Card>b</Card>
+            <ThemeProvider theme={dark} colorScheme="dark">
+              <Card>c</Card>
+            </ThemeProvider>
           </ThemeProvider>
         </ThemeProvider>
       </ThemeProvider>

@@ -44,3 +44,6 @@ fixtures/next-app/AGENTS.md
 
 # Benchmarks: what a run measured
 bench/results
+
+# Working plans: designs before they become issues and docs
+.plan

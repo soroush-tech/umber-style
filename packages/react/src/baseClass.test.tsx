@@ -2,7 +2,6 @@ import { render, screen } from '@testing-library/react'
 import {
   createCache,
   createLazyEngine,
-  NO_THEME_MESSAGE,
   type Theme,
   createEngine,
   createMemorySheet,
@@ -252,7 +251,7 @@ describe('an object sheet has no hook', () => {
 })
 
 describe('a sheet made from a function with no theme at all', () => {
-  it('says so, where an object sheet would work', () => {
+  it('is called with an empty theme, so reading a token throws, where an object sheet works', () => {
     const engine = createLazyEngine<AppTheme>({
       prefix: 'z',
       cache: createCache({ prefix: 'z', sheet: createMemorySheet() }),
@@ -262,7 +261,7 @@ describe('a sheet made from a function with no theme at all', () => {
     const plain = StyleSheet.create({ box: { color: 'red' } })
     expect(readSheet(useStyle, plain)).toBe(plain)
     const spy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
-    expect(() => readSheet(useStyle, themed)).toThrow(NO_THEME_MESSAGE)
+    expect(() => readSheet(useStyle, themed)).toThrow(TypeError)
     spy.mockRestore()
   })
 })

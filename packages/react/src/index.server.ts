@@ -8,12 +8,17 @@ export const {
   styled,
   StyleSheet,
   useStyle,
+  useTheme,
   readTheme,
   ThemeProvider,
   apply,
+  css,
   themeClass,
   when,
   whenScheme,
+  keyframes,
+  globalStyles,
+  Global,
 } = defaults
 
 export { add, alpha, at, divide, multiply, negate, subtract } from '@umber-style/core'

@@ -3,6 +3,7 @@ import type { SheetEntry } from './sheetEntry'
 import type { WebStyleObject } from './webStyle'
 import type { TokenOptions } from './tokens'
 
+/** The options of `createEngine`: the token options, and the options of the cache it makes. */
 export interface EngineOptions extends TokenOptions {
   /** First part of every class name and variable name. Default 'css'. */
   prefix?: string
@@ -14,13 +15,15 @@ export interface EngineOptions extends TokenOptions {
   hasLayers?: boolean
   /** Whether an `alpha()` value is written as a fallback and then the color-mix() value. Default true; used when the engine makes its cache. */
   hasColorFallbacks?: boolean
+  /** Whether the string forms of token maths that are never valid CSS (`var(--x)1F`, `-var(--x)`, `var(--x)ms`) are rewritten in each value. Default false; used when the engine makes its cache. */
+  hasValueRepair?: boolean
   /** Whether a `when()` or `whenScheme()` style is scoped with `@scope`. Default true; used when the engine makes its cache. Without it the rule is a plain descendant selector, which is wrong for nested themes. */
   hasScope?: boolean
   /** Whether a theme class declares only the variables that rules refer to. Default true; used when the engine makes its cache. */
   hasPruning?: boolean
   /** Whether a component's styles are split by position into a base class (made once) and a props class (made for each render). Default true; used when the engine makes its cache. */
   hasBaseClass?: boolean
-  /** Whether the cache checks the page in the browser and warns once for each problem found (`findMissingStyles`). Default: on in development (`process.env.NODE_ENV` is `development`), off otherwise; used when the engine makes its cache. */
+  /** Whether the cache checks the page in the browser and warns once for each problem found (`findMissingStyles`, and each inserted declaration that `CSS.supports` rejects). Default: on in development (`process.env.NODE_ENV` is `development`), off otherwise; used when the engine makes its cache. */
   hasDevChecks?: boolean
   /** Theme paths (dotted, or top-level keys) whose variables are always declared, for code outside the engine that reads them. */
   alwaysDeclare?: readonly string[]
@@ -28,10 +31,14 @@ export interface EngineOptions extends TokenOptions {
   cache?: Cache
 }
 
+/** The value of the CSS `color-scheme` property that a theme declares: light, dark, or both. */
 export type ColorScheme = 'light' | 'dark' | 'light dark'
 
-/** What a style function may return. */
-export type StyleResult = WebStyleObject | null | undefined | false
+/**
+ * What a style function may return: a style object, nothing, or a list of them, nested to any depth,
+ * merged in order as if its items were separate styles.
+ */
+export type StyleResult = WebStyleObject | null | undefined | false | readonly StyleResult[]
 
 /** A style that is computed from the props and the theme. */
 export type StyleFunction<T, P> = (props: P & { theme: T }) => StyleResult
@@ -45,8 +52,14 @@ export interface StylerOptions {
   name?: string
   /** Default 'root'. */
   slot?: string
+  /**
+   * The label of the class, as it is written: it wins over `name` and `slot`. Like them it is part of the
+   * class name only when the cache has `hasLabels` (the default).
+   */
+  label?: string
 }
 
+/** The styles of a sheet, one style object for each name. */
 export type SheetStyles = Record<string, WebStyleObject>
 
 /**

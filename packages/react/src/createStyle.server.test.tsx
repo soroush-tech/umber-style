@@ -4,10 +4,10 @@ import {
   createEngine,
   createLazyEngine,
   createMemorySheet,
-  NO_THEME_MESSAGE,
 } from '@umber-style/core'
 import { bindEngine, createStyle } from './createStyle.server'
 import { findAll, resolveTree, type ResolvedElement } from './vitest.resolveTree'
+import { playScopes } from './vitest.providerScope'
 import type { CacheFunction } from './serverContext'
 
 const theme = {
@@ -44,12 +44,15 @@ const classOf = (element: ResolvedElement) => element.props.className as string
 describe('the server build of styled', () => {
   it('makes the same class as the client build, and renders its style element', async () => {
     const { Box, ThemeProvider } = setup()
-    const tree = await resolveTree(
-      <ThemeProvider theme={theme}>
-        <Box />
-      </ThemeProvider>
+    const tree = playScopes(
+      await resolveTree(
+        <ThemeProvider theme={theme}>
+          <Box />
+        </ThemeProvider>
+      )
     )
-    const [, box] = findAll(tree, 'div')
+    // The outermost provider renders no element.
+    const [box] = findAll(tree, 'div')
     expect(classOf(box)).toBe(BOX_CLASS)
     const styles = findAll(tree, 'style')
     const boxStyle = styles.find((element) => element.props.href === BOX_CLASS)
@@ -60,45 +63,55 @@ describe('the server build of styled', () => {
   })
 
   it('renders the provider with its class, its style element, and its children in order', async () => {
-    const { ThemeProvider, sheet } = setup()
-    const tree = await resolveTree(
-      <ThemeProvider theme={theme} className="mine" as="section">
-        text
-      </ThemeProvider>
+    const { ThemeProvider, engine } = setup()
+    const tree = playScopes(
+      await resolveTree(
+        <ThemeProvider theme={theme}>
+          <ThemeProvider theme={theme} className="mine" as="section">
+            text
+          </ThemeProvider>
+        </ThemeProvider>
+      )
     )
     const [section] = findAll(tree, 'section')
     expect(classOf(section)).toMatch(/^f-theme-\w+ f-boundary f-scope mine$/)
     expect(section.props.style).toBeUndefined()
     expect(section.children).toEqual(['text'])
-    const [style] = findAll(tree, 'style')
+    const [root, style] = findAll(tree, 'style')
+    expect(root.props.href).toMatch(/^f-root-/)
     expect(style.props.href).toBe(classOf(section).split(' ')[0])
-    expect(style.children).toEqual([sheet.rules.find((rule) => rule.startsWith('.f-theme-'))])
+    // The browser part makes the rule from the values: the text the engine gives for that theme.
+    expect(style.children).toEqual([
+      `.${style.props.href}{${engine.readThemeText(theme).declarations}}`,
+    ])
   })
 
   it('has a nested provider with another breakpoint change nothing for the root', async () => {
     const { Box, ThemeProvider } = setup()
-    const tree = await resolveTree(
-      <ThemeProvider theme={theme}>
-        <Box />
-        <ThemeProvider theme={{ breakpoints: ['500px'] }}>
+    const tree = playScopes(
+      await resolveTree(
+        <ThemeProvider theme={theme}>
           <Box />
+          <ThemeProvider theme={{ breakpoints: ['500px'] }}>
+            <Box />
+          </ThemeProvider>
         </ThemeProvider>
-      </ThemeProvider>
+      )
     )
     const boxes = findAll(tree, 'div').filter((element) => classOf(element) === BOX_CLASS)
     expect(boxes).toHaveLength(2)
     const providers = findAll(tree, 'div').filter((element) =>
       classOf(element).startsWith('f-theme-')
     )
-    expect(providers).toHaveLength(2)
-    expect(classOf(providers[0])).not.toBe(classOf(providers[1]))
+    // Only the nested provider renders an element.
+    expect(providers).toHaveLength(1)
     expect(JSON.stringify(findAll(tree, 'style'))).not.toContain('width >= 500px')
   })
 
   it('renders a component with object styles with no theme at all', async () => {
     const style = bindEngine(createLazyEngine({ prefix: 'z' }), requestCache)
     const Plain = style.styled('p')({ color: 'red' })
-    const tree = await resolveTree(<Plain>x</Plain>)
+    const tree = playScopes(await resolveTree(<Plain>x</Plain>))
     expect(findAll(tree, 'p')[0].children).toEqual(['x'])
     expect(findAll(tree, 'style')).toHaveLength(1)
   })
@@ -107,7 +120,7 @@ describe('the server build of styled', () => {
     const style = bindEngine(createEngine(theme, { prefix: 'k', hasLayers: false }), requestCache)
     const { custom } = style.useStyle(style.StyleSheet.create({ custom: { color: 'blue' } }))
     const View = style.styled('div')({ margin: 1 })
-    const tree = await resolveTree(<View style={[custom, { opacity: 0.7 }]} />)
+    const tree = playScopes(await resolveTree(<View style={[custom, { opacity: 0.7 }]} />))
     const [div] = findAll(tree, 'div')
     expect(div.props.style).toBeUndefined()
     const styles = findAll(tree, 'style')
@@ -118,36 +131,61 @@ describe('the server build of styled', () => {
 
   it('reads the base theme without a provider', async () => {
     const { Box } = setup()
-    const tree = await resolveTree(<Box />)
+    const tree = playScopes(await resolveTree(<Box />))
     expect(findAll(tree, 'div').map(classOf)).toEqual([BOX_CLASS])
   })
 
-  it('merges a partial root over the base, once for each root', () => {
+  it('gives useTheme the base theme after a provider rendered, and readTheme is the same function', async () => {
     const engine = createEngine(theme, { prefix: 'm' })
     const style = bindEngine(engine, requestCache)
-    const root = { breakpoints: ['300px'] }
-    return resolveTree(
-      <style.ThemeProvider theme={root}>
-        <i />
+    const seen: string[] = []
+    const Probe = () => {
+      seen.push(style.useTheme().breakpoints[0])
+      return null
+    }
+    await resolveTree(
+      <style.ThemeProvider theme={{ breakpoints: ['300px'] }}>
+        <Probe />
       </style.ThemeProvider>
-    ).then(() => {
-      const read = style.readTheme()
-      expect(read.breakpoints).toEqual(['300px'])
-      expect(read.palette).toEqual(theme.palette)
-      expect(style.readTheme()).toBe(read)
-    })
+    )
+    expect(seen).toEqual(['900px'])
+    expect(style.useTheme()).toBe(theme)
+    expect(style.readTheme).toBe(style.useTheme)
   })
 
-  it('throws without a theme, from a function style and from useStyle', async () => {
-    const style = bindEngine(createLazyEngine(), requestCache)
+  it('gives a function style and useStyle an empty theme without a theme', async () => {
+    const style = bindEngine(createLazyEngine({ prefix: 'e' }), requestCache)
     const Box = style.styled('div')(({ theme: view }) => ({
-      color: (view as unknown as { palette: string }).palette,
+      color: (view as unknown as { palette?: string }).palette ?? 'red',
     }))
-    await expect(resolveTree(<Box />)).rejects.toThrow(NO_THEME_MESSAGE)
+    const tree = playScopes(await resolveTree(<Box />))
+    expect(classOf(findAll(tree, 'div')[0])).toMatch(/^e-/)
     const dynamic = style.StyleSheet.create((view) => ({
-      a: { color: (view as unknown as { palette: string }).palette },
+      a: { color: (view as unknown as { palette?: string }).palette ?? 'blue' },
     }))
-    expect(() => style.useStyle(dynamic)).toThrow(NO_THEME_MESSAGE)
+    expect(style.useStyle(dynamic).a.className).toMatch(/^e-/)
+    expect(style.useTheme()).toEqual({})
+  })
+
+  it('with no base theme, gives function styles the shape of the first provider of the request, and gives the engine no base theme', async () => {
+    const engine = createLazyEngine<typeof theme>({ prefix: 'w' })
+    const style = bindEngine(engine, requestCache)
+    const Box = style.styled('div')(({ theme: view }) => ({ color: view.palette.primary }))
+    const tree = playScopes(
+      await resolveTree(
+        <style.ThemeProvider theme={theme}>
+          <Box />
+        </style.ThemeProvider>
+      )
+    )
+    const className = findAll(tree, 'div')[0].props.className as string
+    const box = findAll(tree, 'style').find((element) => element.props.href === className)
+    expect(box?.children[0]).toContain('color:var(--w-palette-primary);')
+    expect(engine.hasTheme).toBe(false)
+    // The root rule declares the theme given alone: there is no base theme under it.
+    expect(findAll(tree, 'style')[0].children[0]).toContain(
+      ':where(:root){--w-palette-primary:#0000ff;--w-space-0:0;--w-space-1:4px;--w-space-2:8px;}'
+    )
   })
 
   it('has useStyle, apply and themeClass', () => {

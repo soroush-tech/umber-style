@@ -35,6 +35,7 @@ describe('the entries of umber-style', () => {
 
   it('the react-server entry exposes createStyle too (it re-exports the package, which picks its own build)', () => {
     expect(reactServer).toHaveProperty('createStyle')
+    expect(reactServer).toHaveProperty('Global')
   })
 
   it('each binding exposes createStyle and the default style', () => {
@@ -46,13 +47,22 @@ describe('the entries of umber-style', () => {
       'StyleSheet',
       'useStyle',
       'apply',
+      'css',
       'themeClass',
       'configure',
+      'keyframes',
+      'globalStyles',
+      'Global',
     ]
     for (const binding of [react, reactNative, vue]) {
       for (const name of names) expect(binding).toHaveProperty(name)
     }
     for (const binding of [react, vue]) expect(binding).toHaveProperty('getEngine')
+    for (const binding of [react, reactNative, vue]) {
+      for (const name of ['ThemeScope', 'useThemeClass']) expect(binding).toHaveProperty(name)
+    }
+    for (const binding of [react, reactNative]) expect(binding).toHaveProperty('ThemeContext')
+    for (const binding of [react, reactNative, vue]) expect(binding).toHaveProperty('CacheProvider')
     for (const binding of [react, reactNative, vue]) {
       for (const name of ['alpha', 'at', 'multiply', 'divide', 'add', 'subtract', 'negate']) {
         expect(binding).toHaveProperty(name)
@@ -71,7 +81,7 @@ describe('the entries of umber-style', () => {
       expect(existsSync(fileURLToPath(new URL(`../${target}`, import.meta.url)))).toBe(true)
     }
     // The `react-server` condition is first, with its own types: under the custom condition the compiler
-    // reads `shared.server.ts` (`readTheme`), else the `types` condition reads the shared types, and a
+    // reads `shared.server.ts` (`useTheme` and `readTheme`), else the `types` condition reads the shared types, and a
     // bundler skips `types`.
     expect(manifest.exports['./react']).toEqual({
       'react-server': { types: './src/shared.server.ts', default: './src/react.server.ts' },

@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Button } from './components'
+import { Button, FrameStyles, HeaderOverride } from './components'
 import { darkClass, lightClass } from './style'
 import { STORAGE_KEY } from './themes'
 
@@ -31,6 +31,24 @@ export function ThemeSwitch() {
       Switch theme
     </Button>
   )
+}
+
+/** Mounts and unmounts the global styles of the frame: they are on at first, also in the first HTML. */
+export function FrameSwitch() {
+  const [isOn, setOn] = useState(true)
+  return (
+    <>
+      {isOn && <FrameStyles />}
+      <Button variant="outline" data-testid="frame-switch" onClick={() => setOn(!isOn)}>
+        Switch frame
+      </Button>
+    </>
+  )
+}
+
+/** The global rule of the promo page in a client component: in a framework with server components, `Global` is the client build here. */
+export function ClientHeaderOverride() {
+  return <HeaderOverride />
 }
 
 /** Marks <html> once React has taken the page over: the end-to-end tests wait for it. */

@@ -1,7 +1,7 @@
 import { loadPage, navigateInBrowser, PAGE_NAMES, type PageName } from '../helpers/navigation'
 import { collectComputedStyles } from '../helpers/computedStyles'
 import { collectEngineRuleCount, findMissingStyles } from '../helpers/rules'
-import { countRulesFor, engineClasses, expect, findDuplicateRules, test } from '../helpers/dev'
+import { countRulesFor, readEngineClasses, expect, findDuplicateRules, test } from '../helpers/dev'
 
 // The fixtures render under React strict mode in development: a render runs twice and a mount effect
 // runs, is cleaned up and runs again. None of that may write a rule twice or leave a wrong class.
@@ -44,7 +44,7 @@ for (const name of PAGE_NAMES) {
   }) => {
     await loadPage(page, fixture, name)
     for (const [testId, classCount] of KNOWN[name]) {
-      const classes = await engineClasses(page, testId)
+      const classes = await readEngineClasses(page, testId)
       expect(classes, `the engine classes of ${testId}`).toHaveLength(classCount)
       expect(new Set(classes).size, 'a class is on the element once').toBe(classes.length)
       for (const className of classes) {
@@ -65,7 +65,7 @@ test('strict mode: the right class makes the right style', async ({ page, fixtur
   expect(styles['home-card'].backgroundColor).toBe('rgb(244, 241, 238)')
   expect(styles['home-primary'].paddingLeft).toBe('16px')
   expect(styles['home-note'].marginTop).toBe('6px')
-  expect(await engineClasses(page, 'home-primary')).toHaveLength(2)
+  expect(await readEngineClasses(page, 'home-primary')).toHaveLength(2)
 })
 
 test('strict mode: a round trip through the pages writes no rule that the first visit did not', async ({

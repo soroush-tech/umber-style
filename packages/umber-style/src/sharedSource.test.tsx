@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react'
-import { createElement } from 'react'
+import { createElement, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { createCache, createMemorySheet } from './index'
 import {
   multiply as multiplyWeb,
@@ -251,5 +252,65 @@ describe('theme conditions in one component source', () => {
       [{ padding: 8 }],
       [{ padding: 4, opacity: 0.5 }],
     ])
+  })
+})
+
+/** The one source of a part of a page that a nested provider themes, with content in a portal on the web and in a modal on React Native. */
+function createScoped(
+  binding: ReturnType<typeof createWebStyle<typeof theme>>,
+  Host: string | ((props: Record<string, unknown>) => unknown),
+  Layer: (props: { children?: ReactNode }) => ReactNode
+) {
+  const { styled, ThemeProvider, ThemeScope, useThemeClass } = binding
+  const Label = styled(Host as never)(({ theme: refs }: { theme: typeof theme }) => ({
+    color: refs.palette.primary,
+  }))
+  const seen: (string | undefined)[] = []
+  function Content() {
+    seen.push(useThemeClass())
+    return <Label>label</Label>
+  }
+  function Scoped() {
+    return (
+      <ThemeProvider theme={theme}>
+        <ThemeProvider theme={(outer) => ({ palette: { primary: outer.palette.hover } })}>
+          <Layer>
+            <ThemeScope>
+              <Content />
+            </ThemeScope>
+          </Layer>
+        </ThemeProvider>
+      </ThemeProvider>
+    )
+  }
+  return { Scoped, seen }
+}
+
+describe('a nested provider and its portal content in one component source', () => {
+  it('repeats the wrapper of the nested provider around the portal content on the web', () => {
+    const { binding } = setupWeb()
+    const target = document.createElement('div')
+    document.body.appendChild(target)
+    const Portal = ({ children }: { children?: ReactNode }) => createPortal(children, target)
+    const { Scoped, seen } = createScoped(binding, 'span', Portal)
+    const { container } = render(<Scoped />)
+    const wrapper = container.firstElementChild as HTMLElement
+    const repeated = target.firstElementChild as HTMLElement
+    expect(repeated.className).toBe(wrapper.className)
+    expect(seen).toEqual([wrapper.className])
+    target.remove()
+  })
+
+  it('renders the modal content with the nested theme on React Native, where a modal stays in the tree', () => {
+    const { View, calls } = createStandIn()
+    const Modal = ({ children }: { children?: ReactNode }) => <>{children}</>
+    const { Scoped, seen } = createScoped(
+      createNativeStyle(theme) as unknown as ReturnType<typeof createWebStyle<typeof theme>>,
+      View,
+      Modal
+    )
+    render(<Scoped />)
+    expect(calls[0].style).toEqual([{ color: '#000080' }])
+    expect(seen).toEqual([undefined])
   })
 })

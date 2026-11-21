@@ -3,6 +3,7 @@ import { createPropertyRule, type RegisteredSyntax } from './registered'
 /** How a token is written: a variable, the real value in the rules, a variable with a fallback, or a real value that is never written. */
 export type TokenMode = 'variable' | 'inline' | 'reference' | 'raw'
 
+/** The options of `createTokens`: how the variables of a theme are named, and which values are tokens. */
 export interface TokenOptions {
   /** Put before every variable name, e.g. 'ds' gives --ds-palette-primary. */
   prefix?: string
@@ -25,12 +26,14 @@ export interface TokenOptions {
   registered?: Readonly<Record<string, RegisteredSyntax | true>>
 }
 
+/** `T` with every key optional, at every depth; a function is kept as it is. */
 export type DeepPartial<T> = T extends (...args: never[]) => unknown
   ? T
   : T extends object
     ? { [K in keyof T]?: DeepPartial<T[K]> }
     : T
 
+/** What `createTokens` makes of a theme: its references, its declarations, and the views of other themes of its shape. */
 export interface Tokens<T> {
   /** The theme's shape, with var(--name) in place of each variable token, var(--name, value) for a reference, and the real value for the rest. */
   refs: T
@@ -178,7 +181,8 @@ export function createTokens<T extends object>(theme: T, options: TokenOptions =
     if (mode === 'variable') return `var(${name})`
     if (mode !== 'reference') return node
     const fallback = baseDeclarations[name]
-    return fallback === undefined ? `var(${name})` : `var(${name}, ${fallback})`
+    const fallbackText = fallback === undefined ? '' : `, ${fallback}`
+    return `var(${name}${fallbackText})`
   }
 
   const toRefs = (node: unknown, path: string[]): unknown => {

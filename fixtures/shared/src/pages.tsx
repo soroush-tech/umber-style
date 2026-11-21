@@ -11,6 +11,8 @@ import {
   Page,
   Panel,
   ProductGrid,
+  Pulse,
+  Spinner,
 } from './components'
 import { StyleSheet, ThemeProvider } from './style'
 import { brandTheme } from './themes'
@@ -28,6 +30,10 @@ export function HomePage({ extra }: { extra?: ReactNode }) {
         <Muted data-testid="home-note" style={homeSheet.note}>
           A note from a sheet
         </Muted>
+        <Flex gap={2} data-testid="animations">
+          <Spinner data-testid="spinner" />
+          <Pulse data-testid="pulse" />
+        </Flex>
       </Hero>
       <Flex gap={3} data-testid="home-row">
         <Card data-testid="home-card">
@@ -47,6 +53,7 @@ export function HomePage({ extra }: { extra?: ReactNode }) {
   )
 }
 
+/** The catalog page: a grid of product cards. */
 export function CatalogPage() {
   return (
     <Page data-testid="page-catalog">
@@ -66,6 +73,27 @@ export function CatalogPage() {
   )
 }
 
+/**
+ * A page whose `override` writes a global rule for the bar of the shell, which is outside the page: leaving
+ * the page unmounts it. `testId` tells apart the routes of a fixture that renders it in more than one way.
+ */
+export function PromoPage({
+  override,
+  testId = 'page-promo',
+}: {
+  override: ReactNode
+  testId?: string
+}) {
+  return (
+    <Page data-testid={testId}>
+      {override}
+      <Heading>Promo</Heading>
+      <Muted>This page outlines the bar above it</Muted>
+    </Page>
+  )
+}
+
+/** The settings page: a callout in the accent colour, a panel, and a card inside the brand theme. */
 export function SettingsPage() {
   return (
     <Page data-testid="page-settings">

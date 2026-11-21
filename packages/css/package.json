@@ -1,0 +1,82 @@
+{
+  "name": "@umber-style/css",
+  "version": "0.1.0",
+  "description": "UmberStyle's plain layer: a style goes to a cache and comes back as a class name. No framework, no theme.",
+  "keywords": [
+    "styling",
+    "css",
+    "class-names",
+    "ssr",
+    "typescript"
+  ],
+  "license": "MIT",
+  "author": "Masoud Soroush <masoud@soroush.tech>",
+  "homepage": "https://umber-style.soroush.design",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/soroush-tech/umber-style.git",
+    "directory": "packages/css"
+  },
+  "bugs": {
+    "url": "https://github.com/soroush-tech/umber-style/issues"
+  },
+  "type": "module",
+  "sideEffects": false,
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": "./src/index.ts",
+    "./create-instance": "./src/createInstance.ts"
+  },
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      ".": {
+        "import": {
+          "types": "./dist/index.d.mts",
+          "default": "./dist/index.mjs"
+        },
+        "require": {
+          "types": "./dist/index.d.cts",
+          "default": "./dist/index.cjs"
+        }
+      },
+      "./create-instance": {
+        "import": {
+          "types": "./dist/create-instance.d.mts",
+          "default": "./dist/create-instance.mjs"
+        },
+        "require": {
+          "types": "./dist/create-instance.d.cts",
+          "default": "./dist/create-instance.cjs"
+        }
+      }
+    },
+    "main": "./dist/index.cjs",
+    "module": "./dist/index.mjs",
+    "types": "./dist/index.d.mts"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "lint": "oxlint --deny-warnings",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "prepublishOnly": "pnpm build"
+  },
+  "dependencies": {
+    "@umber-style/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@soroush.tech/bench": "^2.2.3",
+    "@types/node": "^26.6.6",
+    "@umber-style/eslint-config": "workspace:*",
+    "@vitest/coverage-v8": "^5.1.0",
+    "jsdom": "^31.0.0",
+    "oxlint": "^1.93.0",
+    "tsdown": "^0.23.7",
+    "typescript": "~7.0.2",
+    "vitest": "^5.1.0"
+  }
+}

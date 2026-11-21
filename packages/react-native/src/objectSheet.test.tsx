@@ -1,7 +1,7 @@
 import { render } from '@testing-library/react'
 import { createElement } from 'react'
 import { StyleSheet as platform } from 'react-native'
-import { NO_THEME_MESSAGE, type Theme } from '@umber-style/core'
+import type { Theme } from '@umber-style/core'
 import { bindHolder, createStyle } from './createStyle'
 import { createDefaultStyle } from './defaultStyle'
 import type { NativeStyleObject } from './nativeStyle'
@@ -91,7 +91,7 @@ describe('the types of a sheet on React Native', () => {
 })
 
 describe('a sheet made from a function with no theme at all', () => {
-  it('says so, where an object sheet would work', () => {
+  it('is called with an empty theme, so reading a token throws, where an object sheet works', () => {
     const { StyleSheet, useStyle } = bindHolder<typeof light>({ baseTheme: undefined })
     const themed = StyleSheet.create((theme) => ({ box: { padding: theme.space.small } }))
     const plain = StyleSheet.create({ box: { margin: 1 } })
@@ -104,7 +104,7 @@ describe('a sheet made from a function with no theme at all', () => {
     }
     expect(() => read(plain)).not.toThrow()
     const spy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
-    expect(() => read(themed)).toThrow(NO_THEME_MESSAGE)
+    expect(() => read(themed)).toThrow(TypeError)
     spy.mockRestore()
   })
 })

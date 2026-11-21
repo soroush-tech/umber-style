@@ -22,7 +22,10 @@ describe('the default style on the server', () => {
     )
     expect(html.match(/class="ds-button-root-\w+"/g)).toHaveLength(2)
     const { css } = getEngine().cache.extract()
-    expect(css.match(/\.ds-theme-\w+\{/g)).toHaveLength(2)
+    // The outer theme is on :root; the nested one changes the one token there is, so its own class is
+    // the class of its whole merged theme.
+    expect(css).toContain(':where(:root){--ds-palette-primary:#0000ff;}')
+    expect(css.match(/\.ds-theme-\w+\{/g)).toHaveLength(1)
     expect(css).toMatch(/\.ds-button-root-\w+\{color:var\(--ds-palette-primary\);\}/)
   })
 })

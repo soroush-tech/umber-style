@@ -84,6 +84,50 @@ In shared code (`umber-style/react`) a token is typed as the number it is on Rea
 
 Every binding exports them, Vue's included, and so does `@umber-style/core`.
 
+### String forms of token maths
+
+Code written for real values often builds strings from tokens. With a token the text is a reference, and three such forms are not valid CSS (but see the contrived case in [Limits](#limits)): the browser drops the declaration. `hasValueRepair: true` (an option of the engine and of the cache, default `false`) rewrites them in each value:
+
+| Written                                      | The text the engine sees | Written out as                                                                                                                                 |
+| -------------------------------------------- | ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `` `${color}1F` `` (two hex digits of alpha) | `var(--x)1F`             | what `alpha(color, 0x1F / 255)` writes: `color-mix(in srgb, var(--x) 12.16%, transparent)`. `ff` gives `var(--x)` and `00` gives `transparent` |
+| `` `-${space}` ``                            | `-var(--x)`              | what `negate(space)` writes: `calc(var(--x) * -1)`                                                                                             |
+| `` `${duration}ms` ``, `` `${duration}s` ``  | `var(--x)ms`             | `calc(var(--x) * 1ms)`, `calc(var(--x) * 1s)`                                                                                                  |
+
+```ts
+const theme = {
+  palette: { primary: '#1b5fd1', text: '#1a1a1a' },
+  space: [0, 4, 8, 16],
+  transitions: { duration: { short: 150 } },
+}
+const engine = createEngine(theme, { prefix: 'umber', hasValueRepair: true })
+
+const { palette, space, transitions } = engine.refs
+const className = engine.css({
+  background: `${palette.primary}1F`,
+  border: `1px solid ${palette.primary}80`,
+  marginLeft: `-${space[2]}`,
+  transition: `opacity ${transitions.duration.short}ms`,
+})
+```
+
+```css
+.umber-jsrgfl {
+  background: color-mix(in srgb, var(--umber-palette-primary) 12.16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--umber-palette-primary) 50.2%, transparent);
+  margin-left: calc(var(--umber-space-2) * -1);
+  transition: opacity calc(var(--umber-transitions-duration-short) * 1ms);
+}
+```
+
+- A form is rewritten in a value alone and inside a longer value, as many times as it is there, and in each item of a fallback list. A reference with a fallback (`var(--x, 8px)`) is one reference, and the forms inside its fallback are rewritten too. Global rules and the steps of `keyframes` are rewritten as a class is.
+- What is left alone: a reference followed by a space, a comma, `)`, `/` or the end of the value; two hex digits or a unit followed by another letter, digit, `-` or `_` (`var(--x)1Fa`, `var(--x)sec`); a minus that is not at the start of the value or after a space, a comma or `(` (`calc(1px - var(--x))` has a space after it); a custom property (a key that starts with `--`), which takes any text; an `alpha()` result, which is valid already.
+- The time form needs a variable that holds a number: `150` makes `calc(var(--x) * 1ms)` a time of `150ms`. Length units (`px`, `rem`, `%`) are not rewritten. A number under a `lengthKeys` key is declared with `px` already, so `` `${space[2]}px` `` would be `calc(8px * 1px)`, which is not valid either: write `space[2]` alone, or add the key to `lengthKeys`.
+- Without the option nothing is rewritten, and a value costs nothing more. With it, a value that holds no `var(` costs one check.
+- The option is part of the stamp of options that a server page carries (`v=1`). It is written only when the option is on, so the stamp of a page without it is the text it was before.
+
+Arithmetic in JavaScript cannot be repaired: `theme.space[2] * 2` and `parseFloat(theme.space[2])` run before the engine sees anything, and a reference is not a number. Use one of the three routes: the helpers above (`multiply(space[2], 2)`), `useTheme()` where JavaScript needs the real value (see [Themes](themes.md)), or a token mode that keeps the real value (`inline` or `raw`, below).
+
 ## Colours at an opacity: `alpha`
 
 `alpha(color, opacity)` returns the colour at an opacity from 0 to 1. A browser without `color-mix()` would drop the declaration and leave the property unset, so the engine writes two declarations when the result is the whole value of a property: a fallback first, then the `color-mix()` value. A browser that does not know `color-mix()` keeps the first.
@@ -187,6 +231,7 @@ const id = engine.themeId(theme)
 With the defaults, the theme class of `id` is `.umber-theme-1342wv{--umber-palette-primary:#1b5fd1;}`: one variable, not the whole theme. With `hasPruning: false` it declares all of them: `--umber-palette-primary`, `--umber-palette-text`, `--umber-space-0` to `--umber-space-3`, `--umber-z-index-modal` and `--umber-transitions-duration-short`.
 
 - A token whose value refers to another variable (`var(--umber-palette-blue)`, or a value that contains one) makes that variable used too, to any depth.
+- The variables of a global rule and of a `@keyframes` rule are used as those of a class are, when the rule is written; on a server they count for every page. See [Animations and global styles](animations-and-global-styles.md).
 - `alwaysDeclare` lists theme paths (a top-level key or a dotted path) whose variables are always declared, for code outside the engine that reads them, such as an app stylesheet. A variable that only such code uses must be listed, or it is not declared:
 
   ```ts
@@ -212,7 +257,7 @@ In the server components build each `<style href precedence>` is sent before the
 
 ## Animating tokens
 
-A CSS variable has no type, so the browser cannot interpolate it. Registering a token writes an `@property` rule that gives its variable a type, and then the variable itself can be transitioned.
+A CSS variable has no type, so the browser cannot interpolate it. Registering a token writes an `@property` rule that gives its variable a type, and then the variable itself can be transitioned. (To animate a component with steps of your own, see `keyframes` in [Animations and global styles](animations-and-global-styles.md): a token in a step is a variable, and a property that uses it is interpolated without registration.)
 
 ```ts
 import { createCache, createEngine, createMemorySheet } from '@umber-style/core'
@@ -275,4 +320,5 @@ What the tests do check: the rule text and where it is written. In jsdom, which 
 - The arithmetic helpers do not know a variable's value. `multiply('var(--x)', 2)` is a `calc()` that the browser computes, so it cannot be used where a plain number is needed (a `z-index`, for example).
 - On React Native, `alpha` cannot mix: a colour it cannot read as a literal (a named colour, `hsl()`) is returned at full opacity, whatever the opacity is.
 - `lengthKeys` and `rawKeys` take top-level keys only. For anything deeper use `modes`.
+- `hasValueRepair` reads the text, not the value of a variable. A reference followed by two digits is valid in one contrived case, when the variable and the digits read as two items of a list (`flex: var(--grow)10`, where `--grow` is `1`, is `flex: 1 10`); the option rewrites it as alpha all the same. Parentheses inside a quoted string of a fallback are counted as any other. Only `ms` and `s` are rewritten as units.
 - Browser versions for `color-mix()` and `@property` are to be confirmed: see [Browser and platform support](browser-support.md).

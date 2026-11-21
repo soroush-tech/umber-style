@@ -52,11 +52,23 @@ type ColorProperty =
   | 'textDecorationColor'
   | 'textEmphasisColor'
 
-/** Every CSS property, by its camelCase name, with its value type; a color property also takes `alpha()`. */
+/** The properties whose value is a time, and so also take a number: milliseconds. */
+type TimeProperty =
+  | 'animationDelay'
+  | 'animationDuration'
+  | 'transitionDelay'
+  | 'transitionDuration'
+
+/** The extra values of property `K`: `alpha()` for a color, a number of milliseconds for a time. */
+type ExtraValue<K> =
+  | (K extends ColorProperty ? AlphaColor : never)
+  | (K extends TimeProperty ? number : never)
+
+/** Every CSS property, by its camelCase name, with its value type; a color property also takes `alpha()`, a time property a number of milliseconds. */
 export type WebProperties = {
   [K in keyof CssProperties]?: K extends 'display'
     ? WebValue<DisplayValue>
-    : WebValue<NonNullable<CssProperties[K]> | (K extends ColorProperty ? AlphaColor : never)>
+    : WebValue<NonNullable<CssProperties[K]> | ExtraValue<K>>
 }
 
 /** What a nested key holds: a style of its own, or nothing (so `isOpen && { ... }` works). */

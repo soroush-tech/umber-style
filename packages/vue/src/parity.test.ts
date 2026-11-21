@@ -1,10 +1,5 @@
 import { createApp, defineComponent, h, nextTick, ref, type Component } from 'vue'
-import {
-  createCache,
-  createLazyEngine,
-  createMemorySheet,
-  NO_THEME_MESSAGE,
-} from '@umber-style/core'
+import { createCache, createLazyEngine, createMemorySheet } from '@umber-style/core'
 import { bindEngine, createStyle } from './createStyle'
 
 const baseTheme = {
@@ -39,7 +34,11 @@ describe('a ThemeProvider whose theme changes', () => {
         return () => h('i', real.value.palette.primary)
       },
     })
-    const root = mount(() => h(ThemeProvider, { theme: theme.value }, () => h(Consumer)))
+    const root = mount(() =>
+      h(ThemeProvider, { theme: baseTheme }, () =>
+        h(ThemeProvider, { theme: theme.value }, () => h(Consumer))
+      )
+    )
     const wrapper = root.firstElementChild as HTMLElement
     const before = wrapper.className
     expect(root.querySelector('i')?.textContent).toBe('#ff0000')
@@ -72,15 +71,21 @@ describe('a ThemeProvider whose theme changes', () => {
 
   it('renders the element of `as` and keeps a given class', () => {
     const { ThemeProvider } = setup()
-    const root = mount(() => h(ThemeProvider, { theme: {}, as: 'section', class: 'mine' }))
+    const root = mount(() =>
+      h(ThemeProvider, { theme: baseTheme }, () =>
+        h(ThemeProvider, { theme: {}, as: 'section', class: 'mine' })
+      )
+    )
     const element = root.firstElementChild as HTMLElement
     expect(element.tagName).toBe('SECTION')
-    expect(element.className).toMatch(/^p-theme-[a-z0-9]+ p-boundary p-scope mine$/)
+    expect(element.className).toMatch(
+      /^p-theme-[a-z0-9]+ p-boundary p-theme-[a-z0-9]+ p-scope mine$/
+    )
   })
 })
 
 describe('useTheme without a provider', () => {
-  it('returns the base theme, and throws without one', () => {
+  it('returns the base theme, and an empty object without one', () => {
     const { useTheme: readTheme } = setup()
     let seen: unknown
     mount(
@@ -97,8 +102,7 @@ describe('useTheme without a provider', () => {
     mount(
       defineComponent({
         setup() {
-          const value = empty.useTheme()
-          expect(() => value.value).toThrow(NO_THEME_MESSAGE)
+          expect(empty.useTheme().value).toEqual({})
           return () => null
         },
       })
@@ -156,11 +160,9 @@ describe('createStyle and bindEngine with an engine', () => {
     expect(engine.baseTheme).toBe(baseTheme)
   })
 
-  it('takes the theme of a provider as it is while the engine has no base yet', () => {
+  it('makes the theme of the first provider the base while the engine has none', () => {
     const engine = createLazyEngine<typeof baseTheme>({ prefix: 'q' })
-    // An engine whose themeClass does not give the base, so the provider reads before there is one.
-    const silent = Object.create(engine, { themeClass: { value: () => 'q-theme' } })
-    const { ThemeProvider, useTheme: readTheme } = bindEngine(silent as typeof engine)
+    const { ThemeProvider, useTheme: readTheme } = bindEngine(engine)
     let seen: unknown
     const Consumer = defineComponent({
       setup() {
@@ -172,6 +174,7 @@ describe('createStyle and bindEngine with an engine', () => {
       },
     })
     mount(() => h(ThemeProvider, { theme: baseTheme }, () => h(Consumer)))
-    expect(seen).toBe(baseTheme)
+    expect(engine.baseTheme).toBe(baseTheme)
+    expect(seen).toEqual(baseTheme)
   })
 })
