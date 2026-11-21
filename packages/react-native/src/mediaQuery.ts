@@ -26,6 +26,11 @@ class Unsupported {
   constructor(readonly problem: string) {}
 }
 
+/** What reading a part of a query gives: its test, or what the binding cannot evaluate. */
+type Reading = Test | Unsupported
+/** A reading, or undefined when the text is not of the form asked for. */
+type MaybeReading = Reading | undefined
+
 /** A key that is a media query: `@media` and then white space or a parenthesis. */
 const MEDIA_KEY = /^@media(?=[\s(])/i
 /** `@media` in front of a query, with any white space before it. */
@@ -102,7 +107,7 @@ function readLength(text: string): ((remBase: number) => number) | Unsupported {
 }
 
 /** The test of `feature operator text`: the width or the height of the window compared with a length. */
-function compareSize(feature: string, operator: Operator, text: string): Test | Unsupported {
+function compareSize(feature: string, operator: Operator, text: string): Reading {
   const length = readLength(text)
   if (length instanceof Unsupported) return length
   return feature === 'width'
@@ -117,7 +122,7 @@ function readBoundOperator(bound: string | undefined): Operator {
 }
 
 /** The test of `(name: value)`. */
-function readPlainFeature(name: string, value: string): Test | Unsupported {
+function readPlainFeature(name: string, value: string): Reading {
   const size = SIZE.exec(name)
   if (size !== null) return compareSize(size[2], readBoundOperator(size[1]), value)
   const keywords = KEYWORD_FEATURES.get(name)
@@ -126,10 +131,7 @@ function readPlainFeature(name: string, value: string): Test | Unsupported {
 }
 
 /** The test of a comparison, `width >= 600px` or `600px <= width`; undefined when neither side is a size feature. */
-function readComparison([left, operator, right]: [string, Operator, string]):
-  | Test
-  | Unsupported
-  | undefined {
+function readComparison([left, operator, right]: [string, Operator, string]): MaybeReading {
   if (SIZE_FEATURES.has(left)) return compareSize(left, operator, right)
   if (SIZE_FEATURES.has(right)) return compareSize(right, FLIPPED[operator], left)
   return undefined
@@ -142,7 +144,7 @@ function readBetween([low, first, feature, second, high]: [
   string,
   Operator,
   string,
-]): Test | Unsupported | undefined {
+]): MaybeReading {
   if (first === '=' || second === '=' || first.startsWith('<') !== second.startsWith('<')) {
     return undefined
   }
@@ -154,8 +156,8 @@ function readBetween([low, first, feature, second, high]: [
 }
 
 /** The test of a range: `width >= 600px`, `600px <= width`, `400px <= width < 800px`. */
-function readRange(parts: string[]): Test | Unsupported {
-  let read: Test | Unsupported | undefined
+function readRange(parts: string[]): Reading {
+  let read: MaybeReading
   if (parts.length === 3) read = readComparison(parts as [string, Operator, string])
   else if (parts.length === 5 && SIZE_FEATURES.has(parts[2])) {
     read = readBetween(parts as [string, Operator, string, Operator, string])
@@ -168,7 +170,7 @@ function readRange(parts: string[]): Test | Unsupported {
 }
 
 /** The test of the text inside one pair of parentheses. */
-function readFeature(text: string): Test | Unsupported {
+function readFeature(text: string): Reading {
   const colon = text.indexOf(':')
   if (colon >= 0) return readPlainFeature(text.slice(0, colon).trim(), text.slice(colon + 1).trim())
   const parts = text.split(RANGE).map((part) => part.trim())
@@ -213,7 +215,7 @@ function readTypedFeatures(
 }
 
 /** The test of one query of a list: `not` or `only`, a media type, and features joined by `and`. */
-function readQuery(text: string): Test | Unsupported {
+function readQuery(text: string): Reading {
   const tokens = text.match(TOKEN) ?? []
   const invalid = new Unsupported(`the text "${text}"`)
   const isNegated = tokens[0] === 'not'
