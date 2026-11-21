@@ -38,9 +38,16 @@ export function createDefaultStyle() {
     pending = options
   }
 
-  // `styled.div` and the other tags are made on use, through the engine's own `styled`.
-  const styled = withTagShorthands(((tag: string | Component, options?: StyledOptions) =>
-    getStyle().styled(tag, options)) as Style<Theme>['styled'])
+  // `styled.div` and the other tags are made on use, through the engine's own `styled`, when the
+  // styles are given: reading them (`Object.assign(wrapper, styled)` reads every tag) leaves `configure`
+  // open.
+  const styled = withTagShorthands(
+    ((tag: string | Component, options?: StyledOptions) =>
+      (...args: unknown[]) =>
+        (getStyle().styled(tag, options) as (...styles: unknown[]) => unknown)(
+          ...args
+        )) as unknown as Style<Theme>['styled']
+  )
 
   // An object sheet is made on first read, so a module can create one before `configure` is called.
   const StyleSheet: Style<Theme>['StyleSheet'] = {

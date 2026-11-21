@@ -195,6 +195,8 @@ By default `breakpoints` and `components` are raw, and everything else is a vari
 | React Native | the theme                                        |
 | Vue          | a computed ref of the theme (`useTheme().value`) |
 
+In a client component of React the theme is the same object from render to render while the theme given to each provider above is (`toBe`, so it can be a dependency of a memo or an effect). A branch that a provider's theme does not change is the object of the theme above, not a copy, and an outermost provider with no base theme gives the very object it was given.
+
 With no provider above, `useTheme()` returns the base theme, or an empty object when there is none. Styles still render: a style function then gets an empty theme, and one that reads a token (`theme.palette.primary`) throws a `TypeError` of the language, because `theme.palette` is `undefined`.
 
 ## The base theme

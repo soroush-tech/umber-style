@@ -65,6 +65,19 @@ describe('mergeDeep and members that are not enumerable', () => {
     expect(Object.getOwnPropertyDescriptor(merged.breakpoints, 'count')?.get).toBe(get)
   })
 
+  it('keeps the identity of a branch that one side has, or that both share, and of base merged with itself', () => {
+    const palette = { primary: 'blue' }
+    const space = [0, 4]
+    const base = { palette, space, radii: { card: 4 } }
+    const merged = mergeDeep(base, { radii: { card: 8 } })
+    expect(merged.palette).toBe(palette)
+    expect(merged.space).toBe(space)
+    expect(mergeDeep(base, { palette }).palette).toBe(palette)
+    expect(mergeDeep(base, base)).toBe(base)
+    const frozen = Object.freeze({ palette })
+    expect(mergeDeep(frozen, frozen)).toBe(frozen)
+  })
+
   it('keeps symbol keys and an object with no prototype', () => {
     const key = Symbol('key')
     const base = Object.assign(Object.create(null) as Record<PropertyKey, unknown>, {

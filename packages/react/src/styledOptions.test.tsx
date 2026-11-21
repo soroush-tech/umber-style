@@ -164,3 +164,35 @@ describe('the tag shorthands', () => {
     expect(only(container).className).toMatch(/^q-/)
   })
 })
+
+describe('the label option, and a function style that returns a list', () => {
+  it('labels the class with the label as it is written, over name and slot', () => {
+    const { styled } = setup()
+    const AlertIcon = styled('span', { label: 'AlertIcon' })({ color: 'red' })
+    const Named = styled('span', { name: 'Alert', slot: 'icon', label: 'AlertIcon' })({
+      color: 'red',
+    })
+    const { container } = render(
+      <>
+        <AlertIcon />
+        <Named />
+      </>
+    )
+    const [first, second] = [...container.children].map((element) => element.className)
+    expect(first).toMatch(/^o-AlertIcon-[a-z0-9]+$/)
+    expect(second).toBe(first)
+  })
+
+  it('merges a list in order, as separate styles in that order', () => {
+    const { styled, css, cache } = setup()
+    const card = css({ padding: 8 })
+    const Toggle = styled('div')<{ isOn?: boolean }>(({ isOn }) => [
+      { color: 'red', margin: 1 },
+      [null, isOn && { color: 'blue' }, [undefined, card]],
+      false,
+    ])
+    const { container } = render(<Toggle isOn />)
+    const className = only(container).className
+    expect(className).toBe(cache.css({ color: 'red', margin: 1 }, { color: 'blue' }, card))
+  })
+})

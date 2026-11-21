@@ -108,8 +108,12 @@ export interface DefaultStyleOptions extends BindingOptions<Theme>, ServerStyleO
   theme?: Theme
 }
 
-/** The options of `styled(tag, options)`: the label of the class, which props reach the element, and a class of your own. */
-export interface StyledOptions extends StylerOptions {
+/**
+ * The options of `styled(tag, options)`: the label of the class, which props reach the element, and a class
+ * of your own. `_Props`, the props of the tag, changes nothing: it lets a wrapper of `styled` write
+ * `StyledOptions<ComponentProps<C>>` next to `FilteringStyledOptions<ComponentProps<C>, Forwarded>`.
+ */
+export interface StyledOptions<_Props = unknown> extends StylerOptions {
   /**
    * Whether a prop is forwarded to a string tag. It replaces the default, which forwards the attributes
    * of HTML and SVG (by their React names), `data-*`, `aria-*`, event handlers and React's own props, and
@@ -132,7 +136,7 @@ export interface StyledOptions extends StylerOptions {
 export interface FilteringStyledOptions<
   Props = Record<string, unknown>,
   Forwarded extends keyof Props & string = keyof Props & string,
-> extends StyledOptions {
+> extends StyledOptions<Props> {
   /** A type guard of the props that are forwarded to a string tag: the component takes only the props of the tag that it names. */
   shouldForwardProp?: (prop: string) => prop is Forwarded
 }
@@ -184,25 +188,75 @@ export type StyledComponent<
 > &
   StyledStatics
 
+/** The props that a function style reads: the props of the tag `Base`, with the component's own `P` over them. */
+type StyleFunctionProps<Base extends object, P extends object> = Omit<Base, keyof P> & P
+
 /**
- * What `styled(tag, options)` returns: it takes the styles and makes the component, or is used as a tag,
- * whose template is one style (a function of the props when an interpolation is a function).
+ * What `styled(tag, options)` returns, in the form that a wrapper of `styled` names it: the props of the
+ * component are `ComponentProps` and `SpecificComponentProps` (a wrapper puts its own, such as `theme`, in
+ * the first, and the props of the tag in the second), and `JSXProps` are props that only the element takes
+ * (`ref`). It takes the styles and makes the component, or is used as a tag, whose template is one style.
+ * The props of the component's own are a type argument, `AdditionalProps`. A function style reads all of
+ * them, the component's own over the others, and `theme`, the theme `T`.
  */
-export interface StyledFactory<T, C extends ElementType, Base extends object = ComponentProps<C>> {
+export interface CreateStyledComponent<
+  ComponentProps extends object,
+  SpecificComponentProps extends object = object,
+  JSXProps extends object = object,
+  T = Theme,
+> {
   // Three forms, in this order. A function first: a function style whose parameters are annotated is
   // typed by the first form that sees it, and keeps its literal values only against a style. The
   // template. Then the styles, last, so that a mistake in a style object is reported against a style.
-  <P extends object = object>(
-    style: (props: P & { theme: T }) => InterpolationResult,
-    ...styles: Interpolation<P, T>[]
-  ): StyledComponent<C, P, Base>
-  // `P` is not inferred from the values: a styled component among them is a selector, not a style.
-  <P extends object = object>(
+  <AdditionalProps extends object = object>(
+    style: (
+      props: StyleFunctionProps<ComponentProps & SpecificComponentProps, AdditionalProps> & {
+        theme: T
+      }
+    ) => InterpolationResult,
+    ...styles: Interpolation<
+      StyleFunctionProps<ComponentProps & SpecificComponentProps, AdditionalProps>,
+      T
+    >[]
+  ): StyledComponent<
+    ElementType,
+    AdditionalProps,
+    ComponentProps & SpecificComponentProps & JSXProps
+  >
+  // The props are not inferred from the values: a styled component among them is a selector, not a style.
+  <AdditionalProps extends object = object>(
     template: TemplateStringsArray,
-    ...values: TemplateValue<NoInfer<P>, T>[]
-  ): StyledComponent<C, P, Base>
-  <P extends object = object>(...styles: Interpolation<P, T>[]): StyledComponent<C, P, Base>
+    ...values: TemplateValue<
+      NoInfer<StyleFunctionProps<ComponentProps & SpecificComponentProps, AdditionalProps>>,
+      T
+    >[]
+  ): StyledComponent<
+    ElementType,
+    AdditionalProps,
+    ComponentProps & SpecificComponentProps & JSXProps
+  >
+  <AdditionalProps extends object = object>(
+    ...styles: Interpolation<
+      StyleFunctionProps<ComponentProps & SpecificComponentProps, AdditionalProps>,
+      T
+    >[]
+  ): StyledComponent<
+    ElementType,
+    AdditionalProps,
+    ComponentProps & SpecificComponentProps & JSXProps
+  >
 }
+
+/**
+ * What `styled(tag, options)` returns for the theme `T` and the tag `C`, whose props the component takes
+ * (`Base`: all of them, unless a `shouldForwardProp` type guard named some): `CreateStyledComponent` with
+ * the props of the tag.
+ */
+export type StyledFactory<
+  T,
+  C extends ElementType,
+  Base extends object = ComponentProps<C>,
+> = CreateStyledComponent<object, Base, object, T>
 
 /** The shorthand of each HTML and SVG tag: `styled.div(...styles)` is `styled('div')(...styles)`. */
 export type StyledTags<T> = {
@@ -239,13 +293,32 @@ export interface SheetDefinition<S extends SheetStyles, E> {
   readonly entries?: { [K in keyof S]: E }
 }
 
+/**
+ * What the `theme` of a provider of the theme `T` takes: `ThemeInput<T>`. The `Theme` of the default style
+ * has no member of its own until an app declares its members in it, and until then no theme of the app
+ * would match it (TypeScript rejects an object that shares no member with a type whose members are all
+ * optional); so while it has none, the provider takes any theme object, or a function of the theme above
+ * whose parameter the app types (`(outer: AppTheme) => AppTheme`).
+ */
+type ProviderThemeInput<T> = [Exclude<keyof T, '_theme'>] extends [never]
+  ? object | UntypedThemeFunction['derive']
+  : ThemeInput<T>
+
+/**
+ * The function form of `ProviderThemeInput` for a theme with no members: its parameter is compared both
+ * ways, as a method's is, so a function whose parameter the app types as its own theme is taken.
+ */
+interface UntypedThemeFunction {
+  derive(outer: object): object
+}
+
 /** The props of `ThemeProvider`: the theme of the subtree, and on the web its color scheme and wrapper. */
 export interface ThemeProviderProps<T> {
   /**
    * The theme, or the part of it that this subtree changes; or a function of the theme above (the base
    * theme, or an empty object, for the outermost provider) that returns it. It is merged over the theme above.
    */
-  readonly theme: ThemeInput<T>
+  readonly theme: ProviderThemeInput<T>
   /** Web only. */
   readonly colorScheme?: ColorScheme
   /** Web only: a class of the wrapper of a nested provider. */

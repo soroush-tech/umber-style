@@ -1,3 +1,4 @@
+import { isDevelopment } from './devChecks'
 import { hashString } from './hash'
 import { createLazyRecord } from './lazyRecord'
 import { createCache, type Cache, type ClassValue, type GlobalRules, type HeldClass } from './cache'
@@ -223,9 +224,39 @@ function isPlainStyle(value: ClassValue): boolean {
   return typeof value === 'object' && value !== null && !isSheetEntry(value)
 }
 
-/** The label of a styled component: `name-slot`, or '' without a name. */
-function createLabel({ name, slot = 'root' }: StylerOptions): string {
+/** The label of a styled component: `label` as it is, else `name-slot`, or '' with neither. */
+function createLabel({ name, slot = 'root', label }: StylerOptions): string {
+  if (label) return label
   return name ? `${toKebabCase(name)}-${toKebabCase(slot)}` : ''
+}
+
+/** The messages already warned about by `checkStyleResult`: each is warned about once. */
+const warnedResults = new Set<string>()
+
+/** `value` as a warning shows it: a string quoted, a function by its kind. */
+function describeValue(value: unknown): string {
+  if (typeof value === 'string') return JSON.stringify(value)
+  return typeof value === 'function' ? 'a function' : String(value)
+}
+
+/**
+ * Warns, once for each message, about each part of `result` (what a style function of the component
+ * labelled `label` returned, lists walked) that is not a style: a string, a number, `true`, a function.
+ * An object, `null`, `undefined` and `false` are styles or nothing.
+ */
+function checkStyleResult(prefix: string, label: string, result: unknown): void {
+  if (Array.isArray(result)) {
+    for (const item of result) checkStyleResult(prefix, label, item)
+    return
+  }
+  if (result === undefined || result === null || result === false || typeof result === 'object') {
+    return
+  }
+  const owner = label ? ` of "${label}"` : ''
+  const message = `[${prefix}] A style function${owner} returned ${describeValue(result)}, which is not a style: return a style object, a css() value, a list of them, null, undefined or false.`
+  if (warnedResults.has(message)) return
+  warnedResults.add(message)
+  console.warn(message)
 }
 
 /** A short text for the token options of an engine, or '' when it has none of its own: they are part of what the server and the browser must agree on. */
@@ -437,17 +468,22 @@ function createFamilyEngine<T extends object>(
     const label = createLabel(stylerOptions)
     const list = [...inherited, ...(label ? [{ label }] : []), ...styles]
     const hasFunction = list.some(isStyleFunction)
+    // What a function returns is checked in development only; a list needs no work of its own here,
+    // because the cache reads lists in order.
+    const isChecked = hasFunction && isDevelopment()
     const resolveStyle = (
       style: StyleInput,
       props: Record<string, unknown>,
       theme: unknown
-    ): StyleResult =>
-      typeof style === 'function'
-        ? (style as StyleFunction<unknown, Record<string, unknown>>)({
-            ...props,
-            theme: theme ?? readTokens().refs,
-          })
-        : style
+    ): StyleResult => {
+      if (typeof style !== 'function') return style
+      const result = (style as StyleFunction<unknown, Record<string, unknown>>)({
+        ...props,
+        theme: theme ?? readTokens().refs,
+      })
+      if (isChecked) checkStyleResult(cache.prefix, label, result)
+      return result
+    }
     const resolveAll = (
       source: readonly StyleInput[],
       props: Record<string, unknown>,
@@ -475,6 +511,7 @@ function createFamilyEngine<T extends object>(
     const plans = new WeakMap<object, Plan>()
     const makePlan = (props: Record<string, unknown>, view: object): Plan => {
       const { base, propsFrom } = splitLeading(list, props, view)
+      if (isChecked) checkStyleResult(cache.prefix, label, base)
       const hasProps = propsFrom < list.length
       const lead = label ? [{ label }] : []
       return {

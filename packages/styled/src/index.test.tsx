@@ -4,6 +4,7 @@ import * as react from '@umber-style/react'
 import { expectTypeOf } from 'vitest'
 import styled, {
   type CreateStyled,
+  type CreateStyledComponent,
   type CSSObject,
   type FilteringStyledOptions,
   type Interpolation,
@@ -50,5 +51,18 @@ describe('the default export', () => {
     expectTypeOf<Interpolation>().toEqualTypeOf<react.Interpolation>()
     expectTypeOf<PropsOf<'a'>['href']>().toEqualTypeOf<string | undefined>()
     expectTypeOf<FilteringStyledOptions>().toExtend<StyledOptions>()
+    expectTypeOf<StyledOptions<PropsOf<'a'>>>().toEqualTypeOf<StyledOptions>()
+    expectTypeOf<ReturnType<typeof styled<'a'>>>().toEqualTypeOf<
+      CreateStyledComponent<object, PropsOf<'a'>>
+    >()
+  })
+
+  it('has its tag shorthands as own members, which Object.assign copies to a wrapper', () => {
+    const wrapper = Object.assign((tag: 'b') => styled(tag), styled)
+    expect(Object.keys(styled)).toContain('section')
+    const Strong = wrapper.b({ fontWeight: 700 })
+    const { container } = render(<Strong>x</Strong>)
+    expect(container.firstElementChild?.tagName).toBe('B')
+    expect(container.firstElementChild?.className).toMatch(/^st-/)
   })
 })

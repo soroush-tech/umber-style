@@ -139,6 +139,15 @@ describe('mergeStyles', () => {
     expect(mergeStyles([{ a: [1] }, { a: { b: 1 } }])).toEqual({ a: { b: 1 } })
   })
 
+  it('skips a key whose value is undefined, null or false: it does not erase an earlier value', () => {
+    const merged = mergeStyles([
+      { width: 80, height: 80, color: 'red', '&:hover': { opacity: 1 } },
+      { width: undefined, height: null, color: false, '&:hover': undefined },
+    ])
+    expect(merged).toEqual({ width: 80, height: 80, color: 'red', '&:hover': { opacity: 1 } })
+    expect(mergeStyles([{ margin: undefined }])).toEqual({})
+  })
+
   it('does not change its inputs', () => {
     const first = { '&:hover': { color: 'red' } }
     const second = { '&:hover': { color: 'blue' } }

@@ -7,6 +7,7 @@ import {
   resolveThemeInput,
   type DeepPartial,
   type Engine,
+  type ThemeInput,
   type ThemeText,
 } from '@umber-style/core'
 import { toPlainTheme } from './plainTheme'
@@ -139,7 +140,7 @@ export function createThemeProvider<T extends object>(
 
   return function ThemeProvider(props: WebThemeProviderProps<T>): ReactElement {
     const { theme, isRoot, children } = props
-    const given = resolveThemeInput(theme, readBaseTheme())
+    const given = resolveThemeInput(theme as ThemeInput<T>, readBaseTheme())
     // The first provider of the request sends the stamp, and its theme gives the shape of the view of
     // function styles where the style has no base theme.
     const slot = readFirstSlot()

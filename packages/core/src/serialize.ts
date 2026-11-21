@@ -228,11 +228,17 @@ function resolveWebParts(style: StyleObject): StyleObject {
   return isStyleObject(web) ? mergeStyles([rest, web]) : rest
 }
 
-/** Merges style objects left to right; a later key wins and moves to the end; nested objects merge the same way. */
+/**
+ * Merges style objects left to right; a later key wins and moves to the end; nested objects merge the
+ * same way. A key whose value is `undefined`, `null` or `false` declares nothing, so it leaves an earlier
+ * value of that key as it is: a parser that returns `{ width: undefined }` for a prop it was not given
+ * does not erase the width of a style before it.
+ */
 export function mergeStyles(styles: readonly StyleObject[]): StyleObject {
   const merged: StyleObject = {}
   for (const style of styles) {
     for (const [key, value] of Object.entries(resolveWebParts(style))) {
+      if (value === undefined || value === null || value === false) continue
       const earlier = merged[key]
       delete merged[key]
       merged[key] =

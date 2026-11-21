@@ -370,3 +370,52 @@ describe('the default style', () => {
     expect(wrapper.querySelectorAll('div')).toHaveLength(1)
   })
 })
+
+describe('the identity of the theme that useTheme returns', () => {
+  it('is the same object across renders while the theme given and the theme above are', () => {
+    const style = setup()
+    const seen: unknown[] = []
+    const Probe = ({ tick }: { tick: number }) => {
+      seen.push(style.useTheme())
+      return <i>{tick}</i>
+    }
+    const tree = (tick: number) => (
+      <style.ThemeProvider theme={light}>
+        <style.ThemeProvider theme={dark}>
+          <Probe tick={tick} />
+        </style.ThemeProvider>
+      </style.ThemeProvider>
+    )
+    const { rerender } = render(tree(1))
+    rerender(tree(2))
+    rerender(tree(3))
+    expect(seen).toHaveLength(3)
+    expect(seen[1]).toBe(seen[0])
+    expect(seen[2]).toBe(seen[0])
+    // A branch that the theme given does not change is the one of the theme above.
+    expect((seen[0] as typeof light).breakpoints).toBe(light.breakpoints)
+  })
+
+  it('is the theme given, for an outermost provider with no base theme, in every render', () => {
+    const engine = createLazyEngine<typeof light>({
+      prefix: 'i',
+      cache: createCache({ prefix: 'i', sheet: createMemorySheet() }),
+    })
+    const style = bindEngine(engine)
+    const seen: unknown[] = []
+    const Probe = ({ tick }: { tick: number }) => {
+      seen.push(style.useTheme())
+      return <i>{tick}</i>
+    }
+    const tree = (tick: number) => (
+      <style.ThemeProvider theme={light}>
+        <Probe tick={tick} />
+      </style.ThemeProvider>
+    )
+    const { rerender } = render(tree(1))
+    rerender(tree(2))
+    expect(seen).toEqual([light, light])
+    expect(seen[0]).toBe(light)
+    expect(seen[1]).toBe(light)
+  })
+})

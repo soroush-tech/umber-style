@@ -7,6 +7,7 @@ export { styled as default } from '@umber-style/react'
 
 export type {
   CreateStyled,
+  CreateStyledComponent,
   CSSObject,
   FilteringStyledOptions,
   Interpolation,

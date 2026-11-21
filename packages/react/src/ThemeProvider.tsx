@@ -15,6 +15,7 @@ import {
   resolveThemeInput,
   type DeepPartial,
   type Engine,
+  type ThemeInput,
 } from '@umber-style/core'
 import { useProvidedCache } from './CacheProvider'
 import { addMark, getMarksContext, type ThemeScopeValue } from './ProviderScope'
@@ -90,7 +91,7 @@ export function createThemeProvider<T extends object>({
     const isOutermost = above === undefined && !isRoot
     const isNested = above !== undefined && !isRoot
     const given = useMemo(
-      () => resolveThemeInput(theme, outer ?? (EMPTY_THEME as T)),
+      () => resolveThemeInput(theme as ThemeInput<T>, outer ?? (EMPTY_THEME as T)),
       [theme, outer]
     )
     // The first provider gives the engine its base theme, before its children render.

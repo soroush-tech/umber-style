@@ -16,8 +16,17 @@ export type Keyframes = ReturnType<typeof keyframes>
  */
 export type SerializedStyles = SheetEntry
 
-/** What a style function may return: a style object, a `css()` result or a sheet entry, or nothing. */
-export type InterpolationResult = CSSObject | SerializedStyles | null | undefined | false
+/**
+ * What a style function may return: a style object, a `css()` result or a sheet entry, nothing, or a list
+ * of them, nested to any depth, merged in order as if its items were separate styles.
+ */
+export type InterpolationResult =
+  | CSSObject
+  | SerializedStyles
+  | null
+  | undefined
+  | false
+  | readonly InterpolationResult[]
 
 /**
  * A style in any form that `styled` takes: a style object, a `css()` result or a sheet entry, a function

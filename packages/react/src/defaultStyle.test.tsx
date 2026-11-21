@@ -147,6 +147,21 @@ describe('the default style', () => {
     expect(String(card)).toMatch(/^late-/)
   })
 
+  it('has its tag shorthands as own members: copying them uses nothing, so configure still works', () => {
+    const style = createDefaultStyle()
+    const wrapper = Object.assign(() => null, style.styled)
+    expect(typeof wrapper.div).toBe('function')
+    const sheet = createMemorySheet()
+    style.configure({ prefix: 'late', cache: createCache({ prefix: 'late', sheet }) })
+    const Box = wrapper.div({ margin: 0 })
+    render(<Box data-testid="copied" />)
+    expect(screen.getByTestId('copied').className).toMatch(/^late-/)
+    const made = createStyle(light, { prefix: 'own', cache: createCache({ prefix: 'own' }) })
+    const Own = Object.assign(() => null, made.styled).em({ margin: 0 })
+    render(<Own data-testid="own" />)
+    expect(screen.getByTestId('own').className).toMatch(/^own-/)
+  })
+
   it('throws from configure once the default style was used', () => {
     const { configure, getEngine } = setup()
     getEngine()

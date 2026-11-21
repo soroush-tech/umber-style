@@ -165,8 +165,18 @@ export type RuleLayer = (typeof RULE_LAYERS)[number]
 /** The layers that a class can be made in: the styles of a component, and what is given to it from outside. */
 export type ClassLayer = 'components' | 'overrides'
 
-/** What a class is made from: a style object, a sheet entry, a class name, or a falsy value that is left out. */
-export type ClassValue = WebStyleObject | SheetEntry | string | null | undefined | false
+/**
+ * What a class is made from: a style object, a sheet entry, a class name, a falsy value that is left out,
+ * or a list of them, nested to any depth, read in order as if its items were given one by one.
+ */
+export type ClassValue =
+  | WebStyleObject
+  | SheetEntry
+  | string
+  | null
+  | undefined
+  | false
+  | readonly ClassValue[]
 
 /** How `cssWith` makes a class, beyond what is in it. */
 export interface ClassOptions {
@@ -507,34 +517,61 @@ function addThemeReferences(
   }
 }
 
+/** What `sortClassValues` finds: the styles to merge, the class names to pass through, and the entries. */
+interface SortedValues {
+  styles: StyleObject[]
+  rawClasses: string[]
+  /** The source of the last entry among the values. */
+  entry: EntrySource | undefined
+  /** The entry when the one style is its own, set once every value is read. */
+  sole: EntrySource | undefined
+}
+
+/** Adds `items` to `sorted`, in order, a list read item by item (see `sortClassValues`). */
+function addClassValues(
+  items: readonly ClassValue[],
+  registered: ReadonlyMap<string, StyleObject>,
+  adopt: (entry: SheetEntry) => SheetEntry,
+  sorted: SortedValues
+): void {
+  for (const value of items) {
+    if (!value) continue
+    if (Array.isArray(value)) {
+      addClassValues(value as readonly ClassValue[], registered, adopt, sorted)
+      continue
+    }
+    if (typeof value === 'object' && !isSheetEntry(value)) {
+      sorted.styles.push(value as StyleObject)
+      continue
+    }
+    // A number, `true` or a function is not a style (what a style function returned, warned about in
+    // development): it is left out.
+    if (typeof value !== 'string' && !isSheetEntry(value)) continue
+    const source = typeof value === 'string' ? undefined : readEntrySource(adopt(value))
+    if (source) {
+      sorted.styles.push(source.style)
+      sorted.entry = source
+      continue
+    }
+    sortClassNames(value, registered, sorted.styles, sorted.rawClasses)
+  }
+}
+
 /**
  * Splits `values` into the styles to merge (the style of an entry a cache made, registered classes
- * resolved back) and the class names to pass through. `sole` is the entry when the one style is its own;
- * an entry of another cache is first made this cache's own with `adopt`.
+ * resolved back) and the class names to pass through; a list among them is read in order, as if its items
+ * were given one by one. `sole` is the entry when the one style is its own; an entry of another cache is
+ * first made this cache's own with `adopt`.
  */
 function sortClassValues(
   values: readonly ClassValue[],
   registered: ReadonlyMap<string, StyleObject>,
   adopt: (entry: SheetEntry) => SheetEntry
-): { styles: StyleObject[]; rawClasses: string[]; sole: EntrySource | undefined } {
-  const styles: StyleObject[] = []
-  const rawClasses: string[] = []
-  let entry: EntrySource | undefined
-  for (const value of values) {
-    if (!value) continue
-    if (typeof value !== 'string' && !isSheetEntry(value)) {
-      styles.push(value)
-      continue
-    }
-    const source = typeof value === 'string' ? undefined : readEntrySource(adopt(value))
-    if (source) {
-      styles.push(source.style)
-      entry = source
-      continue
-    }
-    sortClassNames(value, registered, styles, rawClasses)
-  }
-  return { styles, rawClasses, sole: styles.length === 1 ? entry : undefined }
+): SortedValues {
+  const sorted: SortedValues = { styles: [], rawClasses: [], entry: undefined, sole: undefined }
+  addClassValues(values, registered, adopt, sorted)
+  if (sorted.styles.length === 1) sorted.sole = sorted.entry
+  return sorted
 }
 
 /** Makes a cache: it turns styles into classes and inserts each class's rules once. */

@@ -75,6 +75,16 @@ describe('the default style for server components', () => {
     expect(useTheme()).toBe(theme)
   })
 
+  it('has its tag shorthands as own members: copying them uses nothing, so configure still works', async () => {
+    const style = createDefaultStyle()
+    const wrapper = Object.assign(() => null, style.styled)
+    const sheet = createMemorySheet()
+    style.configure({ prefix: 'late', cache: createCache({ prefix: 'late', sheet }) })
+    const Box = wrapper.div({ margin: 0 })
+    const tree = playScopes(await resolveTree(<Box />))
+    expect(findAll(tree, 'div')[0].props.className).toMatch(/^late-/)
+  })
+
   it('throws from configure once it was used, and shares the engine it is given', () => {
     const { configure, getEngine } = setup()
     getEngine()

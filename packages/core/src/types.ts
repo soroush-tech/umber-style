@@ -34,8 +34,11 @@ export interface EngineOptions extends TokenOptions {
 /** The value of the CSS `color-scheme` property that a theme declares: light, dark, or both. */
 export type ColorScheme = 'light' | 'dark' | 'light dark'
 
-/** What a style function may return. */
-export type StyleResult = WebStyleObject | null | undefined | false
+/**
+ * What a style function may return: a style object, nothing, or a list of them, nested to any depth,
+ * merged in order as if its items were separate styles.
+ */
+export type StyleResult = WebStyleObject | null | undefined | false | readonly StyleResult[]
 
 /** A style that is computed from the props and the theme. */
 export type StyleFunction<T, P> = (props: P & { theme: T }) => StyleResult
@@ -49,6 +52,11 @@ export interface StylerOptions {
   name?: string
   /** Default 'root'. */
   slot?: string
+  /**
+   * The label of the class, as it is written: it wins over `name` and `slot`. Like them it is part of the
+   * class name only when the cache has `hasLabels` (the default).
+   */
+  label?: string
 }
 
 /** The styles of a sheet, one style object for each name. */

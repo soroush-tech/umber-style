@@ -10,10 +10,12 @@ function isPlainObject(value: unknown): value is Record<PropertyKey, unknown> {
 /**
  * `override` over `base`: plain objects merge key by key, everything else is replaced, undefined keeps
  * `base`. Every own member is taken with its descriptor, so a member that is not enumerable (a helper
- * function on `breakpoints`) is kept, from `override` when it has one, else from `base`.
+ * function on `breakpoints`) is kept, from `override` when it has one, else from `base`. A branch that
+ * only one side has, or that both sides share as one object, is that object, not a copy, and so is the
+ * whole result when `override` is `base`.
  */
 export function mergeDeep<T>(base: T, override: DeepPartial<T> | undefined): T {
-  if (override === undefined) return base
+  if (override === undefined || override === base) return base
   if (!isPlainObject(base) || !isPlainObject(override)) return override as T
   const descriptors: PropertyDescriptorMap = Object.getOwnPropertyDescriptors(base)
   const given = Object.getOwnPropertyDescriptors(override)

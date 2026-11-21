@@ -67,18 +67,26 @@ The provider is the outermost one: it renders no element, and its theme is decla
 
 ## Options
 
-`styled(tag, options)` takes these options. `shouldForwardProp` is the only one the React Native binding uses; it ignores `name` and `slot`, and `target` is web only.
+`styled(tag, options)` takes these options. `shouldForwardProp` is the only one the React Native binding uses; it ignores `name`, `slot` and `label`, and `target` is web only.
 
 | Option              | Type                        | Default   | Effect                                                               |
 | ------------------- | --------------------------- | --------- | -------------------------------------------------------------------- |
 | `name`              | `string`                    | none      | The component's name. With it, the class is labelled `<name>-<slot>` |
 | `slot`              | `string`                    | `root`    | The part of the component this style is for. Used in the label       |
+| `label`             | `string`                    | none      | The label of the class as it is written; it wins over `name`/`slot`  |
 | `shouldForwardProp` | `(prop: string) => boolean` | see below | Decides which props reach a string tag                               |
 | `target`            | `string`                    | none      | A class of your own that the element always has: see below           |
 
 ## Tag shorthands
 
-`styled.div(...styles)` is `styled('div')(...styles)`, for every HTML and SVG tag, typed as the tag (`styled.button` takes the props of a `button`). They take no options: write `styled('div', options)` for those. The shorthands are made when they are first read, not up front, and exist in the client build, the server components build, Vue, and the default style (`import { styled } from '@umber-style/react'`).
+`styled.div(...styles)` is `styled('div')(...styles)`, for every HTML and SVG tag, typed as the tag (`styled.button` takes the props of a `button`). They take no options: write `styled('div', options)` for those. The shorthands exist in the client build, the server components build, Vue, the default style (`import { styled } from '@umber-style/react'`) and `createStyle(...).styled`.
+
+Each tag that React types as an element is an own enumerable member of `styled`, a getter that makes the shorthand when it is read. So `Object.assign(wrapper, styled)` copies them, and a wrapper of `styled` has `wrapper.div`. Reading a shorthand of the default style does not use it: `configure` can still be called after the copy. A name that looks like a tag and is not in that list is made when it is read, as before.
+
+```tsx
+const wrapper = Object.assign((tag: 'b') => styled(tag), styled)
+const Strong = wrapper.b({ fontWeight: 700 })
+```
 
 ```tsx
 const Box = styled.div<{ tone?: string }>(({ tone }) => ({ color: tone }))
@@ -95,16 +103,51 @@ The same name can be used with different slots for the parts of one component, a
 
 A style can carry its own `label` key. `name` and `slot` write one for you.
 
+The `label` option is a label as it is written, with no kebab-case: `styled('span', { label: 'AlertIcon' })` makes classes `<prefix>-AlertIcon-<hash>`, the base and the props class alike. Given with `name` and `slot`, it wins over them. A label is part of the class name only while the cache has `hasLabels`, which is on by default (see [Options reference](options.md)); without it the class is `<prefix>-<hash>`. Write a label with letters, digits, `-` and `_`: it goes into the class name as it is.
+
+```tsx
+const AlertIcon = styled('span', { label: 'AlertIcon' })({ color: 'red' })
+// <span class="umber-AlertIcon-1x2y3z">
+```
+
 ## Object styles and function styles
 
 `styled(tag)(...styles)` takes any number of styles. Each is an object or a function:
 
 - An object is used as it is. A component made only of objects reads no context at run time, and its class is computed once.
-- A function receives the component's props and `theme`, and returns an object, or `null`, `undefined` or `false` for nothing. A function that reads only `theme` is worked out once for each theme (it is part of the base, below). One that reads a prop runs on each render. Equal results give the same class, so nothing grows.
+- A function receives the component's props and `theme`, and returns an object, `null`, `undefined` or `false` for nothing, or a list of them (below). A function that reads only `theme` is worked out once for each theme (it is part of the base, below). One that reads a prop runs on each render. Equal results give the same class, so nothing grows.
 
 `theme` in a function style is the theme as references: a token is a `var(--name)` string, and everything that is not a token (breakpoints, your own functions) is its real value from the nearest provider. See [Themes](themes.md). A `theme` prop passed to the component is not forwarded to the element and does not replace this `theme`.
 
 Styles merge in order, and a later key wins. In `Row`, none of the three styles reads a prop, so they become one class: `display: flex`, then `padding`, then the media rule and hover rule.
+
+A key whose value is `undefined`, `null` or `false` declares nothing, and does not erase the same key of an earlier style. A parser that sets a property it was not given to `undefined` (`layout` of `@soroush.tech/styled-system` returns `{ width: undefined, height: undefined }` with no `size`) leaves the width of a style before it:
+
+```tsx
+const sizeStyle = ({ size = 40 }: { size?: number }) => ({ width: size, height: size })
+const safeLayout = (props: { size?: number }) => layout({ ...props, size: undefined })
+const Avatar = styled('span')<{ size?: number }>(sizeStyle, safeLayout)
+// <Avatar size={80} /> has width: 80px and height: 80px.
+```
+
+### A function that returns a list
+
+A function style may return a list instead of one object, nested to any depth. Its items are style objects, `css()` values and sheet entries, further lists, `null`, `undefined` and `false`; they merge in order, the last winning, exactly as if they had been separate styles in that order. A wrapper that adds the overrides of a theme returns as many as apply:
+
+```tsx
+const card = css({ padding: 8 })
+const Toggle = styled('div')<{ isOn?: boolean }>(({ isOn }) => [
+  { color: 'red', margin: 1 },
+  [null, isOn && { color: 'blue' }, [undefined, card]],
+  false,
+])
+// <Toggle isOn /> has the class of css({ color: 'red', margin: 1 }, { color: 'blue' }, card):
+// margin: 1px, color: blue, padding: 8px.
+```
+
+A function that returns a list is cached and compared as one that returns an object is: it reads only `theme`, its list is part of the base class; it reads a prop, its list is part of the props class.
+
+Anything else a function returns is not a style: a string, a number, `true`, a function. In development (`NODE_ENV` is `development`) each is warned about once for each message, with the label of the component, and a list is searched item by item. Outside development nothing is checked: a string is used as a class name, as it always was, and the rest is left out.
 
 ## The base and the props part
 
@@ -288,3 +331,6 @@ A `className` you give a styled component is kept, and any class the engine made
 - The shorthands are typed for the tags of React's JSX types (React) and Vue's (Vue). At run time any name that starts with a lowercase letter is made into a tag, except `then`.
 - A function style that reads props runs on every render of its component. Keep it cheap. One that reads only `theme` runs once for each theme object.
 - Style functions must be pure: the base keeps the first result of a function that read no prop, for a theme. A function that reads a prop only inside something it returns (a callback) is not seen reading it.
+- A `label` is not checked: a space or a character that a class name cannot hold is written into the class name as it is.
+- Only the tags of React's JSX types are own members of `styled` (in Vue too, which shares the list). `Object.assign` does not copy another name that a shorthand would make on access, such as a custom element: write `styled('my-element')` for it.
+- A value that a function style returns that is not a style is checked in development only, where `process.env.NODE_ENV` is `development`. A key whose value is `undefined`, `null` or `false` cannot be used to remove an earlier declaration: give the property another value, such as `initial` or `auto`.
