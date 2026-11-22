@@ -1,0 +1,22 @@
+{
+  "extends": "./tsconfig.json",
+  // The exclusions of tsconfig.json but the strict ones.
+  "exclude": [
+    "../core/src/**/*.test.ts",
+    "../core/src/**/*.test.tsx",
+    "../react/src/**/*.test.ts",
+    "../react/src/**/*.test.tsx",
+    "../react-native/src/**/*.test.ts",
+    "../react-native/src/**/*.test.tsx",
+    "../vue/src/**/*.test.ts",
+    "../vue/src/**/*.test.tsx",
+    "src/sharedServerTypes.test.tsx",
+    "src/platformParts.test.tsx",
+    "src/sharedSource.test.tsx"
+  ],
+  "files": [
+    "src/styleTypes.strict.test.tsx",
+    "src/sharedAnimation.test.tsx",
+    "src/sharedTypes.test.tsx"
+  ]
+}

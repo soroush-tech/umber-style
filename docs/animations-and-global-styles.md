@@ -32,31 +32,10 @@ const Dot = styled('span', { name: 'Dot' })({
 
 `keyframes` returns the name of the animation at once: `pulse` is `'pulse-12o7gg6'`, a plain string. Use it inside the `animation` shorthand, as `Skeleton` does, or as the value of `animationName`, as `Dot` does. Rendering both writes:
 
-```css
-@keyframes pulse-12o7gg6 {
-  0% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.4;
-  }
-  100% {
-    opacity: 1;
-  }
-}
-@layer umber-components {
-  .umber-skeleton-root-1lhil74 {
-    background-color: var(--umber-palette-surface);
-    animation: pulse-12o7gg6 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-  }
-}
-@layer umber-components {
-  .umber-dot-root-1aeyf7r {
-    animation-name: pulse-12o7gg6;
-    animation-duration: 800ms;
-    animation-iteration-count: infinite;
-  }
-}
+```text
+@keyframes pulse-12o7gg6{0%{opacity:1;}50%{opacity:0.4;}100%{opacity:1;}}
+@layer umber-components{.umber-skeleton-root-1lhil74{background-color:var(--umber-palette-surface);animation:pulse-12o7gg6 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;}}
+@layer umber-components{.umber-dot-root-1aeyf7r{animation-name:pulse-12o7gg6;animation-duration:800ms;animation-iteration-count:infinite;}}
 ```
 
 The `@keyframes` rule is written once, though two classes use it, and outside every cascade layer: a `@keyframes` rule is looked up by name, not cascaded.
@@ -105,22 +84,8 @@ const blink = keyframes(
 )
 ```
 
-```css
-@keyframes blink-1l3v8jv {
-  0% {
-    color: red;
-    opacity: 0.1;
-  }
-  25% {
-    opacity: 0.5;
-  }
-  75% {
-    opacity: 0.5;
-  }
-  100% {
-    opacity: 1;
-  }
-}
+```text
+@keyframes blink-1l3v8jv{0%{color:red;opacity:0.1;}25%{opacity:0.5;}75%{opacity:0.5;}100%{opacity:1;}}
 ```
 
 A key that is not a step, a nested style in a step, steps that are not an object and a label that is not an identifier throw a `TypeError`, in every build:
@@ -153,23 +118,9 @@ const slide = engine.keyframes(
 const className = engine.css({ animation: `${slide} 200ms ease-out` })
 ```
 
-```css
-@keyframes slide-1ag0hl4 {
-  0% {
-    transform: translateY(calc(var(--umber-space-2) * 2));
-    background-color: var(--umber-palette-primary);
-    background-color: color-mix(in srgb, var(--umber-palette-primary) 20%, transparent);
-  }
-  100% {
-    transform: none;
-    background-color: var(--umber-palette-primary);
-  }
-}
-@layer umber-components {
-  .umber-9p42ox {
-    animation: slide-1ag0hl4 200ms ease-out;
-  }
-}
+```text
+@keyframes slide-1ag0hl4{0%{transform:translateY(calc(var(--umber-space-2) * 2));background-color:var(--umber-palette-primary);background-color:color-mix(in srgb, var(--umber-palette-primary) 20%, transparent);}100%{transform:none;background-color:var(--umber-palette-primary);}}
+@layer umber-components{.umber-9p42ox{animation:slide-1ag0hl4 200ms ease-out;}}
 ```
 
 The function is called again when the rule is written, with the references of the engine. A token in a step is a variable, so the animation follows a theme switch like any rule. A key that holds real values (`breakpoints`, a raw key, a token in the `inline` mode) is read from the base theme of the engine, not from the nearest provider: one name is one rule for the whole page. `hasValueRepair` rewrites the string forms of token maths in a step as it does in a class: see [Tokens](tokens.md). The variables a step uses count as used, so a theme class declares them.
@@ -244,47 +195,13 @@ const App = () => (
 
 `globalStyles` returns a handle and writes nothing, so a module can make one at its top level. `Global` renders nothing in the browser and writes the rules of its `styles`, in the order of the list, into the `global` layer:
 
-```css
-@layer umber-global {
-  *,
-  *::before,
-  *::after {
-    box-sizing: border-box;
-  }
-}
-@layer umber-global {
-  html {
-    -webkit-text-size-adjust: 100%;
-  }
-}
-@layer umber-global {
-  body {
-    margin: 0;
-    background-color: var(--umber-palette-background);
-    color: var(--umber-palette-text);
-  }
-}
-@layer umber-global {
-  @media (min-width: 600px) {
-    body {
-      font-size: 18px;
-    }
-  }
-}
-@layer umber-global {
-  @font-face {
-    font-family: Inter;
-    font-weight: 400;
-    src: url(/inter-400.woff2);
-  }
-}
-@layer umber-global {
-  @font-face {
-    font-family: Inter;
-    font-weight: 700;
-    src: url(/inter-700.woff2);
-  }
-}
+```text
+@layer umber-global{*,*::before,*::after{box-sizing:border-box;}}
+@layer umber-global{html{-webkit-text-size-adjust:100%;}}
+@layer umber-global{body{margin:0;background-color:var(--umber-palette-background);color:var(--umber-palette-text);}}
+@layer umber-global{@media (min-width: 600px){body{font-size:18px;}}}
+@layer umber-global{@font-face{font-family:Inter;font-weight:400;src:url(/inter-400.woff2);}}
+@layer umber-global{@font-face{font-family:Inter;font-weight:700;src:url(/inter-700.woff2);}}
 ```
 
 ### Keys
@@ -427,32 +344,12 @@ the markup starts with one merged element (shown shortened), then the options st
 
 `extractPageStyles` reads it and returns the whole page in one:
 
-```css
-@layer umber-theme, umber-global, umber-components, umber-overrides;
-@keyframes fade-1acbpvw {
-  0% {
-    opacity: 0;
-  }
-  100% {
-    opacity: 1;
-  }
-}
-@layer umber-theme {
-  :where(:root) {
-    --umber-palette-text: #1a1a1a;
-  }
-}
-@layer umber-global {
-  body {
-    margin: 0;
-    color: var(--umber-palette-text);
-  }
-}
-@layer umber-components {
-  .umber-toast-root-1atv36o {
-    animation: fade-1acbpvw 200ms ease-out;
-  }
-}
+```text
+@layer umber-theme,umber-global,umber-components,umber-overrides;
+@keyframes fade-1acbpvw{0%{opacity:0;}100%{opacity:1;}}
+@layer umber-theme{:where(:root){--umber-palette-text:#1a1a1a;}}
+@layer umber-global{body{margin:0;color:var(--umber-palette-text);}}
+@layer umber-components{.umber-toast-root-1atv36o{animation:fade-1acbpvw 200ms ease-out;}}
 ```
 
 What `extractPageStyles` puts in a page:
@@ -495,26 +392,11 @@ const html = await renderToString(app)
 const { css } = extractPageStyles(cache, html)
 ```
 
-```css
-@layer umber-theme, umber-global, umber-components, umber-overrides;
-@keyframes fade-1acbpvw {
-  0% {
-    opacity: 0;
-  }
-  100% {
-    opacity: 1;
-  }
-}
-@layer umber-global {
-  body {
-    color: var(--umber-palette-text);
-  }
-}
-@layer umber-components {
-  .umber-toast-root-1atv36o {
-    animation: fade-1acbpvw 200ms ease-out;
-  }
-}
+```text
+@layer umber-theme,umber-global,umber-components,umber-overrides;
+@keyframes fade-1acbpvw{0%{opacity:0;}100%{opacity:1;}}
+@layer umber-global{body{color:var(--umber-palette-text);}}
+@layer umber-components{.umber-toast-root-1atv36o{animation:fade-1acbpvw 200ms ease-out;}}
 ```
 
 ### Server components

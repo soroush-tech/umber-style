@@ -2,6 +2,7 @@ import { createCache, createDomSheet, createMemorySheet, type CacheOptions } fro
 import { createStyleTag } from './extractStyles'
 import { createEngine, createLazyEngine, isThemedSheet } from './createEngine'
 import { createSheetEntry, flattenStyle, isSheetEntry, readEntrySource } from './sheetEntry'
+import type { SerializedStyles } from './styleTypes'
 
 const theme = { palette: { primary: '#0000ff' } }
 
@@ -181,7 +182,8 @@ describe('createSheetEntry with a source', () => {
   it('reads its class name through the source, so that it is written when it is read', () => {
     const use = vi.fn(() => 'used')
     const { cache } = setup()
-    const entry = createSheetEntry('named', { style: { color: 'red' }, cache, use })
+    const readStyles = vi.fn(() => 'color:red;')
+    const entry = createSheetEntry('named', { style: { color: 'red' }, cache, use, readStyles })
     expect(use).not.toHaveBeenCalled()
     expect(entry.className).toBe('used')
     expect(`${entry}`).toBe('used')
@@ -189,6 +191,22 @@ describe('createSheetEntry with a source', () => {
     expect(Object.keys(entry)).toEqual(['--umber-entry-named'])
     expect(readEntrySource(entry)?.style).toEqual({ color: 'red' })
     expect(readEntrySource(createSheetEntry('bare'))).toBeUndefined()
+  })
+
+  it('has a name and the text of its styles, read once and without writing the rule', () => {
+    const use = vi.fn(() => 'used')
+    const readStyles = vi.fn(() => 'color:red;')
+    const { cache } = setup()
+    const entry = createSheetEntry('named', { style: { color: 'red' }, cache, use, readStyles })
+    const { name, styles } = entry as SerializedStyles
+    expect([name, styles, (entry as SerializedStyles).styles]).toEqual([
+      'named',
+      'color:red;',
+      'color:red;',
+    ])
+    expect(readStyles).toHaveBeenCalledTimes(1)
+    expect(use).not.toHaveBeenCalled()
+    expect('name' in createSheetEntry('bare')).toBe(false)
   })
 })
 

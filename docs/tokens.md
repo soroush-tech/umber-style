@@ -27,12 +27,8 @@ const className = engine.css({
 
 The rule is:
 
-```css
-.umber-3yq4zs {
-  padding: calc(var(--umber-space-1) * 2);
-  margin-left: calc(var(--umber-space-2) * -1);
-  width: calc(var(--umber-space-3) + 4px);
-}
+```text
+.umber-3yq4zs{padding:calc(var(--umber-space-1) * 2);margin-left:calc(var(--umber-space-2) * -1);width:calc(var(--umber-space-3) + 4px);}
 ```
 
 | Call                                    | Result on the web                    |
@@ -111,13 +107,8 @@ const className = engine.css({
 })
 ```
 
-```css
-.umber-jsrgfl {
-  background: color-mix(in srgb, var(--umber-palette-primary) 12.16%, transparent);
-  border: 1px solid color-mix(in srgb, var(--umber-palette-primary) 50.2%, transparent);
-  margin-left: calc(var(--umber-space-2) * -1);
-  transition: opacity calc(var(--umber-transitions-duration-short) * 1ms);
-}
+```text
+.umber-jsrgfl{background:color-mix(in srgb, var(--umber-palette-primary) 12.16%, transparent);border:1px solid color-mix(in srgb, var(--umber-palette-primary) 50.2%, transparent);margin-left:calc(var(--umber-space-2) * -1);transition:opacity calc(var(--umber-transitions-duration-short) * 1ms);}
 ```
 
 - A form is rewritten in a value alone and inside a longer value, as many times as it is there, and in each item of a fallback list. A reference with a fallback (`var(--x, 8px)`) is one reference, and the forms inside its fallback are rewritten too. Global rules and the steps of `keyframes` are rewritten as a class is.
@@ -143,14 +134,8 @@ const className = engine.css({
 })
 ```
 
-```css
-.umber-m6w5hf {
-  background: var(--umber-palette-primary);
-  background: color-mix(in srgb, var(--umber-palette-primary) 10%, transparent);
-  border-color: rgba(27, 95, 209, 0.5);
-  border-color: color-mix(in srgb, #1b5fd1 50%, transparent);
-  border: 1px solid color-mix(in srgb, #1b5fd1 50%, transparent);
-}
+```text
+.umber-m6w5hf{background:var(--umber-palette-primary);background:color-mix(in srgb, var(--umber-palette-primary) 10%, transparent);border-color:rgba(27, 95, 209, 0.5);border-color:color-mix(in srgb, #1b5fd1 50%, transparent);border:1px solid color-mix(in srgb, #1b5fd1 50%, transparent);}
 ```
 
 - The fallback of a literal colour the engine can read (`#rgb`, `#rgba`, `#rrggbb`, `#rrggbbaa`, and `rgb()` or `rgba()` with numbers, in comma or space syntax) is that colour with the opacity applied, as `rgba(r, g, b, a)`. An alpha the colour already has is multiplied: `alpha('rgb(10 20 30 / 50%)', 0.5)` falls back to `rgba(10, 20, 30, 0.25)`. The fallback of anything else (a token reference, a named colour, `hsl()`) is the colour itself at full opacity: a solid colour is better than none.
@@ -273,17 +258,9 @@ engine.css({ color: engine.refs.palette.primary, padding: engine.refs.space[1] }
 
 `sheet.rules` now holds, after the layer statement and the component rule:
 
-```css
-@property --umber-palette-primary {
-  syntax: '<color>';
-  inherits: true;
-  initial-value: #1b5fd1;
-}
-@property --umber-space-1 {
-  syntax: '<length>';
-  inherits: true;
-  initial-value: 4px;
-}
+```text
+@property --umber-palette-primary{syntax:"<color>";inherits:true;initial-value:#1b5fd1;}
+@property --umber-space-1{syntax:"<length>";inherits:true;initial-value:4px;}
 ```
 
 `registered` is keyed by dotted theme path like `modes`: the most specific path wins, and a top-level key such as `palette` covers everything under it. The value is `true`, to infer the syntax from the base theme value, or one of `'<color>'`, `'<length>'`, `'<number>'`, `'<percentage>'`, `'<length-percentage>'`, `'<angle>'`, `'<time>'` and `'*'`. Only `variable` and `reference` tokens have a variable; the others are skipped. A key that matches no token is ignored.

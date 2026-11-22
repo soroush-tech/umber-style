@@ -24,8 +24,8 @@ export type { StyleOptions } from './types'
 export function bindEngine<T extends object>(engine: Engine<T>): Style<T> {
   const keys = createThemeKeys<T>()
   const { ThemeScope, useThemeClass } = createThemeScope(keys)
-  /** The theme where no provider is above: the base theme, or the empty theme. */
-  const readOwnTheme = () => engine.baseTheme ?? (EMPTY_THEME as T)
+  /** The theme where no provider is above: the base theme given on purpose, or the empty theme; never one that a provider gave the engine. */
+  const readOwnTheme = () => engine.givenTheme ?? (EMPTY_THEME as T)
 
   const useTheme = (): ComputedRef<T> => inject(keys.theme, null) ?? computed(readOwnTheme)
 
@@ -84,6 +84,6 @@ export function bindEngine<T extends object>(engine: Engine<T>): Style<T> {
 /** Makes the Vue styling of one theme shape, apart from the default one: its own engine, or the one given. */
 export function createStyle<T extends object>(theme: T, options: StyleOptions<T> = {}): Style<T> {
   const engine = options.engine ?? createEngine(theme, options)
-  if (!engine.hasTheme) engine.setTheme(theme)
+  if (engine.givenTheme === undefined) engine.setTheme(theme)
   return bindEngine(engine)
 }

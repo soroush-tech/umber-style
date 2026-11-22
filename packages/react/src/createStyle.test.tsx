@@ -93,7 +93,7 @@ describe('styled', () => {
     const { container } = render(<Fancy>x</Fancy>)
     expect(container.querySelectorAll('*')).toHaveLength(1)
     const { className } = screen.getByRole('button')
-    expect(className).toMatch(/^t-fancy-root-[a-z0-9]+$/)
+    expect(className).toMatch(/^t-base-root-fancy-root-[a-z0-9]+$/)
     expect(ruleOf(className)).toBe(`.${className}{color:red;margin:4px;}`)
     expect(Fancy._tag).toBe('button')
     expect(Fancy._styles).toHaveLength(4)
@@ -445,5 +445,23 @@ describe('the wrapper of a ThemeProvider', () => {
     plain.className = themeClass(baseTheme)
     document.body.append(plain)
     expect(getComputedStyle(plain).display).not.toBe('contents')
+  })
+})
+
+describe('the style element of a style', () => {
+  afterEach(() => {
+    document.head.innerHTML = ''
+  })
+
+  it('holds the rules as text outside production, and gets them with insertRule with hasRuleText false', () => {
+    const text = createStyle({}, { prefix: 'rt' })
+    const name = text.engine.css({ color: 'red' })
+    const readText = (prefix: string) =>
+      document.querySelector(`style[data-style="${prefix}"]`)?.textContent
+    expect(readText('rt')).toBe(
+      `@layer rt-theme,rt-global,rt-components,rt-overrides;@layer rt-components{.${name}{color:red;}}`
+    )
+    createStyle({}, { prefix: 'fast', hasRuleText: false }).engine.css({ color: 'red' })
+    expect(readText('fast')).toBe('')
   })
 })

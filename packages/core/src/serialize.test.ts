@@ -1,4 +1,4 @@
-import { compileRules, mergeStyles, readLabel } from './serialize'
+import { compileRules, mergeStyles, readLabel, type StyleObject } from './serialize'
 
 describe('compileRules', () => {
   it('compiles declarations into one rule', () => {
@@ -146,6 +146,20 @@ describe('mergeStyles', () => {
     ])
     expect(merged).toEqual({ width: 80, height: 80, color: 'red', '&:hover': { opacity: 1 } })
     expect(mergeStyles([{ margin: undefined }])).toEqual({})
+  })
+
+  it('joins labels in order, each once, where any other key is replaced', () => {
+    const labelOf = (...styles: StyleObject[]) => mergeStyles(styles).label
+    expect(labelOf({ label: 'Typography' }, { color: 'red' }, { label: 'Link' })).toBe(
+      'Typography-Link'
+    )
+    expect(labelOf({ label: 'Typography-Link' }, { label: 'Link' }, { label: 'Typography' })).toBe(
+      'Typography-Link'
+    )
+    expect(labelOf({ label: 'button-root' }, { label: 'card-root' })).toBe('button-root-card-root')
+    expect(labelOf({ label: 'a' }, { label: '' }, { label: 'b' })).toBe('a-b')
+    expect(labelOf({ label: '' }, { label: 'b' })).toBe('b')
+    expect(labelOf({ label: 'a' }, { label: 1 })).toBe(1)
   })
 
   it('does not change its inputs', () => {

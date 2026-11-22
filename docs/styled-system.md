@@ -44,26 +44,11 @@ const App = () => (
 
 The rules are:
 
-```css
-.umber-152pv3f {
-  padding: var(--umber-space-2);
-  margin-left: var(--umber-space-3);
-  margin-right: var(--umber-space-3);
-}
-.umber-klja4j {
-  padding: var(--umber-space-1);
-}
-@media (width >= 600px) {
-  .umber-klja4j {
-    padding: var(--umber-space-2);
-  }
-}
-.umber-button-root-iry4x2 {
-  background-color: var(--umber-palette-primary);
-  color: var(--umber-palette-on-primary);
-  padding-left: var(--umber-space-2);
-  padding-right: var(--umber-space-2);
-}
+```text
+.umber-152pv3f{padding:var(--umber-space-2);margin-left:var(--umber-space-3);margin-right:var(--umber-space-3);}
+.umber-klja4j{padding:var(--umber-space-1);}
+@media (width >= 600px){.umber-klja4j{padding:var(--umber-space-2);}}
+.umber-button-root-iry4x2{background-color:var(--umber-palette-primary);color:var(--umber-palette-on-primary);padding-left:var(--umber-space-2);padding-right:var(--umber-space-2);}
 ```
 
 What happens:
@@ -74,7 +59,7 @@ What happens:
 - **Parsers made with `system()`.** A parser such as `system({ color: { property: 'color', scale: 'palette' } })` reads a scale of the theme, so `color="primary"` becomes `var(--umber-palette-primary)`.
 - **Variants.** `variant({ prop, variants })` selects a style by prop. The styles may name theme values, or use references from `engine.refs`, as above. `variant({ scale: 'buttons', prop: 'kind' })` reads the variants from a scale of the theme. An unknown variant gives a style with no declaration, and so no class.
 - **Prop filtering.** The `shouldForwardProp` of the package keeps system props (`p`, `mx` and the rest) off the element. It does not know your own variant prop: `kind="filled"` would reach the `button` as an attribute, so `forward` above filters it too.
-- **Types.** A parser is typed loosely, so `styled` takes it without a cast. An object next to a parser is still checked: `styled('div')(space, { backgroudColor: 'red' })` is a type error.
+- **Types.** A parser is typed loosely, so `styled` takes it without a cast. An object next to a parser is still checked as a style; with the strict switch of [Typed styles](typed-styles.md#the-default-types-and-the-strict-switch), `styled('div')(space, { backgroudColor: 'red' })` is a type error.
 
 The package is a development dependency of the repository's tests, not a dependency of any `@umber-style` package. Install it yourself if you use it.
 

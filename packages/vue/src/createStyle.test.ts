@@ -120,7 +120,7 @@ describe('styled', () => {
     expect(wide.className).toMatch(/^typography-body v-Wide-[a-z0-9]+$/)
   })
 
-  it('labels the base and the props class of a wrapper of a styled component with the label of the wrapper', () => {
+  it('labels the base and the props class of a wrapper of a styled component with the inner label and the label of the wrapper', () => {
     const { styled } = setup()
     const Typography = styled('span', { label: 'Typography' })({ margin: 0 }, ({ variant }) => ({
       fontWeight: variant ? 700 : 400,
@@ -130,9 +130,24 @@ describe('styled', () => {
     const [typography, wrapper] = [...root.children].map((element) => element.className.split(' '))
     expect(typography[0]).toMatch(/^v-Typography-[a-z0-9]+$/)
     expect(wrapper).toEqual([
-      typography[0].replace('Typography', 'W'),
-      expect.stringMatching(/^v-W-[a-z0-9]+$/),
+      typography[0].replace('Typography', 'Typography-W'),
+      expect.stringMatching(/^v-Typography-W-[a-z0-9]+$/),
     ])
+  })
+
+  it('joins the labels of a class given in class after the labels of the element', () => {
+    const { styled } = setup()
+    const Root = styled('span', { label: 'Typography' })({ margin: 0 })
+    const Typography = defineComponent({
+      inheritAttrs: false,
+      setup:
+        (_props, { attrs }) =>
+        () =>
+          h(Root, { class: attrs.class }),
+    })
+    const Link = styled(Typography, { label: 'Link' })({ color: 'blue' })
+    const root = mount(() => h(Link))
+    expect(root.firstElementChild?.className).toMatch(/^v-Typography-Link-[a-z0-9]+$/)
   })
 
   it('uses shouldForwardProp for a tag only', () => {

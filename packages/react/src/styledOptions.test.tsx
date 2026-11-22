@@ -1,5 +1,5 @@
 import { render } from '@testing-library/react'
-import type { ReactNode } from 'react'
+import type { ComponentProps, ReactNode } from 'react'
 import { createCache, createMemorySheet } from '@umber-style/core'
 import { createStyle } from './createStyle'
 import { createDefaultStyle } from './defaultStyle'
@@ -201,7 +201,7 @@ describe('the label option, and a function style that returns a list', () => {
 describe('the label of a styled component that wraps a styled component', () => {
   const byVariant = ({ variant }: { variant?: string }) => ({ fontWeight: variant ? 700 : 400 })
 
-  it('is the label of the wrapper on its base and its props class, and the inner label without one', () => {
+  it('is the inner label joined with the label of the wrapper on its base and its props class, and the inner label without one', () => {
     const { styled } = setup()
     const Typography = styled('span', { label: 'Typography' })({ margin: 0 }, byVariant)
     const Wrapper = styled(Typography, { label: 'W' })({ padding: 1 })
@@ -223,14 +223,14 @@ describe('the label of a styled component that wraps a styled component', () => 
       expect.stringMatching(/^o-Typography-\w+$/),
     ])
     expect(wrapper).toEqual([
-      typography[0].replace('Typography', 'W'),
-      expect.stringMatching(/^o-W-\w+$/),
+      typography[0].replace('Typography', 'Typography-W'),
+      expect.stringMatching(/^o-Typography-W-\w+$/),
     ])
     expect(named.map((name) => name.replace(/-\w+$/, ''))).toEqual([
-      'o-popover-root',
-      'o-popover-root',
+      'o-Typography-popover-root',
+      'o-Typography-popover-root',
     ])
-    expect(plain).toEqual([typography[0], expect.stringMatching(/^o-\w+$/)])
+    expect(plain).toEqual([typography[0], expect.stringMatching(/^o-Typography-\w+$/)])
   })
 
   it('keeps the class of a wrapped component without functions in front, so that it is still a selector of the element', () => {
@@ -253,8 +253,8 @@ describe('the label of a styled component that wraps a styled component', () => 
     const [selector, base, props] = popover.className.split(' ')
     expect(selector).toBe(paper.className)
     expect(`.${selector}`).toBe(String(Paper))
-    expect(base).toBe(paper.className.replace('Paper', 'Popover'))
-    expect(props).toMatch(/^o-Popover-\w+$/)
+    expect(base).toBe(paper.className.replace('Paper', 'Paper-Popover'))
+    expect(props).toMatch(/^o-Paper-Popover-\w+$/)
     expect(popover.matches(`main ${Paper}`)).toBe(true)
     expect(sheet.rules.join('')).toContain(`${Paper}{color:red;}`)
   })
@@ -306,21 +306,52 @@ describe('`as` on a styled component', () => {
     expect(link.textContent).toBe('top')
   })
 
-  it('is not given when shouldForwardProp keeps it, and a wrapper of the styled component gives it too', () => {
+  it('replaces the component when shouldForwardProp keeps it off, and a wrapper of the styled component gives it too', () => {
     const { styled } = setup()
-    const Kept = styled(Typography, { shouldForwardProp: (prop) => prop !== 'as' })({ margin: 0 })
+    const Replaced = styled(Typography, { shouldForwardProp: (prop) => prop !== 'as' })({
+      margin: 0,
+    })
     const Link = styled(Typography)({ margin: 0 })
     const Wide = styled(Link, { label: 'Wide' })({ width: '100%' })
     const { container } = render(
       <>
-        <Kept as="a" variant="body" />
+        <Replaced as="a" variant="body" />
         <Wide as="a" variant="body" />
       </>
     )
-    const [kept, wide] = [...container.children]
-    expect(kept.tagName).toBe('SPAN')
+    const [replaced, wide] = [...container.children]
+    expect(replaced.tagName).toBe('A')
+    expect(replaced.className).toMatch(/^o-\w+$/)
     expect(wide.tagName).toBe('A')
     expect(wide.className).toMatch(/^typography typography-body o-Wide-\w+$/)
+  })
+
+  it('replaces a component whose filter does not forward it, also through a wrapper, and the element rendered gets what that filter lets through', () => {
+    const { styled } = setup()
+    const TableElement = (props: ComponentProps<'table'>) => <table {...props} />
+    const Table = styled(TableElement, { shouldForwardProp: isDomProp })({
+      borderCollapse: 'collapse',
+    })
+    const Wide = styled(Table)({ width: '100%' })
+    const seen: Record<string, unknown>[] = []
+    const Probe = (props: Record<string, unknown>) => {
+      seen.push(props)
+      return null
+    }
+    const { container } = render(
+      <>
+        <Table as="div" id="t" {...{ tone: 'x' }} />
+        <Wide as="div" />
+        <Table />
+        <Table as={Probe} id="p" {...{ tone: 'x' }} />
+      </>
+    )
+    const [table, wide, kept] = [...container.children]
+    expect(table.tagName).toBe('DIV')
+    expect(table.getAttributeNames().sort()).toEqual(['class', 'id'])
+    expect(wide.tagName).toBe('DIV')
+    expect(kept.tagName).toBe('TABLE')
+    expect(seen).toEqual([{ id: 'p', className: table.className }])
   })
 
   it('replaces a string tag, also of a wrapped styled component, with the filter of the tag that is rendered', () => {
@@ -337,5 +368,63 @@ describe('`as` on a styled component', () => {
       expect(element.tagName).toBe('A')
       expect(element.getAttributeNames().sort()).toEqual(['class', 'href'])
     }
+  })
+})
+
+describe('the labels of a class that reaches a styled component through className', () => {
+  /** A component that is not made by `styled`, whose root is a labelled styled component that it gives its `className`. */
+  function setupTypography(options?: { hasLabels?: boolean; hasLayers?: boolean }) {
+    const style = createStyle(theme, {
+      prefix: 'o',
+      cache: createCache({ prefix: 'o', sheet: createMemorySheet(), ...options }),
+    })
+    const { styled } = style
+    const Root = styled('span', { label: 'Typography' })({ margin: 0 })
+    const Typography = ({ className, children }: { className?: string; children?: ReactNode }) => (
+      <Root className={className}>{children}</Root>
+    )
+    const Link = styled(Typography, { label: 'Link' })({ color: 'blue' })
+    const NavLink = styled(Link, { label: 'NavLink' })({ fontWeight: 700 })
+    return { ...style, Typography, Link, NavLink }
+  }
+  const classesOf = (container: Element) =>
+    [...container.children].map((element) => element.className.split(' '))
+
+  it('are joined after the labels of the element, inner first, at every level', () => {
+    const { styled, Typography, Link, NavLink } = setupTypography()
+    const Plain = styled(Typography)({ color: 'green' })
+    const { container } = render(
+      <>
+        <Typography />
+        <Link />
+        <NavLink />
+        <Plain />
+        <Typography className="mine" />
+      </>
+    )
+    const [typography, link, navLink, plain, mine] = classesOf(container)
+    expect(typography).toEqual([expect.stringMatching(/^o-Typography-\w+$/)])
+    expect(link).toEqual([typography[0], expect.stringMatching(/^o-Typography-Link-\w+$/)])
+    expect(navLink).toEqual([
+      typography[0],
+      expect.stringMatching(/^o-Typography-Link-NavLink-\w+$/),
+    ])
+    expect(plain).toEqual([typography[0], expect.stringMatching(/^o-Typography-\w+$/)])
+    expect(mine).toEqual([typography[0], 'mine'])
+    // Found by the label of each component that styled it.
+    const element = container.children[1]
+    expect(element.matches('[class*="-Typography-"]')).toBe(true)
+    expect(element.matches('[class*="-Link-"]')).toBe(true)
+  })
+
+  it('make one class without layers, and none with hasLabels false', () => {
+    const merged = setupTypography({ hasLayers: false })
+    const first = render(<merged.Link />)
+    expect(classesOf(first.container)).toEqual([[expect.stringMatching(/^o-Typography-Link-\w+$/)]])
+    const unlabelled = setupTypography({ hasLabels: false })
+    const second = render(<unlabelled.NavLink />)
+    expect(classesOf(second.container)).toEqual([
+      [expect.stringMatching(/^o-\w+$/), expect.stringMatching(/^o-\w+$/)],
+    ])
   })
 })

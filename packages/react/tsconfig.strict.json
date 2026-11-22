@@ -1,0 +1,23 @@
+{
+  "extends": "./tsconfig.json",
+  // The exclusions of tsconfig.json but the strict ones, and the test of the default style types.
+  "exclude": [
+    "src/**/vitest.*.ts",
+    "src/serverTypes.test.tsx",
+    "src/augmentation.test.tsx",
+    "src/defaultStyle.test.tsx",
+    "src/defaultStyle.server.test.tsx",
+    "src/defaultStyle.ssr.test.tsx",
+    "src/index.test.ts",
+    "src/index.server.test.ts",
+    "src/styleTypes.default.test.tsx"
+  ],
+  "files": [
+    "src/styleTypes.strict.test.tsx",
+    "src/sheetTypes.test.tsx",
+    "src/styledSystem.types.test.tsx",
+    "src/typeNames.types.test.tsx",
+    "src/webStyle.server.test.tsx",
+    "src/webStyle.test.tsx"
+  ]
+}

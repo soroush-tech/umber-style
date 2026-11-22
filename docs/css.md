@@ -250,13 +250,14 @@ const {
 
 The options are those of the core's `createCache` (see [Options reference](options.md)), with `key` for `prefix`:
 
-| Option      | What it does                                                                                                           |
-| ----------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `key`       | The first part of every class name, and the key of the style element, `data-style="<key>"`. Default `css`              |
-| `hasLayers` | Whether rules go into cascade layers. Default `false` here                                                             |
-| `sheet`     | Where rules go. Default: the style element of the key when there is a `document`, otherwise an in-memory sheet         |
-| `cache`     | A cache to share, below                                                                                                |
-| the others  | As `createCache` takes them: `suffix`, `hasLabels`, `hasColorFallbacks`, `hasValueRepair`, `hasDevChecks` and the rest |
+| Option        | What it does                                                                                                                                         |
+| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `key`         | The first part of every class name, and the key of the style element, `data-style="<key>"`. Default `css`                                            |
+| `hasLayers`   | Whether rules go into cascade layers. Default `false` here                                                                                           |
+| `sheet`       | Where rules go. Default: the style element of the key when there is a `document`, otherwise an in-memory sheet                                       |
+| `hasRuleText` | Whether that style element holds the rules as text nodes (`textContent` shows them) or gets them with `insertRule`. Default: text outside production |
+| `cache`       | A cache to share, below                                                                                                                              |
+| the others    | As `createCache` takes them: `suffix`, `hasLabels`, `hasColorFallbacks`, `hasValueRepair`, `hasDevChecks` and the rest                               |
 
 ```ts
 const layered = createInstance({ key: 'l', sheet: createMemorySheet(), hasLayers: true })
@@ -290,7 +291,7 @@ The options of a shared cache are its own: the other options are not read, and a
 | `getRegisteredStyles`, `merge`                      | Read and merge the classes of a class string                                        |
 | `@umber-style/css/create-instance` (default export) | `createInstance(options)`, a separate instance                                      |
 
-Types: `CssFunction`, `CssInput`, `ClassNamesInput`, `KeyframesFunction`, `InjectGlobalFunction`, `InjectGlobalInput`, `CssInstance`, `InstanceOptions` and `SharedCache`, and the core's `CSSObject`, `Interpolation`, `Keyframes`, `SerializedStyles`, `Theme` and `UmberCache`, re-exported so that a file needs one import (see [Typed styles](typed-styles.md)). `css` here returns a class name, a string, not the `SerializedStyles` that `css()` of a binding returns.
+Types: `CssFunction`, `CssInput`, `ClassNamesInput`, `KeyframesFunction`, `InjectGlobalFunction`, `InjectGlobalInput`, `CssInstance`, `InstanceOptions` and `SharedCache`, and the core's `CSSObject`, `Interpolation`, `Keyframes`, `SerializedStyles`, `Theme` and `UmberCache`, and `StyleTypeOptions`, the strict switch, re-exported so that a file needs one import (see [Typed styles](typed-styles.md)). `css` here returns a class name, a string, not the `SerializedStyles` that `css()` of a binding returns.
 
 ## Limits
 

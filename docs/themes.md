@@ -76,41 +76,17 @@ The result:
 </div>
 ```
 
-```css
-:where(:root) {
-  --umber-palette-text: #1a1a1a;
-  --umber-palette-surface: #ffffff;
-  --umber-space-3: 16px;
-}
-.umber-theme-1lpp26f {
-  --umber-palette-surface: #fff4d6;
-}
-.umber-theme-3cgoer {
-  --umber-palette-text: #1a1a1a;
-  --umber-palette-surface: #fff4d6;
-  --umber-space-3: 16px;
-}
-.umber-card-root-c45tr {
-  color: var(--umber-palette-text);
-  background-color: var(--umber-palette-surface);
-}
-@media (min-width: 600px) {
-  .umber-card-root-c45tr {
-    padding: var(--umber-space-3);
-  }
-}
-.umber-card-root-1h3unrm {
-  color: var(--umber-palette-text);
-  background-color: var(--umber-palette-surface);
-}
-@media (min-width: 480px) {
-  .umber-card-root-1h3unrm {
-    padding: var(--umber-space-3);
-  }
-}
+```text
+:where(:root){--umber-palette-text:#1a1a1a;--umber-palette-surface:#ffffff;--umber-space-3:16px;}
+.umber-theme-1lpp26f{--umber-palette-surface:#fff4d6;}
+.umber-theme-3cgoer{--umber-palette-text:#1a1a1a;--umber-palette-surface:#fff4d6;--umber-space-3:16px;}
+.umber-card-root-c45tr{color:var(--umber-palette-text);background-color:var(--umber-palette-surface);}
+@media (min-width: 600px){.umber-card-root-c45tr{padding:var(--umber-space-3);}}
+.umber-card-root-1h3unrm{color:var(--umber-palette-text);background-color:var(--umber-palette-surface);}
+@media (min-width: 480px){.umber-card-root-1h3unrm{padding:var(--umber-space-3);}}
 ```
 
-(Each rule is inside its cascade layer; the layers, the `umber-scope` rule and the classes of the merged themes of the last two providers are left out here. The markup is shown formatted. It is the output of a classic server render, asserted in `packages/react/src/providers.docs.ssr.test.tsx`.)
+(Each rule is inside its cascade layer; the layers, the `umber-scope` rule and the classes of the merged themes of the last two providers are left out here. The markup is shown with line breaks; the CSS is the engine's text, one rule on a line. It is the output of a classic server render, asserted in `packages/react/src/providers.docs.ssr.test.tsx`.)
 
 - The outermost provider has no element: the first Card is at the top, and its theme is on `:root`.
 - The second provider changes one token. Its theme class declares one variable, and the Card inside has the same class as the first, because only a variable changed.
@@ -124,7 +100,7 @@ The result:
 <ThemeProvider theme={(outer) => ({ palette: { surface: outer.palette.text } })}>
 ```
 
-The outermost provider calls it with the base theme, or with an empty object when there is none (its result then becomes the base theme). In the server components build every provider calls it with the base theme, in every render: no context tells a server component which providers are above it, and a request that renders only a part of the page (a client-side navigation in the App Router renders the segment that changed) does not render the providers of the layouts above. See [Server rendering](server-rendering.md#server-components).
+The outermost provider calls it with the base theme that was given (`createStyle(theme)`, `configure({ theme })`), or with an empty object when none was. In the server components build every provider calls it with the base theme, in every render: no context tells a server component which providers are above it, and a request that renders only a part of the page (a client-side navigation in the App Router renders the segment that changed) does not render the providers of the layouts above. See [Server rendering](server-rendering.md#server-components).
 
 ### Portal content: `ThemeScope` and `useThemeClass`
 
@@ -161,7 +137,7 @@ These cases are checked in a real browser (Chromium) by `packages/react/src/them
 
 ### The theme context
 
-`ThemeContext` (React client build and React Native) is the React context that holds the real theme of the nearest provider, merged over the ones above: `<ThemeContext.Consumer>{(theme) => ...}</ThemeContext.Consumer>`, or `useContext(ThemeContext)`. With no provider above, its value is `undefined`; `useTheme()` gives the base theme there instead. On the web every style of one prefix shares it, and a provider of the server build fills it too, with the plain data of its theme (see [Server rendering](server-rendering.md#what-crosses-to-the-browser)).
+`ThemeContext` (React client build and React Native) is the React context that holds the real theme of the nearest provider, merged over the ones above: `<ThemeContext.Consumer>{(theme) => ...}</ThemeContext.Consumer>`, or `useContext(ThemeContext)`. With no provider above, its value is `undefined`; `useTheme()` gives the given base theme there instead, or an empty object. On the web every style of one prefix shares it, and a provider of the server build fills it too, with the plain data of its theme (see [Server rendering](server-rendering.md#what-crosses-to-the-browser)).
 
 ### Two React roots on one page
 
@@ -195,9 +171,9 @@ By default `breakpoints` and `components` are raw, and everything else is a vari
 | React Native | the theme                                        |
 | Vue          | a computed ref of the theme (`useTheme().value`) |
 
-In a client component of React the theme is the same object from render to render while the theme given to each provider above is (`toBe`, so it can be a dependency of a memo or an effect). A branch that a provider's theme does not change is the object of the theme above, not a copy, and an outermost provider with no base theme gives the very object it was given.
+In a client component of React the theme is the same object from render to render while the theme given to each provider above is (`toBe`, so it can be a dependency of a memo or an effect). A branch that a provider's theme does not change is the object of the theme above, not a copy, and an outermost provider with no given base theme gives the very object it was given.
 
-With no provider above, `useTheme()` returns the base theme, or an empty object when there is none. Styles still render: a style function then gets an empty theme, and one that reads a token (`theme.palette.primary`) throws a `TypeError` of the language, because `theme.palette` is `undefined`.
+With no provider above, `useTheme()` returns the base theme that was given on purpose (below), or an empty object when none was. A theme that a provider gave the engine does not count: once that provider unmounts, a tree with no provider has the empty theme again, in every binding. Styles still render: a style function then gets an empty theme, and one that reads a token (`theme.palette.primary`) throws a `TypeError` of the language, because `theme.palette` is `undefined`.
 
 ## The base theme
 
@@ -205,9 +181,9 @@ The engine needs one full theme to know its shape: which tokens exist and what t
 
 - `createStyle(theme)`, or `createEngine(theme)`.
 - `configure({ theme })`, for the default style.
-- The first `ThemeProvider` that renders, or the first `themeClass(theme)` call, when none of the above was used. That theme becomes the base, so give the full theme to the outermost provider, not a partial one. A provider of the server components build never does: there the base theme is what `useTheme()` of every server component returns, so it comes from `createStyle(theme)` or `configure({ theme })` only (a `themeClass` or `when` call still gives it where nothing else did).
+- The first `ThemeProvider` that renders, or the first `themeClass(theme)` or `when(theme)` call, when none of the above was used. That theme gives the engine its shape (`engine.baseTheme`), so give the full theme to the outermost provider, not a partial one. It is not a given base theme (`engine.givenTheme` stays empty): `useTheme()` with no provider above, the outermost provider's merge and its function theme, a function style, a function sheet and `Global` with no provider, and `useTheme()` of every server component read only a theme given with `createStyle(theme)`, `configure({ theme })`, `createEngine(theme)` or `setTheme`. A provider of the server components build never gives the engine a theme at all.
 
-With no base theme and no provider, a style function, a function sheet and `Global` get an empty theme, and `useTheme` returns an empty object. What needs the shape of the theme still throws `There is no theme yet: render a ThemeProvider with the full theme first, or call setTheme (or configure({ theme })) before a function style, a sheet or useTheme is used.`: the engine's own calls, such as `engine.refs`, and `keyframes` steps given as a function of the theme.
+With no given base theme and no provider, a style function, a function sheet and `Global` get an empty theme, and `useTheme` returns an empty object. What needs the shape of the theme still throws `There is no theme yet: render a ThemeProvider with the full theme first, or call setTheme (or configure({ theme })) before a function style, a sheet or useTheme is used.`: the engine's own calls, such as `engine.refs`, and `keyframes` steps given as a function of the theme.
 
 Arrays are replaced as a whole in the real values: a provider with `{ space: [0, 8] }` makes `useTheme().space` that two-item array. The variables are per item, so only `--umber-space-0` and `--umber-space-1` are redeclared and `--umber-space-2` and `--umber-space-3` keep the outer values. If you need to change an array, give all of it.
 
@@ -268,9 +244,11 @@ The same works with `@umber-style/vue` and `@umber-style/react-native`. The decl
 
 ## Limits
 
+- The shape that the first provider gave the engine stays after that provider unmounts (`engine.baseTheme`, and `engine.refs` made from it). Only what reads the theme with no provider forgets it. Give the theme to `createStyle(theme)` or `configure({ theme })` when the shape must not depend on which provider renders first.
+
 - The module declaration names `@umber-style/core`, and TypeScript resolves that name from the file that holds the declaration. It was verified with the workspace layout of this repository. With a package manager that does not let your app see a package it did not install itself, you may need to install `@umber-style/core` directly; that was reasoned, not tried.
 - `Theme` is one interface for the whole program. Two different themes in one program (two `createStyle` calls with different shapes) are typed by `createStyle`, not by `Theme`.
-- A key built at run time in a web style, such as the media query above, is written with `at()`: written directly it is a type error. See [Typed styles](typed-styles.md).
+- With the strict style types, a key built at run time in a web style, such as the media query above, is written with `at()`: written directly it is a type error. The default types take it directly. See [Typed styles](typed-styles.md).
 - A provider that changes only raw values (a breakpoint) declares nothing, and its own theme class is always `umber-theme-0`. No rule is written for it, and every such provider shares that name.
 - Under a nested provider the DOM has one more element, the wrapper. It has `display: contents`, so the layout is the same, but selectors that count elements see it: a child selector (`>`), a sibling selector (`+`, `~`), `:first-child` and the like.
 - Portal content without `ThemeScope` sees the outer theme (the variables of `:root`), not the theme of the nested provider above it in the tree.

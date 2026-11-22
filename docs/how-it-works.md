@@ -23,34 +23,34 @@ const className = engine.css({
 
 returns `umber-1p2a3xt` and writes three rules, each in a cascade layer (see [Cascade layers and overrides](cascade-layers.md)):
 
-```css
-@layer umber-components {
-  .umber-1p2a3xt {
-    padding: 8px;
-  }
-}
-@layer umber-components {
-  .umber-1p2a3xt:hover {
-    opacity: 0.8;
-  }
-}
-@layer umber-components {
-  @media (min-width: 40em) {
-    .umber-1p2a3xt {
-      padding: 16px;
-    }
-  }
-}
+```text
+@layer umber-components{.umber-1p2a3xt{padding:8px;}}
+@layer umber-components{.umber-1p2a3xt:hover{opacity:0.8;}}
+@layer umber-components{@media (min-width: 40em){.umber-1p2a3xt{padding:16px;}}}
 ```
 
-There is no CSS processor and no build step. The serializer is a function that runs when the page runs, and the rules are inserted with the browser's `insertRule`.
+There is no CSS processor and no build step. The serializer is a function that runs when the page runs. In the browser the rules go into one `<style data-style="<prefix>">` element: outside production each rule is a text node of it, so the element inspector and `textContent` show the live rules; in production they go in with the browser's `insertRule`, which is faster and leaves the text empty. `hasRuleText` decides it either way: see [Options reference](options.md).
+
+## The text of a rule
+
+Every place where the engine gives the text of a rule writes it in one format: the text nodes of the style element, `sheet.rules`, `cache.extract()`, `createStyleTag`, `extractPageStyles`, the chunks and tags of `@umber-style/server`, `onInsert` and the `inserted` of `@umber-style/cache`, the declarations of `readThemeText` and the `styles` of a `css()` value. It is CSS with no space and no newline where CSS needs none:
+
+- A rule is its prelude, then `{`, its declarations, `}`: `.umber-1p2a3xt{padding:8px;}`. Nothing stands between them.
+- A declaration is `name:value;`. Every declaration ends with `;`, the last one too: `.x{border:none;}`. The name is in kebab-case; the value is written as it was given, with its own spaces (`0 1px 2px`, `calc(1px + 2px)`, `rgba(0, 0, 0, 0.5)`), and a number gets its unit (`8px`, `150ms`).
+- A nested selector is a rule of its own, after the rule of the declarations: `.x:hover{opacity:0.8;}`. A selector list is joined by `,` with no space (`html,body`, `.x:hover,.x:focus`); a descendant is one space (`.x p`); the rest of a selector is written as the key gives it (`.x > p`).
+- An at-rule that holds rules is its prelude, then `{`, the rules, `}`: `@media (min-width: 40em){.x{padding:16px;}}`. The prelude is written as the key gives it, spaces included. The engine's own preludes are `@layer <name>`, `@media (prefers-color-scheme: <scheme>)`, `@scope (<start>) to (<limits>)`, `@keyframes <name>` and `@property <name>`.
+- In a cascade layer a rule is wrapped once more: `@layer umber-components{.x{color:red;}}`, `@layer umber-components{@media (min-width: 40em){.x{padding:16px;}}}`. The order statement is `@layer umber-theme,umber-global,umber-components,umber-overrides;`.
+- A `@keyframes` rule holds its steps as rules, by percentage: `@keyframes fade-1acbpvw{0%{opacity:0;}100%{opacity:1;}}`.
+- Rules follow each other with nothing between them, in a style element and in a CSS text of the server.
+
+The examples in these pages are that text, one rule on a line. What a browser gives back for a rule (`sheet.cssRules[0].cssText`) is the browser's own writing of it (`.x { color: red; }` in Chromium and jsdom), not this text.
 
 ## Classes and the cache
 
 A cache turns a style into a class name and inserts the rules once. The class name is `<prefix>-<label>-<hash>`:
 
 - `prefix` is the cache's prefix (`css` by default).
-- `label` is the style's `label`, which `styled` sets from `name` and `slot` (`umber-button-root-15gvy7r`). It is left out without a name, or with `hasLabels: false`.
+- `label` is the style's `label`, which `styled` sets from `name` and `slot` (`umber-button-root-15gvy7r`). It is left out without a name, or with `hasLabels: false`. The labels of merged styles are joined in order (`umber-Typography-Link-3n5swy`): see [Writing styles](writing-styles.md#the-labels-of-merged-styles).
 - `hash` is a hash of the compiled rules. The same style always gives the same class, in the same or another process, so a server and a browser agree on names.
 
 Several styles merge into one class: later keys win, nested objects merge key by key. `cache.css(a, b)` is one class for both.
@@ -89,31 +89,11 @@ The three elements share one base class, and each has a props class of its own:
 <div class="umber-flex-root-182dnr0 umber-flex-root-canzou"></div>
 ```
 
-```css
-@layer umber-components {
-  .umber-flex-root-182dnr0 {
-    display: flex;
-    min-width: 0;
-  }
-}
-@layer umber-components {
-  .umber-flex-root-1o6pbk7 {
-    gap: 4px;
-    flex-direction: row;
-  }
-}
-@layer umber-components {
-  .umber-flex-root-1gb9ruy {
-    gap: 8px;
-    flex-direction: row;
-  }
-}
-@layer umber-components {
-  .umber-flex-root-canzou {
-    gap: 8px;
-    flex-direction: column;
-  }
-}
+```text
+@layer umber-components{.umber-flex-root-182dnr0{display:flex;min-width:0;}}
+@layer umber-components{.umber-flex-root-1o6pbk7{gap:4px;flex-direction:row;}}
+@layer umber-components{.umber-flex-root-1gb9ruy{gap:8px;flex-direction:row;}}
+@layer umber-components{.umber-flex-root-canzou{gap:8px;flex-direction:column;}}
 ```
 
 Without the split (`hasBaseClass: false`) each of the three would be one class with `display: flex; min-width: 0` repeated in it. With many props the saving grows: a layout component with three fixed declarations and six props, rendered with 48 distinct combinations, writes 291 declarations and 7216 bytes of CSS with the split, and 432 declarations and 9388 bytes without it (one more rule, the base; `packages/core/src/measureBase.test.ts` makes this measurement).
@@ -142,12 +122,8 @@ A variable name is `--<prefix>-<path>`, with each path segment in kebab-case. A 
 
 The value goes somewhere else: a theme class. `engine.themeClass(theme)` makes a class that declares the variables with the theme's values:
 
-```css
-.umber-theme-jg3s2a {
-  --umber-palette-primary: #1b5fd1;
-  --umber-space-2: 8px;
-  color-scheme: light;
-}
+```text
+.umber-theme-jg3s2a{--umber-palette-primary:#1b5fd1;--umber-space-2:8px;color-scheme:light;}
 ```
 
 Any element below an element with that class sees the values. The variables a class declares are only the ones some rule uses: see [Tokens](tokens.md).
@@ -182,16 +158,10 @@ const App = () => (
 
 Both tags get `umber-tag-root-n8ncc0`. The sheet holds one component rule and one theme rule for each theme: the outermost provider declares its theme on `:root`, the nested one in the theme class on its wrapper:
 
-```css
-.umber-tag-root-n8ncc0 {
-  color: var(--umber-palette-primary);
-}
-:where(:root) {
-  --umber-palette-primary: #1b5fd1;
-}
-.umber-theme-1an5zox {
-  --umber-palette-primary: #c2410c;
-}
+```text
+.umber-tag-root-n8ncc0{color:var(--umber-palette-primary);}
+:where(:root){--umber-palette-primary:#1b5fd1;}
+.umber-theme-1an5zox{--umber-palette-primary:#c2410c;}
 ```
 
 This is the idea behind the engine:
@@ -212,4 +182,6 @@ The web bindings (`@umber-style/react`, `@umber-style/vue`) use this model. Reac
 - Classes and `@keyframes` rules are never removed from the cache or from the style sheet while the page lives; only global rules are. A style that is built from many different values (a measured number, for example) adds one class and its rules for each value. See [No inline styles](no-inline-styles.md).
 - The base of a component is only as good as the test that a function reads no prop. A prop that is read inside a function that the style returns, or later (a callback), is not seen; a style that reads module state that changes is not pure, and the base would keep its first result for a theme. Style functions are expected to be pure functions of their props and the theme.
 - The first call of a style function for a theme object runs with the wrapped props; later calls for that theme use the plain props. A theme object that is made again on every render (an inline `theme={{ ... }}` on a provider) is a new theme object each time, so each render works the base out again.
+- The text format takes no space out of what you write: the prelude of an at-rule, the parts of a selector and a value keep the spaces they were given. Only the commas of a selector list are rewritten.
+- In the text nodes of a style element the browser drops a rule it rejects when it parses the text, and the text keeps it; `insertRule` throws for it, and the sheet skips it. The text of an element that a server sent is not rewritten: a rule of it that the cache removes (a global rule released, the root rule of the server) leaves the cascade, and stays in that element's text.
 - The serializer's list of properties that take no unit is fixed in the code. A unitless number for a property that is not in the list gets `px`; write it as a string.

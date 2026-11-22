@@ -31,7 +31,7 @@ const night = engine.themeClass(dark, 'dark')
 - `engine.css(...styles)` merges the styles into one class and inserts its rules once. It returns the class name: `button` is `umber-sarboa`.
 - `engine.themeClass(theme, colorScheme?)` makes the class that declares a theme's variables and returns the class string. `light` is `umber-theme-jg3s2a umber-boundary umber-scheme-light` and `night` is `umber-theme-l0twti umber-boundary umber-scheme-dark`. Put one on `document.documentElement`, or on any element, to give everything below it the theme.
 
-Run in a browser, the engine writes into a `<style data-style="umber">` element it creates in the head, with `insertRule`. Run where there is no `document`, it keeps the rules in memory.
+Run in a browser, the engine writes into a `<style data-style="umber">` element it creates in the head: as text nodes outside production, with `insertRule` in production (`hasRuleText`, see [Options reference](options.md)). Run where there is no `document`, it keeps the rules in memory.
 
 ## Sheets
 
@@ -71,41 +71,8 @@ import { createStyleTag } from '@umber-style/core'
 const tag = createStyleTag(engine.cache)
 ```
 
-```html
-<style data-style="umber" data-options="p=umber;x=;l=1;y=1;r=1;b=1;s=1;f=1;t=">
-  @layer umber-theme, umber-global, umber-components, umber-overrides;
-  @layer umber-components {
-    .umber-sarboa {
-      color: var(--umber-palette-primary);
-      padding: var(--umber-space-2);
-    }
-  }
-  @layer umber-components {
-    .umber-sarboa:hover {
-      opacity: 0.8;
-    }
-  }
-  @layer umber-theme {
-    .umber-theme-jg3s2a {
-      --umber-palette-primary: #1b5fd1;
-      --umber-space-2: 8px;
-      color-scheme: light;
-    }
-  }
-  @layer umber-theme {
-    .umber-theme-l0twti {
-      --umber-palette-primary: #8ab4ff;
-      color-scheme: dark;
-    }
-  }
-  @layer umber-components {
-    .umber-1ntlncu {
-      padding: var(--umber-space-2);
-      color: var(--umber-palette-primary);
-      opacity: 0.9;
-    }
-  }
-</style>
+```text
+<style data-style="umber" data-options="p=umber;x=;l=1;y=1;r=1;b=1;s=1;f=1;t=">@layer umber-theme,umber-global,umber-components,umber-overrides;@layer umber-components{.umber-sarboa{color:var(--umber-palette-primary);padding:var(--umber-space-2);}}@layer umber-components{.umber-sarboa:hover{opacity:0.8;}}@layer umber-theme{.umber-theme-jg3s2a{--umber-palette-primary:#1b5fd1;--umber-space-2:8px;color-scheme:light;}}@layer umber-theme{.umber-theme-l0twti{--umber-palette-primary:#8ab4ff;color-scheme:dark;}}@layer umber-components{.umber-1ntlncu{padding:var(--umber-space-2);color:var(--umber-palette-primary);opacity:0.9;}}</style>
 ```
 
 `cache.extract()` returns the same as `{ css, ids }`. `data-options` is the stamp of the options of the cache: a cache made later in a browser compares it with its own and throws one error that names the options that differ. The browser finds out which rules are already there by reading them, not from a list. See [Server rendering](server-rendering.md).
@@ -169,25 +136,27 @@ const class1 = engine.css({ color: engine.refs.palette.primary }) // 'umber-n8nc
 
 ## What an engine has
 
-| Member                                            | What it does                                                                                               |
-| ------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| `cache`                                           | The cache                                                                                                  |
-| `hasTheme`, `baseTheme`                           | Whether there is a base theme, and what it is                                                              |
-| `refs`                                            | The base theme as references. Throws before there is a theme                                               |
-| `setTheme(theme)`                                 | Gives the engine its base theme                                                                            |
-| `createThemeView(realTheme)`                      | The view of a real theme: references for tokens, real values for the rest. Made once for each theme object |
-| `css(...values)`                                  | One class for style objects, sheet entries and class names the cache made                                  |
-| `themeClass(theme, colorScheme?)`                 | The theme class string: theme class, boundary marker and scheme marker                                     |
-| `themeId(theme, colorScheme?)`                    | The theme class alone, which rules and style elements are keyed by                                         |
-| `findThemeIds(theme)`                             | The theme classes already made for a theme object, without making any                                      |
-| `when(theme, colorScheme?)`, `whenScheme(scheme)` | Keys for [theme conditions](theme-conditions.md)                                                           |
-| `scopeClass()`                                    | The class of the `display: contents` wrapper a provider renders, made once                                 |
-| `createSheet(styles)`                             | The entries of an object of styles, or a sheet for a function of the theme, as above                       |
-| `createStyler(options, styles, inherited?)`       | What every web `styled` shares: the label, the style list, the base and props classes and the class memo   |
-| `keyframes(steps, options?)`                      | Registers an animation and returns its name; the same as `keyframes` of the core, typed by the theme       |
-| `insertKeyframes(name)`                           | Writes the `@keyframes` rule of a name now, for a use the engine cannot see in a class                     |
-| `insertGlobal(styles, theme?)`                    | Writes global styles into the `global` layer and returns the function that releases them                   |
-| `resolveGlobal(styles, theme?)`                   | The sets of rules of global styles, `{ id, rules, animations }`, without writing them                      |
+| Member                                            | What it does                                                                                                                       |
+| ------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `cache`                                           | The cache                                                                                                                          |
+| `hasTheme`, `baseTheme`                           | Whether there is a base theme, and what it is: given, or adopted from the first `themeClass` or provider                           |
+| `givenTheme`                                      | The base theme given on purpose (`createEngine(theme)`, `setTheme`), or undefined: what a binding reads where no provider is above |
+| `refs`                                            | The base theme as references. Throws before there is a theme                                                                       |
+| `setTheme(theme)`                                 | Gives the engine its base theme, on purpose                                                                                        |
+| `adoptTheme(theme)`                               | Gives the engine a base theme for its shape when it has none, not as a given one: what the first provider does                     |
+| `createThemeView(realTheme)`                      | The view of a real theme: references for tokens, real values for the rest. Made once for each theme object                         |
+| `css(...values)`                                  | One class for style objects, sheet entries and class names the cache made                                                          |
+| `themeClass(theme, colorScheme?)`                 | The theme class string: theme class, boundary marker and scheme marker                                                             |
+| `themeId(theme, colorScheme?)`                    | The theme class alone, which rules and style elements are keyed by                                                                 |
+| `findThemeIds(theme)`                             | The theme classes already made for a theme object, without making any                                                              |
+| `when(theme, colorScheme?)`, `whenScheme(scheme)` | Keys for [theme conditions](theme-conditions.md)                                                                                   |
+| `scopeClass()`                                    | The class of the `display: contents` wrapper a provider renders, made once                                                         |
+| `createSheet(styles)`                             | The entries of an object of styles, or a sheet for a function of the theme, as above                                               |
+| `createStyler(options, styles, inherited?)`       | What every web `styled` shares: the label, the style list, the base and props classes and the class memo                           |
+| `keyframes(steps, options?)`                      | Registers an animation and returns its name; the same as `keyframes` of the core, typed by the theme                               |
+| `insertKeyframes(name)`                           | Writes the `@keyframes` rule of a name now, for a use the engine cannot see in a class                                             |
+| `insertGlobal(styles, theme?)`                    | Writes global styles into the `global` layer and returns the function that releases them                                           |
+| `resolveGlobal(styles, theme?)`                   | The sets of rules of global styles, `{ id, rules, animations }`, without writing them                                              |
 
 ## Everything `@umber-style/core` exports
 

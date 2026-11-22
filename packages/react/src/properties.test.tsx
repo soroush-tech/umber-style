@@ -50,43 +50,50 @@ describe('the options of the engine in the client build', () => {
 })
 
 describe('registered properties and a classic server render', () => {
-  it('are in the style element, and the client inserts none of them again', () => {
-    const make = (cache?: ReturnType<typeof createCache>) =>
-      bindEngine(
-        createEngine(theme, {
-          prefix: 'h',
-          registered: { 'palette.primary': true },
-          ...(cache ? { cache } : {}),
-        })
+  it.each([true, false])(
+    'are in the style element, and the client inserts none of them again, hasRuleText %s',
+    (hasRuleText) => {
+      const make = (cache?: ReturnType<typeof createCache>) =>
+        bindEngine(
+          createEngine(theme, {
+            prefix: 'h',
+            registered: { 'palette.primary': true },
+            hasRuleText,
+            ...(cache ? { cache } : {}),
+          })
+        )
+      // The cache that an engine is given does not know the token options of that engine: it is given the
+      // signature that the engine makes for its own cache, so that the stamp of the server is the same.
+      const signature = make().cache.fingerprint.split(';').at(-1)?.slice(2)
+      document.head.innerHTML = ''
+      const server = make(
+        createCache({ prefix: 'h', tokenSignature: signature, sheet: createMemorySheet() })
       )
-    // The cache that an engine is given does not know the token options of that engine: it is given the
-    // signature that the engine makes for its own cache, so that the stamp of the server is the same.
-    const signature = make().cache.fingerprint.split(';').at(-1)?.slice(2)
-    document.head.innerHTML = ''
-    const server = make(
-      createCache({ prefix: 'h', tokenSignature: signature, sheet: createMemorySheet() })
-    )
-    const Box = server.styled('div')(({ theme: view }) => ({ color: view.palette.primary }))
-    const { container } = render(
-      <server.ThemeProvider theme={theme}>
-        <Box />
-      </server.ThemeProvider>
-    )
-    const tag = createStyleTag(server.cache)
-    expect(tag).toContain(PRIMARY)
-    container.remove()
+      const Box = server.styled('div')(({ theme: view }) => ({ color: view.palette.primary }))
+      const { container } = render(
+        <server.ThemeProvider theme={theme}>
+          <Box />
+        </server.ThemeProvider>
+      )
+      const tag = createStyleTag(server.cache)
+      expect(tag).toContain(PRIMARY)
+      container.remove()
 
-    document.head.innerHTML = tag
-    const element = document.querySelector('style[data-style="h"]') as HTMLStyleElement
-    const before = element.sheet?.cssRules.length
-    const client = make()
-    const Again = client.styled('div')(({ theme: view }) => ({ color: view.palette.primary }))
-    render(
-      <client.ThemeProvider theme={theme}>
-        <Again />
-      </client.ThemeProvider>
-    )
-    expect(before).toBeGreaterThan(2)
-    expect(element.sheet?.cssRules.length).toBe(before)
-  })
+      document.head.innerHTML = tag
+      const readCount = () =>
+        [...document.querySelectorAll<HTMLStyleElement>('style[data-style="h"]')].flatMap(
+          (element) => [...(element.sheet?.cssRules ?? [])]
+        ).length
+      const before = readCount()
+      const client = make()
+      const Again = client.styled('div')(({ theme: view }) => ({ color: view.palette.primary }))
+      render(
+        <client.ThemeProvider theme={theme}>
+          <Again />
+        </client.ThemeProvider>
+      )
+      expect(before).toBeGreaterThan(2)
+      expect(readCount()).toBe(before)
+    }
+  )
 })

@@ -16,34 +16,55 @@ export function isDevelopment(): boolean {
   }
 }
 
+/** Whether this is a production build: `process.env.NODE_ENV` is `production`. Where `process` does not exist (a browser, no bundler) it is taken as one. */
+export function isProduction(): boolean {
+  try {
+    return process.env.NODE_ENV === 'production'
+  } catch {
+    return true
+  }
+}
+
+/** A function that warns `message` with the prefix in front, once for each `key`: the same problem is never warned about twice. */
+export function createWarner(prefix: string): (key: string, message: string) => void {
+  const warned = new Set<string>()
+  return (key, message) => {
+    if (warned.has(key)) return
+    warned.add(key)
+    console.warn(`[${prefix}] ${message}`)
+  }
+}
+
 /**
  * The function that asks for a check of `page` (the document by default): it runs `findMissingStyles` once, after the calls
  * have stopped for a short while, and warns once for each problem (never again for the same one). The
  * rules given to it are asked about in the same run: a declaration that the browser does not support
  * (`findUnsupportedDeclarations`) is warned about once for each message. Where the browser cannot be
- * asked (no `CSS.supports`, or jsdom) the rules are not kept.
+ * asked (no `CSS.supports`, or jsdom) the rules are not kept. `readLabel` gives the label of a class, which
+ * a message names.
  */
 export function createDevChecker(
   prefix: string,
   delay = CHECK_DELAY,
-  page: Document = document
+  page: Document = document,
+  readLabel: (className: string) => string = () => ''
 ): (rules?: readonly string[]) => void {
-  const warned = new Set<string>()
   const supports = findBrowserSupports()
   const written: string[] = []
   let timer: ReturnType<typeof setTimeout> | undefined
-  const warn = (key: string, message: string): void => {
-    if (warned.has(key)) return
-    warned.add(key)
-    console.warn(`[${prefix}] ${message}`)
-  }
+  const warn = createWarner(prefix)
   const run = (): void => {
     timer = undefined
     for (const problem of findMissingStyles(page, { prefix })) {
       warn(problem.key, problem.message)
     }
     if (!supports) return
-    for (const message of findUnsupportedDeclarations(written.splice(0), prefix, supports)) {
+    for (const message of findUnsupportedDeclarations(
+      written.splice(0),
+      prefix,
+      supports,
+      readLabel
+    )) {
       warn(`declaration:${message}`, message)
     }
   }

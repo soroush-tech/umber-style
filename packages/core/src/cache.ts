@@ -1,6 +1,8 @@
 import { registerCache } from './cacheRegistry'
 import { hashString } from './hash'
-import { createDevChecker, isDevelopment } from './devChecks'
+import { createDevChecker, createWarner, isDevelopment, isProduction } from './devChecks'
+import { findInvalidValues } from './findInvalidValues'
+import { describeClass } from './findUnsupportedDeclarations'
 import { createFingerprint, describeFingerprintDifferences } from './fingerprint'
 import { compileGlobalRules, type GlobalStyleObject } from './globalStyles'
 import { createKeyframesRule, findAnimationNames, isKeyframesName } from './keyframes'
@@ -8,6 +10,7 @@ import { scanStyleText, type StyleFindings } from './scanStyleText'
 import {
   createSheetEntry,
   isSheetEntry,
+  readEntryStyle,
   readEntrySource,
   type EntryRole,
   type EntrySource,
@@ -61,14 +64,22 @@ export interface CacheOptions {
    */
   hasBaseClass?: boolean
   /**
-   * Whether the cache checks the page while it runs in a browser, and warns once for each problem found
-   * (`findMissingStyles`: an engine class that has no rule, a variable that has no value; `CSS.supports`: an inserted declaration that the browser does not support), throttled,
-   * after the first render and when rules are inserted. Default: on in development (`process.env.NODE_ENV`
-   * is not `production`), off in production, and off where there is no `document`.
+   * Whether the cache runs the development checks, and warns once for each problem found: in a browser it
+   * checks the page (`findMissingStyles`: an engine class that has no rule, a variable that has no value;
+   * `CSS.supports`: an inserted declaration that the browser does not support), throttled, after the first
+   * render and when rules are inserted; anywhere, it checks each value of a class or of global styles that
+   * no CSS property takes (`findInvalidValues`). Default: on in development (`process.env.NODE_ENV` is
+   * `development`) where there is a `document`, off otherwise; `true` turns them on in a test run too.
    */
   hasDevChecks?: boolean
   /** A short text that stands for the token options (modes, raw and length keys, registered tokens), for the stamp that the server writes and the browser compares. The engine gives it; '' when none. */
   tokenSignature?: string
+  /**
+   * Whether the DOM sheet that the cache makes writes each rule as a text node of its style element,
+   * readable through `textContent`, rather than with `insertRule` (see `DomSheetOptions`). Default: on
+   * when `process.env.NODE_ENV` is not `production`. Not read when a `sheet` is given.
+   */
+  hasRuleText?: boolean
   /** Where rules go. Default: a DOM sheet when `document` exists, otherwise an in-memory one. */
   sheet?: Sheet
   /**
@@ -129,7 +140,7 @@ export interface Sheet {
   insert(rule: string): void
   /** Every rule inserted so far and not removed, in order. */
   readonly rules: readonly string[]
-  /** Replaces the rule inserted at `index` of `rules`; a sheet that cannot (a browser one) has none, and the cache appends instead. */
+  /** Replaces the rule inserted at `index` of `rules`; a sheet that cannot (a DOM sheet, in either way of writing) has none, and the cache appends instead. */
   replace?(index: number, rule: string): void
   /**
    * Removes the rule at `index` of `rules`: the rules after it move down by one, in `rules` and in what
@@ -182,7 +193,7 @@ export type ClassValue =
 export interface ClassOptions {
   /** The layer of the class. Default `components`. */
   layer?: ClassLayer
-  /** A label for the class; it wins over the labels of the values. */
+  /** A label for the class, written first: the labels of the values are joined after it (`Typography-Link`). */
   label?: string
   /**
    * A class of this cache that is written before this one, and that this one is only used with (the base
@@ -217,8 +228,9 @@ export interface Cache {
   readonly registered: ReadonlyMap<string, StyleObject>
   /**
    * One class for all of `values`: style objects, and class names this cache made (resolved back
-   * to their styles), merged left to right so the last wins. Other class names pass through in
-   * front of it. Returns '' when there is nothing. The class is in the `components` layer.
+   * to their styles), merged left to right so the last wins; their labels are joined in that order
+   * (see `mergeStyles`). Other class names pass through in front of it. Returns '' when there is
+   * nothing. The class is in the `components` layer.
    */
   css(...values: ClassValue[]): string
   /** `css`, with the layer of the class given: `overrides` for what a component is given from outside. */
@@ -258,6 +270,8 @@ export interface Cache {
   adoptEntry(entry: SheetEntry): SheetEntry
   /** Whether a component's styles are split into a base class and a props class. */
   readonly hasBaseClass: boolean
+  /** Whether the development checks are on: given, or by default in development where there is a document. An engine checks what its style functions return when they are. */
+  readonly hasDevChecks: boolean
   /**
    * Inserts `rules` once under `id`; returns whether it inserted them. With a `layer` (and layers on)
    * each rule is wrapped in it. Without one the rules are written as they are, outside every layer:
@@ -404,21 +418,76 @@ function deleteCssRule(rule: CSSRule): void {
   if (parent) parent.deleteRule(Array.prototype.indexOf.call(parent.cssRules, rule))
 }
 
+/** How `createDomSheet` writes its rules. */
+export interface DomSheetOptions {
+  /**
+   * Whether each rule is written as a text node of the style element, so that the element's
+   * `textContent` (and the element inspector) shows the live rules, rather than with `insertRule`,
+   * which is faster and leaves the text empty. Default: on when `process.env.NODE_ENV` is not
+   * `production`, off in production and where there is no `process`.
+   */
+  hasRuleText?: boolean
+}
+
+// How each style element of the engine is written: by text nodes or by `insertRule`, never both, because
+// a change of the text of an element parses it again and drops what `insertRule` put in. The text nodes
+// that sheets wrote are kept apart from the text that a server sent, which the cache reads.
+const elementModes = new WeakMap<Node, 'text' | 'rules'>()
+const writtenText = new WeakSet<Node>()
+
+/** The text of a style element that no sheet of the engine wrote: what a server or a framework sent. */
+function readSentText(element: Element): string {
+  let text = ''
+  for (const node of element.childNodes) if (!writtenText.has(node)) text += node.textContent
+  return text
+}
+
 /**
- * A sheet in the style element marked `data-style="<key>"` of the document of `container`, which it
- * creates in `container` when that document has none. It keeps the browser's object of each rule it
- * inserts, and removes a rule by finding where that object is at the time, so rules that others insert
- * into or delete from the element do not confuse it. Its `document` is that document: a cache over it
- * reads that one (an iframe's, for a container in the iframe).
+ * The style element `data-style="<key>"` of `owner` that a sheet written as `mode` may use: for text,
+ * one that holds no text but its own (an element a server filled is left to the server's rules); for
+ * `insertRule`, any that is not written by text.
  */
-export function createDomSheet(key: string, container: Node = document.head): Sheet {
-  const owner = container.ownerDocument as Document
-  let element = owner.querySelector<HTMLStyleElement>(`style[data-style="${key}"]`)
-  if (!element) {
-    element = owner.createElement('style')
-    element.dataset.style = key
-    container.appendChild(element)
+function findSheetElement(
+  owner: Document,
+  key: string,
+  mode: 'text' | 'rules'
+): HTMLStyleElement | undefined {
+  return [...owner.querySelectorAll<HTMLStyleElement>(`style[data-style="${key}"]`)].find(
+    (element) => {
+      const used = elementModes.get(element)
+      if (mode === 'rules') return used !== 'text'
+      return used === 'text' || (used === undefined && element.childNodes.length === 0)
+    }
+  )
+}
+
+/**
+ * A sheet that writes each rule as a text node of `element`: removing a rule removes its node, so the
+ * text is always the live rules. It has no `replace`, as a sheet of `insertRule` has none, so that a cache
+ * writes the same rules in both ways.
+ */
+function createTextSheet(element: HTMLStyleElement, owner: Document): Sheet {
+  const rules: string[] = []
+  const nodes: Text[] = []
+  return {
+    rules,
+    document: owner,
+    insert(rule) {
+      const node = owner.createTextNode(rule)
+      writtenText.add(node)
+      element.appendChild(node)
+      nodes.push(node)
+      rules.push(rule)
+    },
+    remove(index) {
+      rules.splice(index, 1)
+      nodes.splice(index, 1)[0].remove()
+    },
   }
+}
+
+/** A sheet that writes with `insertRule`: it keeps the browser's object of each rule, and removes a rule by finding where that object is at the time. */
+function createRuleSheet(element: HTMLStyleElement, owner: Document): Sheet {
   const sheet = element.sheet as CSSStyleSheet
   const rules: string[] = []
   const objects: CSSRule[] = []
@@ -439,6 +508,33 @@ export function createDomSheet(key: string, container: Node = document.head): Sh
       deleteCssRule(objects.splice(index, 1)[0])
     },
   }
+}
+
+/**
+ * A sheet in the style element marked `data-style="<key>"` of the document of `container`, which it
+ * creates in `container` when that document has none it may use (see `DomSheetOptions`). With
+ * `hasRuleText` each rule is a text node of the element, kept as it is given (the browser drops a rule
+ * it rejects when it parses the text); without it a rule goes in with `insertRule`, and one the browser
+ * rejects is skipped. Rules that
+ * others insert into or delete from the element do not confuse it. Its `document` is that document: a
+ * cache over it reads that one (an iframe's, for a container in the iframe).
+ */
+export function createDomSheet(
+  key: string,
+  container: Node = document.head,
+  options: DomSheetOptions = {}
+): Sheet {
+  const { hasRuleText = !isProduction() } = options
+  const mode = hasRuleText ? 'text' : 'rules'
+  const owner = container.ownerDocument as Document
+  let element = findSheetElement(owner, key, mode)
+  if (!element) {
+    element = owner.createElement('style')
+    element.dataset.style = key
+    container.appendChild(element)
+  }
+  elementModes.set(element, mode)
+  return hasRuleText ? createTextSheet(element, owner) : createRuleSheet(element, owner)
 }
 
 /**
@@ -476,6 +572,15 @@ function sortClassNames(
     if (style) styles.push(style)
     else rawClasses.push(name)
   }
+}
+
+/**
+ * The CSS text of the style of an entry from its rules compiled for `&`: the body of the rule of its
+ * declarations, then the other rules as they are (`&:hover{...}`, `@media (...){&{...}}`).
+ */
+function toEntryStyles(rules: readonly string[]): string {
+  const [first = '', ...rest] = rules
+  return first.startsWith('&{') ? first.slice(2, -1) + rest.join('') : rules.join('')
 }
 
 /** Orders distinct strings by UTF-16 code unit, what a sort without a compare function does. */
@@ -574,6 +679,29 @@ function sortClassValues(
   return sorted
 }
 
+/** The document a cache serves: that of its sheet, else the global one where there is one. */
+function readPage(options: CacheOptions): Document | undefined {
+  if (options.sheet?.document) return options.sheet.document
+  return typeof document === 'undefined' ? undefined : document
+}
+
+/** Throws when the page was written by a server whose engine was set up differently: its stamp says how. */
+function assertServerStamp(page: Document, prefix: string, fingerprint: string): void {
+  const stamp = readServerStamp(page, prefix)
+  if (stamp === undefined) return
+  const difference = describeFingerprintDifferences(stamp, fingerprint)
+  if (difference !== '') throw new Error(difference)
+}
+
+/** The sheet a cache makes for itself: in the head of its page, else in memory. */
+function createOwnSheet(
+  prefix: string,
+  page: Document | undefined,
+  hasRuleText: boolean | undefined
+): Sheet {
+  return page ? createDomSheet(prefix, page.head, { hasRuleText }) : createMemorySheet()
+}
+
 /** Makes a cache: it turns styles into classes and inserts each class's rules once. */
 export function createCache(options: CacheOptions = {}): Cache {
   const {
@@ -602,16 +730,22 @@ export function createCache(options: CacheOptions = {}): Cache {
     hasValueRepair,
     tokens: options.tokenSignature ?? '',
   })
-  // The document the cache serves: that of its sheet, else the global one where there is one.
-  const page: Document | undefined =
-    options.sheet?.document ?? (typeof document === 'undefined' ? undefined : document)
-  if (page) {
-    const stamp = readServerStamp(page, prefix)
-    const difference = stamp === undefined ? '' : describeFingerprintDifferences(stamp, fingerprint)
-    if (difference !== '') throw new Error(difference)
-  }
+  const page = readPage(options)
+  if (page) assertServerStamp(page, prefix, fingerprint)
   const { hasDevChecks = page !== undefined && isDevelopment() } = options
-  const checkLater = hasDevChecks ? createDevChecker(prefix, undefined, page) : undefined
+  // The label of a class, for a message: the label of the style it was made from.
+  const readClassLabel = (className: string): string => readLabel(registered.get(className) ?? {})
+  // The page is checked where there is one; a value is checked without one too (a test, a server).
+  const checkLater =
+    hasDevChecks && page ? createDevChecker(prefix, undefined, page, readClassLabel) : undefined
+  const warnValue = hasDevChecks ? createWarner(prefix) : undefined
+  /** Warns about each value of `style` that no CSS property takes, named by `owner`. */
+  const reportValues = (owner: string, style: StyleObject): void => {
+    for (const { key, kind } of findInvalidValues(style)) {
+      const message = `${owner} declares "${key}" as ${kind}, which is never a CSS value: give a string or a number.`
+      ;(warnValue as (key: string, message: string) => void)(message, message)
+    }
+  }
   // The ids of what is written, or was found on the page: class names, the layer order, `@property` rules.
   const insertedIds = new Set<string>()
   const used = new Set<string>()
@@ -621,7 +755,7 @@ export function createCache(options: CacheOptions = {}): Cache {
   const pageThemes = new Map<string, Set<string>>()
   // The class a props class was made after (its base class), by class name.
   const afters = new Map<string, string>()
-  const sheet = options.sheet ?? (page ? createDomSheet(prefix, page.head) : createMemorySheet())
+  const sheet = options.sheet ?? createOwnSheet(prefix, page, options.hasRuleText)
   const registered = new Map<string, StyleObject>()
   const entries = new Map<string, SheetEntry>()
   const scoping = { prefix, hasScope }
@@ -933,9 +1067,20 @@ export function createCache(options: CacheOptions = {}): Cache {
 
   const compileGlobal = (styles: GlobalStyleObject): GlobalRules => {
     const flat = compileGlobalRules(styles, hasColorFallbacks, scoping, hasValueRepair)
+    if (warnValue) reportGlobalValues(styles)
     const rules = wrapInLayer(flat, 'global')
     const id = `${prefix}-global-${hashString(rules.join(''))}`
     return { id, rules, animations: findAnimationNames(flat) }
+  }
+
+  /** Warns about the values of global styles that no CSS property takes, named by the key they are under (as the browser check names a global rule). */
+  const reportGlobalValues = (styles: GlobalStyleObject): void => {
+    for (const [key, value] of Object.entries(styles)) {
+      for (const item of Array.isArray(value) ? value : [value]) {
+        const style = readEntryStyle(item, 'globalStyles') as StyleObject | null | undefined | false
+        if (style) reportValues(`the global rule ${key}`, style)
+      }
+    }
   }
 
   /** Whether the page has every one of `rules`, not taken by another set. */
@@ -1049,7 +1194,7 @@ export function createCache(options: CacheOptions = {}): Cache {
     return [prefix, label, hash].filter(Boolean).join('-') + suffix
   }
 
-  /** The merged style of `styles` (the label last) and the name of its class; undefined when it has no rule. */
+  /** The merged style of `styles` (the label first) and the name of its class; undefined when it has no rule. */
   const prepareClass = (
     layer: ClassLayer,
     label: string | undefined,
@@ -1057,15 +1202,17 @@ export function createCache(options: CacheOptions = {}): Cache {
     styles: readonly StyleObject[]
   ): { merged: StyleObject; className: string } | undefined => {
     if (styles.length === 0) return undefined
-    const merged = mergeStyles(label ? [...styles, { label }] : styles)
+    const merged = mergeStyles(label ? [{ label }, ...styles] : styles)
     const rules = compileRules('&', merged, hasColorFallbacks, scoping, hasValueRepair)
     if (rules.length === 0) return undefined
     return { merged, className: nameClass(layer, merged, rules, after) }
   }
 
-  /** The rules of the class `className` with the style `merged`. */
-  const compileClass = (className: string, merged: StyleObject): readonly string[] =>
-    compileRules(`.${className}`, merged, hasColorFallbacks, scoping, hasValueRepair)
+  /** The rules of the class `className` with the style `merged`; with the development checks, its values are checked first. */
+  const compileClass = (className: string, merged: StyleObject): readonly string[] => {
+    if (warnValue) reportValues(describeClass(className, readLabel(merged)), merged)
+    return compileRules(`.${className}`, merged, hasColorFallbacks, scoping, hasValueRepair)
+  }
 
   const cssWith = (options: ClassOptions, ...values: ClassValue[]): string => {
     const { layer = 'components', label, after = '' } = options
@@ -1209,6 +1356,7 @@ export function createCache(options: CacheOptions = {}): Cache {
         }
         return name
       },
+      readStyles: () => toEntryStyles(rules),
     }
     const entry = createSheetEntry(getRoleName('components'), source)
     entries.set(getRoleName('components'), entry)
@@ -1258,7 +1406,7 @@ export function createCache(options: CacheOptions = {}): Cache {
       // revealed, and is then moved to the head, which parses its rules again: it is read there.
       if (scanned.has(element) || element.getAttribute('media') === 'not all') return
       scanned.add(element)
-      const found = scanStyleText(prefix, element.textContent as string)
+      const found = scanStyleText(prefix, readSentText(element))
       absorb(found)
       // The rules of the text are those of the element's sheet, in order, when the browser kept them all.
       const list = (element as HTMLStyleElement).sheet?.cssRules
@@ -1419,6 +1567,7 @@ export function createCache(options: CacheOptions = {}): Cache {
     findEntry: (className) => entries.get(className),
     adoptEntry,
     hasBaseClass,
+    hasDevChecks,
     hasScope,
     hasPruning,
     usedVariables: used,

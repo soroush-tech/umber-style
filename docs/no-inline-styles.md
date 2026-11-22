@@ -32,27 +32,11 @@ const App = () => (
 <div class="umber-bar-root-1vrm674 umber-bar-root-tyce6a"></div>
 ```
 
-```css
-@layer umber-components {
-  .umber-bar-root-1vrm674 {
-    height: 4px;
-  }
-}
-@layer umber-overrides {
-  .umber-bar-root-qd9pgc {
-    width: 10px;
-  }
-}
-@layer umber-overrides {
-  .umber-bar-root-18oqfqd {
-    width: 20px;
-  }
-}
-@layer umber-overrides {
-  .umber-bar-root-tyce6a {
-    width: 30px;
-  }
-}
+```text
+@layer umber-components{.umber-bar-root-1vrm674{height:4px;}}
+@layer umber-overrides{.umber-bar-root-qd9pgc{width:10px;}}
+@layer umber-overrides{.umber-bar-root-18oqfqd{width:20px;}}
+@layer umber-overrides{.umber-bar-root-tyce6a{width:30px;}}
 ```
 
 React Native is unchanged: a style object is how it works there, and there is no attribute to avoid.
@@ -85,13 +69,13 @@ An object you give to the `style` of a plain element yourself is React's own, an
 
 With no style attributes, a policy with `style-src` that forbids inline style attributes is satisfied by what the engine renders. The engine still inserts CSS in `<style>` elements:
 
-- the element that the cache makes in the browser, with `data-style="<prefix>"`, to which rules are added with `insertRule`;
+- the element that the cache makes in the browser, with `data-style="<prefix>"`, to which rules are added as text nodes outside production and with `insertRule` in production;
 - the element that `createStyleTag` writes for a static page or a classic server render, which has its CSS as text;
 - the `<style href precedence>` elements of the server components build, which have their CSS as text.
 
 A policy that blocks inline `<style>` elements needs a nonce or a hash for the ones that have text. **There is no nonce option today**: not in the cache, in `createDomSheet`, in `createStyleTag` or in the server components build. That is a gap. A `createStyleTag` element can have a nonce added to the string by your own code, since it is a string; the cache's own element and the server components elements cannot.
 
-How a browser treats a style element that a script creates empty and fills with `insertRule` under a given policy was not tested. It is browser behaviour.
+How a browser treats a style element that a script creates empty and fills with `insertRule` or with text nodes under a given policy was not tested. It is browser behaviour.
 
 The head script that applies a stored theme (see [The root theme and switching](root-theme.md)) is an inline script: it needs a nonce or a hash for `script-src`.
 

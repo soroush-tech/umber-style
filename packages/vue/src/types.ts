@@ -48,6 +48,7 @@ export type {
   SchemeName,
   SheetEntry,
   StyleObject,
+  StyleTypeOptions,
   ThemeInput,
   ThemeKey,
   WebNested,

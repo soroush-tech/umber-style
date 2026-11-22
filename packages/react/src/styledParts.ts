@@ -30,9 +30,12 @@ export function prepareStyled<T>(
 ) {
   const inner = isStyledComponent(tag) ? tag : undefined
   const baseTag = inner?._tag ?? tag
-  // `as` replaces a string tag. Any other component is always rendered, and `as` is one of its props.
-  const isTag = typeof baseTag === 'string'
   const shouldForward = options.shouldForwardProp ?? inner?._shouldForwardProp
+  // `as` replaces the base unless the filter forwards it. A string tag is always replaced: its default
+  // filter does not forward `as`, and a filter given for it is not asked. A component's default forwards
+  // every prop, so it is replaced only by a filter that keeps `as` off.
+  const isReplaced =
+    typeof baseTag === 'string' || (shouldForward !== undefined && !shouldForward('as'))
   const target = [inner?._target, options.target].filter(Boolean).join(' ') || undefined
   const styler = engine.createStyler(options, styles, inner?._styles)
   // The styler of the engine over each other cache (a cache provider's), made on first use.
@@ -62,13 +65,13 @@ export function prepareStyled<T>(
     const held = canHold && props.style ? own.getHeldClass(props, extra, theme) : undefined
     let className = held ? held.className : own.getClassName(props, extra, theme)
     if (target) className = className ? `${className} ${target}` : target
-    const element = isTag ? ((props.as as ElementType | undefined) ?? baseTag) : baseTag
+    const element = isReplaced ? ((props.as as ElementType | undefined) ?? baseTag) : baseTag
     const filter = readFilter(element, shouldForward)
 
     const forwarded: Record<string, unknown> = {}
     for (const [key, value] of Object.entries(props)) {
       const isOwn =
-        (isTag && key === 'as') || key === 'theme' || key === 'className' || key === 'style'
+        (isReplaced && key === 'as') || key === 'theme' || key === 'className' || key === 'style'
       if (!isOwn && (!filter || filter(key))) forwarded[key] = value
     }
     forwarded.className = className || undefined

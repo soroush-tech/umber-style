@@ -47,7 +47,8 @@ export interface ThemeProviderParts<T> {
  * - The outermost provider (none above it) renders no element: its theme is declared on `:root`, written
  *   in an insertion effect in the browser (so a change of theme rewrites that rule and renders no styled
  *   component) and during the render where there is no document (a server render). It gives the engine
- *   its base theme when it has none.
+ *   the shape of its tokens when it has none (`adoptTheme`), which is not a base theme that a tree with no
+ *   provider reads.
  * - A nested provider renders its wrapper: the theme class of the theme it was given (with the boundary
  *   and scheme markers that conditions use), the theme class of its merged theme (every variable, so that
  *   it is right where its element is not inside the wrapper of the provider above, in a portal), and the
@@ -87,15 +88,16 @@ export function createThemeProvider<T extends object>({
     // A provider of another cache is not of this engine: with none of this one above, it starts its own.
     const key = readMarkKey(baseEngine, cache)
     const above = marks.get(key)
-    const outer = useContext(ThemeContext) ?? engine.baseTheme
+    const outer = useContext(ThemeContext) ?? engine.givenTheme
     const isOutermost = above === undefined && !isRoot
     const isNested = above !== undefined && !isRoot
     const given = useMemo(
       () => resolveThemeInput(theme as ThemeInput<T>, outer ?? (EMPTY_THEME as T)),
       [theme, outer]
     )
-    // The first provider gives the engine its base theme, before its children render.
-    if (!engine.hasTheme) engine.setTheme(given as T)
+    // The first provider gives the engine the shape of its tokens, before its children render. It is not
+    // a given base theme: what has no provider above never reads it.
+    engine.adoptTheme(given as T)
     const merged = useMemo(() => mergeTheme(outer, given), [outer, given])
     const wrapper = useMemo((): ThemeScopeValue | undefined => {
       if (!isNested) return undefined

@@ -92,4 +92,13 @@ describe('a server ThemeProvider with isRoot and a color scheme of its own', () 
     )
     expect(findAll(some, 'style')).toHaveLength(2)
   })
+
+  it('gives server components no base theme from a themeClass call: only a theme given on purpose is it', () => {
+    const { themeClass, readTheme, engine } = setupRoot()
+    themeClass(theme, 'light')
+    expect(engine.baseTheme).toBe(theme)
+    expect(readTheme()).toEqual({})
+    engine.setTheme(theme)
+    expect(readTheme()).toBe(theme)
+  })
 })

@@ -23,10 +23,10 @@ export function readMarkKey(
   return cache === undefined || cache === engine.cache ? engine.cache.prefix : cache
 }
 
-/** What the hooks read where no provider is above: the base theme of the engine, or nothing. */
+/** What the hooks read where no provider is above: the base theme given to the engine, or nothing. */
 export type ThemeHolder<T> = Pick<
   Engine<T>,
-  'cache' | 'baseTheme' | 'createThemeView' | 'withCache'
+  'cache' | 'givenTheme' | 'createThemeView' | 'withCache'
 >
 
 /** The hooks of one style, and `ThemeScope`, over its contexts. */
@@ -34,10 +34,13 @@ export function createThemeValue<T extends object>(
   holder: ThemeHolder<T>,
   { ThemeContext, ViewContext }: ThemeContexts<T>
 ) {
-  /** The theme where no provider is above: the base theme, or the empty theme. */
-  const readOwnTheme = () => holder.baseTheme ?? (EMPTY_THEME as T)
+  /**
+   * The theme where no provider is above: the base theme given on purpose, or the empty theme. A theme
+   * that a provider gave the engine (`adoptTheme`) is not it: it would outlive that provider.
+   */
+  const readOwnTheme = () => holder.givenTheme ?? (EMPTY_THEME as T)
 
-  /** The real theme of the nearest provider, the base theme, or an empty object. */
+  /** The real theme of the nearest provider, the given base theme, or an empty object. */
   function useTheme(): T {
     return useContext(ThemeContext) ?? readOwnTheme()
   }

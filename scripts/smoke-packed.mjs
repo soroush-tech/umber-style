@@ -465,6 +465,7 @@ import createInstance from '@umber-style/server/create-instance'
 import { createStyle as createShared } from 'umber-style/react'
 import { createStyle as createUmbrellaNative } from 'umber-style/react-native'
 import { createStyle as createUmbrellaVue } from 'umber-style/vue'
+import type { ComponentProps, CSSProperties } from 'react'
 
 const theme = { palette: { primary: '#1b5fd1', onPrimary: '#ffffff' }, space: [0, 4, 8] }
 
@@ -499,6 +500,11 @@ const linkOptions = {
   shouldForwardProp: (prop: string): prop is 'href' => prop === 'href',
 } satisfies FilteringStyledOptions<{ href?: string }, 'href'>
 export const Link = styled('a', linkOptions)({ color: 'red' })
+// The default style types: a value widened to string, and React's CSSProperties in the style prop.
+const widened = { display: 'grid', alignItems: 'start' }
+export const Widened = styled('div')(widened)
+const inline: CSSProperties = { marginTop: 4 }
+export const inlineStyle: ComponentProps<typeof Card>['style'] = inline
 
 const native = createNative(theme)
 export const nativeColor: string = native.useTheme().palette.primary
@@ -527,12 +533,30 @@ export const shared: { palette: { primary: string } } = createStyle(theme).useTh
 export const sharedRead: { palette: { primary: string } } = createStyle(theme).readTheme()
 export const ServerBox = styled.div({ padding: 4 })
 `
+  const strict = `
+import styled from '@umber-style/styled'
+import type { ComponentProps, CSSProperties } from 'react'
+
+declare module '@umber-style/react' {
+  interface StyleTypeOptions {
+    isStrict: true
+  }
+}
+
+// @ts-expect-error with the strict switch, a misspelt property is an error
+export const Typo = styled.div({ backgroudColor: 'red' })
+export const Box = styled.div({ display: 'grid' })
+const inline: CSSProperties = { marginTop: 4 }
+// @ts-expect-error with the strict switch, the style prop takes no CSSProperties
+export const inlineStyle: ComponentProps<typeof Box>['style'] = inline
+`
   const ts = join(consumer, 'ts')
   mkdirSync(ts)
   writeFileSync(join(ts, 'entries.ts'), typed)
   writeFileSync(join(ts, 'entries.mts'), typed)
   writeFileSync(join(ts, 'entries.cts'), typed)
   writeFileSync(join(ts, 'server.ts'), server)
+  writeFileSync(join(ts, 'strict.ts'), strict)
   const options = {
     strict: true,
     noEmit: true,
@@ -564,6 +588,12 @@ export const ServerBox = styled.div({ padding: 4 })
       },
       ['ts/server.ts'],
       'the react-server condition: useTheme and readTheme, and no ThemeContext',
+    ],
+    [
+      'tsconfig.strict.json',
+      { ...options, module: 'esnext', moduleResolution: 'bundler' },
+      ['ts/strict.ts'],
+      'the strict switch, through the StyleTypeOptions of @umber-style/react',
     ],
   ]) {
     writeFileSync(join(consumer, file), JSON.stringify({ compilerOptions, include }, null, 2))

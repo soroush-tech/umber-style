@@ -8,15 +8,8 @@ There are two ways to put the theme of the page on the document. The default nee
 
 The outermost `ThemeProvider` (one with no provider above it) renders no element and puts no class on `<html>`. It declares the variables of its theme on the document root, in one rule in the `theme` layer:
 
-```css
-@layer umber-theme {
-  :where(:root) {
-    --umber-palette-text: #1a1a1a;
-    --umber-palette-surface: #ffffff;
-    --umber-space-3: 16px;
-    color-scheme: light;
-  }
-}
+```text
+@layer umber-theme{:where(:root){--umber-palette-text:#1a1a1a;--umber-palette-surface:#ffffff;--umber-space-3:16px;color-scheme:light;}}
 ```
 
 - Everything sees the variables: the elements of the app, plain elements, portal content, and the rules for `html` and `body` that `Global` writes.
@@ -35,7 +28,7 @@ The default gives no marker class at the root. `when(theme)` and `whenScheme()` 
 
 ## The class on `<html>`: `isRoot`
 
-With `isRoot` the provider renders no element, no class and no rule. It does two things: it gives the engine its base theme (when the engine has none yet; a provider of the server components build never does) and it feeds the context for `useTheme` and function styles of client components (in the server components build, through its browser part). You put the class on an ancestor you control, usually `<html>`, and the call that gives you the class, `themeClass`, makes the rule: see below.
+With `isRoot` the provider renders no element, no class and no rule. It does two things: it gives the engine the shape of its theme (when the engine has none yet, and not as a given base theme: see [Themes](themes.md#the-base-theme); a provider of the server components build never does) and it feeds the context for `useTheme` and function styles of client components (in the server components build, through its browser part). You put the class on an ancestor you control, usually `<html>`, and the call that gives you the class, `themeClass`, makes the rule: see below.
 
 ```tsx
 const App = () => (
@@ -113,38 +106,13 @@ const html = [
 ].join('')
 ```
 
-`extractPageStyles` is called after the render and reads the finished markup, so it holds the rules of this page and of the themes you name, and nothing else. The output is one document (shown formatted):
+`extractPageStyles` is called after the render and reads the finished markup, so it holds the rules of this page and of the themes you name, and nothing else. The output is one document (the markup shown with line breaks, the CSS as the engine writes it):
 
-```html
+```text
 <!doctype html>
 <html class="umber-theme-s44g65 umber-boundary umber-scheme-light">
   <head>
-    <style data-style="umber" data-options="p=umber;x=;l=1;y=1;r=1;b=1;s=1;f=1;t=">
-      @layer umber-theme, umber-global, umber-components, umber-overrides;
-      @layer umber-theme {
-        .umber-theme-s44g65 {
-          --umber-palette-surface: #ffffff;
-          --umber-palette-text: #1a1a1a;
-          --umber-space-3: 16px;
-          color-scheme: light;
-        }
-      }
-      @layer umber-theme {
-        .umber-theme-tk7v2e {
-          --umber-palette-surface: #101114;
-          --umber-palette-text: #f2f2f2;
-          --umber-space-3: 16px;
-          color-scheme: dark;
-        }
-      }
-      @layer umber-components {
-        .umber-page-root-1h3tp5s {
-          background-color: var(--umber-palette-surface);
-          color: var(--umber-palette-text);
-          padding: var(--umber-space-3);
-        }
-      }
-    </style>
+    <style data-style="umber" data-options="p=umber;x=;l=1;y=1;r=1;b=1;s=1;f=1;t=">@layer umber-theme,umber-global,umber-components,umber-overrides;@layer umber-theme{.umber-theme-s44g65{--umber-palette-surface:#ffffff;--umber-palette-text:#1a1a1a;--umber-space-3:16px;color-scheme:light;}}@layer umber-theme{.umber-theme-tk7v2e{--umber-palette-surface:#101114;--umber-palette-text:#f2f2f2;--umber-space-3:16px;color-scheme:dark;}}@layer umber-components{.umber-page-root-1h3tp5s{background-color:var(--umber-palette-surface);color:var(--umber-palette-text);padding:var(--umber-space-3);}}</style>
     <script>
       document.documentElement.className =
         localStorage.getItem('theme') === 'dark'
@@ -185,33 +153,13 @@ const { tag } = extractPageStyles(cache, body, { themes: [dark] })
 const choose = `if (localStorage.getItem('theme') === 'dark') document.documentElement.className = ${JSON.stringify(dark)}`
 ```
 
-The CSS of the page (shown formatted):
+The CSS of the page, one rule on a line:
 
-```css
-@layer umber-theme, umber-global, umber-components, umber-overrides;
-@layer umber-theme {
-  :where(:root) {
-    --umber-palette-text: #1a1a1a;
-    --umber-palette-surface: #ffffff;
-    --umber-space-3: 16px;
-    color-scheme: light;
-  }
-}
-@layer umber-theme {
-  .umber-theme-tk7v2e {
-    --umber-palette-text: #f2f2f2;
-    --umber-palette-surface: #101114;
-    --umber-space-3: 16px;
-    color-scheme: dark;
-  }
-}
-@layer umber-components {
-  .umber-page-root-1h3tp5s {
-    background-color: var(--umber-palette-surface);
-    color: var(--umber-palette-text);
-    padding: var(--umber-space-3);
-  }
-}
+```text
+@layer umber-theme,umber-global,umber-components,umber-overrides;
+@layer umber-theme{:where(:root){--umber-palette-text:#1a1a1a;--umber-palette-surface:#ffffff;--umber-space-3:16px;color-scheme:light;}}
+@layer umber-theme{.umber-theme-tk7v2e{--umber-palette-text:#f2f2f2;--umber-palette-surface:#101114;--umber-space-3:16px;color-scheme:dark;}}
+@layer umber-components{.umber-page-root-1h3tp5s{background-color:var(--umber-palette-surface);color:var(--umber-palette-text);padding:var(--umber-space-3);}}
 ```
 
 The body is `<main class="umber-page-root-1h3tp5s">Hello</main>`, with no wrapper. That the dark class on `<html>` wins over `:root` was checked in Chromium (`packages/react/src/themeProvider.browser.test.tsx`); the CSS above is asserted in `packages/react/src/providers.docs.ssr.test.tsx`. Under the default light theme, `whenScheme('dark')` at the root follows the system preference (see above); under the dark class it has the scheme marker. The script is an inline script: a strict content security policy needs a nonce or a hash for it. See [No inline styles](no-inline-styles.md).

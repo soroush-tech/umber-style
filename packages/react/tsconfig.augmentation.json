@@ -1,8 +1,19 @@
 {
   "extends": "./tsconfig.json",
   "include": ["src"],
-  // styledWrapper.types.test.tsx types the default style as an app that declares no member of `Theme`.
-  "exclude": ["src/**/vitest.*.ts", "src/serverTypes.test.tsx", "src/styledWrapper.types.test.tsx"],
+  // styledWrapper.types.test.tsx types the default style as an app that declares no member of `Theme`;
+  // the strict style types are compiled by tsconfig.strict.json.
+  "exclude": [
+    "src/**/vitest.*.ts",
+    "src/serverTypes.test.tsx",
+    "src/styledWrapper.types.test.tsx",
+    "src/styleTypes.strict.test.tsx",
+    "src/sheetTypes.test.tsx",
+    "src/styledSystem.types.test.tsx",
+    "src/typeNames.types.test.tsx",
+    "src/webStyle.server.test.tsx",
+    "src/webStyle.test.tsx"
+  ],
   "files": [
     "src/augmentation.test.tsx",
     "src/defaultStyle.test.tsx",

@@ -30,7 +30,7 @@ describe('createThemeValue', () => {
     expect(seen[1]).toEqual({ a: { b: 5, c: 7 } })
   })
 
-  it('takes the theme as it is when there is no base, and gives an empty object without a provider', () => {
+  it('takes the theme as it is when there is no base, and gives an empty object without a provider, after one unmounted too', () => {
     const { ThemeValueProvider, useTheme } = createThemeValue<typeof base>(
       { baseTheme: undefined },
       keep
@@ -45,10 +45,11 @@ describe('createThemeValue', () => {
       <ThemeValueProvider theme={theme}>
         <Probe />
       </ThemeValueProvider>
-    )
+    ).unmount()
     expect(seen[0]).toBe(theme)
+    // The theme of a provider does not outlive it: a tree with no provider has the empty theme.
     render(<Probe />)
-    expect(seen[1]).toBe(theme)
+    expect(seen[1]).toBe(EMPTY_THEME)
     const empty = createThemeValue<typeof base>({ baseTheme: undefined }, keep)
     const Empty = () => {
       seen.push(empty.useTheme())

@@ -19,5 +19,6 @@ export type {
   StyledStatics,
   StyledTags,
   StyleProp,
+  StyleTypeOptions,
   Theme,
 } from '@umber-style/react'

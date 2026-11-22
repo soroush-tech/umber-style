@@ -17,6 +17,8 @@ export interface EntrySource {
   readonly cache: Cache
   /** The class name for `role`; its rule is written, once, the first time it is asked for. */
   use(role: EntryRole): string
+  /** The CSS text of the style: its declarations, then its nested rules with `&` for the class. Nothing is written. */
+  readStyles(): string
 }
 
 /** One style of a sheet: it carries the class name that the cache made for it, and nothing else. */
@@ -37,10 +39,17 @@ export interface SheetEntry {
 export function createSheetEntry(className: string, source?: EntrySource): SheetEntry {
   const entry = { [`${ENTRY_KEY_PREFIX}${className}`]: null, [BRAND]: true }
   const read = () => source?.use('components') ?? className
+  let styles: string | undefined
   Object.defineProperties(entry, {
     className: { get: read },
     toString: { value: read },
-    ...(source ? { [SOURCE]: { value: source } } : {}),
+    ...(source
+      ? {
+          [SOURCE]: { value: source },
+          name: { value: className },
+          styles: { get: () => (styles ??= source.readStyles()) },
+        }
+      : {}),
   })
   return Object.freeze(entry) as unknown as SheetEntry
 }

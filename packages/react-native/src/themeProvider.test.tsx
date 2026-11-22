@@ -72,6 +72,25 @@ describe('the provider on React Native', () => {
     expect(calls[0].style).toEqual([{ color: '#111111' }])
   })
 
+  it('gives a tree with no provider the empty theme after a provider with a theme unmounted', () => {
+    const { styled, ThemeProvider, useTheme } = bindHolder<typeof light>({ baseTheme: undefined })
+    const { View, calls } = createStandIn()
+    const Box = styled(View)(({ theme }) => ({ color: theme.palette ? 'red' : 'blue' }))
+    const seen: unknown[] = []
+    const Probe = () => {
+      seen.push(useTheme())
+      return <Box />
+    }
+    render(
+      <ThemeProvider theme={light}>
+        <Probe />
+      </ThemeProvider>
+    ).unmount()
+    render(<Probe />)
+    expect(seen).toEqual([light, {}])
+    expect(calls.map((call) => call.style)).toEqual([[{ color: 'red' }], [{ color: 'blue' }]])
+  })
+
   it('gives the merged theme to ThemeContext, with the helpers of a raw key kept', () => {
     const { ThemeProvider, ThemeContext } = createStyle(light)
     const seen: (typeof light | undefined)[] = []

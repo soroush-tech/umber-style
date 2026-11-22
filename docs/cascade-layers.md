@@ -6,8 +6,8 @@ After this page you can say which of two styles wins and why, override a compone
 
 Every rule the engine writes is in a CSS cascade layer. The layers are named after the cache prefix (`css` by default) and are declared in this order, lowest priority first, by the first rule of the sheet:
 
-```css
-@layer umber-theme, umber-global, umber-components, umber-overrides;
+```text
+@layer umber-theme,umber-global,umber-components,umber-overrides;
 ```
 
 | Layer                 | What goes in it                                                                                                                      |
@@ -58,13 +58,9 @@ The order is kept in every place the rules go:
 
 Unlayered CSS always beats layered CSS, whatever its specificity. That makes it easy for your own stylesheet to override a component: write the rule, and it wins. It also means that an unlayered reset such as `button { background: none }` overrides the component styles. Put a reset in a layer that is declared before the engine's:
 
-```css
-@layer reset, umber-theme, umber-global, umber-components, umber-overrides;
-@layer reset {
-  button {
-    background: none;
-  }
-}
+```text
+@layer reset,umber-theme,umber-global,umber-components,umber-overrides;
+@layer reset{button{background:none;}}
 ```
 
 The order of layers is fixed by the first place each name is declared in the document, across all style sheets, and a later statement never reorders it. The engine's own statement does not help you here: it comes first in the engine's sheet, but a sheet that your app adds after it would put `reset` after `umber-overrides`, which gives the reset the highest priority. So your statement must be in a `<style>` or `<link>` that comes before the engine's `<style>` in the document. The same holds for the server components build, where every `<style href precedence>` starts with the statement.
@@ -81,13 +77,9 @@ const style = createStyle(theme, { prefix: 'umber', hasLayers: false })
 
 For a button with `color: red` and `'&:hover': { color: 'orange' }` that is given a sheet entry with `color: blue`, the rules are:
 
-```css
-.umber-button-root-191a01u {
-  color: blue;
-}
-.umber-button-root-191a01u:hover {
-  color: orange;
-}
+```text
+.umber-button-root-191a01u{color:blue;}
+.umber-button-root-191a01u:hover{color:orange;}
 ```
 
 The merged class has the entry's colour, but the hover rule of the component still sets orange. Without layers, a style given from outside does not beat a nested rule of the component such as `:hover`, unless it has its own nested rule. The entry's own class is not written: nothing used it.

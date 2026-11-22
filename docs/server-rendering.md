@@ -76,27 +76,11 @@ const page = [
 
 `extractPageStyles` returns `{ css, ids, options, tag }`. `tag` is one `<style>` element with the CSS of this page. The page below is shown with `hasServerStyleElements: false`; with the default, the same rules come as `<style data-precedence>` elements inside the markup (see "Client components" below), and `tag` holds only what the markup does not carry, such as the themes offered for switching. The provider is the outermost one, so it renders no element: its theme is declared on `:root`, and that rule is part of the CSS of the page. The page:
 
-```html
+```text
 <!doctype html>
 <html>
   <head>
-    <style data-style="umber" data-options="p=umber;x=;l=1;y=1;r=1;b=1;s=1;f=1;t=">
-      @layer umber-theme, umber-global, umber-components, umber-overrides;
-      @layer umber-theme {
-        :where(:root) {
-          --umber-palette-primary: #1b5fd1;
-          --umber-palette-on-primary: #ffffff;
-          --umber-space-2: 8px;
-        }
-      }
-      @layer umber-components {
-        .umber-button-root-jiompv {
-          background-color: var(--umber-palette-primary);
-          color: var(--umber-palette-on-primary);
-          padding: var(--umber-space-2);
-        }
-      }
-    </style>
+    <style data-style="umber" data-options="p=umber;x=;l=1;y=1;r=1;b=1;s=1;f=1;t=">@layer umber-theme,umber-global,umber-components,umber-overrides;@layer umber-theme{:where(:root){--umber-palette-primary:#1b5fd1;--umber-palette-on-primary:#ffffff;--umber-space-2:8px;}}@layer umber-components{.umber-button-root-jiompv{background-color:var(--umber-palette-primary);color:var(--umber-palette-on-primary);padding:var(--umber-space-2);}}</style>
   </head>
   <body>
     <div id="root"><button class="umber-button-root-jiompv">Save</button></div>
@@ -105,7 +89,7 @@ const page = [
 </html>
 ```
 
-(The markup of the root and the CSS are asserted in `packages/react/src/providers.docs.ssr.test.tsx`; the page is shown formatted.)
+(The markup of the root and the CSS are asserted in `packages/react/src/providers.docs.ssr.test.tsx`; the markup is shown with line breaks, the CSS as the engine writes it.)
 
 **The root theme of a page.** No element stands for the outermost provider, so `extractPageStyles` cannot find its theme in the markup. It takes the root theme that the cache declared last, the one of the render that just ran: render a page and extract its CSS before the next page renders, as above (`renderToString` is synchronous). A server that interleaves the renders of two pages (a stream for each, extracted at the end) and gives them different root themes should use the default `hasServerStyleElements`: the provider then sends its root theme as a style element in its own markup, keyed `umber-root-<hash>`, and `extractPageStyles` leaves it out.
 

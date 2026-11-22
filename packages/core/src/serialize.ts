@@ -204,6 +204,11 @@ function splitSelectors(selector: string): string[] {
   return parts
 }
 
+/** `selector` as the engine writes a selector list: each part trimmed, joined by `,` with no space (`html, body` is `html,body`). */
+export function toSelectorText(selector: string): string {
+  return splitSelectors(selector).join(',')
+}
+
 /** The selector of one part of a key inside one parent: `&` is the parent, a leading colon is the parent itself, anything else is a descendant. */
 function joinSelector(one: string, part: string): string {
   if (part.includes('&')) return part.replaceAll('&', one)
@@ -229,10 +234,30 @@ function resolveWebParts(style: StyleObject): StyleObject {
 }
 
 /**
+ * The label `label` written after the label `earlier`, joined by `-`: `Typography` then `Link` is
+ * `Typography-Link`. A label that `earlier` already has, as a whole run of its `-`-separated parts, is
+ * not written again, and an empty one adds nothing.
+ */
+export function joinLabels(earlier: string, label: string): string {
+  if (earlier === '') return label
+  if (label === '' || `-${earlier}-`.includes(`-${label}-`)) return earlier
+  return `${earlier}-${label}`
+}
+
+/** The value of `key` once `value` is merged over `earlier`: two labels are joined, two objects merged, else `value`. */
+function mergeValue(key: string, earlier: StyleValue, value: StyleValue): StyleValue {
+  if (key === 'label' && typeof earlier === 'string' && typeof value === 'string') {
+    return joinLabels(earlier, value)
+  }
+  return isStyleObject(earlier) && isStyleObject(value) ? mergeStyles([earlier, value]) : value
+}
+
+/**
  * Merges style objects left to right; a later key wins and moves to the end; nested objects merge the
  * same way. A key whose value is `undefined`, `null` or `false` declares nothing, so it leaves an earlier
  * value of that key as it is: a parser that returns `{ width: undefined }` for a prop it was not given
- * does not erase the width of a style before it.
+ * does not erase the width of a style before it. Labels are not replaced: each is joined after the
+ * labels before it (`joinLabels`), so the merged style names every style that has one, in order.
  */
 export function mergeStyles(styles: readonly StyleObject[]): StyleObject {
   const merged: StyleObject = {}
@@ -241,8 +266,7 @@ export function mergeStyles(styles: readonly StyleObject[]): StyleObject {
       if (value === undefined || value === null || value === false) continue
       const earlier = merged[key]
       delete merged[key]
-      merged[key] =
-        isStyleObject(earlier) && isStyleObject(value) ? mergeStyles([earlier, value]) : value
+      merged[key] = mergeValue(key, earlier, value)
     }
   }
   return merged

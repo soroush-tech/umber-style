@@ -23,8 +23,17 @@ export interface EngineOptions extends TokenOptions {
   hasPruning?: boolean
   /** Whether a component's styles are split by position into a base class (made once) and a props class (made for each render). Default true; used when the engine makes its cache. */
   hasBaseClass?: boolean
-  /** Whether the cache checks the page in the browser and warns once for each problem found (`findMissingStyles`, and each inserted declaration that `CSS.supports` rejects). Default: on in development (`process.env.NODE_ENV` is `development`), off otherwise; used when the engine makes its cache. */
+  /**
+   * Whether the development checks run, each problem warned about once: the cache checks the page in the
+   * browser (`findMissingStyles`, and each inserted declaration that `CSS.supports` rejects) and each value
+   * that no CSS property takes, and the engine checks what its style functions return. Default: on in
+   * development (`process.env.NODE_ENV` is `development`), off otherwise; `true` turns them on in a test
+   * run too. The cache takes it when the engine makes one; with a `cache` given, the engine's own checks
+   * follow this option, else that cache's.
+   */
   hasDevChecks?: boolean
+  /** Whether the style element of the cache holds its rules as text, readable through `textContent`, rather than written with `insertRule` (see `DomSheetOptions`). Default: on when `process.env.NODE_ENV` is not `production`; used when the engine makes its cache. */
+  hasRuleText?: boolean
   /** Theme paths (dotted, or top-level keys) whose variables are always declared, for code outside the engine that reads them. */
   alwaysDeclare?: readonly string[]
   /** The cache to use; one is made when not given. */

@@ -110,7 +110,7 @@ describe('a styled component with a base class and a props class', () => {
 })
 
 describe('a styled component that wraps one with a base class', () => {
-  it('flattens to one element that carries the base of the inner one under its own label', () => {
+  it('flattens to one element that carries the base of the inner one under the labels of both', () => {
     const { styled, rules } = setup()
     const Inner = styled('div', { name: 'Inner' })<FlexProps>({ display: 'flex' }, ({ gap }) => ({
       gap,
@@ -120,8 +120,8 @@ describe('a styled component that wraps one with a base class', () => {
     render(<Outer data-testid="o" gap={2} />)
     const inner = screen.getByTestId('i').className.split(' ')
     const outer = screen.getByTestId('o').className.split(' ')
-    expect(outer[0]).toBe(inner[0].replace('inner', 'outer'))
-    expect(outer[1]).toMatch(/^b-outer-root-/)
+    expect(outer[0]).toBe(inner[0].replace('inner-root', 'inner-root-outer-root'))
+    expect(outer[1]).toMatch(/^b-inner-root-outer-root-/)
     expect(rules().filter((rule) => rule.includes('display:flex'))).toHaveLength(2)
   })
 })

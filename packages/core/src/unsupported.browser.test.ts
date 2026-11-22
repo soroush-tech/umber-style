@@ -38,6 +38,23 @@ describe('the development checker asks the browser about each declaration, in a 
     ])
   })
 
+  it('warns once about a value that the browser rejects for its property, naming the class and its component', async () => {
+    expect(CSS.supports('border-color', 'light')).toBe(false)
+    const { prefix, warn, cache } = startCache()
+    const name = cache.cssWith({ label: 'Button-root' }, { borderColor: 'light', color: 'red' })
+    cache.cssWith({ label: 'Button-root' }, { borderColor: 'light', color: 'red' })
+    const plain = cache.css({ borderColor: 'light' })
+    await settle()
+    expect(warn.mock.calls).toEqual([
+      [
+        `[${prefix}] the class ${name} of "Button-root" declares border-color:light, which this browser does not support`,
+      ],
+      [
+        `[${prefix}] the class ${plain} declares border-color:light, which this browser does not support`,
+      ],
+    ])
+  })
+
   it('says nothing about a property or a value with a vendor prefix that this browser does not have', async () => {
     expect(CSS.supports('-moz-osx-font-smoothing', 'grayscale')).toBe(false)
     const { warn, cache } = startCache()
