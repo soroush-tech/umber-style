@@ -179,8 +179,7 @@ export function createTokens<T extends object>(theme: T, options: TokenOptions =
   const isKept = (path: readonly string[]): boolean => {
     const mode = readMode(path)
     const hasDeeper =
-      parents.has(path.join('.')) ||
-      (patternParents.length > 0 && patternParents.some((parts) => matchesPattern(parts, path)))
+      parents.has(path.join('.')) || patternParents.some((parts) => matchesPattern(parts, path))
     return (mode === 'raw' || mode === 'inline') && !hasDeeper
   }
 

@@ -227,6 +227,25 @@ describe('compileStyleRules with hasValueRepair: a reference followed by a lengt
     ])
   })
 
+  it('reads a number in every form it is written in', () => {
+    const widthOf = (fallback: string, unit: string) =>
+      repairWith({ width: `var(--n, ${fallback})${unit}` }).rules[0].slice('.a{width:'.length, -2)
+    // A sign, a number that starts or ends with its point, and an exponent in either case.
+    for (const value of ['+4px', '-4px', '.5px', '5.px']) {
+      expect(widthOf(value, 'px')).toBe(`var(--n, ${value})`)
+    }
+    for (const value of ['1e3', '2E-2', '1e+2']) {
+      expect(widthOf(value, 'px')).toBe(`calc(var(--n, ${value}) * 1px)`)
+    }
+    // An `e` with no digit after it starts a unit.
+    expect(widthOf('2em', 'em')).toBe('var(--n, 2em)')
+    expect(widthOf('2ex', 'ex')).toBe('var(--n, 2ex)')
+    // No digit at all, and text after the unit, are not a number with a unit: the form is left.
+    for (const value of ['.', 'e3', '-', '4px solid']) {
+      expect(widthOf(value, 'px')).toBe(`var(--n, ${value})px`)
+    }
+  })
+
   it('leaves a reference with another unit, another value or no known value as it is, and reports it', () => {
     const { rules, reported } = repairWith({
       width: 'var(--rem)px',

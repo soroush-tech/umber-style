@@ -133,8 +133,44 @@ const REPAIR_UNITS = [
   'rad',
   'turn',
 ]
-/** A number, with the unit after it: what the declared value of a token is when it is a length, a time or a plain number. */
-const NUMBER_VALUE = /^[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?([a-z%]*)$/i
+/** What may follow a number as its unit: letters or a percent sign, or nothing. */
+const UNIT_TEXT = /^[a-z%]*$/i
+
+/** Whether the character at `index` of `text` is a digit. */
+function isDigitAt(text: string, index: number): boolean {
+  const code = text.charCodeAt(index)
+  return code >= 48 && code <= 57
+}
+
+/** The index after the digits of `text` that start at `index`. */
+function skipDigits(text: string, index: number): number {
+  let end = index
+  while (isDigitAt(text, end)) end++
+  return end
+}
+
+/** The index after an exponent (`e3`, `E-2`) that starts at `index`, or `index` when none does: an `e` with no digit after it starts a unit (`em`, `ex`). */
+function skipExponent(text: string, index: number): number {
+  if (text[index] !== 'e' && text[index] !== 'E') return index
+  const digits = text[index + 1] === '+' || text[index + 1] === '-' ? index + 2 : index + 1
+  return isDigitAt(text, digits) ? skipDigits(text, digits) : index
+}
+
+/**
+ * The unit of `text` when it is a number with a unit after it, in lower case (`''` for a plain number);
+ * undefined when it is not such a value. It is what the declared value of a token is when it is a
+ * length, a time or a plain number.
+ */
+function readNumberUnit(text: string): string | undefined {
+  const start = text[0] === '+' || text[0] === '-' ? 1 : 0
+  const whole = skipDigits(text, start)
+  const fraction = text[whole] === '.' ? skipDigits(text, whole + 1) : whole
+  // A number has a digit, before the point or after it: `.` alone and no digits at all are not one.
+  const hasDigits = whole > start || fraction > whole + 1
+  if (!hasDigits) return undefined
+  const unit = text.slice(skipExponent(text, fraction))
+  return UNIT_TEXT.test(unit) ? unit.toLowerCase() : undefined
+}
 
 /** Whether the character code `code` can be part of an identifier: a letter, a digit, `-`, `_` or any non-ASCII character. NaN (past either end of the text) cannot. */
 function isNameCode(code: number): boolean {
@@ -204,8 +240,7 @@ function repairUnit(
 ): string | undefined {
   const declared = readDeclared(inner, context)
   if (declared === undefined && TIME_UNITS.has(unit)) return `calc(${reference} * 1${unit})`
-  const found = declared === undefined ? undefined : NUMBER_VALUE.exec(declared)
-  const valueUnit = found?.[1].toLowerCase()
+  const valueUnit = declared === undefined ? undefined : readNumberUnit(declared)
   if (valueUnit === unit) return reference
   if (valueUnit === '') return `calc(${reference} * 1${unit})`
   const start = `${context.owner}, which puts "${unit}" after ${reference}, whose value`
@@ -213,7 +248,7 @@ function repairUnit(
   let problem = `${declared} has another unit: ${end} Write the value in ${unit}, or the reference alone.`
   if (declared === undefined) {
     problem = `is not known (no token of the theme has it): ${end} Write calc(${reference} * 1${unit}) for a number, or the reference alone for a length.`
-  } else if (found === null) {
+  } else if (valueUnit === undefined) {
     problem = `${declared} is not a number: ${end} Write the reference alone.`
   }
   context.report?.(`${start} ${problem}`)
