@@ -27,7 +27,7 @@ export function Header({ children }: { readonly children?: ReactNode }) {
       gap={4}
       borderBottom={`1px solid ${alpha(theme.border.primary, 0.2)}`} style={{ backgroundColor: '#F4F0E4D9' }} borderBottomWidth="0" fontFamily="'Space Grotesk Variable', 'Space Grotesk', sans-serif" paddingBottom={2} paddingLeft={4} paddingRight={4} paddingTop={2}
     >
-      <Typography variant="h6" as="span" href="/" color="initial" fontFamily="'Space Grotesk Variable', 'Space Grotesk', sans-serif" fontSize="22px" fontWeight="700" letterSpacing="-0.03em" marginRight="auto" textDecoration="none">
+      <Typography variant="h6" as="a" href="/" color="initial" fontFamily="'Space Grotesk Variable', 'Space Grotesk', sans-serif" fontSize="22px" fontWeight="700" letterSpacing="-0.03em" marginRight="auto" textDecoration="none">
         UmberStyle
       </Typography>
       <Flex
