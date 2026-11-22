@@ -25,23 +25,35 @@ function describeItem(item: unknown): string | undefined {
   return describeKind(item)
 }
 
+/** Whether a key of a style declares nothing to check: the label, the native part, or an empty value. */
+function isSkipped(key: string, value: unknown): boolean {
+  // The native part of a shared style is not written on the web, and holds what React Native takes.
+  if (key === 'label' || key === 'native') return true
+  return value === null || value === undefined || value === false
+}
+
+/** Adds to `found` what `kind` names, when it names something. */
+function addKind(key: string, kind: string | undefined, found: InvalidValue[]): void {
+  if (kind !== undefined) found.push({ key, kind })
+}
+
+/** Adds to `found` the invalid value under one key: each item of a list, a nested rule at any depth, or the value itself. */
+function addInvalidValue(key: string, value: unknown, found: InvalidValue[]): void {
+  if (Array.isArray(value)) {
+    for (const item of value) addKind(key, describeItem(item), found)
+    return
+  }
+  if (typeof value === 'object' && !isAlphaColor(value)) {
+    addInvalidValues(value as StyleObject, found)
+    return
+  }
+  addKind(key, describeKind(value), found)
+}
+
 /** Adds to `found` the invalid values of `style`, at any depth of its nested rules. */
 function addInvalidValues(style: StyleObject, found: InvalidValue[]): void {
   for (const [key, value] of Object.entries(style)) {
-    // The native part of a shared style is not written on the web, and holds what React Native takes.
-    if (key === 'label' || key === 'native') continue
-    if (value === null || value === undefined || value === false) continue
-    if (Array.isArray(value)) {
-      for (const item of value) {
-        const kind = describeItem(item)
-        if (kind !== undefined) found.push({ key, kind })
-      }
-    } else if (typeof value === 'object' && !isAlphaColor(value)) {
-      addInvalidValues(value as StyleObject, found)
-    } else {
-      const kind = describeKind(value)
-      if (kind !== undefined) found.push({ key, kind })
-    }
+    if (!isSkipped(key, value)) addInvalidValue(key, value, found)
   }
 }
 

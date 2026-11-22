@@ -679,6 +679,29 @@ function sortClassValues(
   return sorted
 }
 
+/** The document a cache serves: that of its sheet, else the global one where there is one. */
+function readPage(options: CacheOptions): Document | undefined {
+  if (options.sheet?.document) return options.sheet.document
+  return typeof document === 'undefined' ? undefined : document
+}
+
+/** Throws when the page was written by a server whose engine was set up differently: its stamp says how. */
+function assertServerStamp(page: Document, prefix: string, fingerprint: string): void {
+  const stamp = readServerStamp(page, prefix)
+  if (stamp === undefined) return
+  const difference = describeFingerprintDifferences(stamp, fingerprint)
+  if (difference !== '') throw new Error(difference)
+}
+
+/** The sheet a cache makes for itself: in the head of its page, else in memory. */
+function createOwnSheet(
+  prefix: string,
+  page: Document | undefined,
+  hasRuleText: boolean | undefined
+): Sheet {
+  return page ? createDomSheet(prefix, page.head, { hasRuleText }) : createMemorySheet()
+}
+
 /** Makes a cache: it turns styles into classes and inserts each class's rules once. */
 export function createCache(options: CacheOptions = {}): Cache {
   const {
@@ -707,14 +730,8 @@ export function createCache(options: CacheOptions = {}): Cache {
     hasValueRepair,
     tokens: options.tokenSignature ?? '',
   })
-  // The document the cache serves: that of its sheet, else the global one where there is one.
-  const page: Document | undefined =
-    options.sheet?.document ?? (typeof document === 'undefined' ? undefined : document)
-  if (page) {
-    const stamp = readServerStamp(page, prefix)
-    const difference = stamp === undefined ? '' : describeFingerprintDifferences(stamp, fingerprint)
-    if (difference !== '') throw new Error(difference)
-  }
+  const page = readPage(options)
+  if (page) assertServerStamp(page, prefix, fingerprint)
   const { hasDevChecks = page !== undefined && isDevelopment() } = options
   // The label of a class, for a message: the label of the style it was made from.
   const readClassLabel = (className: string): string => readLabel(registered.get(className) ?? {})
@@ -738,11 +755,7 @@ export function createCache(options: CacheOptions = {}): Cache {
   const pageThemes = new Map<string, Set<string>>()
   // The class a props class was made after (its base class), by class name.
   const afters = new Map<string, string>()
-  const sheet =
-    options.sheet ??
-    (page
-      ? createDomSheet(prefix, page.head, { hasRuleText: options.hasRuleText })
-      : createMemorySheet())
+  const sheet = options.sheet ?? createOwnSheet(prefix, page, options.hasRuleText)
   const registered = new Map<string, StyleObject>()
   const entries = new Map<string, SheetEntry>()
   const scoping = { prefix, hasScope }
