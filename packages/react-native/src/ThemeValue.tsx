@@ -21,7 +21,7 @@ export interface ThemeValueProviderProps<T> {
   readonly children?: ReactNode
 }
 
-/** Where the base theme lives while no provider is above: set by the outermost provider, or by the app. */
+/** Where the base theme lives while no provider is above: given by the app (`createStyle(theme)`, `configure({ theme })`), never by a provider. */
 export interface ThemeHolder<T> {
   baseTheme: T | undefined
 }
@@ -55,7 +55,7 @@ export function createThemeValue<T extends object>(
     return native
   }
 
-  /** The theme where no provider is above: the base theme, or the empty theme. */
+  /** The theme where no provider is above: the base theme given by the app, or the empty theme. */
   const readOwnTheme = () => holder.baseTheme ?? (EMPTY_THEME as T)
 
   function ThemeValueProvider({ theme, colorScheme, children }: ThemeValueProviderProps<T>) {
@@ -68,8 +68,6 @@ export function createThemeValue<T extends object>(
       () => resolveThemeInput(theme, outer ?? (EMPTY_THEME as T)),
       [theme, outer]
     )
-    // The outermost provider that renders gives the base theme, as on the web.
-    holder.baseTheme ??= given as T
     const value = useMemo(() => toNative(mergeTheme(outer, given)), [outer, given])
     const scheme = readSchemeName(colorScheme) ?? outerScheme
     const condition = useMemo(() => ({ theme: given, colorScheme: scheme }), [given, scheme])

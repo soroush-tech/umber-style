@@ -35,7 +35,7 @@ const box = cache.css({ color: 'red' })
 
 The types are exported: `UmberCache` (the cache), `UmberCacheOptions`, `SerializedRule` (`{ name, styles }`) and `UmberSheet`. `UmberCache`, `SerializedRule` and `UmberSheet` are declared in `@umber-style/core`, with the other types apps import, and re-exported here, by `@umber-style/react`, `@umber-style/vue` and `@umber-style/css`: one type, whichever package a file imports it from.
 
-The options are those of the core's `createCache` (see [Options reference](options.md)), with `key` for `prefix` and without `onInsert`, which the package uses itself. A key is lowercase letters, digits and hyphens, starting with a letter; another throws:
+The options are those of the core's `createCache` (see [Options reference](options.md)), with `key` for `prefix` and without `onInsert`, which the package uses itself. `speedy` is kept for compatibility with what an app passes to its cache when it moves from the styling library it used: `speedy: true` is `hasRuleText: false` (rules written with `insertRule`), `speedy: false` is `hasRuleText: true` (rules as text nodes, readable through `textContent`), and `hasRuleText` wins when both are given. Without either, the rules are text outside production and go in with `insertRule` in production. A key is lowercase letters, digits and hyphens, starting with a letter; another throws:
 
 ```text
 Error: Invalid cache prefix "Bad Key": use lowercase letters, digits and hyphens.
@@ -249,40 +249,10 @@ function Page() {
 
 The `CacheProvider` of the registry turns the automatic style elements off below it, so the registry is the only output: the test checks that the markup has no `<style>` and no `<meta>`, and that each rule of the inserted element appears exactly once in the markup and the inserted HTML together.
 
-On the server the page is `<section class="soroush-hero-root-76d9i0">Hello</section>`, and the registry inserts one element (shown with line breaks):
+On the server the page is `<section class="soroush-hero-root-76d9i0">Hello</section>`, and the registry inserts one element:
 
-```html
-<style
-  data-umber="soroush soroush-layers soroush-global-1xngop0 @keyframes:keyframes-1acbpvw soroush-hero-root-76d9i0 soroush-root-49xedb-1ql2sy9"
->
-  @layer soroush-theme, soroush-global, soroush-components, soroush-overrides;
-  @layer soroush-global {
-    body {
-      margin: 0;
-    }
-  }
-  @keyframes keyframes-1acbpvw {
-    0% {
-      opacity: 0;
-    }
-    100% {
-      opacity: 1;
-    }
-  }
-  @layer soroush-components {
-    .soroush-hero-root-76d9i0 {
-      color: var(--soroush-palette-primary);
-      padding: var(--soroush-space-2);
-      animation: keyframes-1acbpvw 1s;
-    }
-  }
-  @layer soroush-theme {
-    :where(:root) {
-      --soroush-palette-primary: #1b5fd1;
-      --soroush-space-2: 8px;
-    }
-  }
-</style>
+```text
+<style data-umber="soroush soroush-layers soroush-global-1xngop0 @keyframes:keyframes-1acbpvw soroush-hero-root-76d9i0 soroush-root-49xedb-1ql2sy9">@layer soroush-theme,soroush-global,soroush-components,soroush-overrides;@layer soroush-global{body{margin:0;}}@keyframes keyframes-1acbpvw{0%{opacity:0;}100%{opacity:1;}}@layer soroush-components{.soroush-hero-root-76d9i0{color:var(--soroush-palette-primary);padding:var(--soroush-space-2);animation:keyframes-1acbpvw 1s;}}@layer soroush-theme{:where(:root){--soroush-palette-primary:#1b5fd1;--soroush-space-2:8px;}}</style>
 ```
 
 `data-umber` is the key, then the names of the groups in the element. The outermost provider declares its theme on `:root` (see [The root theme and switching](root-theme.md)), with the variables the rules use: `--soroush-palette-accent` is not there.
@@ -329,39 +299,10 @@ const styleTags = constructStyleTagsFromChunks(chunks)
 ]
 ```
 
-and `styleTags` is one element for each chunk that has CSS (shown with line breaks):
+and `styleTags` is one element for each chunk that has CSS:
 
-```html
-<style data-umber="app-global app-theme-1u39y9v app-global-83groy">
-  @layer app-theme, app-global, app-components, app-overrides;
-  @keyframes keyframes-1acbpvw {
-    0% {
-      opacity: 0;
-    }
-    100% {
-      opacity: 1;
-    }
-  }
-  @layer app-theme {
-    .app-theme-1u39y9v {
-      --app-palette-primary: #0000ff;
-      color-scheme: light;
-    }
-  }
-  @layer app-global {
-    body {
-      margin: 0;
-    }
-  }
-</style>
-<style data-umber="app app-5jg77">
-  @layer app-components {
-    .app-5jg77 {
-      color: var(--app-palette-primary);
-      animation: keyframes-1acbpvw 1s;
-    }
-  }
-</style>
+```text
+<style data-umber="app-global app-theme-1u39y9v app-global-83groy">@layer app-theme,app-global,app-components,app-overrides;@keyframes keyframes-1acbpvw{0%{opacity:0;}100%{opacity:1;}}@layer app-theme{.app-theme-1u39y9v{--app-palette-primary:#0000ff;color-scheme:light;}}@layer app-global{body{margin:0;}}</style><style data-umber="app app-5jg77">@layer app-components{.app-5jg77{color:var(--app-palette-primary);animation:keyframes-1acbpvw 1s;}}</style>
 ```
 
 The class `unused` and the variable `--app-palette-accent` are in neither: no element of the page has that class.

@@ -57,6 +57,18 @@ describe('createLazyEngine without a theme', () => {
     engine.themeClass(other as unknown as typeof light)
     expect(engine.baseTheme).toBe(light)
     expect(engine.themeClass(light)).toBe(first)
+    // Adopted, not given: what reads the theme with no provider above gets none.
+    expect(engine.givenTheme).toBeUndefined()
+  })
+
+  it('adopts a theme only while it has none, and never as the given theme', () => {
+    const { engine } = setup()
+    engine.adoptTheme(light)
+    engine.adoptTheme(other as unknown as typeof light)
+    expect([engine.baseTheme, engine.givenTheme]).toEqual([light, undefined])
+    engine.setTheme(other as unknown as typeof light)
+    engine.adoptTheme(light)
+    expect([engine.baseTheme, engine.givenTheme]).toEqual([other, other])
   })
 
   it('makes the base from a partial theme, whose shape then lacks the other tokens', () => {
@@ -114,5 +126,6 @@ describe('setTheme', () => {
     const engine = createEngine(light, { prefix: 'c', hasLayers: false })
     expect(engine.hasTheme).toBe(true)
     expect(engine.baseTheme).toBe(light)
+    expect(engine.givenTheme).toBe(light)
   })
 })

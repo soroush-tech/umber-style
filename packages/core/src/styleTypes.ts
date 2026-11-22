@@ -13,8 +13,17 @@ export type Keyframes = ReturnType<typeof keyframes>
 /**
  * What `css()` of a web binding returns: a sheet entry of the merged style. It prints as its class name,
  * and goes wherever an entry goes: the `style` prop of a styled component, `apply`, another `css()`.
+ * Reading `name` or `styles` writes no rule.
  */
-export type SerializedStyles = SheetEntry
+export interface SerializedStyles extends SheetEntry {
+  /** The class name of the value used on its own (a plain element, `apply`): `className` without writing its rule. */
+  readonly name: string
+  /**
+   * The CSS text of the style, in the engine's text format: its declarations, then each nested rule as the
+   * engine writes it, with `&` for the class (`color:red;&:hover{opacity:0.5;}@media (min-width: 40em){&{padding:16px;}}`).
+   */
+  readonly styles: string
+}
 
 /**
  * What a style function may return: a style object, a `css()` result or a sheet entry, nothing, or a list
@@ -23,6 +32,7 @@ export type SerializedStyles = SheetEntry
 export type InterpolationResult =
   | CSSObject
   | SerializedStyles
+  | SheetEntry
   | null
   | undefined
   | false
@@ -60,6 +70,7 @@ export type StaticTemplateValue =
   | undefined
   | CSSObject
   | SerializedStyles
+  | SheetEntry
   | AlphaColor
   | ComponentSelector
   | readonly StaticTemplateValue[]

@@ -44,26 +44,11 @@ const App = () => (
 
 The rules are:
 
-```css
-.umber-152pv3f {
-  padding: var(--umber-space-2);
-  margin-left: var(--umber-space-3);
-  margin-right: var(--umber-space-3);
-}
-.umber-klja4j {
-  padding: var(--umber-space-1);
-}
-@media (width >= 600px) {
-  .umber-klja4j {
-    padding: var(--umber-space-2);
-  }
-}
-.umber-button-root-iry4x2 {
-  background-color: var(--umber-palette-primary);
-  color: var(--umber-palette-on-primary);
-  padding-left: var(--umber-space-2);
-  padding-right: var(--umber-space-2);
-}
+```text
+.umber-152pv3f{padding:var(--umber-space-2);margin-left:var(--umber-space-3);margin-right:var(--umber-space-3);}
+.umber-klja4j{padding:var(--umber-space-1);}
+@media (width >= 600px){.umber-klja4j{padding:var(--umber-space-2);}}
+.umber-button-root-iry4x2{background-color:var(--umber-palette-primary);color:var(--umber-palette-on-primary);padding-left:var(--umber-space-2);padding-right:var(--umber-space-2);}
 ```
 
 What happens:

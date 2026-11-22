@@ -367,6 +367,19 @@ describe('options', () => {
       `.${name} { color: red; }`,
     ])
   })
+
+  it('writes the rules as text of the element outside production, and with insertRule when asked', () => {
+    const text = createInstance({ key: 'text' })
+    const name = text.css({ color: 'red' })
+    text.injectGlobal({ body: { margin: 0 } })
+    const readText = (key: string) =>
+      document.querySelector(`style[data-style="${key}"]`)?.textContent
+    expect(readText('text')).toBe(`.${name}{color:red;}body{margin:0;}`)
+    text.flush()
+    expect(readText('text')).toBe('')
+    createInstance({ key: 'fast', hasRuleText: false }).css({ color: 'red' })
+    expect(readText('fast')).toBe('')
+  })
 })
 
 describe('a shared cache', () => {

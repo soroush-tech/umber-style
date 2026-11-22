@@ -56,7 +56,7 @@ export function createGlobal<T extends object>(
       const local = cache === undefined ? engine : engine.withCache(cache)
       const outerView = inject(keys.view, null)
       const outerTheme = inject(keys.theme, null)
-      const readOwnTheme = () => engine.baseTheme ?? (EMPTY_THEME as T)
+      const readOwnTheme = () => engine.givenTheme ?? (EMPTY_THEME as T)
       const sets = computed(() => {
         const view =
           local === engine

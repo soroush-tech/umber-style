@@ -34,7 +34,7 @@ describe('global styles in an engine', () => {
     const { engine, sheet } = setup()
     engine.insertGlobal(base)
     expect(sheet.rules).toEqual([
-      '*, *::before, *::after{box-sizing:border-box;}',
+      '*,*::before,*::after{box-sizing:border-box;}',
       'body{margin:0;background:var(--e-palette-background);color:var(--e-palette-text);}',
       '@media (min-width: 768px){body{font-size:18px;}}',
       '@font-face{font-family:Inter;font-weight:400;src:url(/inter-400.woff2);}',

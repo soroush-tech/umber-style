@@ -1,5 +1,6 @@
 import { createCache, createMemorySheet } from './cache'
-import { createDevChecker, isDevelopment } from './devChecks'
+import { createDevChecker, isDevelopment, isProduction } from './devChecks'
+import type { GlobalStyleObject } from './globalStyles'
 import type { WebStyleObject } from './webStyle'
 
 afterEach(() => {
@@ -31,6 +32,20 @@ describe('isDevelopment', () => {
   it('is false where there is no process', () => {
     vi.stubGlobal('process', undefined)
     expect(isDevelopment()).toBe(false)
+  })
+})
+
+describe('isProduction', () => {
+  it('is true for a production build only', () => {
+    vi.stubEnv('NODE_ENV', 'production')
+    expect(isProduction()).toBe(true)
+    vi.stubEnv('NODE_ENV', 'test')
+    expect(isProduction()).toBe(false)
+  })
+
+  it('is true where there is no process', () => {
+    vi.stubGlobal('process', undefined)
+    expect(isProduction()).toBe(true)
   })
 })
 
@@ -194,5 +209,90 @@ describe('a cache with development checks', () => {
     createCache({ prefix: 'u', hasLayers: false, sheet: createMemorySheet() })
     vi.advanceTimersByTime(1000)
     expect(warn).toHaveBeenCalledTimes(1)
+  })
+})
+
+/** A style with what the types do not let through, as plain JavaScript can write it. */
+const untypedStyle = (style: object) => style as WebStyleObject & GlobalStyleObject
+
+describe('the report of values that no CSS property takes', () => {
+  it('fires in a test run with hasDevChecks, once for each message, for classes, entries and global styles', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const cache = createCache({
+      prefix: 'u',
+      hasLayers: false,
+      hasDevChecks: true,
+      sheet: createMemorySheet(),
+    })
+    const name = cache.cssWith(
+      { label: 'Card-root' },
+      untypedStyle({ width: true, '&:hover': { color: () => 'red' } })
+    )
+    cache.cssWith(
+      { label: 'Card-root' },
+      untypedStyle({ width: true, '&:hover': { color: () => 'red' } })
+    )
+    const entry = cache.createEntry(untypedStyle({ margin: Number.NaN }))
+    const plain = entry.className
+    cache.compileGlobal(
+      untypedStyle({
+        body: [{ margin: Number.NaN }, entry],
+        html: null,
+        '@media print': { main: { display: ['block', {}] } },
+      })
+    )
+    expect(warn.mock.calls).toEqual([
+      [
+        `[u] the class ${name} of "Card-root" declares "width" as true, which is never a CSS value: give a string or a number.`,
+      ],
+      [
+        `[u] the class ${name} of "Card-root" declares "color" as a function, which is never a CSS value: give a string or a number.`,
+      ],
+      [
+        `[u] the class ${plain} declares "margin" as NaN, which is never a CSS value: give a string or a number.`,
+      ],
+      [
+        '[u] the global rule body declares "margin" as NaN, which is never a CSS value: give a string or a number.',
+      ],
+      [
+        '[u] the global rule @media print declares "display" as an object in a list of values, which is never a CSS value: give a string or a number.',
+      ],
+    ])
+  })
+
+  it('says nothing without the development checks', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const cache = createCache({ prefix: 'u', hasLayers: false, sheet: createMemorySheet() })
+    cache.css(untypedStyle({ width: true }))
+    cache.compileGlobal(untypedStyle({ body: { margin: true } }))
+    expect(warn).not.toHaveBeenCalled()
+    expect(cache.hasDevChecks).toBe(false)
+  })
+})
+
+describe('the label of a class in a message of the browser check', () => {
+  it('names the component of a class that has a label, capitals kept', () => {
+    vi.useFakeTimers()
+    vi.stubGlobal('navigator', { userAgent: 'Chrome' })
+    vi.stubGlobal('CSS', {
+      supports: (_property: string, value: string) => value !== 'light' && value !== 'not-a-color',
+    })
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const cache = createCache({
+      prefix: 'u',
+      hasLayers: false,
+      hasDevChecks: true,
+      sheet: createMemorySheet(),
+    })
+    const name = cache.cssWith({ label: 'Button-root' }, { borderColor: 'light' })
+    // A class that the cache did not make from a style has no label.
+    cache.insertOnce('u-raw', ['.u-raw{border-color:light;}'])
+    vi.advanceTimersByTime(1000)
+    expect(warn.mock.calls).toEqual([
+      [
+        `[u] the class ${name} of "Button-root" declares border-color:light, which this browser does not support`,
+      ],
+      ['[u] the class u-raw declares border-color:light, which this browser does not support'],
+    ])
   })
 })

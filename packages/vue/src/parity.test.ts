@@ -108,6 +108,36 @@ describe('useTheme without a provider', () => {
       })
     )
   })
+
+  it('returns the empty theme after a provider with a theme unmounted, and a function style does not see it', () => {
+    const sheet = createMemorySheet()
+    const engine = createLazyEngine<Partial<typeof baseTheme>>({
+      cache: createCache({ hasLayers: false, prefix: 'u', sheet }),
+    })
+    const { styled, ThemeProvider, useTheme: readTheme, Global } = bindEngine(engine)
+    const seen: unknown[] = []
+    const Probe = defineComponent({
+      setup() {
+        seen.push(readTheme().value)
+        return () => null
+      },
+    })
+    const Box = styled('p')(({ theme }) => ({ color: theme.palette ? 'red' : 'blue' }))
+    const element = document.createElement('div')
+    const app = createApp(() => h(ThemeProvider, { theme: baseTheme }, () => h(Probe)))
+    app.mount(element)
+    app.unmount()
+    const root = mount(() => [
+      h(Probe),
+      h(Box),
+      h(Global, { styles: (theme: object) => ({ body: { margin: 'palette' in theme ? 1 : 0 } }) }),
+    ])
+    expect(seen).toEqual([baseTheme, {}])
+    const { className } = root.querySelector('p') as HTMLElement
+    expect(sheet.rules).toContain(`.${className}{color:blue;}`)
+    expect(sheet.rules).toContain('body{margin:0;}')
+    expect([engine.baseTheme, engine.givenTheme]).toEqual([baseTheme, undefined])
+  })
 })
 
 describe('StyleSheet, useStyle and apply', () => {

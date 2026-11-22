@@ -76,7 +76,7 @@ describe('the default style', () => {
     expect(getEngine().refs.palette.onPrimary).toBeUndefined()
   })
 
-  it('keeps the first of two full themes as the base; each outermost provider merges over it', () => {
+  it('keeps the first of two full themes as the shape of the tokens; each outermost provider gives its own theme', () => {
     const { ThemeProvider, useTheme, getEngine, sheet } = setup()
     const seen: unknown[] = []
     const Probe = () => {
@@ -113,6 +113,33 @@ describe('the default style', () => {
     expect(screen.getByText('#0000ff')).toBeTruthy()
   })
 
+  it('gives a tree with no provider the empty theme after a provider with a theme unmounted', () => {
+    const { styled, ThemeProvider, useTheme, getEngine, ruleOf } = setup()
+    const seen: unknown[] = []
+    const Probe = () => {
+      seen.push(useTheme())
+      return null
+    }
+    const Box = styled('p')(({ theme }) => ({ color: theme.palette ? 'red' : 'blue' }))
+    const { unmount } = render(
+      <ThemeProvider theme={light}>
+        <Probe />
+      </ThemeProvider>
+    )
+    unmount()
+    render(
+      <>
+        <Probe />
+        <Box data-testid="box" />
+      </>
+    )
+    expect(seen).toEqual([light, {}])
+    const { className } = screen.getByTestId('box')
+    expect(ruleOf(className)).toBe(`.${className}{color:blue;}`)
+    // The engine keeps the shape of the tokens that the provider gave it; it is not a given theme.
+    expect([getEngine().baseTheme, getEngine().givenTheme]).toEqual([light, undefined])
+  })
+
   it('makes keyframes and global styles before configure, and writes them through Global with no theme', () => {
     const style = createDefaultStyle()
     const fade = style.keyframes({ from: { opacity: 0 } }, { label: 'fade' })
@@ -145,6 +172,7 @@ describe('the default style', () => {
     expect(override).toMatch(/^late-/)
     expect(sheet.rules).toContain(`@layer late-overrides{.${override}{padding:8px;color:red;}}`)
     expect(String(card)).toMatch(/^late-/)
+    expect([loud.styles, loud.name]).toEqual(['padding:8px;color:red;', loud.className])
   })
 
   it('has its tag shorthands as own members: copying them uses nothing, so configure still works', () => {
@@ -206,7 +234,7 @@ describe('the contexts of the prefix of the default style', () => {
     style.configure({ prefix: 'claim-a', theme: light })
     const found = readPrefixStyle('claim-a')
     expect(found.contexts.ThemeContext).toBe(style.ThemeContext)
-    expect(found.holder?.baseTheme).toBe(light)
+    expect(found.holder?.givenTheme).toBe(light)
     expect(readPrefixStyle('claim-a')).toBe(found)
   })
 
@@ -214,13 +242,13 @@ describe('the contexts of the prefix of the default style', () => {
     const fromCache = createDefaultStyle()
     fromCache.configure({ cache: createCache({ prefix: 'claim-b', sheet: createMemorySheet() }) })
     expect(readPrefixStyle('claim-b').contexts.ThemeContext).toBe(fromCache.ThemeContext)
-    expect(readPrefixStyle('claim-b').holder?.baseTheme).toBeUndefined()
+    expect(readPrefixStyle('claim-b').holder?.givenTheme).toBeUndefined()
     const engine = createLazyEngine({ prefix: 'claim-c' })
     engine.setTheme(other)
     const fromEngine = createDefaultStyle()
     fromEngine.configure({ engine })
     expect(readPrefixStyle('claim-c').contexts.ThemeContext).toBe(fromEngine.ThemeContext)
-    expect(readPrefixStyle('claim-c').holder?.baseTheme).toBe(other)
+    expect(readPrefixStyle('claim-c').holder?.givenTheme).toBe(other)
   })
 
   it('claims css with no options, and the prefix and base theme of its engine once used', () => {
@@ -229,7 +257,7 @@ describe('the contexts of the prefix of the default style', () => {
     style.configure({ prefix: 'claim-d' })
     style.getEngine().setTheme(light)
     expect(readPrefixStyle('claim-d').contexts.ThemeContext).toBe(style.ThemeContext)
-    expect(readPrefixStyle('claim-d').holder?.baseTheme).toBe(light)
+    expect(readPrefixStyle('claim-d').holder?.givenTheme).toBe(light)
   })
 
   it('shares the contexts of a prefix with each createStyle of that prefix', () => {
@@ -240,7 +268,7 @@ describe('the contexts of the prefix of the default style', () => {
     expect(createStyle(other, { prefix: 'claim-f' }).ThemeContext).toBe(
       createStyle(light, { prefix: 'claim-f' }).ThemeContext
     )
-    expect(readPrefixStyle('claim-f').holder?.baseTheme).toBe(other)
+    expect(readPrefixStyle('claim-f').holder?.givenTheme).toBe(other)
   })
 })
 

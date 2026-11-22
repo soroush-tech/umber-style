@@ -2,6 +2,7 @@ import type { Cache } from './cache'
 import type { Styler } from './createEngine'
 import { mergeStyles, type StyleObject } from './serialize'
 import { flattenStyle, readEntryStyle, type SheetEntry } from './sheetEntry'
+import type { SerializedStyles } from './styleTypes'
 import { isTemplateStrings, parseStyleTemplate } from './templateStyle'
 import type { StyleInput } from './types'
 import type { WebStyleObject } from './webStyle'
@@ -64,10 +65,12 @@ export function readCssStyle(
 /**
  * `css()` of a web binding over `cache`: one sheet entry of the merged style (see `readCssStyle`). Its
  * class name is worked out now and its rule is written when the entry is first used, as an entry of a
- * sheet; equal styles give the same class.
+ * sheet; equal styles give the same class. Its `name` and `styles` are read without writing the rule.
  */
-export function createCssEntry(cache: Cache, args: readonly unknown[]): SheetEntry {
-  return cache.createEntry(readCssStyle(args, cache.findEntry) as WebStyleObject)
+export function createCssEntry(cache: Cache, args: readonly unknown[]): SerializedStyles {
+  return cache.createEntry(
+    readCssStyle(args, cache.findEntry) as WebStyleObject
+  ) as SerializedStyles
 }
 
 /**

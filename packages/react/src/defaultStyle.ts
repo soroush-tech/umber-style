@@ -51,8 +51,8 @@ export function createDefaultStyle() {
     {
       contexts: contexts as never,
       holder: {
-        get baseTheme() {
-          return bound?.engine.baseTheme ?? pending.theme ?? pending.engine?.baseTheme
+        get givenTheme() {
+          return bound?.engine.givenTheme ?? pending.theme ?? pending.engine?.givenTheme
         },
       },
     }

@@ -204,6 +204,11 @@ function splitSelectors(selector: string): string[] {
   return parts
 }
 
+/** `selector` as the engine writes a selector list: each part trimmed, joined by `,` with no space (`html, body` is `html,body`). */
+export function toSelectorText(selector: string): string {
+  return splitSelectors(selector).join(',')
+}
+
 /** The selector of one part of a key inside one parent: `&` is the parent, a leading colon is the parent itself, anything else is a descendant. */
 function joinSelector(one: string, part: string): string {
   if (part.includes('&')) return part.replaceAll('&', one)

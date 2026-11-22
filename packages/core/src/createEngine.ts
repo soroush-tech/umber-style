@@ -104,10 +104,16 @@ export interface ThemeText {
 export interface Engine<T> {
   /** The cache that every rule of the engine is written to. */
   cache: Cache
-  /** Whether a base theme is known: it is given by `setTheme`, or by the first `themeClass`. */
+  /** Whether a base theme is known: it is given by `setTheme`, or adopted from the first `themeClass` or provider (`adoptTheme`). */
   readonly hasTheme: boolean
-  /** The base theme, the real values, or undefined while there is none. */
+  /** The base theme, the real values, or undefined while there is none: the shape of the tokens and of the root rule, given or adopted. */
   readonly baseTheme: T | undefined
+  /**
+   * The base theme that was given on purpose: by `createEngine(theme)` or `setTheme` (what `createStyle(theme)`
+   * and `configure({ theme })` of a binding call), never one adopted from a provider or a `themeClass`.
+   * What a binding gives as the theme where no provider is above; undefined while none was given.
+   */
+  readonly givenTheme: T | undefined
   /** The view of the base theme: its shape, with a var(--name) reference for each token. Throws while there is no theme. */
   readonly refs: T
   /** The token options of the engine, with the prefix of its cache: what names the variables of a theme and decides which values are tokens. */
@@ -119,8 +125,13 @@ export interface Engine<T> {
    * that a component that reads the view does not render again when only variables change.
    */
   createThemeView(realTheme: T): T
-  /** Gives the engine its base theme. The same object again does nothing; another one replaces the base. */
+  /** Gives the engine its base theme, on purpose: it is `baseTheme` and `givenTheme`. The same object again does nothing; another one replaces the base. */
   setTheme(theme: T): void
+  /**
+   * Makes `theme` the base theme when the engine has none, for the shape of its tokens and its root rule,
+   * without giving it (`givenTheme` stays as it is): what the first provider does. Does nothing when there is one.
+   */
+  adoptTheme(theme: T): void
   /** `css` of the cache: one class in the `components` layer for style objects, sheet entries and class names. */
   css: Cache['css']
   /**
@@ -212,6 +223,8 @@ export interface Engine<T> {
 /** What the engines of one theme share: the base theme, and the engine of each cache. */
 interface EngineFamily<T> {
   theme: T | undefined
+  /** The base theme as it was given on purpose (`setTheme`), not adopted from the first theme seen. */
+  givenTheme: T | undefined
   engines: WeakMap<Cache, Engine<T>>
 }
 
@@ -273,7 +286,11 @@ function createTokenSignature(values: readonly unknown[]): string {
 
 /** Makes an engine that has no theme yet: it takes one from `setTheme`, or from the first `themeClass`. It needs no framework. */
 export function createLazyEngine<T extends object = Theme>(options: EngineOptions = {}): Engine<T> {
-  return createFamilyEngine(options, { theme: undefined, engines: new WeakMap() })
+  return createFamilyEngine(options, {
+    theme: undefined,
+    givenTheme: undefined,
+    engines: new WeakMap(),
+  })
 }
 
 /** Makes an engine of `family`: its cache is the one in `options` or a new one; its base theme is the family's. */
@@ -282,7 +299,7 @@ function createFamilyEngine<T extends object>(
   family: EngineFamily<T>
 ): Engine<T> {
   const { cache: given, suffix, hasLabels, hasLayers, hasPruning, hasColorFallbacks } = options
-  const { hasScope, hasBaseClass, hasDevChecks, hasValueRepair } = options
+  const { hasScope, hasBaseClass, hasDevChecks, hasValueRepair, hasRuleText } = options
   const { alwaysDeclare = [] } = options
   const { rawKeys, lengthKeys, modes, registered, prefix: optionPrefix } = options
   if (given && optionPrefix !== undefined && optionPrefix !== given.prefix) {
@@ -304,6 +321,7 @@ function createFamilyEngine<T extends object>(
       hasScope,
       hasBaseClass,
       hasDevChecks,
+      hasRuleText,
       tokenSignature: createTokenSignature([rawKeys, lengthKeys, modes, registered, alwaysDeclare]),
     })
   const tokenOptions: TokenOptions = { prefix, rawKeys, lengthKeys, modes, registered }
@@ -339,6 +357,13 @@ function createFamilyEngine<T extends object>(
 
   const setTheme = (theme: T) => {
     family.theme = theme
+    family.givenTheme = theme
+    sync()
+  }
+
+  const adoptTheme = (theme: T) => {
+    if (family.theme !== undefined) return
+    family.theme = theme
     sync()
   }
 
@@ -364,7 +389,7 @@ function createFamilyEngine<T extends object>(
   // A theme object is read once per color scheme: a theme object is not changed after it is used.
   const themeClasses = new WeakMap<object, Map<string, string>>()
   const themeId = (partial: DeepPartial<T>, colorScheme?: ColorScheme) => {
-    if (family.theme === undefined) setTheme(partial as T)
+    adoptTheme(partial as T)
     const key = colorScheme ?? ''
     const known = themeClasses.get(partial) ?? new Map<string, string>()
     themeClasses.set(partial, known)
@@ -378,7 +403,7 @@ function createFamilyEngine<T extends object>(
   // The root rule of a theme object is worked out once per color scheme, like a theme class.
   const roots = new WeakMap<object, Map<string, [string, Record<string, string>]>>()
   const declareRoot = (theme: T, colorScheme?: ColorScheme) => {
-    if (family.theme === undefined) setTheme(theme)
+    adoptTheme(theme)
     const key = colorScheme ?? ''
     const known = roots.get(theme) ?? new Map<string, [string, Record<string, string>]>()
     roots.set(theme, known)
@@ -477,9 +502,10 @@ function createFamilyEngine<T extends object>(
     const labels = list.filter((style) => labelStyles.has(style as object)) as { label: string }[]
     const fullLabel = labels.reduce((joined, style) => joinLabels(joined, style.label), '')
     const hasFunction = list.some(isStyleFunction)
-    // What a function returns is checked in development only; a list needs no work of its own here,
-    // because the cache reads lists in order.
-    const isChecked = hasFunction && isDevelopment()
+    // What a function returns is checked with the development checks (the option, else those of the
+    // cache, or a development build); a list needs no work of its own here, because the cache reads lists
+    // in order.
+    const isChecked = hasFunction && (hasDevChecks ?? (cache.hasDevChecks || isDevelopment()))
     const resolveStyle = (
       style: StyleInput,
       props: Record<string, unknown>,
@@ -656,6 +682,9 @@ function createFamilyEngine<T extends object>(
     get baseTheme() {
       return family.theme
     },
+    get givenTheme() {
+      return family.givenTheme
+    },
     get refs() {
       return readTokens().refs
     },
@@ -664,6 +693,7 @@ function createFamilyEngine<T extends object>(
     keyframes,
     insertKeyframes: cache.insertKeyframes,
     setTheme,
+    adoptTheme,
     createThemeView,
     themeClass,
     themeId,

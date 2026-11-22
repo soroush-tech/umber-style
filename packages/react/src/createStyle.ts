@@ -127,6 +127,6 @@ export function createStyle<T extends object>(
   options: StyleOptions<T> = {}
 ): WebStyle<T> {
   const engine = options.engine ?? createEngine(theme, options)
-  if (!engine.hasTheme) engine.setTheme(theme)
+  if (engine.givenTheme === undefined) engine.setTheme(theme)
   return bindEngine(engine, options)
 }

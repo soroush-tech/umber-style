@@ -85,19 +85,9 @@ The rendered `Box` is:
 
 and the rules for the card:
 
-```css
-@layer umber-components {
-  .umber-card-root-1l5hymm {
-    color: inherit;
-  }
-}
-@layer umber-overrides {
-  .umber-card-root-qkafnl {
-    padding: var(--umber-space-2);
-    background-color: var(--umber-palette-primary);
-    opacity: 0.9;
-  }
-}
+```text
+@layer umber-components{.umber-card-root-1l5hymm{color:inherit;}}
+@layer umber-overrides{.umber-card-root-qkafnl{padding:var(--umber-space-2);background-color:var(--umber-palette-primary);opacity:0.9;}}
 ```
 
 The component has two classes: its own (`umber-card-root-1l5hymm`) and one override class for everything it was given from outside. A component that has props-dependent styles has a base class and a props class instead of the one, see [Cascade layers and overrides](cascade-layers.md). The override class is in a later cascade layer, so it wins.
@@ -157,7 +147,27 @@ On the web the value is a sheet entry of the merged style: an entry like one of 
 - in the `style` prop of a styled component, alone (its own class in the `overrides` layer, permanent, shared by every user) or in a list (merged with the rest);
 - in another `css()`, in `apply`, among the styles of `styled` (`Button` above), and under a selector of global styles (`{ body: value }`).
 
-A function is a `TypeError`: `css()` has no props to call it with. Give a function style to `styled`.
+On the web the value also has `name` and `styles`. Reading either writes no rule:
+
+- `name` is the class name of the value used on its own: what `String(value)`, `className` and `apply(value)` give, and what a plain element gets. Given alone to the `style` of a styled component the value gets another class, in the `overrides` layer.
+- `styles` is the CSS text of the style, in the engine's text format (see [How it works](how-it-works.md#the-text-of-a-rule)): its declarations, then each nested rule as the engine writes it, with `&` standing for the class (`&:hover{...}`, `@media (min-width: 40em){&{...}}`). It is made the first time it is read.
+
+The values are those of the object. From `packages/react/src/css.test.tsx`, an app's helper that makes a `css()` value from the theme that `useTheme()` returns:
+
+```tsx
+const createGlobalStyles = (real: typeof theme) =>
+  css({ '&::backdrop': { backgroundColor: real.palette.primary }, border: 'none' })
+
+function Reader() {
+  const value = createGlobalStyles(useTheme())
+  // value.styles is 'border:none;&::backdrop{background-color:#0000ff;}'
+  return <Global styles={{ dialog: value }} />
+}
+```
+
+`styles` holds the real values of the theme, `#0000ff`, because the object holds them. An object built from the theme that a style function gets holds references, and its `styles` holds `var(--umber-palette-primary)`.
+
+A function is a `TypeError`: `css()` has no props to call it with, and so no `css()` value is made from a function of the theme. Give a function style to `styled`.
 
 `css` of the default style (`import { css } from '@umber-style/react'`) can be called at module level before `configure()`: the value stands for the entry, which is made on its first use, with the options that `configure` gave. `css` of `createStyle()` makes the entry at once.
 
@@ -190,42 +200,19 @@ The button has the Button's class and an override class, and both keep the label
 <button class="umber-button-root-sx8930 umber-button-root-11gr2ac">Delete</button>
 ```
 
-```css
-@layer umber-components {
-  .umber-button-root-sx8930 {
-    background-color: var(--umber-palette-primary);
-    border-radius: 8px;
-  }
-}
-@layer umber-components {
-  .umber-button-root-sx8930:hover {
-    background-color: var(--umber-palette-hover);
-  }
-}
-@layer umber-overrides {
-  .umber-button-root-11gr2ac {
-    background-color: firebrick;
-    border-radius: 0;
-  }
-}
-@layer umber-overrides {
-  .umber-button-root-11gr2ac:hover {
-    background-color: darkred;
-  }
-}
+```text
+@layer umber-components{.umber-button-root-sx8930{background-color:var(--umber-palette-primary);border-radius:8px;}}
+@layer umber-components{.umber-button-root-sx8930:hover{background-color:var(--umber-palette-hover);}}
+@layer umber-overrides{.umber-button-root-11gr2ac{background-color:firebrick;border-radius:0;}}
+@layer umber-overrides{.umber-button-root-11gr2ac:hover{background-color:darkred;}}
 ```
 
 Because the override class is in a later layer, its `background-color` beats the Button's `:hover` background even though the entry has no `:hover` rule of its own: a later layer wins whatever the specificity. `dangerHover` is there to give the hovered button a colour of its own.
 
 Given one entry alone, `<Button style={overrides.danger}>Delete</Button>`, the button is `<button class="umber-button-root-sx8930 umber-sz1m68">`, and the entry's own override class is the only rule written for it:
 
-```css
-@layer umber-overrides {
-  .umber-sz1m68 {
-    background-color: firebrick;
-    border-radius: 0;
-  }
-}
+```text
+@layer umber-overrides{.umber-sz1m68{background-color:firebrick;border-radius:0;}}
 ```
 
 That class has no label of the Button, because it is the entry's class and the same one for every component that is given the entry. With `hasLayers: false` there is no such class: what is given from outside is always merged into the one class.
@@ -303,6 +290,7 @@ A sheet entry in the `style` prop only works on a component made by `styled()`. 
 
 ## Limits
 
+- `name` and `styles` of a `css()` value exist on the web only: on React Native `css()` returns a native style. `styles` is the text of the style alone, not of the rule a cache writes for it: there is no class and no cascade layer in it.
 - The shared types are the intersection of the two platforms, so a web-only value (`display: 'grid'`, the `border` shorthand, `display: 'block'`) is a type error in shared code and belongs in `web`. See [Typed styles](typed-styles.md).
 - A length with a unit (`'10px'`) and a shorthand with several values type-check in shared code, because the platform's own types accept any string there. React Native warns about them in development; the web writes what you give.
 - An object sheet cannot use tokens, and on React Native it drops `when()` and `whenScheme()` keys. Both need a function sheet and `useStyle`.

@@ -143,8 +143,9 @@ describe('global rules in a browser sheet', () => {
   const texts = (element: HTMLStyleElement) =>
     [...(element.sheet as CSSStyleSheet).cssRules].map((rule) => rule.cssText.replace(/\s+/g, ''))
 
-  it('are deleted from the style element where they are at the time', () => {
-    const { cache, insert } = setup({ hasLayers: false, sheet: createDomSheet('u') })
+  it('are deleted from the style element where they are at the time, written by insertRule', () => {
+    const sheet = createDomSheet('u', undefined, { hasRuleText: false })
+    const { cache, insert } = setup({ hasLayers: false, sheet })
     const element = document.querySelector('style[data-style="u"]') as HTMLStyleElement
     const releaseReset = insert(reset)
     const releaseApp = insert(app)
@@ -163,6 +164,22 @@ describe('global rules in a browser sheet', () => {
     releaseApp()
     expect(texts(element)).toEqual(['main{order:1;}', expect.stringMatching(/color:blue/)])
     expect(cache.extract().css).toMatch(/^\.u-\w+\{color:blue;\}$/)
+  })
+
+  it('leave the text of the style element when released, written by text', () => {
+    const sheet = createDomSheet('u', undefined, { hasRuleText: true })
+    const { cache, insert } = setup({ hasLayers: false, sheet })
+    const element = document.querySelector('style[data-style="u"]') as HTMLStyleElement
+    const releaseReset = insert(reset)
+    const releaseApp = insert(app)
+    const name = cache.css({ color: 'blue' })
+    releaseReset()
+    expect(element.textContent).toBe(
+      `body{color:red;}#root{isolation:isolate;}.${name}{color:blue;}`
+    )
+    releaseApp()
+    expect(element.textContent).toBe(`.${name}{color:blue;}`)
+    expect(texts(element)).toEqual([`.${name}{color:blue;}`])
   })
 })
 

@@ -95,12 +95,13 @@ export function createThemeProvider<T extends object>(baseEngine: Engine<T>, key
       // The scope of a provider of another engine (another cache) is not this one's: it starts its own.
       const scope = inject(keys.engine, null) === engine ? inject(keys.scope, null) : null
       const isNested = scope !== null && !props.isRoot
-      const readOuter = () => outer?.value ?? engine.baseTheme
+      const readOuter = () => outer?.value ?? engine.givenTheme
       const given = computed(() =>
         resolveThemeInput(props.theme as ThemeInput<T>, readOuter() ?? (EMPTY_THEME as T))
       )
-      // The first provider gives the engine its base theme, before its children are set up.
-      if (!engine.hasTheme) engine.setTheme(given.value as T)
+      // The first provider gives the engine the shape of its tokens, before its children are set up. It is
+      // not a given base theme: what has no provider above never reads it.
+      engine.adoptTheme(given.value as T)
       const merged = computed(() => mergeTheme(readOuter(), given.value))
       const classes = computed(() => {
         const own = engine.themeClass(given.value, props.colorScheme)

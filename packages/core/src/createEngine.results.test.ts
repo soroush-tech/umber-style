@@ -163,6 +163,36 @@ describe('what a style function returns that is not a style', () => {
     )
   })
 
+  it('is warned about in a test run with hasDevChecks, of the engine or of its cache, and not with it off', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const own = createEngine(theme, { prefix: 'dc', hasDevChecks: true })
+    own
+      .createStyler(
+        {},
+        asStyles(() => 7)
+      )
+      .getClassName({})
+    const { engine } = setup({ hasDevChecks: true })
+    engine
+      .createStyler(
+        {},
+        asStyles(() => 8)
+      )
+      .getClassName({})
+    vi.stubEnv('NODE_ENV', 'development')
+    const off = createEngine(theme, { prefix: 'off', hasDevChecks: false })
+    off
+      .createStyler(
+        {},
+        asStyles(() => 9)
+      )
+      .getClassName({})
+    expect(warn.mock.calls.map(([message]) => message)).toEqual([
+      '[dc] A style function returned 7, which is not a style: return a style object, a css() value, a list of them, null, undefined or false.',
+      '[r] A style function returned 8, which is not a style: return a style object, a css() value, a list of them, null, undefined or false.',
+    ])
+  })
+
   it('is not warned about outside development: a string is a class name, and the rest is left out', () => {
     vi.stubEnv('NODE_ENV', 'production')
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)

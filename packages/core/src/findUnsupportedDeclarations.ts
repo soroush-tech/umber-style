@@ -128,13 +128,26 @@ function stripImportant(value: string): string {
   return before.endsWith('!') ? before.slice(0, -1).trimEnd() : value
 }
 
-/** What a message names a rule by: its `@keyframes` rule, the last class of the engine in its selector, or its selector for a global rule. */
-function describeRule({ selector, parent }: StyleRuleText, classPattern: RegExp): string {
+/**
+ * What a message names a rule by: its `@keyframes` rule, the last class of the engine in its selector with
+ * the label of its component when it has one, or its selector for a global rule.
+ */
+function describeRule(
+  { selector, parent }: StyleRuleText,
+  classPattern: RegExp,
+  readLabel: (className: string) => string
+): string {
   if (parent.startsWith(KEYFRAMES_AT_RULE)) {
     return `the keyframes ${parent.slice(KEYFRAMES_AT_RULE.length).trim()}`
   }
   const name = [...selector.matchAll(classPattern)].at(-1)?.[1]
-  return name === undefined ? `the global rule ${selector}` : `the class ${name}`
+  if (name === undefined) return `the global rule ${selector}`
+  return describeClass(name, readLabel(name))
+}
+
+/** What a message names a class by: the class, and the label of its component when it has one (`of "Button-root"`). */
+export function describeClass(className: string, label: string): string {
+  return label ? `the class ${className} of "${label}"` : `the class ${className}`
 }
 
 /**
@@ -144,25 +157,30 @@ function describeRule({ selector, parent }: StyleRuleText, classPattern: RegExp)
  * with a vendor prefix is written for another browser, as is a value that starts with a vendor prefix
  * (`-moz-available`, `-webkit-linear-gradient(...)`). For a value with `var(`, which is valid until it
  * is used, the browser is asked whether it knows the property at all. `!important` is not part of the
- * question. At-rules with descriptors (`@property`, `@font-face`) are not asked about.
+ * question. At-rules with descriptors (`@property`, `@font-face`) are not asked about. A class is named with
+ * the label that `readLabel` gives for it, when there is one.
  */
 export function findUnsupportedDeclarations(
   texts: readonly string[],
   prefix: string,
-  supports: Supports
+  supports: Supports,
+  readLabel: (className: string) => string = () => ''
 ): string[] {
-  const classPattern = new RegExp(String.raw`\.(${prefix}-[a-z0-9_-]*)`, 'g')
+  // A label is written as it is given, capitals too (`Typography-Link`).
+  const classPattern = new RegExp(String.raw`\.(${prefix}-[\w-]*)`, 'g')
   const messages: string[] = []
   for (const text of texts) {
-    for (const rule of readStyleRules(text)) addRuleMessages(rule, classPattern, supports, messages)
+    for (const rule of readStyleRules(text)) {
+      addRuleMessages(rule, describeRule(rule, classPattern, readLabel), supports, messages)
+    }
   }
   return messages
 }
 
-/** Adds to `messages` a message for each last declaration of `rule` that the browser does not support (see `findUnsupportedDeclarations`). */
+/** Adds to `messages` a message for each last declaration of `rule` (named `owner`) that the browser does not support (see `findUnsupportedDeclarations`). */
 function addRuleMessages(
   rule: StyleRuleText,
-  classPattern: RegExp,
+  owner: string,
   supports: Supports,
   messages: string[]
 ): void {
@@ -171,7 +189,6 @@ function addRuleMessages(
     if (name.startsWith('-') || VENDOR_VALUE.test(plain)) continue
     const asked = plain.includes('var(') ? 'inherit' : plain
     if (supports(name, asked)) continue
-    const owner = describeRule(rule, classPattern)
     messages.push(`${owner} declares ${name}:${value}, which this browser does not support`)
   }
 }

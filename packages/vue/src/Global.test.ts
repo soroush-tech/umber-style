@@ -46,7 +46,7 @@ describe('Global in the browser', () => {
     }))
     const { element, app } = mount(() => h(Global, { styles: base }))
     expect(element.textContent).toBe('')
-    expect(rules).toEqual(['html, body{margin:0;color:var(--g-palette-text);}'])
+    expect(rules).toEqual(['html,body{margin:0;color:var(--g-palette-text);}'])
     app.unmount()
     expect(rules).toEqual([])
   })
@@ -97,7 +97,7 @@ describe('Global in the browser', () => {
         ? h(Global, { styles: { '*, *::before, *::after': { boxSizing: 'border-box' } } })
         : null,
     ])
-    expect(rules).toEqual(['*, *::before, *::after{box-sizing:border-box;}'])
+    expect(rules).toEqual(['*,*::before,*::after{box-sizing:border-box;}'])
     count.value = 1
     await nextTick()
     expect(rules).toHaveLength(1)

@@ -93,7 +93,7 @@ export function createThemeProvider<T extends object>(
     { colorScheme, className, as = 'div' }: WebThemeProviderProps<T>,
     isFirst: boolean
   ): ScopeTheme => {
-    const { cache, baseTheme } = engine
+    const { cache, givenTheme: baseTheme } = engine
     const text = engine.readThemeText(given)
     const classId = createThemeId(prefix, text.declarations, colorScheme)
     const own = text.declarations + (colorScheme ? `color-scheme:${colorScheme};` : '')
@@ -131,8 +131,8 @@ export function createThemeProvider<T extends object>(
     const known = described.get(given) ?? new Map()
     described.set(given, known)
     let made = known.get(key)
-    if (made === undefined || made.base !== engine.baseTheme) {
-      made = { base: engine.baseTheme, theme: describe(given, props, isFirst) }
+    if (made === undefined || made.base !== engine.givenTheme) {
+      made = { base: engine.givenTheme, theme: describe(given, props, isFirst) }
       known.set(key, made)
     }
     return made.theme

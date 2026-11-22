@@ -96,7 +96,24 @@ With `hasDevChecks` (on in development where there is a `document`, see [Options
 - An element with a class of the engine that no rule names (`findMissingStyles`).
 - A variable of the engine that a rule matching the element uses without a fallback, and that has no value on the element.
 - A global rule for `html`, `body` or `:root` whose variables have no value there: no outermost provider declares its theme on `:root`, and no theme class is on `<html>`.
-- A declaration of a rule that the cache inserted, or of a global rule it wrote, that the browser does not support, asked with `CSS.supports`: `[umber] the class umber-x1 declares elevation:2px, which this browser does not support`. A global rule is named by its selector, a step of `@keyframes` by the name of the animation.
+- A declaration of a rule that the cache inserted, or of a global rule it wrote, that the browser does not support, asked with `CSS.supports`: `[umber] the class umber-x1 declares elevation:2px, which this browser does not support`. A class with a label is named with its component: `[umber] the class umber-Button-root-x1 of "Button-root" declares border-color:light, which this browser does not support` (checked in Chromium). A global rule is named by its selector, a step of `@keyframes` by the name of the animation.
+
+Two more checks need no page and no browser, so they run wherever the checks are on, in jsdom and on a server too:
+
+- A value that no CSS property takes, whatever the property, which the engine can tell by itself: `true`, a function, a number that is not finite (`NaN`, `Infinity`), and an object in a list of values: `[umber] the class umber-wide-root-x1 of "wide-root" declares "width" as true, which is never a CSS value: give a string or a number.` A word such as `light` is not one of them: whether a property takes it is for the browser to say, through `CSS.supports` above.
+- What a style function returns that is not a style (a string, a number, `true`, a function): `[umber] A style function of "Odd" returned 1, which is not a style: ...`. The engine checks it.
+
+### The checks in a test run
+
+The checks are off by default in a test run (`process.env.NODE_ENV` is `test`, not `development`). `hasDevChecks: true` turns them on; give it where the style is configured for the tests, for example in a setup file that vitest runs before each test file (`setupFiles` in `vitest.config.ts`). From `packages/react/src/devChecks.test.tsx`:
+
+```ts
+import { configure } from '@umber-style/react'
+
+configure({ prefix: 'app', theme, hasDevChecks: true })
+```
+
+A style function that returns `3` and a style with `width: true` each warn once then. In jsdom `CSS.supports` is not asked (jsdom answers from a table of its own), so `borderColor: 'light'` says nothing there; it does in a browser. The page check (`findMissingStyles`) runs in jsdom too, after its wait of 250 milliseconds. The warnings of React Native (a dropped web-only key, a value it does not convert) do not read `hasDevChecks`: they are on wherever `process.env.NODE_ENV` is not `production`, so a test run has them already.
 
 What it does not report:
 
@@ -106,7 +123,7 @@ What it does not report:
 - The value of a declaration that holds `var(`: such a value is valid until it is used, so the browser is asked whether it knows the property at all.
 - Anything about declarations where `CSS.supports` is missing, throws, or does not answer like a browser: a server, and jsdom, which answers from a table of its own.
 - The descriptors of `@property` and `@font-face`, and `!important`, which is left out of the question.
-- A rule that the browser rejects as a whole (a selector or an at-rule it does not know, such as `@scope` in a browser without it): the sheet skips it without a word, as before. Its declarations are still asked about.
+- A rule that the browser rejects as a whole (a selector or an at-rule it does not know, such as `@scope` in a browser without it): written with `insertRule` the sheet skips it, written as text the browser drops it when it parses the text, without a word either way. Its declarations are still asked about.
 - The rules that reach the page in style elements (written by a server, or rendered by React and hoisted into the head): the cache does not insert them, so they are not asked about.
 
 ## Tier 3 in development
@@ -150,3 +167,5 @@ The tests change `fixtures/shared/src/components.tsx`, `fixtures/shared/src/page
 - The text of a rule that a browser cache inserted after load is not seen by the rule usage tracking: scenario E does not apply to a client-only app.
 - The class on `<html>` is switched by script. A page with scripting disabled stays in the scheme that the server chose.
 - The development checker's question to `CSS.supports` is tested in Chromium only: what Firefox or WebKit would reject is not observed.
+- The check of values that no property takes reads the styles of classes and of global styles. The steps of a `keyframes` and what a style function hands on inside a nested object are checked only as part of the class they make.
+- In a test run the DOM sheet writes its rules as text, as in development; a test that reads `sheet.cssRules` reads what jsdom parsed from that text. A test that needs the way of production gives `hasRuleText: false`. The unit tests of the core run the tests of what a cache writes to a document twice, once in each way (the `text` and `insertRule` projects of `packages/core/vitest.config.ts`).

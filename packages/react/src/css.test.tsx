@@ -84,6 +84,33 @@ describe('css', () => {
     expect(sheet.rules).toContain('@layer c-global{body{margin:0;}}')
   })
 
+  it('has the name and the text of its style, the real values of a theme read with useTheme, and writes no rule for them', () => {
+    const { css, useTheme, ThemeProvider, Global, sheet } = setup()
+    // An app's helper: css() of an object built from the real theme.
+    const createGlobalStyles = (real: typeof theme) =>
+      css({ '&::backdrop': { backgroundColor: real.palette.primary }, border: 'none' })
+    let value: ReturnType<typeof createGlobalStyles> | undefined
+    function Reader() {
+      value = createGlobalStyles(useTheme())
+      return <Global styles={{ dialog: value }} />
+    }
+    render(
+      <ThemeProvider theme={theme}>
+        <Reader />
+      </ThemeProvider>
+    )
+    const { name, styles } = value as ReturnType<typeof createGlobalStyles>
+    expect(styles).toBe('border:none;&::backdrop{background-color:#0000ff;}')
+    expect(name).toMatch(/^c-\w+$/)
+    expect(sheet.rules.some((rule) => rule.includes(`.${name}`))).toBe(false)
+    expect(sheet.rules.filter((rule) => rule.includes('dialog'))).toEqual([
+      '@layer c-global{dialog{border:none;}}',
+      '@layer c-global{dialog::backdrop{background-color:#0000ff;}}',
+    ])
+    render(<p data-testid="alone" className={String(value)} />)
+    expect(screen.getByTestId('alone').className).toBe(name)
+  })
+
   it('reads a tagged template as CSS text, and gives the class of the equal object', () => {
     const { css } = setup()
     const card = css`

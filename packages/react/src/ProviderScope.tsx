@@ -75,8 +75,8 @@ export function createThemeContexts<T>(): ThemeContexts<T> {
 export interface PrefixStyle {
   /** The contexts that every style of the prefix reads and its providers give. */
   readonly contexts: ThemeContexts<unknown>
-  /** What holds the base theme of the engine, once a style of the client build has one; undefined before. */
-  holder?: { readonly baseTheme: unknown }
+  /** What holds the base theme given to the engine, once a style of the client build has one; undefined before. */
+  holder?: { readonly givenTheme: unknown }
 }
 
 const prefixStyles = new Map<string, PrefixStyle>()
@@ -271,7 +271,7 @@ export function ProviderScope({
   const scope = theme === undefined ? (above?.scope ?? null) : (wrapper ?? null)
   const below = React.useMemo(() => addMark(marks, prefix, { scope }), [marks, prefix, scope])
   const { contexts, holder } = readPrefixStyle(prefix)
-  const outer = (React.use(contexts.ThemeContext) ?? holder?.baseTheme) as object | undefined
+  const outer = (React.use(contexts.ThemeContext) ?? holder?.givenTheme) as object | undefined
   const merged = React.useMemo(() => mergeTheme(outer, given), [outer, given])
   const styles = React.useMemo(() => {
     if (theme === undefined) return { list: [] as readonly StyleText[], rule: undefined }

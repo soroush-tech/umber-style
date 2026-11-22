@@ -114,7 +114,7 @@ describe('readGlobalStyles', () => {
 })
 
 describe('compileGlobalRules', () => {
-  it('writes the selectors of a base as they are given, nesting against them', () => {
+  it('writes the selectors of a base as a list joined by commas with no space, nesting against them', () => {
     expect(
       compile({
         '*, *::before, *::after': { boxSizing: 'border-box' },
@@ -126,11 +126,11 @@ describe('compileGlobalRules', () => {
         '::selection': { background: 'yellow' },
       })
     ).toEqual([
-      '*, *::before, *::after{box-sizing:border-box;}',
-      'html, body{margin:0;}',
+      '*,*::before,*::after{box-sizing:border-box;}',
+      'html,body{margin:0;}',
       'html:focus-within,body:focus-within{scroll-behavior:smooth;}',
-      'p, h1, h2, h3, h4, h5, h6{overflow-wrap:break-word;}',
-      'td, th{padding:4px;}',
+      'p,h1,h2,h3,h4,h5,h6{overflow-wrap:break-word;}',
+      'td,th{padding:4px;}',
       '#root{isolation:isolate;}',
       'main [id]{scroll-margin-top:64px;}',
       '::selection{background:yellow;}',
@@ -162,7 +162,7 @@ describe('compileGlobalRules', () => {
         '@media screen': { body: null },
       })
     ).toEqual([
-      '@media (width >= 600px){body{font-size:18px;}h1, h2{margin:0;}}',
+      '@media (width >= 600px){body{font-size:18px;}h1,h2{margin:0;}}',
       '@supports (display: grid){@media print{main{display:grid;}}}',
     ])
   })

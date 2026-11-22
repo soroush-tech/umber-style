@@ -38,7 +38,7 @@ describe('Global in the browser', () => {
     }))
     const { container, unmount } = render(<Global styles={base} />)
     expect(container.innerHTML).toBe('')
-    expect(rules).toEqual(['html, body{margin:0;color:var(--g-palette-text);}'])
+    expect(rules).toEqual(['html,body{margin:0;color:var(--g-palette-text);}'])
     unmount()
     expect(rules).toEqual([])
   })
@@ -109,7 +109,7 @@ describe('Global in the browser', () => {
       </>
     )
     const { rerender } = render(<App count={2} />)
-    expect(rules).toEqual(['*, *::before, *::after{box-sizing:border-box;}'])
+    expect(rules).toEqual(['*,*::before,*::after{box-sizing:border-box;}'])
     rerender(<App count={1} />)
     expect(rules).toHaveLength(1)
     rerender(<App count={0} />)

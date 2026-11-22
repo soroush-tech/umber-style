@@ -447,3 +447,21 @@ describe('the wrapper of a ThemeProvider', () => {
     expect(getComputedStyle(plain).display).not.toBe('contents')
   })
 })
+
+describe('the style element of a style', () => {
+  afterEach(() => {
+    document.head.innerHTML = ''
+  })
+
+  it('holds the rules as text outside production, and gets them with insertRule with hasRuleText false', () => {
+    const text = createStyle({}, { prefix: 'rt' })
+    const name = text.engine.css({ color: 'red' })
+    const readText = (prefix: string) =>
+      document.querySelector(`style[data-style="${prefix}"]`)?.textContent
+    expect(readText('rt')).toBe(
+      `@layer rt-theme,rt-global,rt-components,rt-overrides;@layer rt-components{.${name}{color:red;}}`
+    )
+    createStyle({}, { prefix: 'fast', hasRuleText: false }).engine.css({ color: 'red' })
+    expect(readText('fast')).toBe('')
+  })
+})

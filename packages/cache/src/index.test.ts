@@ -203,3 +203,24 @@ describe('a cache made in the browser', () => {
     expect(cache.inserted).toEqual({ 'soroush-framed': true })
   })
 })
+
+describe('how the style element of the cache is written', () => {
+  /** The text of the style element of the cache `key`. */
+  const readText = (key: string) =>
+    document.querySelector(`style[data-style="${key}"]`)?.textContent
+
+  it('holds the rules as text outside production, and takes speedy as kept for compatibility', () => {
+    const text = createCache({ key: 'text', hasDevChecks: false })
+    const box = text.css({ color: 'red' })
+    expect(readText('text')).toBe(
+      `@layer text-theme,text-global,text-components,text-overrides;@layer text-components{.${box}{color:red;}}`
+    )
+    createCache({ key: 'speedy', speedy: true, hasDevChecks: false }).css({ color: 'red' })
+    createCache({ key: 'slow', speedy: false, hasDevChecks: false }).css({ color: 'red' })
+    createCache({ key: 'both', speedy: false, hasRuleText: false, hasDevChecks: false }).css({
+      color: 'red',
+    })
+    expect([readText('speedy'), readText('both')]).toEqual(['', ''])
+    expect(readText('slow')).toContain('{color:red;}')
+  })
+})

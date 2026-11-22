@@ -1,7 +1,7 @@
 import type * as CSS from 'csstype'
 import { hashString } from './hash'
 import type { Scoping } from './scope'
-import { compileRules, type StyleObject } from './serialize'
+import { compileRules, toSelectorText, type StyleObject } from './serialize'
 import { readEntryStyle, type SheetEntry } from './sheetEntry'
 import { createStandIn, readStandIn } from './standIn'
 import type { TemplateValue } from './styleTypes'
@@ -150,7 +150,13 @@ function addGlobalItemRules(
 ): void {
   if (!GROUP_AT_RULE.test(key)) {
     rules.push(
-      ...compileRules(key, item as StyleObject, hasColorFallbacks, scoping, hasValueRepair)
+      ...compileRules(
+        toSelectorText(key),
+        item as StyleObject,
+        hasColorFallbacks,
+        scoping,
+        hasValueRepair
+      )
     )
     return
   }

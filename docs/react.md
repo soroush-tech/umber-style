@@ -112,7 +112,7 @@ The package has a second build for server components, picked by the `react-serve
 
 - The context part of the binding is a client module (it has the `'use client'` directive). Whether a framework treats it as one was not checked.
 - `useTheme()` returns the real theme, merged: do not mutate it. With no provider and no base theme it returns an empty object.
-- The value of `ThemeContext` is `undefined` with no provider above, where `useTheme()` returns the base theme. Every style of one prefix shares one `ThemeContext`, as it shares the marks of the providers: two styles with one prefix see each other's providers.
+- The value of `ThemeContext` is `undefined` with no provider above, where `useTheme()` returns the base theme given to `createStyle(theme)` or `configure({ theme })` (a theme that a provider gave the engine does not count), or an empty object. Every style of one prefix shares one `ThemeContext`, as it shares the marks of the providers: two styles with one prefix see each other's providers.
 - Below a provider of the server build, `useTheme()` reads the plain data of its theme only: a function or a class instance in that theme keeps the value of the theme above. See [Server rendering](server-rendering.md#what-crosses-to-the-browser).
 - Under a nested provider the DOM has one more element; a portal without `ThemeScope` sees the outer theme. See [Themes](themes.md).
 - The default style is a module singleton. Two copies of the package in one app are two engines.

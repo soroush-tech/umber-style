@@ -122,6 +122,38 @@ describe('createCssEntry', () => {
     const { cache } = setup()
     expect(String(createCssEntry(cache, []))).toBe('')
     expect(String(createCssEntry(cache, [false, null]))).toBe('')
+    expect(createCssEntry(cache, []).name).toBe('')
+    expect(createCssEntry(cache, []).styles).toBe('')
+  })
+
+  it('has the class name it is used under alone as its name, and the text of its style, with no rule written', () => {
+    const { cache, sheet } = setup()
+    const value = createCssEntry(cache, [
+      {
+        color: 'red',
+        border: 'none',
+        boxShadow: '0 1px 2px black',
+        width: 'calc(1px + 2px)',
+        '&::backdrop': { backgroundColor: 'rgba(0, 0, 0, 0.5)' },
+        '@media (min-width: 40em)': { padding: 16, '&:hover': { opacity: 0.5 } },
+      },
+    ])
+    expect(value.styles).toBe(
+      'color:red;border:none;box-shadow:0 1px 2px black;width:calc(1px + 2px);&::backdrop{background-color:rgba(0, 0, 0, 0.5);}@media (min-width: 40em){&{padding:16px;}}@media (min-width: 40em){&:hover{opacity:0.5;}}'
+    )
+    expect(value.name).toMatch(/^c-\w+$/)
+    expect(sheet.rules).toEqual([])
+    expect(value.className).toBe(value.name)
+    expect(sheet.rules[0]).toBe(
+      `.${value.name}{color:red;border:none;box-shadow:0 1px 2px black;width:calc(1px + 2px);}`
+    )
+  })
+
+  it('writes the nested rules alone when the style declares nothing of its own', () => {
+    const { cache } = setup()
+    expect(createCssEntry(cache, [{ '&:hover': { color: 'red' } }]).styles).toBe(
+      '&:hover{color:red;}'
+    )
   })
 })
 

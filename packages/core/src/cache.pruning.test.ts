@@ -256,22 +256,26 @@ describe('a page extracted on the server and hydrated', () => {
     expect(client.getRules(name)).toEqual([`.${name}{--u-a:5;color-scheme:light;}`])
   })
 
-  it('appends to the style element of the server in the browser, and not twice', () => {
-    const { server, darkName } = serverPage()
-    document.head.innerHTML = createStyleTag(server)
-    const count = () => document.querySelector('style')?.sheet?.cssRules.length
-    const before = count()
-    const client = createCache({ hasLayers: false, prefix: 'u', sheet: createDomSheet('u') })
-    createThemeClass(client, dark)
-    client.css({ color: 'var(--u-a)' })
-    expect(count()).toBe(before)
-    client.css({ margin: 'var(--u-d)' })
-    client.css({ margin: 'var(--u-d)' })
-    expect(count()).toBe((before ?? 0) + 2)
-    const rules = [...(document.querySelector('style')?.sheet?.cssRules ?? [])].map(
-      (rule) => rule.cssText
-    )
-    expect(rules.at(-1)).toContain(darkName)
-    expect(rules.at(-1)).toContain('--u-d: 4')
-  })
+  it.each([true, false])(
+    'writes after the rules of the server in the browser, and not twice, hasRuleText %s',
+    (hasRuleText) => {
+      const { server, darkName } = serverPage()
+      document.head.innerHTML = createStyleTag(server)
+      const readRules = () =>
+        [...document.querySelectorAll<HTMLStyleElement>('style[data-style="u"]')].flatMap(
+          (element) => [...(element.sheet?.cssRules ?? [])].map((rule) => rule.cssText)
+        )
+      const before = readRules().length
+      const sheet = createDomSheet('u', undefined, { hasRuleText })
+      const client = createCache({ hasLayers: false, prefix: 'u', sheet })
+      createThemeClass(client, dark)
+      client.css({ color: 'var(--u-a)' })
+      expect(readRules()).toHaveLength(before)
+      client.css({ margin: 'var(--u-d)' })
+      client.css({ margin: 'var(--u-d)' })
+      expect(readRules()).toHaveLength(before + 2)
+      expect(readRules().at(-1)).toContain(darkName)
+      expect(readRules().at(-1)).toContain('--u-d: 4')
+    }
+  )
 })

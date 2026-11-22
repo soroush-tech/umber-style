@@ -36,7 +36,7 @@ export function bindEngine<T extends object>(
   const readFirstSlot = createRequestSlot<DeepPartial<T> | undefined>(undefined, cache)
   let hasWarned = false
 
-  const readBaseTheme = (): T => engine.baseTheme ?? (EMPTY_THEME as T)
+  const readBaseTheme = (): T => engine.givenTheme ?? (EMPTY_THEME as T)
 
   /**
    * The base theme: the one given to `createStyle(theme)` or `configure({ theme })`, the same in every
@@ -45,7 +45,7 @@ export function bindEngine<T extends object>(
    * values is a client component, whose `useTheme()` reads them.
    */
   const useTheme = (): T => {
-    if (engine.baseTheme === undefined && !hasWarned && isDevelopment()) {
+    if (engine.givenTheme === undefined && !hasWarned && isDevelopment()) {
       hasWarned = true
       console.warn(
         `[${engine.cache.prefix}] useTheme() in a server component returns the base theme, and there is none: give the theme to createStyle(theme) or configure({ theme }) to read it in server components. It returns an empty object.`
@@ -54,10 +54,10 @@ export function bindEngine<T extends object>(
     return readBaseTheme()
   }
 
-  // The theme whose view function styles read: the base theme. With none, the theme of the first provider
-  // of the request gives the shape (tokens are references either way), else there is none.
+  // The theme whose view function styles read: the given base theme. With none, the theme of the first
+  // provider of the request gives the shape (tokens are references either way), else there is none.
   const readViewTheme = (): T =>
-    engine.baseTheme ?? (readFirstSlot().current as T | undefined) ?? (EMPTY_THEME as T)
+    engine.givenTheme ?? (readFirstSlot().current as T | undefined) ?? (EMPTY_THEME as T)
 
   const themeClass = (partial: DeepPartial<T>, colorScheme?: ColorScheme) =>
     engine.themeClass(partial, colorScheme)
@@ -104,6 +104,6 @@ export function createStyle<T extends object>(
   options: StyleOptions<T> = {}
 ): ServerStyle<T> {
   const engine = options.engine ?? createEngine(theme, options)
-  if (!engine.hasTheme) engine.setTheme(theme)
+  if (engine.givenTheme === undefined) engine.setTheme(theme)
   return bindEngine(engine)
 }
