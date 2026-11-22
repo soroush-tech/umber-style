@@ -33,8 +33,8 @@ flowchart TD
   loadPrevious --> missing
   missing -->|no| throw["throw: what to run (pnpm build, or previous.mjs)"]
   missing -->|yes| cases["cases: current, previous"]
-  cases --> call["a case runs with a context"]
-  call --> built{"operation made already?"}
+  cases --> callNode["a case runs with a context"]
+  callNode --> built{"operation made already?"}
   built -->|no| pick["select(context): this side's module"]
   pick --> make["run = scenario.build(module)"]
   make --> exec["return run()"]
