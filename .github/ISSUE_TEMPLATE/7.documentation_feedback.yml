@@ -15,6 +15,7 @@ body:
         - core
         - css
         - eslint-config
+        - is-prop-valid
         - react
         - react-native
         - server

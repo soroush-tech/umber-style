@@ -174,10 +174,10 @@ Give a function the type of your props with the type argument, as `Badge` does: 
 
 ## Which props reach the element
 
-`theme`, `className` and `style` are the component's own and never reach the element, and so is `as` where it replaces what is rendered (see [`as`](#as)). Of the other props, a string tag such as `'span'` receives by default only:
+`theme`, `className` and `style` are the component's own and never reach the element, and so is `as` where it replaces what is rendered (see [`as`](#as)). Of the other props, a string tag such as `'span'` receives by default only those that `@umber-style/is-prop-valid/react` is true for (see [Prop filters](prop-filters.md)):
 
-- the attributes of HTML and SVG, by the names React gives them (`id`, `title`, `type`, `disabled`, `tabIndex`, `htmlFor`, `viewBox`, `strokeWidth`, `xlinkHref` and the rest);
-- `data-*` and `aria-*` attributes, and event handlers (`onClick`, `onPointerDownCapture`: `on` followed by a capital letter);
+- the attributes of HTML and SVG, by the names React gives them (`id`, `title`, `type`, `disabled`, `tabIndex`, `htmlFor`, `viewBox`, `strokeWidth`, `xlinkHref` and the rest), and their older spellings (`class`, `for`, `autofocus`);
+- `data-*` and `aria-*` attributes in any case, `x-*`, and event handlers (`onClick`, `onPointerDownCapture`: `on` followed by a character whose code is below 91, a capital letter, a digit, `-` or `:`);
 - React's own props: `children`, `ref`, `key`, `dangerouslySetInnerHTML`, `defaultValue`, `defaultChecked`, `suppressHydrationWarning`, `suppressContentEditableWarning`.
 
 So a prop that only the styles read stays off the element:
@@ -195,7 +195,7 @@ renders `<button type="submit" data-test="b" aria-label="go" class="...">` with 
 
 `shouldForwardProp` replaces that default: with it, a prop reaches the element or the component exactly when it returns `true`, whatever is rendered. In `Badge` above, `(prop) => prop !== 'tone'` keeps `tone` off and forwards everything else, an unknown attribute included.
 
-The list of HTML and SVG attributes adds about 3 KB to the React binding, minified (1.7 KB gzipped). The Vue binding has no default filter: see [Vue](vue.md).
+The list is a module of `@umber-style/is-prop-valid`, a dependency of the binding that an app's bundler includes once: about 4.4 KB minified (2.3 KB gzipped). The Vue and React Native bindings have no default filter, and take the entry of their platform as `shouldForwardProp` when you give it: see [Prop filters](prop-filters.md), [Vue](vue.md) and [React Native](react-native.md).
 
 The filter is applied to what is finally rendered: if you change the element with `as`, the default filter is only used when the new element is a string, and a `shouldForwardProp` you give is used for any element.
 
@@ -342,6 +342,8 @@ What is between `${ }`:
 
 Give the props a type with the type argument, as `Title` does: the props are not inferred from the functions in a template. A template that cannot be read throws a `TypeError` with its line and the text around the place.
 
+**What the parser costs.** The parser of the template form is part of `@umber-style/core` and is loaded with it, by every binding, also by code that writes objects only: `css`, `keyframes`, `globalStyles` and `styled` import it statically, so a bundler cannot leave it out. It is about 4.7 kB of the 73.7 kB of the core minified (6.4%), and about 1.6 kB of 26.2 kB gzipped (6.0%). Measured with the bundler of the repository (rolldown 1.3, `--minify`, ESM) on `packages/core/src/index.ts`, once as it is and once with `templateStyle.ts` replaced by functions that read nothing: 73,706 and 68,977 bytes minified, 26,210 and 24,646 bytes after `gzip` at its default level.
+
 ## A styled component as a selector
 
 A styled component is a selector in a template, and in a key: as text it is `.` and a class that every element of it has.
@@ -367,6 +369,17 @@ The rules are `.umber-button-root-... .icon{margin-right:4px;}` and `.umber-butt
 3. else there is none, because the classes of its elements depend on the props or the theme, and using it as a selector throws a `TypeError` that asks for a `target`.
 
 In an object style write the key with `at`: `at(`&:hover ${Icon}`, { opacity: 0.8 })`.
+
+## Media keys on React Native
+
+A key that starts with `@media` is the same key on every platform. On the web it is a media rule, and the browser decides it. On React Native there is no style sheet to decide it, so the binding evaluates the query against the window and the system settings and merges the block of a query that matches:
+
+- `min-width`, `max-width`, `width`, the same three for `height`, and their range form (`width >= 600px`, `400px <= width < 800px`);
+- `orientation`, `prefers-color-scheme` and `prefers-reduced-motion`;
+- `and`, a comma list, `not`, and the media types `all`, `screen` and `only`;
+- lengths in `px` or with no unit, and `rem` and `em` as `remBase` times their number.
+
+Any other feature, media type or unit never matches, with a development warning that names it, and `@container` and `@supports` blocks are dropped. The matching blocks merge over the plain keys of their object in the order they are written, as on the web, and a component renders again only when the set of its matching queries changes. See [Media queries](react-native.md#media-queries) for the whole table, what is cached, and `useMediaQuery`.
 
 ## Animations and styles outside a class
 
@@ -420,6 +433,7 @@ Every class the merge makes carries the joined label: the override class with la
 
 - What the template form does not read: an at-rule that is a statement (`@import`, `@charset`) is an error; `/*` inside an unquoted `url(...)` starts a comment (quote the URL); an interpolation is a statement of its own only when it stands alone on its line, so `${card} color: red;` reads `${card} color` as a property name; a value is text, so a number without a unit (`padding: 8`) is written as `8`, where the object `{ padding: 8 }` writes `8px`; a nested selector without `&` (`a:hover { }`) is a descendant of the element.
 - The template form is not offered by `styled` on React Native in this release; `css` and `keyframes` take it there.
+- The parser of the template form is loaded by code that never writes a template: about 1.6 kB gzipped of the core (see [Template strings](#template-strings) for how it was measured). It is not split into a module of its own that loads on first use.
 - A styled component is a selector only by its `target` or, without a function style, by its class. A component that wraps it has its own class, so `${Button}` does not match the elements of `styled(Button)(...)`, except where the wrapper's styles start with a function that reads props (see [Wrapping a styled component](#wrapping-a-styled-component)); a `target` is kept by every wrapper.
 - A wrapper with a label of its own writes the base of the wrapped component again under the labels of the chain: one more rule of the same declarations for each such wrapper. Without a label it shares the base.
 - A class merged through `className` is one class for each distinct joined label: the same styles given to two roots (`Typography-Link`, `Button-Link`) are two rules of the same declarations, one for each pair that meets. A class name grows by one label for each labelled level of a chain.

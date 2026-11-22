@@ -1,9 +1,9 @@
 import { render } from '@testing-library/react'
 import type { ComponentProps, ReactNode } from 'react'
 import { createCache, createMemorySheet } from '@umber-style/core'
+import isDomProp from '@umber-style/is-prop-valid/react'
 import { createStyle } from './createStyle'
 import { createDefaultStyle } from './defaultStyle'
-import { isDomProp } from './domProps'
 
 const theme = { palette: { primary: '#0000ff' } }
 

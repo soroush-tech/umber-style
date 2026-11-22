@@ -5,6 +5,7 @@ import {
   createStyleTag,
   type Sheet,
   type StyleObject,
+  type UmberSheet,
 } from '@umber-style/core'
 import createInstance from './createInstance'
 
@@ -406,6 +407,19 @@ describe('a shared cache', () => {
       shared.layerOrder,
       `@layer carried-components{.${name}{color:red;}}`,
     ])
+  })
+
+  it('takes a cache that carries its style elements as its sheet, as a cache of @umber-style/cache does', () => {
+    const tags: UmberSheet = { tags: [] }
+    const umberCache = {
+      ...createCache({ prefix: 'elements', sheet: createMemorySheet() }),
+      sheet: tags,
+    }
+    const instance = createInstance({ cache: umberCache })
+    expect(instance.sheet).toBe(tags)
+    expect(instance.cache).toBe(umberCache)
+    const name = instance.css({ color: 'red' })
+    expect(umberCache.extract().css).toContain(`.${name}{color:red;}`)
   })
 
   it('throws a TypeError when no sheet is known', () => {

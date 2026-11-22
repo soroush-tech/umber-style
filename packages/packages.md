@@ -4,10 +4,11 @@ Conventions for everything under `packages/` - the workspace's code. UmberStyle 
 (`core`) with one thin binding per platform (`react`, `react-native`, `vue`) and an umbrella
 (`umber-style`) that re-exports them. Three packages build on `core` with no framework: `css`
 (class names with no theme), `cache` (the cache that server-rendering set-ups read and wrap) and
-`server` (the CSS of one page as chunks). `styled` is a legacy entry for React that gives the
+`server` (the CSS of one page as chunks). `is-prop-valid` depends on nothing: one prop filter for each
+platform, which the React binding uses as its default. `styled` is a legacy entry for React that gives the
 `styled` of `react` as a default export. `eslint-config` is the private lint config they share. Each
 folder is its own pnpm package, globbed by `packages/*` in `pnpm-workspace.yaml` and consumed by the
-other packages via `workspace:*`.
+other packages via `workspace:^` (`workspace:*` for a `devDependency`).
 
 ---
 
@@ -26,7 +27,7 @@ published on its own. Until then, keep the code where it is used - don't pre-ext
 ## Folder structure
 
 The folder is the package name without the `@umber-style/` scope: `core`, `cache`, `server`, `css`,
-`react`, `react-native`, `vue`, `styled`. The unscoped package `umber-style` lives in `packages/umber-style`. A private tooling package
+`is-prop-valid`, `react`, `react-native`, `vue`, `styled`. The unscoped package `umber-style` lives in `packages/umber-style`. A private tooling package
 follows the same rule (`@umber-style/eslint-config` is `packages/eslint-config`).
 
 ```
@@ -35,6 +36,7 @@ packages/
     src/
       index.ts            <- single entry: the public API + its exported types
       index.test.ts       <- co-located unit tests (100% coverage - required)
+      index.md            <- the sidecar of index.ts: the model of the file (see "Sidecars")
     package.json
     tsconfig.json         <- bundler resolution, noEmit; NOT in the root solution
     .oxlintrc.json        <- extends @umber-style/eslint-config's base (or React layer) + env
@@ -45,7 +47,9 @@ packages/
 ```
 
 Keep the **public API in `index.ts`**; extract internal helpers into sibling modules with co-located
-`*.test.ts` once the entry file grows unwieldy - don't pre-split a small, well-factored file.
+`*.test.ts` once the entry file grows unwieldy - don't pre-split a small, well-factored file. Each
+source file, the entry and every sibling module, has its sidecar next to it (`cache.ts`, `cache.test.ts`,
+`cache.md`).
 
 ---
 
@@ -60,11 +64,12 @@ Keep the **public API in `index.ts`**; extract internal helpers into sibling mod
 ## Exports
 
 - Internal consumption is **TypeScript source**: `exports: { ".": "./src/index.ts" }`, consumed under
-  `moduleResolution: bundler` via `workspace:*`. **No `paths` alias, no build step** for internal use.
+  `moduleResolution: bundler` via `workspace:^`. **No `paths` alias, no build step** for internal use.
 - A package whose API is one function may export it as the default export of its entry or of a
   subpath (`@umber-style/cache`, `@umber-style/server/create-instance`,
-  `@umber-style/css/create-instance`). A package with no root entry exports only its subpaths
-  (`server` has `./create-instance` and no `.`).
+  `@umber-style/css/create-instance`, `@umber-style/is-prop-valid/react`, `/vue` and `/react-native`). A package with no root entry exports only its subpaths
+  (`server` has `./create-instance` and no `.`; `is-prop-valid` has `./react`, `./vue` and
+  `./react-native`, and no `main`, `module` or `types` either, so that its bare name does not resolve).
 - A binding that has a server build adds the `react-server` condition ahead of `default`. The umbrella
   re-exports each binding as a subpath (`umber-style/react`, `umber-style/react-native`,
   `umber-style/vue`).
@@ -74,7 +79,7 @@ Keep the **public API in `index.ts`**; extract internal helpers into sibling mod
 
 ## Publishing
 
-Every package but `eslint-config` is publishable (`core`, `cache`, `server`, `css`, `react`,
+Every package but `eslint-config` is publishable (`core`, `cache`, `server`, `css`, `is-prop-valid`, `react`,
 `react-native`, `vue`, `styled`, `umber-style`); `eslint-config` stays `"private": true` and is never built. Internal-only packages consume source directly. A
 publishable package has:
 
@@ -91,7 +96,7 @@ publishable package has:
   `shared.server`), because its code and its types come from different files. `react` and
   `react-native` build unbundled so the `'use client'` directive of the module that holds the theme
   context stays on that module.
-- An entry whose API is a default export sets **`cjsDefault: false`** (`cache`, `server`, `css`): the
+- An entry whose API is a default export sets **`cjsDefault: false`** (`cache`, `server`, `css`, `is-prop-valid`): the
   CommonJS build then keeps it as `exports.default`, as its declarations (`export default`) say,
   where the default would make the function `module.exports` itself and a typed `require` would not
   match it. `pnpm smoke:packed` checks `default` from `require` and the types under `node16` from a
@@ -112,16 +117,21 @@ publishable package has:
 
 - Declare the host framework as a **`peerDependency`** (`react`, `react-native`, `vue`); never bundle
   the peer. `react-native` is an optional peer of its binding.
-- `@umber-style/core` is a `dependency` of every other publishable package but `styled`, never
-  bundled into them: one engine is shared. `styled` depends on `@umber-style/react` alone, which
-  brings the core. `workspace:*` is published as the exact version, so the packages move together.
+- `@umber-style/core` is a `dependency` of every other publishable package but `styled` and
+  `is-prop-valid`, never bundled into them: one engine is shared. `styled` depends on
+  `@umber-style/react` alone, which brings the core; `react` depends on `is-prop-valid` too.
+- A sibling in `dependencies` or `peerDependencies` is declared **`workspace:^`**, which pnpm
+  publishes as `^<the sibling's version>`, so a package can be patched alone and its dependents take
+  the patch within their range. `workspace:*` would publish the exact version, and a patch of one
+  package would then nest a second copy of it under every dependent that pinned the older one.
+  `pnpm smoke:packed` fails on any other form. A `devDependency` on a sibling stays `workspace:*`.
   `csstype` is a dependency of `core` because its declarations name it.
 - Keep every export condition of the source exports in `publishConfig.exports`, each split into
   `import` and `require` with their own `types`. The order of the conditions is part of the meaning
   (`react-server` before `react-native` before the default).
-- A peer on a **sibling package** is an explicit range covering every major it supports, widened
-  deliberately when a new major lands, never `workspace:^`: pnpm freezes `workspace:^` to
-  `^<the sibling's version at publish time>`. The `devDependency` stays `workspace:*`.
+- A peer on a **sibling package** (none has one today) follows the same rule, `workspace:^`: pnpm
+  freezes it to `^<the sibling's version at publish time>`, which under 1.0.0 holds the minor, so a
+  new minor of the sibling needs a release of the package that names it as a peer.
 - `prepublishOnly: pnpm build`; verify the tarball with `pnpm pack` before publishing: `pnpm smoke:packed`
   does it for every publishable package (see [Releasing](../docs/releasing.md)).
 
@@ -178,6 +188,32 @@ at the repository root, and is written for all platforms together.
   test. A page ends with a "Limits" section for what is not checked or not observed.
 - The package `README.md` stays a stub: what the package is, an install line, one import example, and a
   link to `docs/`. Do not document features in it.
+
+### Sidecars
+
+The one kind of writing that does live in a package is the sidecar: every source file has a sibling
+`.md` of the same name, written in the same change as the code (`AGENTS.md`, guidelines 7 and 8).
+`docs/` is for the people who use the packages; a sidecar is for whoever changes the file.
+
+- **One for each source file:** `src/cache.ts` has `src/cache.md`; `src/styledParts.ts` has
+  `src/styledParts.md`. The same holds for a `.tsx` file, and for a script in `scripts/`.
+- **What it holds:** what the file is for, the shape of the data it works on, the invariants it keeps,
+  what was decided and what was rejected. Not the signatures: the comments in the code say what each
+  function does, and a sidecar that repeats them drifts from them.
+- **A document and a graph:** it opens with what the file does and why it exists, and it holds a graph
+  of the logic as a `mermaid` block: the path of the data through the file, the decisions and what each
+  one leads to.
+- **It changes with the code:** a commit that changes behaviour and leaves the sidecar describing the old
+  behaviour is incomplete. A sidecar that is wrong and cannot be rewritten now is deleted, not left.
+- **A change to what a sidecar describes stops and asks:** the behaviour as it is, what it would become
+  and why, before it is written, and again after, for the owner to see it work.
+- **No sidecar for:** tests and specs (`*.test.ts(x)`, `*.spec.ts(x)`, `*.bench.ts`), generated output
+  (`dist/`, `coverage/`, `*.d.ts`), and config (`tsdown.config.ts`, `vitest.config.ts`, set-up files,
+  stubs).
+- **It is not published:** a package's `files` is `dist` alone, so a sidecar in `src/` never reaches a
+  tarball. Do not add `src` to `files`.
+- **It follows the rules of the repository:** no library names, ASCII punctuation, and any code in it is
+  copied from the file or from a passing test.
 
 ---
 

@@ -1,4 +1,10 @@
-import { createThemeKey, readCondition, type SchemeName, type ThemeKey } from '@umber-style/core'
+import {
+  createThemeKey,
+  readCondition,
+  readSharedState,
+  type SchemeName,
+  type ThemeKey,
+} from '@umber-style/core'
 import { platformAppearance } from './platform'
 
 /** What a condition key is matched against: the theme object and the color scheme of the nearest provider. */
@@ -9,8 +15,12 @@ export interface NativeCondition {
   readonly colorScheme: SchemeName | undefined
 }
 
-const themesById = new Map<string, object>()
-const idsByTheme = new WeakMap<object, string>()
+// The theme of each id that `when(theme)` names, shared by every copy of the binding in the program: the
+// ids are counted, so two copies with their own would give one id to two themes.
+const { themesById, idsByTheme } = readSharedState('react-native.theme-ids@1', () => ({
+  themesById: new Map<string, object>(),
+  idsByTheme: new WeakMap<object, string>(),
+}))
 
 /** The key of `when(theme)`: it names the theme object itself, which `matchesCondition` compares by identity. */
 export function createNativeThemeKey(theme: object): ThemeKey {

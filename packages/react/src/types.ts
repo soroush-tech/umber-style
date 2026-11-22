@@ -205,6 +205,17 @@ type AsProp<Base> = Base extends { as?: infer As }
  */
 type OwnProps<P extends object> = 'style' extends keyof P ? Omit<P, 'style'> : P
 
+// The props of the tag without those of the component's own props `P` are `Omit<Base, keyof P>` below
+// (and `Omit<Base, keyof P | 'as' | 'style'>` for the element), written in a form that costs the compiler
+// less. `Omit` filters every key of `Base` (the props of a tag are hundreds of keys) against `keyof P`,
+// once for each `P`. Where `P` names no key of `Base`, the result keeps every key of `Base`, so it is the
+// one type `Pick<Base, keyof Base>` (or `Omit<Base, 'as' | 'style'>`), made once for each `Base`; only
+// where they share a key is `Omit` itself computed. The tests, in this order: `P` has no key; `P` has a
+// key that is not a literal (an index or a pattern signature, whose matches `Omit` removes; only then
+// does an empty object fit `Record<keyof P, unknown>`), so `Omit`; no key of `P` is a key of `Base`. The last is written `[keyof P] extends [Exclude<...>]`, so it is not
+// decided while `P` is still a type parameter, where it would compute an `Omit` of that parameter for
+// nothing. They are written in place, not as an alias of their own: the compiler did more work with one.
+
 /**
  * A component made by `styled`: it takes the props of the tag (`Base`: all of them, unless a
  * `shouldForwardProp` type guard named some), its own props `P`, `as` and `style`. As text it is a
@@ -216,12 +227,25 @@ export type StyledComponent<
   P extends object,
   Base extends object = ComponentProps<C>,
 > = FunctionComponent<
-  Omit<Base, keyof P | 'as' | 'style'> & OwnProps<P> & { as?: AsProp<Base>; style?: StyleProp }
+  ([keyof P] extends [never]
+    ? Omit<Base, 'as' | 'style'>
+    : [Record<never, never>] extends [Record<keyof P, unknown>]
+      ? Omit<Base, keyof P | 'as' | 'style'>
+      : [keyof P] extends [Exclude<keyof P, keyof Base>]
+        ? Omit<Base, 'as' | 'style'>
+        : Omit<Base, keyof P | 'as' | 'style'>) &
+    OwnProps<P> & { as?: AsProp<Base>; style?: StyleProp }
 > &
   StyledStatics
 
 /** The props that a function style reads: the props of the tag `Base`, with the component's own `P` over them. */
-type StyleFunctionProps<Base extends object, P extends object> = Omit<Base, keyof P> & P
+type StyleFunctionProps<Base extends object, P extends object> = [keyof P] extends [never]
+  ? Pick<Base, keyof Base> & P
+  : [Record<never, never>] extends [Record<keyof P, unknown>]
+    ? Omit<Base, keyof P> & P
+    : [keyof P] extends [Exclude<keyof P, keyof Base>]
+      ? Pick<Base, keyof Base> & P
+      : Omit<Base, keyof P> & P
 
 /** The props that the element of a styled component takes: those of the component, of the tag, and the ones only the element takes. */
 type ElementProps<

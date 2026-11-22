@@ -136,7 +136,7 @@ Under it, everything the binding writes goes to `cache` and nowhere else: the cl
 
 An engine given a `cache` directly (`createStyle(theme, { cache })`) follows the same table, and with the development checks it warns once, naming each option of the cache column that it was given: the cache decides those, and they are ignored. A class is named from the rules it writes, so the same styles written with value repair and without it are two classes, each with its own rule. The stamp of the options that a server writes is the cache's (`cache.fingerprint`): the style options of an engine over a provided cache are not in it, as its token options are not, because they come from the same module code on the server and in the browser. Labels are the cache's (`hasLabels`, on by default in both): a class has a label when its style has one (the `name` or `label` of `styled`, a `label` key), under a provider or not; a `css()` value or a plain object without a `label` key gives a class without one. The tests are `createEngine.withCache.test.ts` and, with the set-up of an app (`createCache({ key })`, `CacheProvider`, `configure`, `@umber-style/server`), `appSetUp.test.tsx` of the server package.
 
-**The default cache of an app.** The app above never calls `configure`: its class names and variables have the prefix `soroush` everywhere, and the cache of the default engine stays empty (`CacheProvider.test.tsx`, "the default cache of an app").
+**The default cache of an app.** The app above never calls `configure`: its class names and variables have the prefix `soroush` everywhere, and the cache of the default engine stays empty (`CacheProvider.test.tsx`, "the default cache of an app"). In development the default style warns once there, because a default style that was never configured under a cache of another key is also what a `configure` call that did not run looks like: call `configure` (with the key as its `prefix`, or any option) to say the set-up is meant. See [A library that wraps the engine](react.md#a-library-that-wraps-the-engine).
 
 **Entries made at module scope.** A sheet entry or a `css()` value belongs to the cache that made it. Given to the `style` of a styled component under a provider, it is written into the provider's cache, under a class of that cache, from its style (`cache.adoptEntry`). For a plain element, read the sheet with `useStyle(sheet)` under the provider: it returns entries of the provider's cache, and `apply` writes an entry into the cache that made it.
 
@@ -184,33 +184,36 @@ In headless Chromium the framed text has the class `frame-text-root-<hash>` and 
 
 ## A registry for the Next.js App Router
 
-In the App Router a client component collects the rules that a request writes and sends them with `useServerInsertedHTML`, which the framework calls as the stream goes. This is the registry of `packages/server/src/registry.test.tsx`, with the framework's import instead of the test's stand-in:
+In the App Router a client component collects the rules that a request writes and sends them with `useServerInsertedHTML`, which the framework calls as the stream goes. This is the providers file of the App Router fixture, `fixtures/next-app/app/(registry)/providers.tsx`, as the end-to-end suite runs it (Next.js 16.4.6, production build and development server):
 
 ```tsx
 'use client'
 
 import createCache from '@umber-style/cache'
 import { CacheProvider } from '@umber-style/react'
+import { Global, ThemeProvider } from '@umber-fixtures/shared/style'
+import { lightTheme } from '@umber-fixtures/shared/themes'
 import { useServerInsertedHTML } from 'next/navigation'
 import { useState, type ReactNode } from 'react'
 
-export function UmberRegistry({ children }: { children: ReactNode }) {
+// The providers file that apps copy, with this repository's packages: a cache for each request, whose
+// new rules are flushed into the stream with useServerInsertedHTML, then the theme and the global rules.
+// The key is the prefix of the style that the components are made with (`umber`).
+function useStyleRegistry() {
   const [{ cache, flush }] = useState(() => {
-    const cache = createCache({ key: 'soroush' })
+    const cache = createCache({ key: 'umber' })
     cache.compat = true
     const prevInsert = cache.insert
     let inserted: string[] = []
     cache.insert = (...args) => {
       const serialized = args[1]
-      if (cache.inserted[serialized.name] === undefined) {
-        inserted.push(serialized.name)
-      }
+      if (cache.inserted[serialized.name] === undefined) inserted.push(serialized.name)
       return prevInsert(...args)
     }
     const flush = () => {
-      const prevInserted = inserted
+      const prev = inserted
       inserted = []
-      return prevInserted
+      return prev
     }
     return { cache, flush }
   })
@@ -219,9 +222,7 @@ export function UmberRegistry({ children }: { children: ReactNode }) {
     const names = flush()
     if (names.length === 0) return null
     let styles = ''
-    for (const name of names) {
-      styles += cache.inserted[name]
-    }
+    for (const name of names) styles += cache.inserted[name]
     return (
       <style
         key={cache.key}
@@ -231,13 +232,45 @@ export function UmberRegistry({ children }: { children: ReactNode }) {
     )
   })
 
-  return <CacheProvider value={cache}>{children}</CacheProvider>
+  return cache
+}
+
+export default function Providers({ children }: Readonly<{ children: ReactNode }>) {
+  const cache = useStyleRegistry()
+  return (
+    <CacheProvider value={cache}>
+      <ThemeProvider theme={lightTheme}>
+        <Global
+          styles={(theme) => ({
+            '*, *::before, *::after': { boxSizing: 'border-box' },
+            body: {
+              margin: 0,
+              backgroundColor: theme.palette.background,
+              color: theme.palette.text,
+              fontFamily: 'sans-serif',
+            },
+          })}
+        />
+        {children}
+      </ThemeProvider>
+    </CacheProvider>
+  )
 }
 ```
 
-Render `UmberRegistry` around the children of the root layout. Each request makes its own cache (the state of the registry), and each flush writes the names collected since the last one: a rule is sent once, a second flush with nothing new returns `null`, and two requests each send the whole of what they use (the tests of the file check the three).
+The root layout is a server component that renders `<html lang="en"><body><Providers>{children}</Providers></body></html>`, with no theme class on `<html>`. Each request makes its own cache (the state of the providers file), and each flush writes the names collected since the last one: a rule is sent once, a flush with nothing new returns `null`, and two requests each send the whole of what they use. In the fixture (`e2e/tests/next-app.registry.spec.ts`, the same checks in `e2e/dev-tests/registry.spec.ts`):
 
-The styling of the app is made once, with its defaults, and knows nothing of the registry:
+- The first flush is one `<style data-umber>` element in the head, with the layer order, the global rules of `Global` and the rule of the root theme. A part that streams in later through a `Suspense` boundary brings a second element, in the body, before the markup it styles, with only the groups that are new. With scripting disabled every class of the HTML has its rule in an element that comes before it.
+- Hydration prints no warning, and writes no rule of the HTML again. The browser's cache removes the root rules that the server sent and writes its own, one live rule (see the Limits for a chunk that arrives after hydration).
+- A client-side navigation renders the new page in the browser, where the hook does nothing: the browser's cache writes the rules of the classes that only the new page has and its `@keyframes` rule, into its own `<style data-style>` element. The rules of the page that was left stay: the cache does not remove the rule of a class.
+- Two requests rendered at the same time, with parts that have no class in common, each get the rules of their own part only.
+- The same `key` on the element of every flush is fine: each flush is rendered on its own, React printed no warning in the browser or the server log, and the two elements of a streamed page are both in the document.
+
+The parts of the pages are client components. A server component cannot see `CacheProvider` (the server components build has no context), so a styled component rendered by a server component sends its own `<style href precedence>` element, outside the registry. A server component that calls `useTheme()` of a default style that nothing configured gets `{}` and warns once in development (the theme of the providers file is given to a provider of a client file, never to `configure`): the fixture's `/registry/server-theme` renders `{}`.
+
+The cache key may be the prefix of the style or another one. Under the provider, classes and variables take the key (`other-box-root-<hash>`, `var(--other-palette-primary)`), the root rule declares `--other-...` variables, and the options of a configured style that describe how styles are written still apply; outside the provider the style's prefix is used, so one subtree never has two sets of variables (`packages/server/src/cacheKey.test.tsx`). A default style that was never configured, under a cache of another key, warns once in development: see [A library that wraps the engine](react.md#a-library-that-wraps-the-engine).
+
+The unit test of the same registry, with a stand-in for `useServerInsertedHTML`, is `packages/server/src/registry.test.tsx`. The styling of the app is made once, with its defaults, and knows nothing of the registry:
 
 ```tsx
 import { createStyle } from '@umber-style/react'
@@ -336,7 +369,7 @@ renderStylesToString(page)
 
 The CSS is decided as `extractPageStyles` decides it (`createInstance` is a thin layer over `extractPageStyleParts` of `@umber-style/core`): the global rules of the page (each set that `engine.insertGlobal` wrote for the app, as in the example, and each set of a `Global` that the HTML carries or names in its marker), the `@keyframes` rules the page uses, the theme classes with the variables in use. A set of a `Global` that another page rendered is not in the chunks of this one, whichever page was rendered first (`pageGlobal.test.tsx`). See "What the scan reads" in [Server rendering](server-rendering.md). The cache is not changed, so one cache can serve pages rendered at once, and the same page gets the same CSS.
 
-With the React binding, render the page under `<CacheProvider value={cache}>` (no `<style href precedence>` element is rendered under it), with `renderToStaticMarkup` or `renderToString`, and pass the markup to these functions. A class of `@umber-style/css` made over the same cache (`createInstance({ cache, sheet })`) is in the same style element and is extracted with the rest (`packages/server/src/sharedCache.test.tsx`). The packed-tarball test does that with the built packages (`scripts/smoke-packed.mjs`, see [Releasing](releasing.md)).
+With the React binding, render the page under `<CacheProvider value={cache}>` (no `<style href precedence>` element is rendered under it), with `renderToStaticMarkup` or `renderToString`, and pass the markup to these functions. A class of `@umber-style/css` made over the same cache is in the same style element and is extracted with the rest, in the cache's layers: a cache of `createCache({ key })` is given to the `createInstance` of `@umber-style/css/create-instance` as it is (`{ cache }`, no `sheet`, no cast), and a cache of the core with the sheet it writes to (`{ cache, sheet }`) (`packages/server/src/sharedCache.test.tsx`). The packed-tarball test does that with the built packages (`scripts/smoke-packed.mjs`, see [Releasing](releasing.md)). The Vike fixture renders its page `/chunks` this way at build time, with a cache made for the page in its `+onRenderHtml` and another made in the browser in its `+onRenderClient` (`fixtures/vike-ssg/src/pages/chunks`): the end-to-end suite finds the page styled with no script, the two chunks in the head, no rule for a class that the page does not have, and a hydration with no warning that writes no rule of the page again (`e2e/tests/chunks.spec.ts`).
 
 ## In the browser
 
@@ -355,14 +388,18 @@ The second element is the cache's own (`data-style="soroush"`). Rendering the sa
 
 ## Limits
 
-- `CacheProvider` was checked in jsdom with React and Vue, and in headless Chromium for the iframe. The registry ran in a unit test, with a stand-in for `useServerInsertedHTML`, in jsdom with the `document` removed for the server render. No fixture app uses `CacheProvider` or either package: neither was run in a real Next.js app.
+- `CacheProvider` was checked in jsdom with React and Vue, in headless Chromium for the iframe, and in two fixture apps: the registry above in the App Router fixture (Next.js 16.4.6 with Turbopack, production build and development server; no other version was run), and `createInstance` on the prerendered page `/chunks` of the Vike fixture. Vue was not run with either package in a fixture.
+- A registry element that streams into the body after the browser's cache declared its root theme keeps its root rules: on `/registry/stream` three root rules are live after hydration, the cache's in the head and two in the body, which come later and win. Today they hold the same values; a root theme changed in the browser after that would be overridden by them. This is a known failure (`cache.root.test.ts`, and `registry-late-root` in `e2e/fixtures.ts`).
+- The root theme is written anew each time a rule uses a variable it had not declared, and a registry that sends every new group sends each of those rules whole: the first flush of the fixture's stream page holds six `:where(:root)` rules, each one the last with more variables. Only the last one is needed.
+- A page of the registry that renders a styled component from a server component as well as from a client component was not run: the same class would then come both from the registry and from a `<style href precedence>` element.
+- A cache key other than the style's prefix was run at the unit tier only (`cacheKey.test.tsx`); the fixture's key is the prefix of its style.
 - `apply`, `themeClass`, `when` and `whenScheme` are plain functions, not hooks, so they cannot see a `CacheProvider`. `apply` writes an entry into the cache that made it: read the sheet with `useStyle` under the provider. `themeClass` and `when` name theme classes of the engine of their style. A class name string of another cache (`className="..."`) passes through as it is, and its rule is not written into the provider's cache.
 - A styled component used as a selector (`${Button}:hover &`) stands for the class of the engine of its style, read when the template is read; under a provider of another prefix that class is not in the provider's cache. Give the component a `target` for that.
 - A subtree under a `CacheProvider` with no `ThemeProvider` of its own has no rule that declares the variables of the cache's prefix: put one in it.
 - `ThemeScope` and `useThemeClass` under a `CacheProvider` with no `ThemeProvider` of its own repeat the wrapper of the nearest provider outside, whose classes are in the other cache.
 - In Vue `value` is read once, in `setup` (see [Vue](vue.md)). In React another `value` is used at the next render.
 - Two engines over one cache (a style made with `createStyle(theme, { cache })`, and the engine of another style for the same cache under a provider) both give the cache the theme for keyframes written as a function of the theme, and the last one wins, as with any two engines over one cache.
-- A style element is read when the cache is made, and later when it is added as a child of the `<head>` or the `<body>` of the cache's document (the cache watches the children of both, and the root element until there is a body). One added deeper, inside another element, is not read. The body was checked in jsdom, not in a streamed page of a real browser.
+- A style element is read when the cache is made, and later when it is added as a child of the `<head>` or the `<body>` of the cache's document (the cache watches the children of both, and the root element until there is a body). One added deeper, inside another element, is not read. The body was checked in jsdom, and in Chromium with the stream of the App Router fixture.
 - `registered[className]` is `true`, not the style text. The style object is `registered.get(className)`.
 - The global rules of a `Global` reach the chunks of a page through the marker in its HTML. HTML that leaves out the markup of a `Global` (a part extracted apart from the rest) leaves its rules out too. A registry does not read markers: it sends each rule once in the request that writes it.
 - There is no `container` option of the cache (give it `createDomSheet(key, container)` as its sheet) and no `nonce` option (see [No inline styles](no-inline-styles.md)).

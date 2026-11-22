@@ -4,7 +4,7 @@
 // the built `dist` of each package, so `pnpm bench` builds before it calls this script.
 //
 //   pnpm bench                  every file
-//   pnpm bench core             the files of one package (core, react, vue or react-native)
+//   pnpm bench core             the files of one package (core, css, react, vue or react-native)
 //   pnpm bench classes          the files whose name has "classes" in it
 //   pnpm bench react string     a package and a part of a file name together
 //   pnpm bench --rounds 5 --md  options go to soroush-bench as they are, for every file

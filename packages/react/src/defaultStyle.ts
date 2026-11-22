@@ -4,6 +4,7 @@ import {
   createDeferredRecord,
   createLazyEngine,
   globalStyles,
+  isDevelopment,
   keyframes,
   withTagShorthands,
   type WebStyleObject,
@@ -11,6 +12,7 @@ import {
 import { bindEngine } from './createStyle'
 import { claimPrefixStyle } from './ProviderScope'
 import { createThemeContexts } from './ThemeValue'
+import { watchProvidedCaches } from './watchProvidedCaches'
 import type {
   DefaultStyleOptions,
   GlobalProps,
@@ -25,6 +27,7 @@ import type {
 /** Makes the default styling: one engine, made on first use, behind `styled`, `ThemeProvider` and the rest. */
 export function createDefaultStyle() {
   let pending: DefaultStyleOptions = {}
+  let isConfigured = false
   let bound: WebStyle<Theme> | undefined
   // The contexts exist before the engine, so that the theme context can be exported.
   const contexts = createThemeContexts<Theme>()
@@ -32,6 +35,9 @@ export function createDefaultStyle() {
   const getStyle = (): WebStyle<Theme> => {
     if (!bound) {
       const engine = pending.engine ?? createLazyEngine<Theme>(pending)
+      // A style that was never configured, under a cache of another key, is the sign of a configure call
+      // that did not run in time: said once, in development.
+      if (!isConfigured && isDevelopment()) watchProvidedCaches(engine)
       if (pending.theme) engine.setTheme(pending.theme)
       bound = bindEngine(engine, pending, contexts)
     }
@@ -62,6 +68,7 @@ export function createDefaultStyle() {
   function configure(options: DefaultStyleOptions): void {
     if (bound) throw new Error('configure must be called before the default style is used.')
     pending = options
+    isConfigured = true
   }
 
   // `styled.div` and the other tags are made on use, through the engine's own `styled`, when the

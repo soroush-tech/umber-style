@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@umber-fixtures/shared": "workspace:*",
+    "@umber-style/cache": "workspace:*",
     "@umber-style/core": "workspace:*",
     "@umber-style/react": "workspace:*",
     "next": "16.4.6",

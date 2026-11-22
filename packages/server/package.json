@@ -1,6 +1,6 @@
 {
   "name": "@umber-style/server",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Server rendering over an UmberStyle cache: the CSS of one page as chunks and as style tags.",
   "keywords": [
     "styling",
@@ -55,7 +55,7 @@
     "prepublishOnly": "pnpm build"
   },
   "dependencies": {
-    "@umber-style/core": "workspace:*"
+    "@umber-style/core": "workspace:^"
   },
   "devDependencies": {
     "@types/node": "^26.6.6",

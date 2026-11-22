@@ -1,6 +1,9 @@
+import { readSharedState } from '@umber-style/core'
 import { createDefaultStyle } from './defaultStyle'
 
-const defaults = createDefaultStyle()
+// One default style for every copy of the binding in the program, so that a component of one copy reads
+// the provider of another.
+const defaults = readSharedState('react-native.default-style@1', createDefaultStyle)
 
 export const {
   configure,

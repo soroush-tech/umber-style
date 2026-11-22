@@ -54,7 +54,6 @@ describe('the server build', () => {
       'ThemeProvider.server.ts',
       'createStyle.server.ts',
       'defaultStyle.server.ts',
-      'domProps.ts',
       'index.server.ts',
       'plainTheme.ts',
       'serverContext.ts',

@@ -55,7 +55,8 @@ if (isDisabled) {
 
 Every module exports by name. A default export exists only where a package's API is one function,
 as the default export of its entry or of a subpath (`@umber-style/cache`,
-`@umber-style/css/create-instance`, `@umber-style/server/create-instance`), and in
+`@umber-style/css/create-instance`, `@umber-style/server/create-instance`, the three subpaths of
+`@umber-style/is-prop-valid`), and in
 `@umber-style/styled`, whose purpose is `styled` as a default export (`packages/packages.md`). A
 file in `fixtures/` whose default export a framework requires (a page, a layout, the config of
 Next.js, Vike or Vite) is exempt.

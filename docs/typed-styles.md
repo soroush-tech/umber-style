@@ -1,6 +1,6 @@
 # Typed styles
 
-After this page you can tell what the compiler catches in a style on each platform, what it lets through, and how to get past it when you must; how to switch the web types to strict checking; and you know the type names an app imports, where they live, and the two ways to type the theme.
+After this page you can tell what the compiler catches in a style on each platform, what it lets through, and how to get past it when you must; how to switch the web types to strict checking; and you know the type names an app imports, where they live, the two ways to type the theme, and how the repository keeps what the types cost the checker.
 
 Each entry checks the keys of a style in an object literal, for its own platform:
 
@@ -252,6 +252,8 @@ Under the `react-server` condition `@umber-style/react` has `useTheme` (a plain 
 
 These names describe the same shapes as the types that existing apps import today (the list of names comes from the issue), so that code written against them compiles with only the scope of its imports changed. They are UmberStyle's own types: code that mixes them with types of another library may not line up.
 
+One import of an app that moves over changes by more than the scope: the prop filter. Its path names the platform, because each platform takes other props: `import isPropValid from '@umber-style/is-prop-valid/react'` (or `/vue`, `/react-native`), and the package has no root entry. See [Prop filters](prop-filters.md).
+
 | Name                     | What it is                                                                                                                                      | Declared in                                        |
 | ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
 | `CSSObject`              | A style written as an object on the web: `WebStyleObject` under another name                                                                    | `@umber-style/core`                                |
@@ -385,6 +387,25 @@ The theme of `@umber-style/react` then has `palette`, `space` and `radii`. The s
 
 An engine made for the default style of a binding (`configure({ engine })`) is typed with that binding's `Theme`: `createLazyEngine<Theme>()`, with `Theme` imported from the binding. One made with the core's `Theme` is accepted while the binding adds no required member of its own.
 
+## How the cost of the types is kept
+
+A design system often has a base component whose props are the attributes of an element and its groups of style props: several hundred members. Each component styled from it makes the type checker build the props of the base without the props the component names, twice: the props a function style reads, and the props of the element. Filtering hundreds of keys once for each component is what costs.
+
+The types of `@umber-style/react` skip that work where it changes nothing. Where the props given as the type argument name no prop of the tag (`styled(Flex)<{ isOpen: boolean }>`), nothing is removed, so the props of the tag are used as they are: one type for each tag, made once and shared by every component styled from it. Where they share props (props that extend the base's, `interface PanelProps extends FlexProps`), the props of the tag without them are computed as before. The types are the same either way; what compiles and what is an error did not change.
+
+On the design system these types were measured with (220 `styled` calls, a base of several hundred props, a wrapper of `styled` with five overloads), `tsc --noEmit --extendedDiagnostics` with TypeScript 7.0.2 counted, against the published declarations:
+
+| Types of `@umber-style/react` | Instantiations | Types   | Memory | Check time |
+| ----------------------------- | -------------- | ------- | ------ | ---------- |
+| 0.1.0                         | 1,938,543      | 349,873 | 695 MB | 0.748 s    |
+| 0.1.1                         | 1,374,738      | 274,576 | 674 MB | 0.703 s    |
+
+(The median of three runs, on one machine. The same package with the styling library it moved from counted 1,036,010 instantiations, 223,083 types, 632 MB and 0.652 s.)
+
+`pnpm typecheck` keeps the cost from growing back. The typecheck of `@umber-style/react` ends with `scripts/check-type-cost.mjs`, which compiles `packages/react/type-cost/designSystem.tsx`: the shapes above written fresh, a base component of about 370 props, a wrapper of `styled` with the five overloads, twenty components styled from the base (six with props that extend the base's, fourteen with a few of their own) and an element of each. It subtracts the count of `engineOnly.ts`, which imports the same modules and uses nothing, so the number is the cost of those shapes and not of the engine's own source. It fails when the number is above the budget in the script, 164,000: about 20% over the 136,522 that the types count now. The types of 0.1.0 count 175,941 there.
+
+The number is a count of instantiations: how many times the checker made a generic type for some type arguments (a `Pick`, an `Omit`, each member of a conditional type). For one version of TypeScript and of `@types/react` it is the same on every run, where a time is not, so a budget can be exact. The script compiles with `--singleThreaded`: with several checkers, a type that two files need is made once in each, and how the files are shared out moves the total. When TypeScript or `@types/react` is upgraded, the count moves: measure it again and set the budget the same way.
+
 ## Limits
 
 - The values of colours and lengths are not checked, on any platform.
@@ -410,6 +431,8 @@ An engine made for the default style of a binding (`configure({ engine })`) is t
 - `styled(tag)` has three call forms (a function first, a template, styles). A mistake in a style is reported against the styles form, and an error message can list the other forms too.
 - The props of a template are not inferred from its functions: give them with the type argument.
 - A function style reads the props of the tag too, and the props of the type argument win over them: a prop that both name (`size` of an `input`) has the type of the type argument, not an intersection of the two.
+- The cost of the types is still above that of the styling library an app moves from, on the one design system it was measured with: 33% more instantiations, 23% more types, 7% more memory and 8% more check time. Most of the rest is where a component's props extend the base's, and the props of the base without them are computed for each component.
+- The budget of `check-type-cost.mjs` counts instantiations, single-threaded, on one fixture. It does not measure time or memory, nor the cost of a shape that the fixture does not have; the check times above were measured on one machine, which other work on it moves by several percent.
 - While `Theme` has no member of its own, the `theme` of `ThemeProvider` of the default style is not checked against the app's theme, and a function given to it with no type on its parameter gets `object`. `useTheme()` then returns `Theme`, which has none of the app's members: declare them in `Theme`, or cast.
 - With the strict switch, the `style` prop of a styled component takes sheet entries and web style objects, not React's `CSSProperties`: props spread from `HTMLAttributes` into a styled component (`<Root {...rest} />` with `style` in `rest`) are a type error. TypeScript reports it twice: the error, and "Expression produces a union type that is too complex to represent", which it hits while it explains the first. It was reproduced with a union that holds the strict style and an object of many keys that does not fit it; a union that holds only the properties does not give it, which points at the pattern index signatures of the strict style. The default types give neither error.
 - With the strict switch, a style object whose type was inferred where nothing typed it (a function with no return type that is not written in the call, or a variable) has `display: string`, which is not one of the values of `display`: give it a return type of `WebStyleObject`, use `satisfies`, or write `'flex' as const`.

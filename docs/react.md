@@ -25,6 +25,31 @@ configure({ prefix: 'umber', theme: lightTheme })
 
 `configure` takes the options of `createStyle` and a `theme`. It throws if the default style has already been used.
 
+### A library that wraps the engine
+
+A design system that re-exports the default style configures it for its users. Do it in a function that the app calls, not in a module that the library imports only for its side effect:
+
+```ts
+// engine.ts of the library
+import { configure } from '@umber-style/react'
+import { lightTheme } from './theme'
+
+let isConfigured = false
+
+/** Configures the engine of the library. The app calls it once, before it renders. */
+export function setUpEngine(): void {
+  if (isConfigured) return
+  isConfigured = true
+  configure({ prefix: 'soroush', theme: lightTheme })
+}
+```
+
+A library whose `package.json` says `"sideEffects": false` tells the bundler that a module can be dropped when nothing it exports is used. `import './engine'` uses nothing, so a production build may leave the module out: `configure` never runs, and nothing says so, because an unconfigured default style works, with the prefix `css` and the default options. A function that the app calls is used, so it is kept. If the library keeps a module for its side effect, list it in `sideEffects` (`"sideEffects": ["./dist/engine.js"]`).
+
+The call must also run before the first `styled(...)(...)` of the default style, because that call makes the engine with the options `configure` gave so far; `configure` throws after it. A component module that calls `styled` at its top level and is imported before the module that configures binds the default style unconfigured.
+
+In development, a component of a default style that was never configured warns once when it renders under a `CacheProvider` whose cache has another key (the `key` of `createCache`): the warning names both prefixes and these two causes. A configured style may use a cache of any key, and a cache with the key `css` is the default prefix on purpose: neither warns. See [The cache and server packages](cache-and-server.md).
+
 **`@umber-style/styled`** has the `styled` of the default style as its default export, for code that imports it that way. It is the same function, so `configure` from `@umber-style/react` sets it up, and under the `react-server` condition it is the `styled` of the server build:
 
 ```tsx
@@ -129,6 +154,6 @@ The package has a second build for server components, picked by the `react-serve
 - The value of `ThemeContext` is `undefined` with no provider above, where `useTheme()` returns the base theme given to `createStyle(theme)` or `configure({ theme })` (a theme that a provider gave the engine does not count), or an empty object. Every style of one prefix shares one `ThemeContext`, as it shares the marks of the providers: two styles with one prefix see each other's providers.
 - Below a provider of the server build, `useTheme()` reads the plain data of its theme only: a function or a class instance in that theme keeps the value of the theme above. See [Server rendering](server-rendering.md#what-crosses-to-the-browser).
 - Under a nested provider the DOM has one more element; a portal without `ThemeScope` sees the outer theme. See [Themes](themes.md).
-- The default style is a module singleton. Two copies of the package in one app are two engines.
+- The default style is one for the program: two copies of the package in one app share it, as they share the contexts of each prefix and of `CacheProvider` (see [How it works](how-it-works.md#two-copies-in-one-program)). A copy of 0.1.0 shares nothing.
 - An element that is given a plain object in `style` renders a second child next to it, which renders nothing: the element's own state is kept when the object comes and goes (checked in jsdom), but the component's root is then a fragment.
 - `apply`, `themeClass`, `when` and `whenScheme` are not hooks and do not see a `CacheProvider`: read a sheet with `useStyle` under the provider, so that `apply` writes its entries there. The server components build has no `CacheProvider`. The other limits of the provider are in [The cache and server packages](cache-and-server.md).

@@ -1,6 +1,6 @@
 {
   "name": "@umber-style/react-native",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "UmberStyle for React Native: the same names as the React binding, over the real theme values.",
   "keywords": [
     "styling",
@@ -55,7 +55,7 @@
     "prepublishOnly": "pnpm build"
   },
   "dependencies": {
-    "@umber-style/core": "workspace:*"
+    "@umber-style/core": "workspace:^"
   },
   "peerDependencies": {
     "react": "^19.2.8",
@@ -68,11 +68,13 @@
   },
   "devDependencies": {
     "@soroush.tech/bench": "^2.2.3",
+    "@soroush.tech/styled-system": "^6.0.1",
     "@testing-library/react": "^16.3.3",
     "@types/node": "^26.6.6",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@umber-style/eslint-config": "workspace:*",
+    "@umber-style/is-prop-valid": "workspace:*",
     "@vitest/coverage-v8": "^5.1.0",
     "jsdom": "^31.0.0",
     "oxlint": "^1.93.0",

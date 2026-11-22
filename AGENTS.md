@@ -62,6 +62,45 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 **After any implementation, run `pnpm test:coverage` and verify 100% on all touched files.**
 
+### 7. Document the model beside the code
+
+**Every source file has a sibling `.md` of the same name, written in the same change as the
+code.**
+
+`cache.ts` -> `cache.md`. `styledParts.ts` -> `styledParts.md`.
+
+- **Explain the model, not the signatures.** What the file is for, the shape of the data it works
+  on, the invariants it keeps, what was decided and what was rejected. The doc comments already
+  say what each function does; repeating them is how the two drift apart. The comments in the
+  code stay governed by the `code-style` skill - the sidecar is the layer above them, for the
+  reader who does not yet know the model. The pages in `docs/` are for the people who use the
+  packages; the sidecar is for whoever changes the file.
+- **A document and a graph.** It opens with what the file does and why it exists, and it holds a
+  graph of the logic (a `mermaid` block: the path of the data through the file, the decisions
+  and what each one leads to).
+- **A commit that changes behaviour and leaves the sidecar describing the old behaviour is
+  incomplete**, the same way one that breaks a test is.
+- **A wrong sidecar is worse than none.** If the logic has moved on and there is no time to
+  rewrite it, delete the sidecar rather than leave it lying.
+- **Exempt:** tests and specs (`*.test.ts(x)`, `*.spec.ts(x)`, `*.bench.ts`, everything under
+  `e2e/`), generated output (`dist/`, `coverage/`, `*.d.ts`), and config (`tsdown.config.ts`,
+  `vitest.config.ts`, `playwright.config.ts`, set-up files, stubs).
+
+### 8. Changing documented behaviour stops and asks
+
+**When a change would alter the logic or behaviour a sidecar describes, say so and wait for user
+confirmation - before writing it, and again after.**
+
+Not the wording: the substance. What the code decides, what it guarantees, what a call does.
+
+- Say what the behaviour is now, what it would become, and why.
+- Wait for an answer before writing it.
+- Once written, wait for verification. Tests passing is not the same as having seen it work.
+
+This is narrower than guideline 2 and bites at a different moment. Guideline 2 covers the plan
+agreed up front; this covers behaviour change discovered during the work, where the shape of
+the fix turns out to move something that was being relied on.
+
 ## Critical conventions
 
 - **Framework-free core:** `@umber-style/core` knows no framework: no React, no Vue, no DOM globals at
@@ -73,6 +112,8 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
   re-exports; it holds no logic. `@umber-style/css`, `@umber-style/cache` and `@umber-style/server`
   are built on core and know no framework: class names with no theme, the cache that
   server-rendering set-ups read, and the CSS of one page as `data-umber` chunks.
+  `@umber-style/is-prop-valid` depends on nothing, not even core: one prop filter for each platform
+  (`/react`, `/vue`, `/react-native`, no root entry), which the React binding uses as its default.
 - **No library names:** never name another CSS-in-JS library, CSS framework or web framework in code,
   comments, tests, docs or config comments. The platforms (React, React Native, Vue) and
   `@soroush.tech/styled-system` may be named. A dependency name in a `package.json` is the one
@@ -102,11 +143,12 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 - **Packages:** everything under `packages/` is a workspace package. `packages/packages.md` is the
   **standard** for packages - read it first, and follow it when creating or changing any package
   (structure, exports, publishing, registration chores). Every package but `eslint-config` is publishable
-  (`core`, `cache`, `server`, `css`, `react`, `react-native`, `vue`, `styled`, `umber-style`) and built with
+  (`core`, `cache`, `server`, `css`, `is-prop-valid`, `react`, `react-native`, `vue`, `styled`, `umber-style`) and built with
   tsdown (`pnpm build`); they consume source inside the workspace and `publishConfig` swaps in `dist` only
   when a tarball is made, so release with `pnpm` through the workflow, never `npm publish`. A publishable
   package must declare a license, ship a `LICENSE` file, and have `release-notes/<version>.md`;
-  `eslint-config` stays `private`.
+  `eslint-config` stays `private`. A sibling in `dependencies` or `peerDependencies` is `workspace:^`
+  (published as `^<version>`, so a package can be patched alone); a `devDependency` stays `workspace:*`.
 - **Releasing:** `.github/workflows/cd-packages.yml` is dispatched by hand with a `package` and a
   `channel` (`alpha` from a branch whose `ci-ok` passed, `rc` and `stable` from `main`), and publishes by
   npm Trusted Publishing. `package.json` always holds the target version, never a prerelease.
@@ -139,6 +181,7 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 | Plain layer      | `packages/css`                                            | `css`, `cx`, `keyframes`, `injectGlobal`: class names with no theme and no framework        |
 | Cache            | `packages/cache`                                          | `createCache({ key })`: the engine's cache with the members server-rendering set-ups read   |
 | Server           | `packages/server`                                         | `/create-instance`: the CSS of one page as chunks and `<style data-umber>` tags             |
+| Prop filters     | `packages/is-prop-valid`                                  | `/react`, `/vue`, `/react-native`: whether a prop is one an element takes. No dependency    |
 | Legacy entry     | `packages/styled`                                         | The `styled` of `@umber-style/react` as a default export, for code that imports it that way |
 | Lint config      | `packages/eslint-config`                                  | Private oxlint base and React layers, shared by every package                               |
 | Package standard | `packages/packages.md`                                    | Structure, exports, publishing, 100% coverage, licensing, linting                           |

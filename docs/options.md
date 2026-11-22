@@ -74,7 +74,7 @@ A `Sheet` has `insert(rule)`, a readonly `rules` list, and optionally `replace(i
 | `theme`                  | the theme       | none    | `configure` only: the base theme of the default style                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | `hasServerStyleElements` | `boolean`       | `true`  | React only (client build): where there is no `document` (a server render), a styled element and a theme provider also render the `<style href precedence>` elements of their classes, as the server components build does, so that a client component is styled in the first HTML. In the browser it changes nothing. Set it to `false` when a classic server render sends the CSS of the page in one element of its own. See [Server rendering](server-rendering.md) |
 
-`configure` throws if the default style has been used already.
+`configure` throws if the default style has been used already. A library that wraps the engine calls it from a function that the app calls, not from a module imported only for its side effect: see [A library that wraps the engine](react.md#a-library-that-wraps-the-engine).
 
 ## `styled` options
 

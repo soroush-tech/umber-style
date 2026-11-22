@@ -1,6 +1,6 @@
 {
   "name": "@umber-style/react",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "UmberStyle for React: styled, ThemeProvider, useTheme, StyleSheet, useStyle and apply, with a server build for server components.",
   "keywords": [
     "styling",
@@ -65,21 +65,21 @@
   "scripts": {
     "build": "tsdown",
     "lint": "oxlint --deny-warnings",
-    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.augmentation.json && tsc --noEmit -p tsconfig.server.json && tsc --noEmit -p tsconfig.strict.json",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.augmentation.json && tsc --noEmit -p tsconfig.server.json && tsc --noEmit -p tsconfig.strict.json && node ../../scripts/check-type-cost.mjs",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:browser": "vitest run --config vitest.browser.config.ts",
     "prepublishOnly": "pnpm build"
   },
   "dependencies": {
-    "@umber-style/core": "workspace:*"
+    "@umber-style/core": "workspace:^",
+    "@umber-style/is-prop-valid": "workspace:^"
   },
   "peerDependencies": {
     "react": "^19.2.8"
   },
   "devDependencies": {
     "@soroush.tech/bench": "^2.2.3",
-    "@emotion/is-prop-valid": "^1.4.0",
     "@soroush.tech/styled-system": "^6.0.1",
     "@testing-library/react": "^16.3.3",
     "@types/node": "^26.6.6",

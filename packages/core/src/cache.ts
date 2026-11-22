@@ -7,6 +7,7 @@ import { createFingerprint, describeFingerprintDifferences } from './fingerprint
 import { compileGlobalRules, type GlobalStyleObject } from './globalStyles'
 import { createKeyframesRule, findAnimationNames, isKeyframesName } from './keyframes'
 import { scanStyleText, type StyleFindings } from './scanStyleText'
+import { readSharedState } from './sharedState'
 import {
   createSheetEntry,
   isSheetEntry,
@@ -490,9 +491,13 @@ export interface DomSheetOptions {
 
 // How each style element of the engine is written: by text nodes or by `insertRule`, never both, because
 // a change of the text of an element parses it again and drops what `insertRule` put in. The text nodes
-// that sheets wrote are kept apart from the text that a server sent, which the cache reads.
-const elementModes = new WeakMap<Node, 'text' | 'rules'>()
-const writtenText = new WeakSet<Node>()
+// that sheets wrote are kept apart from the text that a server sent, which the cache reads. A cache of
+// another copy of the core may write into the same element: both copies keep these alike.
+const elementModes = readSharedState(
+  'core.element-modes@1',
+  () => new WeakMap<Node, 'text' | 'rules'>()
+)
+const writtenText = readSharedState('core.written-text@1', () => new WeakSet<Node>())
 
 /** The text of a style element that no sheet of the engine wrote: what a server or a framework sent. */
 function readSentText(element: Element): string {
