@@ -14,6 +14,7 @@ const base: FingerprintOptions = {
   hasScope: true,
   hasColorFallbacks: true,
   hasValueRepair: false,
+  hasVendorPrefixes: true,
   tokens: '',
 }
 
@@ -64,5 +65,13 @@ describe('the fingerprint of the options', () => {
       'Differing options: hasValueRepair (server: 0, browser: 1).'
     )
     expect(describeFingerprintDifferences('p=umber', off)).not.toContain('hasValueRepair')
+  })
+
+  it('writes hasVendorPrefixes only when it is off, so that the stamp of the default stays the same text', () => {
+    const off = createFingerprint({ ...base, hasVendorPrefixes: false })
+    expect(off).toBe('p=umber;x=;l=1;y=1;r=1;b=1;s=1;f=1;w=0;t=')
+    expect(describeFingerprintDifferences(createFingerprint(base), off)).toContain(
+      'hasVendorPrefixes (server: 1, browser: 0)'
+    )
   })
 })

@@ -1,4 +1,4 @@
-import { createTokens } from './tokens'
+import { createTokens, findMissingPaths } from './tokens'
 
 const theme = {
   palette: { primary: '#0b57d0', ramp: ['#111', '#222'] },
@@ -68,5 +68,24 @@ describe('createTokens', () => {
     expect(declare({ palette: { primary: 'red' }, lineHeights: { body: 2 } })).toEqual({
       '--line-heights-body': '2px',
     })
+  })
+})
+
+describe('findMissingPaths', () => {
+  it('gives the paths that the theme does not have, through a leaf or a null value too', () => {
+    const theme = { palette: { primary: '#000', none: null }, space: [0, 4] }
+    expect(
+      findMissingPaths(theme, [
+        'palette',
+        'palette.primary',
+        'palette.*',
+        'space.1',
+        '*.primary',
+        'palette.primary.dark',
+        'palette.none.x',
+        'space.2',
+        '*.secondary',
+      ])
+    ).toEqual(['palette.primary.dark', 'palette.none.x', 'space.2', '*.secondary'])
   })
 })

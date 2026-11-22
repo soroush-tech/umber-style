@@ -48,6 +48,22 @@ describe('findUnsupportedDeclarations', () => {
     ).toEqual([])
   })
 
+  it('leaves out a property that it does not support when the rule has a prefixed form of it that it supports', () => {
+    const supports = (property: string, value: string) =>
+      property === '-webkit-user-select' || (property === 'color' && value !== 'nope')
+    expect(
+      findUnsupportedDeclarations(
+        [
+          '.u-a{-webkit-user-select:none;user-select:none;}',
+          '.u-b{-moz-user-select:none;user-select:none;}',
+          '.u-c{-webkit-user-select:var(--s);user-select:var(--s);}',
+        ],
+        'u',
+        supports
+      )
+    ).toEqual(['the class u-b declares user-select:none, which this browser does not support'])
+  })
+
   it('leaves out a value with a vendor prefix: a keyword, a function, and one with !important', () => {
     expect(
       find(

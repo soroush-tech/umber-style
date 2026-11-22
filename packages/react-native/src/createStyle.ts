@@ -25,6 +25,7 @@ import { platformStyleSheet } from './platform'
 import { collectKeys, toNativeStyle, type StyleKeys } from './toNativeStyle'
 import { DEFAULT_REM_BASE } from './units'
 import { readMediaKey, readWindowState, useMediaKey } from './windowState'
+import { warnAboutIgnoredOptions } from './warnStyle'
 
 export type { StyleOptions } from './types'
 
@@ -184,6 +185,7 @@ export function bindHolder<T extends object>(
   options: StyleOptions<T> = {}
 ): NativeStyle<T> {
   const { remBase = DEFAULT_REM_BASE, lengthKeys = DEFAULT_LENGTH_KEYS } = options
+  warnAboutIgnoredOptions(options)
   const { ThemeContext, ThemeValueProvider, useTheme, useCondition } = createThemeValue(
     holder,
     (theme: T) => toNativeTheme(theme, lengthKeys, remBase),

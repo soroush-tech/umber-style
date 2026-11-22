@@ -101,7 +101,14 @@ With `hasDevChecks` (on in development where there is a `document`, see [Options
 Two more checks need no page and no browser, so they run wherever the checks are on, in jsdom and on a server too:
 
 - A value that no CSS property takes, whatever the property, which the engine can tell by itself: `true`, a function, a number that is not finite (`NaN`, `Infinity`), and an object in a list of values: `[umber] the class umber-wide-root-x1 of "wide-root" declares "width" as true, which is never a CSS value: give a string or a number.` A word such as `light` is not one of them: whether a property takes it is for the browser to say, through `CSS.supports` above.
-- What a style function returns that is not a style (a string, a number, `true`, a function): `[umber] A style function of "Odd" returned 1, which is not a style: ...`. The engine checks it.
+- What a style function returns that is not a style (a string, a number, `true`, a function): `[umber] A style function of "Odd" returned 1, which is not a style: ...`. The engine checks it, and leaves out what it warned about, so the cache does not warn about it again.
+- A `NaN` value is warned about with a hint: in a style function a token is a reference, so `theme.space[2] * 2` is `NaN`; use `multiply()` or `calc()`, a raw or inline mode, or `useTheme()`.
+- A value given to `css` of the cache that is not a style, a class name or an entry (`cache.css(5)`, `true`, a function), which is left out: `[umber] css() was given 5, which is not a style: it is left out. ...`, with `for "<label>"` when the class has a label.
+- An `@scheme` key that names neither `light` nor `dark` (`'@scheme blue'`), which is written as an at-rule the browser drops.
+- A reference followed by a unit that value repair leaves as it is (see [Tokens](tokens.md#string-forms-of-token-maths)).
+- A declaration of a `css()` value given to `Global` that is outside every selector, which a global rule leaves out (see [Animations and global styles](animations-and-global-styles.md#what-styles-takes)).
+- A rule that the browser rejects when the cache's own sheet writes it with `insertRule`: `[umber] the browser rejected the rule of .a (<the browser's message>): it is left out.`
+- With the engine's checks: a path of `modes`, `registered` or `alwaysDeclare` that matches no key of the theme, when the tokens are made; an option of the cache column given to an engine together with a `cache` (see [The cache and server packages](cache-and-server.md#cacheprovider-a-cache-for-a-subtree)); and a read of the theme view in a style function with a key that is a token reference (`theme.space[theme.layout.margin]`), which gives `undefined`: `[umber] A style function of "Box" reads theme.space[var(--umber-layout-margin)]: ... Give "layout.margin" a raw mode (modes: { 'layout.margin': 'raw' }), or read the real value from useTheme().` For that one the view is wrapped in a `Proxy` while the checks are on; without them a style function gets the view itself (`referenceKeys.test.ts` checks that it is the same object).
 
 ### The checks in a test run
 
@@ -123,7 +130,8 @@ What it does not report:
 - The value of a declaration that holds `var(`: such a value is valid until it is used, so the browser is asked whether it knows the property at all.
 - Anything about declarations where `CSS.supports` is missing, throws, or does not answer like a browser: a server, and jsdom, which answers from a table of its own.
 - The descriptors of `@property` and `@font-face`, and `!important`, which is left out of the question.
-- A rule that the browser rejects as a whole (a selector or an at-rule it does not know, such as `@scope` in a browser without it): written with `insertRule` the sheet skips it, written as text the browser drops it when it parses the text, without a word either way. Its declarations are still asked about.
+- A rule that the browser drops as a whole when it parses the text of a style element (a selector or an at-rule it does not know, such as `@scope` in a browser without it): written as text, nothing tells the cache. Written with `insertRule` the browser throws, and the cache warns (above). Its declarations are still asked about.
+- A token reference used as a key of an object that is not the theme view (`sizes[theme.typography.h1.fontSize]` with a `sizes` of your own): only the view is watched.
 - The rules that reach the page in style elements (written by a server, or rendered by React and hoisted into the head): the cache does not insert them, so they are not asked about.
 
 ## Tier 3 in development

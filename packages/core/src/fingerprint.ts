@@ -18,6 +18,8 @@ export interface FingerprintOptions {
   hasColorFallbacks: boolean
   /** Whether the string forms of token maths that are not valid CSS are rewritten. */
   hasValueRepair: boolean
+  /** Whether a declaration that a supported browser needs in a prefixed form gets that form first. */
+  hasVendorPrefixes: boolean
   /** A hash of the token options (modes, raw and length keys, registered tokens, always-declared paths). */
   tokens: string
 }
@@ -37,6 +39,7 @@ const CODES: readonly (readonly [string, keyof FingerprintOptions, string?])[] =
   ['s', 'hasScope'],
   ['f', 'hasColorFallbacks'],
   ['v', 'hasValueRepair', '0'],
+  ['w', 'hasVendorPrefixes', '1'],
   ['t', 'tokens'],
 ]
 

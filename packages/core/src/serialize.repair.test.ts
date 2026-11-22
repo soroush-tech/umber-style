@@ -1,7 +1,7 @@
 import { alpha } from './alpha'
 import { negate } from './calc'
 import { DEFAULT_SCOPING } from './scope'
-import { compileRules, type StyleObject, type StyleValue } from './serialize'
+import { compileRules, compileStyleRules, type StyleObject, type StyleValue } from './serialize'
 
 const MIX_1F = 'color-mix(in srgb, var(--x) 12.16%, transparent)'
 
@@ -175,5 +175,98 @@ describe('compileRules with hasValueRepair: where it applies', () => {
     expect(compileRules('.a', style, true, DEFAULT_SCOPING, false)).toEqual(
       compileRules('.a', style)
     )
+  })
+})
+
+describe('compileStyleRules with hasValueRepair: a reference followed by a length or another unit', () => {
+  const VALUES: Record<string, string> = {
+    '--px': '4px',
+    '--rem': '1.5rem',
+    '--plain': '2',
+    '--ms': '150ms',
+    '--color': '#fff',
+  }
+  /** The rules of `style` for `.a` with value repair, the values above, and what is reported. */
+  const repairWith = (style: StyleObject) => {
+    const reported: string[] = []
+    const rules = compileStyleRules('.a', style, {
+      hasColorFallbacks: true,
+      hasValueRepair: true,
+      scoping: DEFAULT_SCOPING,
+      readValue: (name) => VALUES[name],
+      report: (message) => reported.push(message),
+    })
+    return { rules, reported }
+  }
+
+  it('writes the bare reference when the value of the token has that unit', () => {
+    expect(repairWith({ fontSize: 'var(--px)px', margin: '0 var(--rem)rem' }).rules).toEqual([
+      '.a{font-size:var(--px);margin:0 var(--rem);}',
+    ])
+    expect(repairWith({ transitionDuration: 'var(--ms)ms' }).rules).toEqual([
+      '.a{transition-duration:var(--ms);}',
+    ])
+    expect(repairWith({ width: 'var(--px)PX' }).rules).toEqual(['.a{width:var(--px);}'])
+  })
+
+  it('writes a calc() of the unit when the value of the token is a plain number', () => {
+    const units = ['px', 'rem', 'em', '%', 'vh', 'vw', 'vmin', 'vmax', 'dvh', 'ch', 'deg', 'turn']
+    for (const unit of units) {
+      expect(repairWith({ width: `var(--plain)${unit}` }).rules).toEqual([
+        `.a{width:calc(var(--plain) * 1${unit});}`,
+      ])
+    }
+    expect(repairWith({ marginTop: '-var(--plain)px' }).rules).toEqual([
+      '.a{margin-top:calc((var(--plain) * 1px) * -1);}',
+    ])
+  })
+
+  it('reads the unit of the fallback of a reference whose value is not known', () => {
+    expect(repairWith({ width: 'var(--gap, 8px)px', height: 'var(--n, 3)px' }).rules).toEqual([
+      '.a{width:var(--gap, 8px);height:calc(var(--n, 3) * 1px);}',
+    ])
+  })
+
+  it('reads a number in every form it is written in', () => {
+    const widthOf = (fallback: string, unit: string) =>
+      repairWith({ width: `var(--n, ${fallback})${unit}` }).rules[0].slice('.a{width:'.length, -2)
+    // A sign, a number that starts or ends with its point, and an exponent in either case.
+    for (const value of ['+4px', '-4px', '.5px', '5.px']) {
+      expect(widthOf(value, 'px')).toBe(`var(--n, ${value})`)
+    }
+    for (const value of ['1e3', '2E-2', '1e+2']) {
+      expect(widthOf(value, 'px')).toBe(`calc(var(--n, ${value}) * 1px)`)
+    }
+    // An `e` with no digit after it starts a unit.
+    expect(widthOf('2em', 'em')).toBe('var(--n, 2em)')
+    expect(widthOf('2ex', 'ex')).toBe('var(--n, 2ex)')
+    // No digit at all, and text after the unit, are not a number with a unit: the form is left.
+    for (const value of ['.', 'e3', '-', '4px solid']) {
+      expect(widthOf(value, 'px')).toBe(`var(--n, ${value})px`)
+    }
+  })
+
+  it('leaves a reference with another unit, another value or no known value as it is, and reports it', () => {
+    const { rules, reported } = repairWith({
+      width: 'var(--rem)px',
+      height: 'var(--color)px',
+      top: 'var(--other)px',
+      left: 'var(--px)ms',
+    })
+    expect(rules).toEqual([
+      '.a{width:var(--rem)px;height:var(--color)px;top:var(--other)px;left:var(--px)ms;}',
+    ])
+    expect(reported).toEqual([
+      '.a declares width:var(--rem)px, which puts "px" after var(--rem), whose value 1.5rem has another unit: it is left as it is, and the browser drops it. Write the value in px, or the reference alone.',
+      '.a declares height:var(--color)px, which puts "px" after var(--color), whose value #fff is not a number: it is left as it is, and the browser drops it. Write the reference alone.',
+      '.a declares top:var(--other)px, which puts "px" after var(--other), whose value is not known (no token of the theme has it): it is left as it is, and the browser drops it. Write calc(var(--other) * 1px) for a number, or the reference alone for a length.',
+      '.a declares left:var(--px)ms, which puts "ms" after var(--px), whose value 4px has another unit: it is left as it is, and the browser drops it. Write the value in ms, or the reference alone.',
+    ])
+  })
+
+  it('keeps the calc() of a time for a reference whose value is not known', () => {
+    expect(repairWith({ transitionDelay: 'var(--other)ms' }).rules).toEqual([
+      '.a{transition-delay:calc(var(--other) * 1ms);}',
+    ])
   })
 })

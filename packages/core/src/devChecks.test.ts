@@ -19,6 +19,10 @@ function addStyle(css: string) {
   document.head.appendChild(element)
 }
 
+/** What a message about a NaN value ends with. */
+const NAN_HINT =
+  ' A NaN often comes from arithmetic on a token in a style function (theme.space[2] * 2), where the token is a reference such as var(--x), not a number: use multiply() or calc(), give the token a raw or inline mode (modes), or read the real value from useTheme().'
+
 describe('isDevelopment', () => {
   it('is true for a development build only', () => {
     vi.stubEnv('NODE_ENV', 'development')
@@ -249,10 +253,10 @@ describe('the report of values that no CSS property takes', () => {
         `[u] the class ${name} of "Card-root" declares "color" as a function, which is never a CSS value: give a string or a number.`,
       ],
       [
-        `[u] the class ${plain} declares "margin" as NaN, which is never a CSS value: give a string or a number.`,
+        `[u] the class ${plain} declares "margin" as NaN, which is never a CSS value: give a string or a number.${NAN_HINT}`,
       ],
       [
-        '[u] the global rule body declares "margin" as NaN, which is never a CSS value: give a string or a number.',
+        `[u] the global rule body declares "margin" as NaN, which is never a CSS value: give a string or a number.${NAN_HINT}`,
       ],
       [
         '[u] the global rule @media print declares "display" as an object in a list of values, which is never a CSS value: give a string or a number.',

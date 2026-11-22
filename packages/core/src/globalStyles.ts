@@ -1,8 +1,15 @@
 import type * as CSS from 'csstype'
+import { isAlphaColor } from './alpha'
 import { hashString } from './hash'
-import type { Scoping } from './scope'
-import { compileRules, toSelectorText, type StyleObject } from './serialize'
-import { readEntryStyle, type SheetEntry } from './sheetEntry'
+import {
+  compileStyleRules,
+  readLabel,
+  toSelectorText,
+  type CompileContext,
+  type StyleObject,
+} from './serialize'
+import { isSheetEntry, readEntryStyle, type SheetEntry } from './sheetEntry'
+import { DEFAULT_SCOPING } from './scope'
 import { createStandIn, readStandIn } from './standIn'
 import type { TemplateValue } from './styleTypes'
 import { isTemplateStrings, parseStyleTemplate } from './templateStyle'
@@ -49,18 +56,41 @@ export interface GlobalStyles<T = never> {
   readonly id: string
   /** The styles: those given, or what the function returns for the theme that `readTheme` gives, which is called only then. */
   resolve(readTheme: () => T): GlobalStyleObject
+  /**
+   * The CSS text of the styles as global rules (`html,body{margin:0;}`), in the engine's text format and
+   * with the defaults of a cache, no layer: made on first read, and nothing is written. Undefined for a
+   * function of the theme, whose rules need the theme of an engine.
+   */
+  readonly styles: string | undefined
 }
 
-/** Global styles in any form an engine takes: a handle, an object, a function of the theme, or a list of them, written in the order of the list. */
+/**
+ * Global styles in any form an engine takes: a handle, an object, a `css()` value or sheet entry (its
+ * nested rules are the global rules), a function of the theme that returns any of these, nothing
+ * (`null`, `undefined`, `false`), or a list of them, nested to any depth, written in the order of the list.
+ */
 export type GlobalInput<T> =
   | GlobalStyles<T>
-  | GlobalStylesInput<T>
-  | readonly (GlobalStyles<T> | GlobalStylesInput<T>)[]
+  | GlobalStyleObject
+  | SheetEntry
+  | ((theme: T) => GlobalInput<T>)
+  | null
+  | undefined
+  | false
+  | readonly GlobalInput<T>[]
 
 const BRAND = Symbol.for('umber-style.global-styles')
 
 /** The at-rules that hold rules (selectors as keys); every other at-rule holds declarations. */
 const GROUP_AT_RULE = /^@(?:media|supports|container|layer|scope|starting-style|document)(?![\w-])/
+
+/** How the `styles` text of a handle is written: the defaults of a cache. */
+const TEXT_CONTEXT: CompileContext = {
+  hasColorFallbacks: true,
+  hasValueRepair: false,
+  hasVendorPrefixes: true,
+  scoping: DEFAULT_SCOPING,
+}
 
 /** `value` for the id of a handle: a stand-in as its path, everything else as it is. */
 function toText(_key: string, value: unknown): unknown {
@@ -102,6 +132,7 @@ export function globalStyles<T = never>(
       [BRAND]: true,
       id: `global-${hash}`,
       resolve: (readTheme: () => T) => styles(readTheme()),
+      styles: undefined,
     })
   }
   if (typeof styles !== 'object' || styles === null || Array.isArray(styles)) {
@@ -109,10 +140,15 @@ export function globalStyles<T = never>(
       'globalStyles(): the styles must be an object, or a function that returns one.'
     )
   }
+  let text: string | undefined
   return Object.freeze({
     [BRAND]: true,
     id: `global-${hashString(JSON.stringify(styles))}`,
     resolve: () => styles,
+    get styles() {
+      text ??= compileGlobalRules(styles, TEXT_CONTEXT).join('')
+      return text
+    },
   })
 }
 
@@ -121,13 +157,70 @@ export function isGlobalStyles(value: unknown): value is GlobalStyles<unknown> {
   return typeof value === 'object' && value !== null && BRAND in value
 }
 
-/** The styles of one item of a `GlobalInput`: a handle resolves itself, a function is called with the theme that `readTheme` gives. */
-export function readGlobalStyles<T>(
-  item: GlobalStyles<T> | GlobalStylesInput<T>,
-  readTheme: () => T
-): GlobalStyleObject {
-  if (isGlobalStyles(item)) return (item as GlobalStyles<T>).resolve(readTheme)
-  return typeof item === 'function' ? item(readTheme()) : item
+/** Whether `value` of a key of a style is a nested rule (a selector or an at-rule that holds a style), not a declared value. */
+function isNestedRule(value: unknown): boolean {
+  return (
+    typeof value === 'object' && value !== null && !Array.isArray(value) && !isAlphaColor(value)
+  )
+}
+
+/**
+ * The global styles of a sheet entry (a `css()` value): each nested rule of its style, a selector or an
+ * at-rule, is a global rule as it is written (`html`, `html, body`, `@media (...)`). A declaration of the
+ * style itself has no selector to go under: it is left out, and `warn` is told about it.
+ */
+function readEntryGlobal(entry: SheetEntry, warn: ((message: string) => void) | undefined) {
+  const style = readEntryStyle(entry, 'Global') as StyleObject
+  const label = readLabel(style)
+  const owner = label ? `the css() value "${label}"` : 'a css() value'
+  const global: GlobalStyleObject = {}
+  for (const [key, value] of Object.entries(style)) {
+    if (isNestedRule(value)) global[key] = value as GlobalStyleObject
+    else if (key !== 'label') {
+      warn?.(
+        `Global styles: ${owner} declares "${key}" outside a selector. A global rule needs a selector, so it is left out: put it under one (html, body, :root).`
+      )
+    }
+  }
+  return global
+}
+
+/** Adds to `found` the global styles of `input` (see `readGlobalInput`). */
+function addGlobalInput<T>(
+  input: GlobalInput<T>,
+  readTheme: () => T,
+  warn: ((message: string) => void) | undefined,
+  found: GlobalStyleObject[]
+): void {
+  if (Array.isArray(input)) {
+    for (const item of input as readonly GlobalInput<T>[])
+      addGlobalInput(item, readTheme, warn, found)
+  } else if (isGlobalStyles(input)) {
+    addGlobalInput((input as GlobalStyles<T>).resolve(readTheme), readTheme, warn, found)
+  } else if (typeof input === 'function') {
+    addGlobalInput(input(readTheme()), readTheme, warn, found)
+  } else if (isSheetEntry(input)) {
+    found.push(readEntryGlobal(input, warn))
+  } else if (input !== null && input !== undefined && input !== false) {
+    // Anything else is given to the compiler, which throws a `TypeError` for what is not an object.
+    found.push(input as GlobalStyleObject)
+  }
+}
+
+/**
+ * The sets of global styles of `input`, one for each item, in order: a list is read item by item at any
+ * depth, a handle resolves itself, a function is called with the theme that `readTheme` gives (and what
+ * it returns is read the same way), a `css()` value gives its nested rules (see `readEntryGlobal`, which
+ * tells `warn` about a declaration it leaves out), and nothing is left out.
+ */
+export function readGlobalInput<T>(
+  input: GlobalInput<T>,
+  readTheme: () => T,
+  warn?: (message: string) => void
+): GlobalStyleObject[] {
+  const found: GlobalStyleObject[] = []
+  addGlobalInput(input, readTheme, warn, found)
+  return found
 }
 
 /** The style of one item under `key` (a sheet entry is read as its style); a `TypeError` for anything that is not a style object. */
@@ -144,23 +237,13 @@ function addGlobalItemRules(
   rules: string[],
   key: string,
   item: GlobalStyleObject,
-  hasColorFallbacks: boolean,
-  scoping: Scoping,
-  hasValueRepair: boolean
+  context: CompileContext
 ): void {
   if (!GROUP_AT_RULE.test(key)) {
-    rules.push(
-      ...compileRules(
-        toSelectorText(key),
-        item as StyleObject,
-        hasColorFallbacks,
-        scoping,
-        hasValueRepair
-      )
-    )
+    rules.push(...compileStyleRules(toSelectorText(key), item as StyleObject, context))
     return
   }
-  const inner = compileGlobalRules(item, hasColorFallbacks, scoping, hasValueRepair)
+  const inner = compileGlobalRules(item, context)
   if (inner.length > 0) rules.push(`${key}{${inner.join('')}}`)
 }
 
@@ -170,12 +253,7 @@ function addGlobalItemRules(
  * a rule of declarations (one for each item of a list). Throws a `TypeError` for styles that are not an
  * object, and for a key that holds no style.
  */
-export function compileGlobalRules(
-  styles: GlobalStyleObject,
-  hasColorFallbacks: boolean,
-  scoping: Scoping,
-  hasValueRepair: boolean
-): string[] {
+export function compileGlobalRules(styles: GlobalStyleObject, context: CompileContext): string[] {
   if (typeof styles !== 'object' || styles === null || Array.isArray(styles)) {
     throw new TypeError(
       'globalStyles(): the styles must be an object, or a function that returns one.'
@@ -186,7 +264,7 @@ export function compileGlobalRules(
     if (value === null || value === undefined || value === false) continue
     for (const each of Array.isArray(value) ? value : [value]) {
       const item = readGlobalItem(key, each)
-      addGlobalItemRules(rules, key, item, hasColorFallbacks, scoping, hasValueRepair)
+      addGlobalItemRules(rules, key, item, context)
     }
   }
   return rules

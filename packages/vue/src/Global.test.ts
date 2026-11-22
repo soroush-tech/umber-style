@@ -39,6 +39,45 @@ function mount(component: Component) {
 }
 
 describe('Global in the browser', () => {
+  it('writes a css value, a function that returns a css template and a list of them as global rules, and removes them', async () => {
+    const { Global, css, rules } = setup()
+    const reset = (view: typeof theme) => css`
+      html,
+      body {
+        margin: 0;
+        color: ${view.palette.text};
+      }
+      /* media */
+      ${`@media (min-width: ${view.breakpoints.md}px)`} {
+        main [id] {
+          scroll-margin-top: 5rem;
+        }
+      }
+    `
+    const isOn = ref(true)
+    const { app } = mount(() =>
+      h(Global, {
+        styles: isOn.value
+          ? [{ '#app': { padding: 0 } }, reset]
+          : css`
+              body {
+                margin: 1px;
+              }
+            `,
+      })
+    )
+    expect(rules).toEqual([
+      '#app{padding:0;}',
+      'html,body{margin:0;color:var(--g-palette-text);}',
+      '@media (min-width: 768px){main [id]{scroll-margin-top:5rem;}}',
+    ])
+    isOn.value = false
+    await nextTick()
+    expect(rules).toEqual(['body{margin:1px;}'])
+    app.unmount()
+    expect(rules).toEqual([])
+  })
+
   it('renders nothing, writes its rules when it mounts and removes them when it unmounts', () => {
     const { Global, globalStyles, rules } = setup()
     const base = globalStyles((view) => ({

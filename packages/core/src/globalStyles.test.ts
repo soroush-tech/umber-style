@@ -1,3 +1,4 @@
+import type { WebStyleObject } from './webStyle'
 import { alpha } from './alpha'
 import { createCache, createMemorySheet } from './cache'
 import { DEFAULT_SCOPING } from './scope'
@@ -6,7 +7,7 @@ import {
   compileGlobalRules,
   globalStyles,
   isGlobalStyles,
-  readGlobalStyles,
+  readGlobalInput,
   type GlobalStyleObject,
 } from './globalStyles'
 
@@ -16,7 +17,7 @@ interface AppTheme {
 }
 
 const compile = (styles: GlobalStyleObject, hasValueRepair = false) =>
-  compileGlobalRules(styles, true, DEFAULT_SCOPING, hasValueRepair)
+  compileGlobalRules(styles, { hasColorFallbacks: true, scoping: DEFAULT_SCOPING, hasValueRepair })
 
 describe('globalStyles', () => {
   it('returns a frozen handle that writes nothing and needs no engine', () => {
@@ -94,16 +95,61 @@ describe('globalStyles', () => {
   })
 })
 
-describe('readGlobalStyles', () => {
+describe('readGlobalInput', () => {
   it('reads a handle, an object and a function, the theme only for a function', () => {
     const readTheme = vi.fn(() => ({ color: 'var(--u-x)' }))
     const object = { body: { margin: 0 } }
-    expect(readGlobalStyles(object, readTheme)).toBe(object)
-    expect(readGlobalStyles(globalStyles(object), readTheme)).toBe(object)
+    expect(readGlobalInput(object, readTheme)).toEqual([object])
+    expect(readGlobalInput(globalStyles(object), readTheme)[0]).toBe(object)
     expect(readTheme).not.toHaveBeenCalled()
-    expect(readGlobalStyles((theme) => ({ body: { color: theme.color } }), readTheme)).toEqual({
-      body: { color: 'var(--u-x)' },
-    })
+    expect(readGlobalInput((theme) => ({ body: { color: theme.color } }), readTheme)).toEqual([
+      { body: { color: 'var(--u-x)' } },
+    ])
+  })
+
+  it('reads lists at any depth, what a function returns, and leaves out nothing', () => {
+    const readTheme = () => ({ color: 'red' })
+    const first = { html: { margin: 0 } }
+    const second = { body: { margin: 0 } }
+    expect(
+      readGlobalInput([null, [first, false], undefined, () => [second, null]], readTheme)
+    ).toEqual([first, second])
+  })
+
+  it('reads the nested rules of a sheet entry as global styles, and tells about each declaration it leaves out', () => {
+    const cache = createCache({ prefix: 'u', sheet: createMemorySheet() })
+    const warn = vi.fn()
+    const entry = cache.createEntry({
+      label: 'Reset',
+      color: 'red',
+      margin: [0, '1px'],
+      fill: alpha('#000000', 0.5),
+      html: { margin: 0 },
+      '@media (min-width: 1px)': { body: { padding: 0 } },
+    } as WebStyleObject)
+    expect(readGlobalInput(entry, () => ({}), warn)).toEqual([
+      { html: { margin: 0 }, '@media (min-width: 1px)': { body: { padding: 0 } } },
+    ])
+    expect(warn.mock.calls.map(([message]) => message)).toEqual(
+      ['color', 'margin', 'fill'].map(
+        (key) =>
+          `Global styles: the css() value "Reset" declares "${key}" outside a selector. A global rule needs a selector, so it is left out: put it under one (html, body, :root).`
+      )
+    )
+    const unnamed = cache.createEntry({ color: 'red' })
+    expect(readGlobalInput(unnamed, () => ({}))).toEqual([{}])
+    readGlobalInput(unnamed, () => ({}), warn)
+    expect(warn).toHaveBeenLastCalledWith(
+      'Global styles: a css() value declares "color" outside a selector. A global rule needs a selector, so it is left out: put it under one (html, body, :root).'
+    )
+  })
+
+  it('throws for an entry that is only a class name, whose style is not known', () => {
+    expect(() => readGlobalInput(createSheetEntry('x-1'), () => ({}))).toThrow(
+      new TypeError(
+        'Global(): the sheet entry "x-1" is only a class name, so its style cannot be merged.'
+      )
+    )
   })
 
   it('tells a handle from an object by its brand', () => {
@@ -229,5 +275,22 @@ describe('compileGlobalRules', () => {
         new TypeError('globalStyles(): "body" must hold a style object, or a list of them.')
       )
     }
+  })
+})
+
+describe('the styles text of a handle', () => {
+  it('reads as global rules for styles given as an object or a template, made once, and is undefined for a function', () => {
+    const reset = globalStyles({
+      'html, body': { margin: 0, userSelect: 'none' },
+      '*': { boxSizing: 'border-box' },
+    })
+    expect(reset.styles).toBe(
+      'html,body{margin:0;-webkit-user-select:none;user-select:none;}*{box-sizing:border-box;}'
+    )
+    expect(reset.styles).toBe(reset.styles)
+    expect(globalStyles`body { margin: 0; }`.styles).toBe('body{margin:0;}')
+    expect(
+      globalStyles((theme: AppTheme) => ({ body: { color: theme.palette.text } })).styles
+    ).toBeUndefined()
   })
 })

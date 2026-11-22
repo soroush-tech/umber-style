@@ -1,5 +1,10 @@
 import { afterEach, vi } from 'vitest'
-import { warnAboutDroppedKey, warnAboutQuery, warnAboutValues } from './warnStyle'
+import {
+  warnAboutDroppedKey,
+  warnAboutIgnoredOptions,
+  warnAboutQuery,
+  warnAboutValues,
+} from './warnStyle'
 
 const NODE_ENV = process.env.NODE_ENV
 
@@ -176,5 +181,23 @@ describe('warnAboutDroppedKey', () => {
     warnAboutDroppedKey('&:active', 'Quiet')
     warnAboutQuery('(hover: hover)', 'the media feature "hover"')
     expect(warn).not.toHaveBeenCalled()
+  })
+})
+
+describe('warnAboutIgnoredOptions', () => {
+  it('names the web options given, once, and nothing for the options React Native reads or in production', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    warnAboutIgnoredOptions({ theme: {}, remBase: 10, lengthKeys: [], prefix: undefined })
+    expect(warn).not.toHaveBeenCalled()
+    warnAboutIgnoredOptions({ prefix: 'app', hasValueRepair: true, remBase: 10 })
+    warnAboutIgnoredOptions({ prefix: 'app', hasValueRepair: true })
+    expect(warn.mock.calls).toEqual([
+      [
+        '@umber-style/react-native: the options prefix, hasValueRepair are for the web, and React Native does not use them: they are ignored. Only theme, remBase and lengthKeys are read.',
+      ],
+    ])
+    process.env.NODE_ENV = 'production'
+    warnAboutIgnoredOptions({ suffix: '-x' })
+    expect(warn).toHaveBeenCalledTimes(1)
   })
 })

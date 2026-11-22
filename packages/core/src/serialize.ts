@@ -11,6 +11,7 @@ import {
   type Condition,
   type Scoping,
 } from './scope'
+import { PREFIXED_FORMS, type PrefixedForm } from './vendorPrefixes'
 
 /** The value of a key of a style: a CSS value, a falsy value that is left out, a list of values (one declaration each, in order), or a nested style. */
 export type StyleValue =
@@ -44,6 +45,7 @@ const UNITLESS = new Set([
   'gridRow',
   'gridRowEnd',
   'gridRowStart',
+  'initialLetter',
   'lineHeight',
   'opacity',
   'order',
@@ -93,8 +95,83 @@ function toPropertyName(key: string): string {
 
 const REFERENCE = 'var('
 const HEX_PAIR = /^[0-9a-f]{2}$/i
-/** The units that make a reference a time: `var(--x)ms` is `calc(var(--x) * 1ms)`. */
-const TIME_UNITS = ['ms', 's']
+/** The units that make a reference a time: `var(--x)ms` is `calc(var(--x) * 1ms)` when the value of `--x` is not known. */
+const TIME_UNITS = new Set(['ms', 's'])
+/**
+ * The units that value repair reads after a reference (`var(--x)px`), longest first where one starts
+ * another: each is a unit a `calc()` can multiply a number by. A unit must end there (`var(--x)pxa` is
+ * left alone), and none is two hex digits, which are an opacity.
+ */
+const REPAIR_UNITS = [
+  'ms',
+  's',
+  'px',
+  'rem',
+  'em',
+  '%',
+  'vmin',
+  'vmax',
+  'vh',
+  'vw',
+  'svh',
+  'lvh',
+  'dvh',
+  'svw',
+  'lvw',
+  'dvw',
+  'ch',
+  'ex',
+  'rlh',
+  'lh',
+  'cm',
+  'mm',
+  'in',
+  'pt',
+  'pc',
+  'deg',
+  'grad',
+  'rad',
+  'turn',
+]
+/** What may follow a number as its unit: letters or a percent sign, or nothing. */
+const UNIT_TEXT = /^[a-z%]*$/i
+
+/** Whether the character at `index` of `text` is a digit. */
+function isDigitAt(text: string, index: number): boolean {
+  // Past the end there is no code point, and no digit.
+  const code = text.codePointAt(index) ?? 0
+  return code >= 48 && code <= 57
+}
+
+/** The index after the digits of `text` that start at `index`. */
+function skipDigits(text: string, index: number): number {
+  let end = index
+  while (isDigitAt(text, end)) end++
+  return end
+}
+
+/** The index after an exponent (`e3`, `E-2`) that starts at `index`, or `index` when none does: an `e` with no digit after it starts a unit (`em`, `ex`). */
+function skipExponent(text: string, index: number): number {
+  if (text[index] !== 'e' && text[index] !== 'E') return index
+  const digits = text[index + 1] === '+' || text[index + 1] === '-' ? index + 2 : index + 1
+  return isDigitAt(text, digits) ? skipDigits(text, digits) : index
+}
+
+/**
+ * The unit of `text` when it is a number with a unit after it, in lower case (`''` for a plain number);
+ * undefined when it is not such a value. It is what the declared value of a token is when it is a
+ * length, a time or a plain number.
+ */
+function readNumberUnit(text: string): string | undefined {
+  const start = text.startsWith('+') || text.startsWith('-') ? 1 : 0
+  const whole = skipDigits(text, start)
+  const fraction = text[whole] === '.' ? skipDigits(text, whole + 1) : whole
+  // A number has a digit, before the point or after it: `.` alone and no digits at all are not one.
+  const hasDigits = whole > start || fraction > whole + 1
+  if (!hasDigits) return undefined
+  const unit = text.slice(skipExponent(text, fraction))
+  return UNIT_TEXT.test(unit) ? unit.toLowerCase() : undefined
+}
 
 /** Whether the character code `code` can be part of an identifier: a letter, a digit, `-`, `_` or any non-ASCII character. NaN (past either end of the text) cannot. */
 function isNameCode(code: number): boolean {
@@ -123,32 +200,90 @@ function findClose(value: string, start: number): number {
   return -1
 }
 
+/** What value repair reads and tells besides the value: the declared value of a variable, and where a form that it leaves is reported. */
+interface RepairContext {
+  /** The declared value of the variable `name` (`--x`), or undefined when it is not known. */
+  readValue?: (name: string) => string | undefined
+  /** Told, in a sentence, about a reference followed by a unit that is left as it is. */
+  report?: (message: string) => void
+  /** The text a report starts with: the selector and the declaration. */
+  owner: string
+}
+
+/** The unit at `index` of `value` (lowercase) that ends there, or undefined. */
+function readUnit(value: string, index: number): string | undefined {
+  for (const unit of REPAIR_UNITS) {
+    const end = index + unit.length
+    if (value.slice(index, end).toLowerCase() === unit && !isNameCode(codeAt(value, end))) {
+      return unit
+    }
+  }
+  return undefined
+}
+
+/** The declared value of the reference whose text inside `var(...)` is `inner`: the token's, else its fallback. */
+function readDeclared(inner: string, context: RepairContext): string | undefined {
+  const comma = inner.indexOf(',')
+  const name = (comma === -1 ? inner : inner.slice(0, comma)).trim()
+  return context.readValue?.(name) ?? (comma === -1 ? undefined : inner.slice(comma + 1).trim())
+}
+
 /**
- * `reference` with what follows it at `at` taken in, and where the rest of the value starts: two hex
- * digits of alpha are what `alpha()` writes for that opacity, a time unit makes a `calc()` of a time.
+ * The text of `reference` followed by `unit`: the reference alone when its value has that unit, a
+ * `calc()` of the unit when it is a plain number (or, for a time, when it is not known), else undefined,
+ * after `context.report` is told why.
+ */
+function repairUnit(
+  reference: string,
+  inner: string,
+  unit: string,
+  context: RepairContext
+): string | undefined {
+  const declared = readDeclared(inner, context)
+  if (declared === undefined && TIME_UNITS.has(unit)) return `calc(${reference} * 1${unit})`
+  const valueUnit = declared === undefined ? undefined : readNumberUnit(declared)
+  if (valueUnit === unit) return reference
+  if (valueUnit === '') return `calc(${reference} * 1${unit})`
+  const start = `${context.owner}, which puts "${unit}" after ${reference}, whose value`
+  const end = 'it is left as it is, and the browser drops it.'
+  let problem = `${declared} has another unit: ${end} Write the value in ${unit}, or the reference alone.`
+  if (declared === undefined) {
+    problem = `is not known (no token of the theme has it): ${end} Write calc(${reference} * 1${unit}) for a number, or the reference alone for a length.`
+  } else if (valueUnit === undefined) {
+    problem = `${declared} is not a number: ${end} Write the reference alone.`
+  }
+  context.report?.(`${start} ${problem}`)
+  return undefined
+}
+
+/**
+ * `reference` with what follows it at `index` taken in, and where the rest of the value starts: two hex
+ * digits of alpha are what `alpha()` writes for that opacity, a unit is taken in as `repairUnit` says.
  * The digits or the unit must end there: `var(--x)1Fa` is left alone.
  */
-function repairSuffix(value: string, index: number, reference: string): [string, number] {
+function repairSuffix(
+  value: string,
+  index: number,
+  reference: string,
+  inner: string,
+  context: RepairContext
+): [string, number] {
   const pair = value.slice(index, index + 2)
   if (HEX_PAIR.test(pair) && !isNameCode(codeAt(value, index + 2))) {
     return [String(alpha(reference, Number.parseInt(pair, 16) / 255)), index + 2]
   }
-  for (const unit of TIME_UNITS) {
-    const end = index + unit.length
-    if (value.slice(index, end).toLowerCase() === unit && !isNameCode(codeAt(value, end))) {
-      return [`calc(${reference} * 1${unit})`, end]
-    }
-  }
-  return [reference, index]
+  const unit = readUnit(value, index)
+  const repaired = unit === undefined ? undefined : repairUnit(reference, inner, unit, context)
+  return repaired === undefined ? [reference, index] : [repaired, index + (unit as string).length]
 }
 
 /**
  * `value` with the string forms of token maths that are never valid CSS rewritten: a reference followed
  * by two hex digits (`var(--x)1F`) as `alpha()` writes it, a minus before a reference (`-var(--x)`) as
- * `negate()` writes it, and a reference followed by `ms` or `s` as a `calc()` of a time. A reference may
- * have a fallback, which is repaired too. Any other text is kept as it is.
+ * `negate()` writes it, and a reference followed by a unit (`var(--x)px`, `var(--x)ms`) as `repairUnit`
+ * says. A reference may have a fallback, which is repaired too. Any other text is kept as it is.
  */
-function repairValue(value: string): string {
+function repairValue(value: string, context: RepairContext): string {
   let repaired = ''
   let from = 0
   let index = value.indexOf(REFERENCE)
@@ -162,7 +297,9 @@ function repairValue(value: string): string {
     const close = findClose(value, index + REFERENCE.length)
     if (close === -1) break
     const inner = value.slice(index + REFERENCE.length, close - 1)
-    const [text, end] = repairSuffix(value, close, `${REFERENCE}${repairValue(inner)})`)
+    const repairedInner = repairValue(inner, context)
+    const reference = `${REFERENCE}${repairedInner})`
+    const [text, end] = repairSuffix(value, close, reference, repairedInner, context)
     const start = hasMinus ? index - 1 : index
     repaired += value.slice(from, start) + (hasMinus ? String(negate(text)) : text)
     from = end
@@ -172,14 +309,22 @@ function repairValue(value: string): string {
 }
 
 /**
- * The CSS text of one declared value: a number is a time in `ms` (0 too: a time needs its unit), or a
- * length in `px` unless it is 0 or the property takes a plain number. With `hasValueRepair` a string
- * that holds a reference, outside a custom property, has its string forms of token maths rewritten.
+ * The CSS text of one declared value of the property `name`: a number is a time in `ms` (0 too: a time
+ * needs its unit), or a length in `px` unless it is 0 or the property takes a plain number. With
+ * `hasValueRepair` a string that holds a reference, outside a custom property, has its string forms of
+ * token maths rewritten.
  */
-function toValue(key: string, value: string | number, hasValueRepair: boolean): string {
+function toValue(
+  key: string,
+  name: string,
+  value: string | number,
+  selector: string,
+  context: CompileContext
+): string {
   if (typeof value === 'string') {
-    if (!hasValueRepair || !value.includes(REFERENCE) || key.startsWith('--')) return value
-    return repairValue(value)
+    if (!context.hasValueRepair || !value.includes(REFERENCE) || key.startsWith('--')) return value
+    const { readValue, report } = context
+    return repairValue(value, { readValue, report, owner: `${selector} declares ${name}:${value}` })
   }
   if (TIMES.has(key)) return `${value}ms`
   const hasUnit = value !== 0 && !key.startsWith('--') && !UNITLESS.has(key)
@@ -272,11 +417,20 @@ export function mergeStyles(styles: readonly StyleObject[]): StyleObject {
   return merged
 }
 
-/** What the compiler is given besides the style: how an `alpha()` value is written, whether string forms of token maths are repaired, and how a condition is scoped. */
-interface CompileContext {
+/** What the compiler is given besides the style: how an `alpha()` value is written, whether string forms of token maths are repaired and with what, and how a condition is scoped. */
+export interface CompileContext {
+  /** Whether an `alpha()` value is written as its fallback, then its mix. */
   hasColorFallbacks: boolean
+  /** Whether the string forms of token maths that are never valid CSS are rewritten. */
   hasValueRepair: boolean
+  /** How a condition key is scoped. */
   scoping: Scoping
+  /** The declared value of a variable, by name (`--x`): value repair reads the unit of a token from it. */
+  readValue?: (name: string) => string | undefined
+  /** Told about each reference followed by a unit that value repair leaves as it is. */
+  report?: (message: string) => void
+  /** Whether a declaration that a supported browser needs in a prefixed form gets that form first (`PREFIXED_FORMS`). Default false. */
+  hasVendorPrefixes?: boolean
 }
 
 /** `selector`, a list or one, with `text` in front of each of its parts. */
@@ -356,23 +510,85 @@ function toItemDeclarations(
   key: string,
   name: string,
   item: DeclaredItem,
+  selector: string,
   context: CompileContext
 ): string {
-  if (!isAlphaColor(item)) return `${name}:${toValue(key, item, context.hasValueRepair)};`
+  if (!isAlphaColor(item)) return `${name}:${toValue(key, name, item, selector, context)};`
   const hasFallback = context.hasColorFallbacks && !key.startsWith('--')
   const fallback = hasFallback ? `${name}:${item.fallback};` : ''
   return `${fallback}${name}:${item.value};`
 }
 
-/** The declarations of one property: one for a value, one for each item of a fallback list. */
+/** The declarations of `items` under the property `name`; a function is never CSS, and is left out (with the development checks, `findInvalidValues` reports it). */
+function toListDeclarations(
+  key: string,
+  name: string,
+  items: readonly unknown[],
+  selector: string,
+  context: CompileContext
+): string {
+  let text = ''
+  for (const item of items) {
+    if (typeof item !== 'function') {
+      text += toItemDeclarations(key, name, item as DeclaredItem, selector, context)
+    }
+  }
+  return text
+}
+
+/** Whether `style` declares one of `keys` (the spellings of one property): a value that declares nothing does not count. */
+function hasDeclared(style: StyleObject, keys: readonly string[]): boolean {
+  return keys.some((key) => {
+    const value = style[key]
+    return value !== undefined && value !== null && value !== false
+  })
+}
+
+/** The declaration of `form` for `items`, unless the author wrote it in `style` already, or no item needs it. */
+function toPrefixedDeclarations(
+  key: string,
+  form: PrefixedForm,
+  items: readonly unknown[],
+  style: StyleObject,
+  selector: string,
+  context: CompileContext
+): string {
+  const { property, value, forValue, keys } = form
+  if (value === undefined) {
+    if (hasDeclared(style, keys)) return ''
+    return toListDeclarations(key, property, items, selector, context)
+  }
+  // A form of a value is the same property: the author's values are `items`.
+  return items.includes(forValue) && !items.includes(value) ? `${property}:${value};` : ''
+}
+
+/**
+ * The declarations of one property: one for a value, one for each item of a fallback list; with
+ * `hasVendorPrefixes`, after the prefixed forms that a supported browser needs (`PREFIXED_FORMS`).
+ */
 function toDeclarations(
   key: string,
   value: DeclaredItem | readonly DeclaredItem[],
+  style: StyleObject,
+  selector: string,
   context: CompileContext
 ): string {
   const name = toPropertyName(key)
-  const items = Array.isArray(value) ? (value as readonly DeclaredItem[]) : [value as DeclaredItem]
-  return items.map((item) => toItemDeclarations(key, name, item, context)).join('')
+  const isList = Array.isArray(value)
+  let standard = ''
+  if (isList)
+    standard = toListDeclarations(key, name, value as readonly unknown[], selector, context)
+  else if (typeof value !== 'function') {
+    standard = toItemDeclarations(key, name, value as DeclaredItem, selector, context)
+  }
+  const forms = context.hasVendorPrefixes ? PREFIXED_FORMS.get(name) : undefined
+  if (forms === undefined) return standard
+  const items: readonly unknown[] = isList ? (value as readonly unknown[]) : [value]
+  let prefixedText = ''
+  for (const form of forms) {
+    prefixedText += toPrefixedDeclarations(key, form, items, style, selector, context)
+  }
+  return prefixedText + standard
 }
 
 /** The rules of `style` for `selector`, with the options of `context`. */
@@ -383,7 +599,7 @@ function compileStyle(selector: string, style: StyleObject, context: CompileCont
   for (const [key, value] of Object.entries(style)) {
     if (key === 'label' || value === null || value === undefined || value === false) continue
     if (isStyleObject(value)) nested.push(...compileNested(selector, key, value, context))
-    else declarations += toDeclarations(key, value, context)
+    else declarations += toDeclarations(key, value, style, selector, context)
   }
 
   return declarations ? [`${selector}{${declarations}}`, ...nested] : nested
@@ -403,6 +619,19 @@ export function compileRules(
   hasValueRepair = false
 ): string[] {
   return compileStyle(selector, style, { hasColorFallbacks, hasValueRepair, scoping })
+}
+
+/**
+ * `compileRules` with every option in `context`: with `hasValueRepair`, the unit of a reference is read
+ * from `readValue`, and what is left as it is reported to `report`; with `hasVendorPrefixes`, each
+ * declaration of `PREFIXED_FORMS` is written after its prefixed forms. `compileRules` writes none.
+ */
+export function compileStyleRules(
+  selector: string,
+  style: StyleObject,
+  context: CompileContext
+): string[] {
+  return compileStyle(selector, style, context)
 }
 
 /** The label of `style` (its `label` key), or ''. */

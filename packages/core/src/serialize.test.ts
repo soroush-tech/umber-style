@@ -210,3 +210,13 @@ describe('readLabel', () => {
     expect(readLabel({ color: 'red' })).toBe('')
   })
 })
+
+describe('compileRules: a function given as a value', () => {
+  it('is left out, alone or in a list, and the other declarations are written as they were', () => {
+    const fn = () => 'red'
+    expect(
+      compileRules('.a', { color: fn, margin: 0, padding: [fn, 4] } as unknown as StyleObject)
+    ).toEqual(['.a{margin:0;padding:4px;}'])
+    expect(compileRules('.a', { color: fn } as unknown as StyleObject)).toEqual([])
+  })
+})

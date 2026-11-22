@@ -128,3 +128,42 @@ describe('token modes', () => {
     expect(findNames(['zIndex', 'spac', 'nothing'])).toEqual([])
   })
 })
+
+describe('modes by a pattern', () => {
+  const typeTheme = {
+    typography: {
+      h1: { fontSize: '2rem', lineHeight: 1.2 },
+      h2: { fontSize: '1.5rem', lineHeight: 1.3 },
+      body: { fontSize: '1rem', lineHeight: 1.5 },
+    },
+  }
+
+  it('gives every path that a * matches the mode, an exact path winning over it', () => {
+    const { refs, declare } = createTokens(typeTheme, {
+      prefix: 'p',
+      modes: { 'typography.*.fontSize': 'raw', 'typography.body.fontSize': 'variable' },
+    })
+    expect(refs.typography.h1).toEqual({
+      fontSize: '2rem',
+      lineHeight: 'var(--p-typography-h1-line-height)',
+    })
+    expect(refs.typography.h2.fontSize).toBe('1.5rem')
+    expect(refs.typography.body.fontSize).toBe('var(--p-typography-body-font-size)')
+    expect(Object.keys(declare(typeTheme))).not.toContain('--p-typography-h1-font-size')
+  })
+
+  it('takes the longest path first, and of two patterns the one with fewer *', () => {
+    const { refs } = createTokens(typeTheme, {
+      prefix: 'p',
+      modes: {
+        'typography.*': 'raw',
+        '*.*.lineHeight': 'inline',
+        'typography.*.lineHeight': 'variable',
+      },
+    })
+    expect(refs.typography.h1).toEqual({
+      fontSize: '2rem',
+      lineHeight: 'var(--p-typography-h1-line-height)',
+    })
+  })
+})

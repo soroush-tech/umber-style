@@ -224,3 +224,18 @@ describe('how the style element of the cache is written', () => {
     expect(readText('slow')).toContain('{color:red;}')
   })
 })
+
+describe('the options of createCache', () => {
+  it('throws for onInsert, which the cache sets itself, and passes the style options on', () => {
+    expect(() =>
+      createCache({ key: 'app', onInsert: () => undefined } as Parameters<typeof createCache>[0])
+    ).toThrow(
+      new TypeError(
+        "createCache(): `onInsert` is the cache's own: it calls `insert` for every group of rules it writes. Replace `cache.insert` to see each rule."
+      )
+    )
+    const cache = createCache({ key: 'app', sheet: createMemorySheet(), hasVendorPrefixes: false })
+    const name = cache.css({ userSelect: 'none' })
+    expect(cache.getRules(name)).toEqual([`@layer app-components{.${name}{user-select:none;}}`])
+  })
+})

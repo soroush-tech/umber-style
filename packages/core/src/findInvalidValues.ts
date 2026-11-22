@@ -1,4 +1,5 @@
 import { isAlphaColor } from './alpha'
+import { readCondition } from './scope'
 import type { StyleObject } from './serialize'
 
 /** A declared value that no CSS property takes, found by the engine on its own: the key it is under, and what it is. */
@@ -66,5 +67,32 @@ function addInvalidValues(style: StyleObject, found: InvalidValue[]): void {
 export function findInvalidValues(style: StyleObject): InvalidValue[] {
   const found: InvalidValue[] = []
   addInvalidValues(style, found)
+  return found
+}
+
+const SCHEME_KEY = '@scheme '
+
+/** Adds to `found` each key of `style`, at any depth, that starts as a scheme condition and names no scheme. */
+function addUnknownSchemeKeys(style: StyleObject, found: string[]): void {
+  for (const [key, value] of Object.entries(style)) {
+    if (key.startsWith(SCHEME_KEY) && readCondition(key) === undefined) found.push(key)
+    if (
+      typeof value === 'object' &&
+      value !== null &&
+      !Array.isArray(value) &&
+      !isAlphaColor(value)
+    ) {
+      addUnknownSchemeKeys(value as StyleObject, found)
+    }
+  }
+}
+
+/**
+ * The keys of `style` (nested rules too) that start with `@scheme ` and name neither `light` nor `dark`
+ * (`@scheme blue`): the serializer writes such a key as an at-rule, which no browser knows.
+ */
+export function findUnknownSchemeKeys(style: StyleObject): string[] {
+  const found: string[] = []
+  addUnknownSchemeKeys(style, found)
   return found
 }

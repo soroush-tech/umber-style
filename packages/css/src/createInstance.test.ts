@@ -427,3 +427,18 @@ describe('a shared cache', () => {
     )
   })
 })
+
+describe('the prefixed forms in the plain layer', () => {
+  it('writes them in a class and in global rules by default, and not with hasVendorPrefixes false', () => {
+    const { css, injectGlobal, sheet } = createTestInstance()
+    const name = css({ userSelect: 'none' })
+    injectGlobal({ body: { textSizeAdjust: '100%' } })
+    expect(sheet.rules).toEqual([
+      `.${name}{-webkit-user-select:none;user-select:none;}`,
+      'body{-webkit-text-size-adjust:100%;text-size-adjust:100%;}',
+    ])
+    const plain = createInstance({ key: 't', sheet: createMemorySheet(), hasVendorPrefixes: false })
+    expect(plain.css({ userSelect: 'none' })).toBe(name)
+    expect(plain.sheet.rules).toEqual([`.${name}{user-select:none;}`])
+  })
+})

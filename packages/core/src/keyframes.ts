@@ -1,7 +1,7 @@
 import { isAlphaColor, type AlphaColor } from './alpha'
 import { hashString } from './hash'
 import { DEFAULT_SCOPING } from './scope'
-import { compileRules, mergeStyles, type StyleObject } from './serialize'
+import { compileStyleRules, mergeStyles, type CompileContext, type StyleObject } from './serialize'
 import { createStandIn, readStandIn } from './standIn'
 import type { TemplateValue } from './styleTypes'
 import { isTemplateStrings, parseKeyframesTemplate } from './templateStyle'
@@ -81,17 +81,18 @@ function normalizeSteps(steps: KeyframesSteps): [number, StyleObject][] {
   return [...merged].sort(([first], [second]) => first - second)
 }
 
-/** The body of a `@keyframes` rule: each step that declares something, sorted, written as the rule of a class. */
-function compileSteps(
-  steps: KeyframesSteps,
-  hasColorFallbacks: boolean,
-  hasValueRepair: boolean
-): string {
+/** The body of a `@keyframes` rule: each step that declares something, sorted, written as the rule of a class, as `context` says (its scoping is never read: a step holds no condition). */
+function compileSteps(steps: KeyframesSteps, context: CompileContext): string {
   return normalizeSteps(steps)
-    .flatMap(([offset, step]) =>
-      compileRules(`${offset}%`, step, hasColorFallbacks, DEFAULT_SCOPING, hasValueRepair)
-    )
+    .flatMap(([offset, step]) => compileStyleRules(`${offset}%`, step, context))
     .join('')
+}
+
+/** How the name of an animation is made from its steps: the defaults, the same for every engine. */
+const NAMING_CONTEXT: CompileContext = {
+  hasColorFallbacks: true,
+  hasValueRepair: false,
+  scoping: DEFAULT_SCOPING,
 }
 
 /**
@@ -127,7 +128,7 @@ export function keyframes<T = never>(
   }
   const isThemed = typeof steps === 'function'
   const resolved = isThemed ? steps(createStandIn('') as T) : steps
-  const name = `${label}-${hashString((isThemed ? 'theme:' : '') + compileSteps(resolved, true, false))}`
+  const name = `${label}-${hashString((isThemed ? 'theme:' : '') + compileSteps(resolved, NAMING_CONTEXT))}`
   if (!registry.has(name)) registry.set(name, steps as KeyframesInput<never>)
   return name
 }
@@ -138,18 +139,17 @@ export function isKeyframesName(name: string): boolean {
 }
 
 /**
- * The `@keyframes` rule of the registered `name`: steps given as a function are resolved against the
- * theme that `readTheme` gives, which is read only then.
+ * The `@keyframes` rule of the registered `name`, written as `context` says: steps given as a function are
+ * resolved against the theme that `readTheme` gives, which is read only then.
  */
 export function createKeyframesRule(
   name: string,
   readTheme: () => unknown,
-  hasColorFallbacks: boolean,
-  hasValueRepair: boolean
+  context: CompileContext
 ): string {
   const steps = registry.get(name) as KeyframesInput<unknown>
   const resolved = typeof steps === 'function' ? steps(readTheme()) : steps
-  return `@keyframes ${name}{${compileSteps(resolved, hasColorFallbacks, hasValueRepair)}}`
+  return `@keyframes ${name}{${compileSteps(resolved, context)}}`
 }
 
 /** Adds to `names` each identifier of `value` that is a registered name. */

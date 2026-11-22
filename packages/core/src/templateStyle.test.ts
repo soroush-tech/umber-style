@@ -45,6 +45,9 @@ const errorOf = (text: string) => {
   throw new Error('no error')
 }
 
+/** The compile options of a cache made with the defaults. */
+const PLAIN = { hasColorFallbacks: true, hasValueRepair: false, scoping: DEFAULT_SCOPING }
+
 describe('parseStyleTemplate', () => {
   it('reads declarations, with the last ";" optional and whitespace anywhere', () => {
     expect(style`color: red; padding: 8px`).toEqual({ color: 'red', padding: '8px' })
@@ -246,13 +249,11 @@ describe('parseStyleTemplate', () => {
       },
       'html, body': { margin: 0 },
     }
-    expect(compileGlobalRules(parsed, true, DEFAULT_SCOPING, false)).toEqual([
+    expect(compileGlobalRules(parsed, PLAIN)).toEqual([
       '@font-face{font-family:Brand;src:url(brand.woff2) format("woff2");font-display:swap;}',
       'html,body{margin:0;}',
     ])
-    expect(compileGlobalRules(parsed, true, DEFAULT_SCOPING, false)).toEqual(
-      compileGlobalRules(object, true, DEFAULT_SCOPING, false)
-    )
+    expect(compileGlobalRules(parsed, PLAIN)).toEqual(compileGlobalRules(object, PLAIN))
   })
 
   it('makes a property declared twice in a block a fallback list, at the place of the last', () => {

@@ -1,5 +1,6 @@
 import { at } from '@umber-style/react'
-import { Global, globalStyles, keyframes, omitProps, styled } from './style'
+import { css, Global, globalStyles, keyframes, omitProps, styled } from './style'
+import type { AppTheme } from './themes'
 
 /** The props of `Button`. */
 export type ButtonProps = {
@@ -225,10 +226,13 @@ export function FrameStyles() {
 }
 
 // The outline is not among the properties that the other scenarios compare: a rule that is left in the
-// page shows in the tests of the promo page, not as a difference in theirs.
-const headerOverride = globalStyles((theme) => ({
-  '[data-testid="nav"]': { outline: `3px solid ${theme.palette.accent}` },
-}))
+// page shows in the tests of the promo page, not as a difference in theirs. It is a function of the theme
+// that returns a `css` template, the form an app's reset has: its selector is a global rule's.
+const headerOverride = (theme: AppTheme) => css`
+  [data-testid='nav'] {
+    outline: 3px solid ${theme.palette.accent};
+  }
+`
 
 /** A global rule for the bar of the shell, outside the page that renders it: the promo page only. */
 export function HeaderOverride() {

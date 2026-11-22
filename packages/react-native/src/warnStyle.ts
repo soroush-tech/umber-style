@@ -109,3 +109,19 @@ export function warnAboutQuery(query: string, problem: string): void {
     undefined
   )
 }
+
+/** The options of `createStyle` and `configure` that React Native uses; every other option is for the web. */
+const NATIVE_OPTIONS = new Set(['theme', 'remBase', 'lengthKeys'])
+
+/** In development, warns (once) about the options of `createStyle` or `configure` that React Native does not use, by name. */
+export function warnAboutIgnoredOptions(options: object): void {
+  if (!isDevelopment()) return
+  const ignored = Object.entries(options)
+    .filter(([name, value]) => value !== undefined && !NATIVE_OPTIONS.has(name))
+    .map(([name]) => name)
+  if (ignored.length === 0) return
+  warnOnce(
+    `the options ${ignored.join(', ')} are for the web, and React Native does not use them: they are ignored. Only theme, remBase and lengthKeys are read.`,
+    undefined
+  )
+}

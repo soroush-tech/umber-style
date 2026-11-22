@@ -1,9 +1,9 @@
-import { isDevelopment } from './devChecks'
+import { createWarner, isDevelopment } from './devChecks'
 import { hashString } from './hash'
 import { createLazyRecord } from './lazyRecord'
 import { createCache, type Cache, type ClassValue, type GlobalRules, type HeldClass } from './cache'
 import { isSheetEntry } from './sheetEntry'
-import { readGlobalStyles, type GlobalInput } from './globalStyles'
+import { readGlobalInput, type GlobalInput } from './globalStyles'
 import {
   createSchemeKey,
   createThemeClassName,
@@ -20,9 +20,16 @@ import {
 } from './keyframes'
 import { joinLabels } from './serialize'
 import { isStyleFunction, splitLeading } from './styleBase'
+import { createReferenceGuard } from './referenceKeys'
 import { isSameView } from './sameView'
 import { createThemeClass, declareRootTheme, toDeclarationText } from './theme'
-import { createTokens, type DeepPartial, type TokenOptions, type Tokens } from './tokens'
+import {
+  createTokens,
+  findMissingPaths,
+  type DeepPartial,
+  type TokenOptions,
+  type Tokens,
+} from './tokens'
 import type { TemplateValue } from './styleTypes'
 import type { WebStyleObject } from './webStyle'
 import type {
@@ -259,21 +266,62 @@ function describeValue(value: unknown): string {
 /**
  * Warns, once for each message, about each part of `result` (what a style function of the component
  * labelled `label` returned, lists walked) that is not a style: a string, a number, `true`, a function.
- * An object, `null`, `undefined` and `false` are styles or nothing.
+ * An object, `null`, `undefined` and `false` are styles or nothing. Returns `result` with each number,
+ * `true` and function in place of `undefined` (a list keeps its length): the cache leaves them out
+ * too, and so is not asked to warn about them again. A string stays: the cache takes it as a class name.
  */
-function checkStyleResult(prefix: string, label: string, result: unknown): void {
-  if (Array.isArray(result)) {
-    for (const item of result) checkStyleResult(prefix, label, item)
-    return
-  }
+function checkStyleResult(prefix: string, label: string, result: unknown): StyleResult {
+  if (Array.isArray(result)) return result.map((item) => checkStyleResult(prefix, label, item))
   if (result === undefined || result === null || result === false || typeof result === 'object') {
-    return
+    return result as StyleResult
   }
   const owner = label ? ` of "${label}"` : ''
   const message = `[${prefix}] A style function${owner} returned ${describeValue(result)}, which is not a style: return a style object, a css() value, a list of them, null, undefined or false.`
-  if (warnedResults.has(message)) return
-  warnedResults.add(message)
-  console.warn(message)
+  if (!warnedResults.has(message)) {
+    warnedResults.add(message)
+    console.warn(message)
+  }
+  return typeof result === 'string' ? (result as unknown as StyleResult) : undefined
+}
+
+/**
+ * The engine options that only a cache holds (how classes are named and where and how rules are stored):
+ * with a `cache` given, that cache's decide, and these are ignored.
+ */
+const CACHE_OPTIONS = [
+  'suffix',
+  'hasLabels',
+  'hasLayers',
+  'hasPruning',
+  'hasScope',
+  'hasRuleText',
+] as const
+
+/** Warns, once for each message, about the options of `CACHE_OPTIONS` given to an engine that was given a cache too. */
+function warnIgnoredOptions(options: EngineOptions, warn: (key: string, message: string) => void) {
+  const ignored = CACHE_OPTIONS.filter((name) => options[name] !== undefined)
+  if (ignored.length === 0) return
+  const message = `The engine was given a cache and the options ${ignored.join(', ')}, which the cache decides: they are ignored. Give them to createCache, or leave out the cache.`
+  warn(message, message)
+}
+
+/** Warns, once for each message, about each path of `modes`, `registered` and `alwaysDeclare` that `theme` does not have. */
+function warnMissingPaths(
+  theme: object,
+  options: Pick<EngineOptions, 'modes' | 'registered'> & { alwaysDeclare: readonly string[] },
+  warn: (key: string, message: string) => void
+): void {
+  const given: [string, Iterable<string>][] = [
+    ['modes', Object.keys(options.modes ?? {})],
+    ['registered', Object.keys(options.registered ?? {})],
+    ['alwaysDeclare', options.alwaysDeclare],
+  ]
+  for (const [option, paths] of given) {
+    for (const path of findMissingPaths(theme, paths)) {
+      const message = `The ${option} path "${path}" matches no key of the theme, so it does nothing: check it against the theme.`
+      warn(message, message)
+    }
+  }
 }
 
 /** A short text for the token options of an engine, or '' when it has none of its own: they are part of what the server and the browser must agree on. */
@@ -282,6 +330,57 @@ function createTokenSignature(values: readonly unknown[]): string {
     (value) => value === undefined || (Array.isArray(value) && value.length === 0)
   )
   return isDefault ? '' : hashString(JSON.stringify(values))
+}
+
+/**
+ * The cache of an engine with the prefix `prefix`: over a cache it was given, that cache with the options
+ * that describe how the engine's styles are written (`withStyleOptions`); else one made from `options`.
+ */
+function selectCache(options: EngineOptions, prefix: string): Cache {
+  const { cache: given, hasColorFallbacks, hasValueRepair, hasVendorPrefixes } = options
+  if (given) return given.withStyleOptions({ hasColorFallbacks, hasValueRepair, hasVendorPrefixes })
+  const { rawKeys, lengthKeys, modes, registered, alwaysDeclare = [] } = options
+  return createCache({
+    prefix,
+    suffix: options.suffix,
+    hasLabels: options.hasLabels,
+    hasLayers: options.hasLayers,
+    hasPruning: options.hasPruning,
+    hasColorFallbacks,
+    hasValueRepair,
+    hasVendorPrefixes,
+    hasScope: options.hasScope,
+    hasBaseClass: options.hasBaseClass,
+    hasDevChecks: options.hasDevChecks,
+    hasRuleText: options.hasRuleText,
+    tokenSignature: createTokenSignature([rawKeys, lengthKeys, modes, registered, alwaysDeclare]),
+  })
+}
+
+/**
+ * The development checks of an engine over `cache`: whether they are on (the option, else those of the
+ * cache, or a development build), the warner, what wraps the theme view that a style function gets (with
+ * the checks, it warns about a read with a token reference as the key; without them it is the view
+ * itself, and no wrapper is made), and what is told about a declaration that global styles leave out.
+ * With the checks, the options of the cache column given with a `cache` are warned about at once.
+ */
+function createEngineChecks(
+  options: EngineOptions,
+  cache: Cache,
+  readTokens: () => { refs: unknown }
+) {
+  const isChecked = options.hasDevChecks ?? (cache.hasDevChecks || isDevelopment())
+  const warn = createWarner(cache.prefix)
+  if (!isChecked) {
+    return { isChecked, warn, guardView: (view: object) => view, reportGlobal: undefined }
+  }
+  if (options.cache) warnIgnoredOptions(options, warn)
+  return {
+    isChecked,
+    warn,
+    guardView: createReferenceGuard(cache.prefix, () => readTokens().refs, warn),
+    reportGlobal: (message: string) => warn(message, message),
+  }
 }
 
 /** Makes an engine that has no theme yet: it takes one from `setTheme`, or from the first `themeClass`. It needs no framework. */
@@ -298,8 +397,8 @@ function createFamilyEngine<T extends object>(
   options: EngineOptions,
   family: EngineFamily<T>
 ): Engine<T> {
-  const { cache: given, suffix, hasLabels, hasLayers, hasPruning, hasColorFallbacks } = options
-  const { hasScope, hasBaseClass, hasDevChecks, hasValueRepair, hasRuleText } = options
+  const { cache: given, hasColorFallbacks, hasBaseClass, hasDevChecks, hasValueRepair } = options
+  const { hasVendorPrefixes } = options
   const { alwaysDeclare = [] } = options
   const { rawKeys, lengthKeys, modes, registered, prefix: optionPrefix } = options
   if (given && optionPrefix !== undefined && optionPrefix !== given.prefix) {
@@ -308,22 +407,12 @@ function createFamilyEngine<T extends object>(
     )
   }
   const prefix = given?.prefix ?? optionPrefix ?? 'css'
-  const cache =
-    given ??
-    createCache({
-      prefix,
-      suffix,
-      hasLabels,
-      hasLayers,
-      hasPruning,
-      hasColorFallbacks,
-      hasValueRepair,
-      hasScope,
-      hasBaseClass,
-      hasDevChecks,
-      hasRuleText,
-      tokenSignature: createTokenSignature([rawKeys, lengthKeys, modes, registered, alwaysDeclare]),
-    })
+  const cache = selectCache(options, prefix)
+  const { isChecked, warn, guardView, reportGlobal } = createEngineChecks(options, cache, () =>
+    readTokens()
+  )
+  // Whether a component's list is split into a base class and a props class: the engine's option, else the cache's.
+  const isBaseSplit = hasBaseClass ?? cache.hasBaseClass
   const tokenOptions: TokenOptions = { prefix, rawKeys, lengthKeys, modes, registered }
   // The base theme is the family's; the tokens are this engine's (its prefix), made from the base theme
   // they were last made from, and made again when the family has another one.
@@ -338,10 +427,14 @@ function createFamilyEngine<T extends object>(
     if (theme === tokensTheme) return
     tokensTheme = theme
     tokens = createTokens(theme as T, tokenOptions)
+    if (isChecked && theme) warnMissingPaths(theme, { modes, registered, alwaysDeclare }, warn)
     views = new WeakMap()
     recentViews = []
     // A registered variable gets its @property rule when a rule first uses it.
     cache.registerProperties(tokens.registrations)
+    // Value repair reads the unit of a token from its declared value.
+    const made = tokens
+    cache.registerValues(() => made.declare(theme as DeepPartial<T>))
     // Variables that code outside the engine reads are always declared.
     cache.markUsed(tokens.findNames(alwaysDeclare))
     version++
@@ -505,7 +598,7 @@ function createFamilyEngine<T extends object>(
     // What a function returns is checked with the development checks (the option, else those of the
     // cache, or a development build); a list needs no work of its own here, because the cache reads lists
     // in order.
-    const isChecked = hasFunction && (hasDevChecks ?? (cache.hasDevChecks || isDevelopment()))
+    const isResultChecked = hasFunction && isChecked
     const resolveStyle = (
       style: StyleInput,
       props: Record<string, unknown>,
@@ -514,10 +607,9 @@ function createFamilyEngine<T extends object>(
       if (typeof style !== 'function') return style
       const result = (style as StyleFunction<unknown, Record<string, unknown>>)({
         ...props,
-        theme: theme ?? readTokens().refs,
+        theme: guardView((theme ?? readTokens().refs) as object, label),
       })
-      if (isChecked) checkStyleResult(cache.prefix, label, result)
-      return result
+      return isResultChecked ? checkStyleResult(cache.prefix, label, result) : result
     }
     const resolveAll = (
       source: readonly StyleInput[],
@@ -572,8 +664,11 @@ function createFamilyEngine<T extends object>(
     // takes the same path for every later call with that view.
     const plans = new WeakMap<object, Plan>()
     const makePlan = (props: Record<string, unknown>, view: object): Plan => {
-      const { base, propsFrom } = splitLeading(list, props, view)
-      if (isChecked) checkStyleResult(cache.prefix, label, base)
+      const split = splitLeading(list, props, guardView(view, label))
+      const { propsFrom } = split
+      const base = isResultChecked
+        ? (checkStyleResult(cache.prefix, label, split.base) as StyleResult[])
+        : split.base
       const hasProps = propsFrom < list.length
       return {
         ...createBase(base),
@@ -581,7 +676,7 @@ function createFamilyEngine<T extends object>(
       }
     }
     const getPlan = (props: Record<string, unknown>, theme: unknown): Plan => {
-      if (!cache.hasBaseClass || !hasFunction) return getFixed()
+      if (!isBaseSplit || !hasFunction) return getFixed()
       const view = (theme ?? readTokens().refs) as object
       let plan = plans.get(view)
       if (plan === undefined) {
@@ -648,8 +743,7 @@ function createFamilyEngine<T extends object>(
 
   const resolveGlobal = (input: GlobalInput<T>, theme?: T): GlobalRules[] => {
     const readTheme = () => theme ?? readTokens().refs
-    const items = Array.isArray(input) ? input : [input]
-    return items.map((item) => cache.compileGlobal(readGlobalStyles<T>(item, readTheme)))
+    return readGlobalInput<T>(input, readTheme, reportGlobal).map(cache.compileGlobal)
   }
 
   const insertGlobal = (input: GlobalInput<T>, theme?: T): (() => void) => {
@@ -704,13 +798,29 @@ function createFamilyEngine<T extends object>(
     whenScheme: createSchemeKey,
     createSheet,
     createStyler,
-    // The engine of another cache keeps the token options; its prefix is that cache's.
+    // The engine of another cache keeps the options of the style (the token options, how its styles are
+    // written, its checks); its prefix and everything the cache holds are that cache's.
     withCache: (other) =>
       family.engines.get(other) ??
-      createFamilyEngine({ ...options, prefix: undefined, cache: other }, family),
+      createFamilyEngine(
+        {
+          rawKeys,
+          lengthKeys,
+          modes,
+          registered,
+          alwaysDeclare: options.alwaysDeclare,
+          hasColorFallbacks,
+          hasValueRepair,
+          hasVendorPrefixes,
+          hasBaseClass,
+          hasDevChecks,
+          cache: other,
+        },
+        family
+      ),
     adoptSheet,
   }
-  family.engines.set(cache, engine)
+  family.engines.set(given ?? cache, engine)
   return engine
 }
 

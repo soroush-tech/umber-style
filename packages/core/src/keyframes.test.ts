@@ -1,3 +1,4 @@
+import { DEFAULT_SCOPING } from './scope'
 import { alpha } from './alpha'
 import { multiply } from './calc'
 import { createKeyframesRule, findAnimationNames, isKeyframesName, keyframes } from './keyframes'
@@ -18,7 +19,15 @@ const ruleOf = (
   theme: unknown = undefined,
   hasColorFallbacks = true,
   hasValueRepair = false
-) => createKeyframesRule(name, () => theme, hasColorFallbacks, hasValueRepair)
+) =>
+  createKeyframesRule(name, () => theme, {
+    hasColorFallbacks,
+    hasValueRepair,
+    scoping: DEFAULT_SCOPING,
+  })
+
+/** The compile options of a cache made with the defaults. */
+const PLAIN = { hasColorFallbacks: true, hasValueRepair: false, scoping: DEFAULT_SCOPING }
 
 describe('keyframes', () => {
   it('returns <label>-<hash> at once, and the same name for the same steps', () => {
@@ -221,11 +230,11 @@ describe('createKeyframesRule', () => {
 
   it('reads the theme only for steps that are a function of it, and only then', () => {
     const plain = keyframes({ to: { opacity: 0.25 } })
-    expect(createKeyframesRule(plain, NO_THEME, true, false)).toBe(
+    expect(createKeyframesRule(plain, NO_THEME, PLAIN)).toBe(
       `@keyframes ${plain}{100%{opacity:0.25;}}`
     )
     const themed = keyframes((theme: StandInTheme) => ({ to: { color: theme.palette.muted } }))
-    expect(() => createKeyframesRule(themed, NO_THEME, true, false)).toThrow('no theme')
+    expect(() => createKeyframesRule(themed, NO_THEME, PLAIN)).toThrow('no theme')
     expect(ruleOf(themed, { palette: { muted: 'var(--u-palette-muted)' } })).toBe(
       `@keyframes ${themed}{100%{color:var(--u-palette-muted);}}`
     )

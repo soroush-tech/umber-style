@@ -217,16 +217,20 @@ const App = () => (
 
 ### What `styles` takes
 
-`Global`'s `styles` (and `engine.insertGlobal`, below) takes any of these, or a list of them, written in the order of the list:
+`Global`'s `styles` (and `engine.insertGlobal`, below) takes any of these, or a list of them, nested to any depth, written in the order of the list:
 
-| Form                              | Example                                                  |
-| --------------------------------- | -------------------------------------------------------- |
-| A handle that `globalStyles` made | `reset`                                                  |
-| A style object                    | `{ body: { margin: 0 } }`                                |
-| A function of the theme           | `(theme) => ({ body: { color: theme.palette.text } })`   |
-| A list of the three               | `[reset, { body: { margin: 0 } }, (theme) => ({ ... })]` |
+| Form                                                  | Example                                                      |
+| ----------------------------------------------------- | ------------------------------------------------------------ |
+| A handle that `globalStyles` made                     | `reset`                                                      |
+| A style object                                        | `{ body: { margin: 0 } }`                                    |
+| A `css()` value, of an object or a template           | `` css`html, body { margin: 0; }` ``                         |
+| A function of the theme that returns any of the above | `` (theme) => css`body { color: ${theme.palette.text}; }` `` |
+| A list of any of them                                 | `[reset, { body: { margin: 0 } }, (theme) => ({ ... })]`     |
+| Nothing: `null`, `undefined`, `false`, also in a list | `isFramed && frame`                                          |
 
-A handle has an `id` (`global-<hash>`, from the styles alone, as a `keyframes` name is) and needs no engine. `globalStyles` can also be used as a tag, with selectors and at-rules written as CSS text (`` globalStyles`body { margin: 0; }` ``); a function among its interpolations is called with `{ theme }`. Under a selector a `css()` value is taken as its style (`{ body: card }`). Each item of a list is one set of rules, named `<prefix>-global-<hash>` from its compiled rules: equal content gives one set, whatever form it was given in, and it is written once.
+A `css()` value is read as global rules: each of its nested rules is a rule as it is written, so `` css`html, body { margin: 0; }` `` writes `html,body{margin:0;}`, not `.class html{...}`, and an at-rule around a selector (`` css`${theme.breakpoints.up('lg')} { main [id] { scroll-margin-top: 5rem; } }` ``, the helper returning `@media (min-width: 1200px)`) writes `@media (min-width: 1200px){main [id]{scroll-margin-top:5rem;}}`. A comment in the template is left out. A declaration of the value itself, outside every selector (`` css`color: red; body { margin: 0; }` ``), has no selector to go under in a global rule: it is left out, and with the development checks it is warned about once, with the label of the value when it has one. Anything else (a string, a number) throws a `TypeError`; nothing is dropped without a word. The same value used as a class (`apply`, the `style` prop) is a class: there its nested rules are descendants of the class, and its `styles` text reads them that way (`& html{margin:0;}`); see [Style sheets](style-sheets.md). The tests with the shape of an app's reset (a selector list, a comment, an at-rule whose prelude is an interpolation, theme values in declarations, alone and in a list with an object) are `Global.css.test.tsx` and, through a `CacheProvider` and `@umber-style/server`, `appSetUp.test.tsx` of the server package.
+
+A handle has an `id` (`global-<hash>`, from the styles alone, as a `keyframes` name is) and needs no engine. A handle of styles given as an object or a template also has `styles`, the CSS text of its rules as global rules, made on first read and written nowhere: `globalStyles({ 'html, body': { margin: 0 } }).styles` is `html,body{margin:0;}` (the text format of [How it works](how-it-works.md#the-text-of-a-rule), with the defaults of a cache and no layer). A handle of a function of the theme has none (`undefined`): its rules need the theme of an engine. Which text reads how: the `styles` of a `css()` value reads as the class would write it, `& html,& body{margin:0;}`, because a `css()` value is a class wherever it is not given to `Global`; the `styles` of a `globalStyles` handle reads as global rules; and `Global` writes global rules from either. `globalStyles` can also be used as a tag, with selectors and at-rules written as CSS text (`` globalStyles`body { margin: 0; }` ``); a function among its interpolations is called with `{ theme }`. Under a selector a `css()` value is taken as its style (`{ body: card }`). Each item of a list is one set of rules, named `<prefix>-global-<hash>` from its compiled rules: equal content gives one set, whatever form it was given in, and it is written once.
 
 ### What a function of the theme reads
 
