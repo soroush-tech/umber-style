@@ -1,22 +1,83 @@
 # Typed styles
 
-After this page you can tell what the compiler catches in a style on each platform, what it lets through, and how to get past it when you must; and you know the type names an app imports, where they live, and the two ways to type the theme.
+After this page you can tell what the compiler catches in a style on each platform, what it lets through, and how to get past it when you must; how to switch the web types to strict checking; and you know the type names an app imports, where they live, and the two ways to type the theme.
 
 Each entry checks the keys of a style in an object literal, for its own platform:
 
-| Entry                                              | Keys allowed                                                                             |
-| -------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| `@umber-style/react`, `@umber-style/vue`, the core | every CSS property, nested selectors and at-rules, custom properties (`--x`) and `label` |
-| `@umber-style/react-native`                        | the platform's view, text and image style keys; nothing nested                           |
-| `umber-style/react`                                | only the keys that both of them have, with the values that both accept                   |
+| Entry                                              | Keys allowed                                                                                                                                |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@umber-style/react`, `@umber-style/vue`, the core | every CSS property, nested selectors and at-rules, custom properties (`--x`) and `label`; by default any other key too, unless strict is on |
+| `@umber-style/react-native`                        | the platform's view, text and image style keys; nothing nested                                                                              |
+| `umber-style/react`                                | only the keys that both of them have, with the values that both accept                                                                      |
 
 `umber-style/vue` and `umber-style` follow the web types. `umber-style/react` is the entry for code that runs on the web and on React Native: use `@umber-style/react` for code that only runs on the web, or you will get the stricter shared types.
 
 ## The web
 
-`WebStyleObject` is the type of a style on the web: every CSS property with its values (a number where CSS takes a length, a list for fallbacks), nested styles under a selector or an at-rule, custom properties (`--name`) and `label`. `engine.css`, `createSheet`, `createStyler`, and the `styled`, `StyleSheet.create` and `style` of the web bindings take it. It comes from `@umber-style/core`. The web bindings re-export it as a type, with `WebProperties`, `WebNested`, `NestedKey`, `StyleObject`, `AlphaColor`, `SheetEntry`, `ThemeKey`, `SchemeKey` and `SchemeName`: `@umber-style/react` (both builds), `@umber-style/vue`, and every entry of `umber-style` but `umber-style/react-native`.
+`WebStyleObject` is the type of a style on the web: every CSS property with its values (a number where CSS takes a length, a list for fallbacks), nested styles under a selector or an at-rule, custom properties (`--name`) and `label`. `engine.css`, `createSheet`, `createStyler`, and the `styled`, `StyleSheet.create` and `style` of the web bindings take it. It comes from `@umber-style/core`. The web bindings re-export it as a type, with `WebProperties`, `WebNested`, `NestedKey`, `StyleObject`, `StyleTypeOptions`, `AlphaColor`, `SheetEntry`, `ThemeKey`, `SchemeKey` and `SchemeName`: `@umber-style/react` (both builds), `@umber-style/vue`, and every entry of `umber-style` but `umber-style/react-native`.
 
 The typings of the CSS properties come from the standard `csstype` package. It is a `dependency` of the core and is only imported as a type, so the core has no run-time dependency on it. The declarations the core publishes refer to it, and a consumer without it would see every property as `any`.
+
+### The default types and the strict switch
+
+The web types have two modes. The default one is for code that moves from the styling library it used before and should compile as it is; the strict one checks keys and keywords, and is opted into once for the whole program.
+
+By default a web style takes:
+
+- every CSS property, with the values `csstype` knows (an editor still completes them) and also any string or number, so an object whose values were widened to `string` is accepted;
+- any other key, whose value is a nested style or a value: selectors with or without `&`, at-rules, custom properties, and keys computed at run time;
+- `null`, `undefined` and `false` for a value.
+
+The `style` prop of a styled component of `@umber-style/react` takes React's `CSSProperties` too, so props spread from `HTMLAttributes` into a styled component compile.
+
+```tsx
+const pageSheet = createMemorySheet()
+const { styled } = createStyle(
+  { palette: { primary: '#1b5fd1' }, breakpoints: ['40em'] },
+  { prefix: 'p', cache: createCache({ prefix: 'p', sheet: pageSheet }) }
+)
+
+// A value that was widened to string, where nothing typed the object.
+const card = { display: 'grid', alignItems: 'start' }
+styled('div')(card)
+
+// A key computed at run time.
+styled('div')(({ theme }) => ({
+  gap: 8,
+  [`@media (min-width: ${theme.breakpoints[0]})`]: { gap: 16 },
+}))
+
+// Any other key, with a nested style or a value: a misspelt key is not caught.
+styled('div')({ backgroudColor: 'red', '> li': { margin: 0 } })
+
+// React's CSSProperties in the style prop.
+const Box = styled('div')({ padding: 8 })
+const inline: CSSProperties = { marginTop: 4 }
+render(<Box style={inline} />)
+
+// @ts-expect-error a boolean is never a value
+styled('div')({ padding: true })
+// @ts-expect-error `label` is a string
+styled('div')({ label: 1 })
+```
+
+(This is a case of `packages/react/src/styleTypes.default.test.tsx`, which also holds the shapes of a design system that compiled against these types unchanged.)
+
+What the default catches: a value of a type that no property takes (`true`, an object for a property), a `label` that is not a string, and a misspelt key in a step of `keyframes` (a step takes properties only). What it does not catch: a misspelt key, a keyword that does not exist, and a selector without `&`, which is a descendant selector.
+
+The strict types are switched on by one declaration, in any file of the program:
+
+```ts
+declare module '@umber-style/core' {
+  interface StyleTypeOptions {
+    isStrict: true
+  }
+}
+```
+
+`StyleTypeOptions` is an interface of the core that an app merges into, as it does with `Theme`. Every web binding re-exports it, so the declaration can name the module the app imports: `@umber-style/react`, `@umber-style/vue`, `@umber-style/css`, `@umber-style/styled` or `umber-style/react`. It is one switch for the whole program, not for a file. The repository compiles its strict type tests with it (`tsconfig.strict.json` of `core`, `react`, `vue` and `umber-style`), and its default ones without it.
+
+### With the strict switch
 
 ```ts
 import { createStyle, type StyleObject, type WebStyleObject } from '@umber-style/react'
@@ -54,24 +115,26 @@ styled('div')(() => ({ backgroudColor: 'red' }) satisfies WebStyleObject)
 styled('div')({ color: 'not-a-colour', width: '12 parsecs' })
 ```
 
-What is checked:
+What the strict types check:
 
 - In an object literal, a key that is not a property, a selector or an at-rule (`backgroudColor`).
 - A wrong value where the property's typing is a closed set of keywords: `display: 'gird'`, `position: 'abslute'`, `flexDirection: 'rows'` and `textAlign: 'midle'` are errors. `display` is written out by the engine, because `csstype` lets any string through for it; the others come from `csstype`. A property whose typing admits any string is not checked: `cursor: 'ponter'` compiles.
 - A nested style under a selector (a key with `&`, or one that starts with `:`) or an at-rule (a key that starts with `@`) is itself checked as a style.
 - A key that starts with `:` (`':hover'`, `'::before'`) is the element itself, written as if it were `'&:hover'`: the rule is `.class:hover`. A key with no `&` that does not start with `:` (`'span'`, `'> li'`) is an error in an object literal, because it would be a descendant selector; the loose `StyleObject` writes it as one.
 
-What is not checked:
+What the strict types do not check:
 
 - A misspelt key in an object that a variable holds, or in the object that a style function returns without a return type. Give the function a return type of `WebStyleObject`, or end the literal with `satisfies WebStyleObject`.
 - A value that CSS cannot list (a colour, a length with a unit): it is any string.
 - Whether a selector is valid CSS.
 
-A `style` prop of a styled component is checked like a style.
+A `style` prop of a styled component is checked like a style. With the strict types it takes no `CSSProperties`: a `style` spread from `HTMLAttributes` is a type error there.
 
 ### Steps and global styles
 
-The steps of `keyframes` are flat web properties: a misspelt key and a nested style in a step are type errors. The key of a step is any string (`from`, `'50%'`), so a key that is not a step compiles and throws when `keyframes` runs. In `globalStyles` a key is any string (a selector or an at-rule), and the style under a selector is checked as a web style is; the descriptors of `@font-face`, `@page`, `@counter-style` and `@font-palette-values` are typed by `csstype`.
+The steps of `keyframes` are flat web properties: a misspelt key and a nested style in a step are type errors, in both modes (by default a property of a step takes any string or number, as in a style). The key of a step is any string (`from`, `'50%'`), so a key that is not a step compiles and throws when `keyframes` runs. In `globalStyles` a key is any string (a selector or an at-rule), and the style under a selector is checked as a web style is (by default it takes any key, so the misspelt key below compiles); the descriptors of `@font-face`, `@page`, `@counter-style` and `@font-palette-values` are typed by `csstype`.
+
+With the strict switch:
 
 ```ts
 import { globalStyles, keyframes } from '@umber-style/core'
@@ -93,7 +156,7 @@ In the shared types of `umber-style/react` an `animation` key is not in the shar
 
 ### Keys built at run time
 
-A key made from a value, such as a media query from a breakpoint or the key of `when()`, is a computed key. TypeScript gives every computed key in an object literal the type `string`, whatever its template literal type, and checks it against every index signature of `WebStyleObject`. The custom property signature (`--name`) takes no style, so `{ [`@media (min-width: ${bp})`]: { gap: 16 } }` is rejected, though it works at run time. No type can accept the key and still reject a style given to a custom property (the reproduction is in the limits below), so use `at(key, style)`:
+A key made from a value, such as a media query from a breakpoint or the key of `when()`, is a computed key. By default it is written directly, as the example above shows: the default style takes any key. With the strict types it is not: TypeScript gives every computed key in an object literal the type `string`, whatever its template literal type, and checks it against every index signature of `WebStyleObject`. The custom property signature (`--name`) takes no style, so `{ [`@media (min-width: ${bp})`]: { gap: 16 } }` is rejected, though it works at run time. No type can accept the key and still reject a style given to a custom property (the reproduction is in the limits below), so use `at(key, style)`, in either mode:
 
 ```ts
 import { at } from '@umber-style/react'
@@ -112,11 +175,11 @@ styled('div')(({ theme }) => ({
 
 `at(key, style)` returns `{ [key]: style }` typed so that it spreads into a style. The key keeps its template literal type, and `style` is checked as a style of its own. The key must be a selector with `&`, one that starts with `:`, or an at-rule (`NestedKey`). `at` is exported by `@umber-style/core`, by every binding and by `umber-style/react`, where it is for the `web` part of a shared style. It is the same function for the keys of `when()` and `whenScheme()`: see [Theme conditions](theme-conditions.md).
 
-A key that TypeScript only knows as `string` (a variable of that type) is an error in `at()` too. Build the key in the call, or type it with a template literal. When that is not possible, cast the whole style: `({ gap: 8, [key]: { gap: 16 } }) as WebStyleObject`.
+A key that TypeScript only knows as `string` (a variable of that type) is an error in `at()`, in both modes: by default write such a key directly. With the strict types, build the key in the call, or type it with a template literal; when that is not possible, cast the whole style: `({ gap: 8, [key]: { gap: 16 } }) as WebStyleObject`.
 
 ### The escape hatch
 
-`StyleObject`, with any key, is the loose type that the serializer works on. To use a key that the types do not know (a property that is too new for `csstype`), cast the style to the type of the platform:
+`StyleObject`, with any key, is the loose type that the serializer works on. The default web types accept it as it is. With the strict types, to use a key that the types do not know (a property that is too new for `csstype`), cast the style to the type of the platform:
 
 ```ts
 const unknownKey = { containerType: 'inline-size', somethingNew: 'x' } as StyleObject
@@ -149,7 +212,7 @@ The types come from the platform's own `ViewStyle`, `TextStyle` and `ImageStyle`
 - a shorthand with several values (`padding: '10px 20px'`, `margin: '0 auto'`);
 - a value with a CSS unit (`width: '12px'`).
 
-Nothing is warned in production. The `web`-only keys (`label`, selectors, at-rules, custom properties) are dropped when a style is turned into a native style.
+Nothing is warned in production. The strict switch does not change these types: they are the platform's own, and the default for the web does not loosen them. The `web`-only keys (`label`, selectors, at-rules, custom properties) are dropped when a style is turned into a native style.
 
 ## Web and mobile: `umber-style/react`
 
@@ -169,17 +232,17 @@ const Box = styled(Host)({
 })
 ```
 
-`web` takes a web style and `native` takes a native style, so a native-only key inside `web` is an error, and the other way round. The types are `SharedStyleObject`, `WebStyleObject` and `NativeStyleObject`. `SharedStyleObject` is from `umber-style/react`; the other two are from `@umber-style/core` and `@umber-style/react-native`.
+`web` takes a web style and `native` takes a native style, so a nested selector inside `native` is an error, and, with the strict switch, a native-only key inside `web` is one too (by default `web` takes any key, as a web style does). The types are `SharedStyleObject`, `WebStyleObject` and `NativeStyleObject`. `SharedStyleObject` is from `umber-style/react`; the other two are from `@umber-style/core` and `@umber-style/react-native`.
 
 A tag name such as `'div'` type-checks in shared code and throws on React Native, so give `styled` a component there. See [Style sheets and the style prop](style-sheets.md) for a pattern that does this.
 
 To use a key that a type does not know, cast the style to the type of the platform: `style as WebStyleObject`, or `style as NativeStyleObject`.
 
-The cases above are those of `packages/umber-style/src/sharedTypes.test.tsx`, which `pnpm typecheck` compiles twice, with and without the `react-native` export condition. The server declarations are compiled with the `react-server` condition (`packages/umber-style/src/sharedServerTypes.test.tsx`).
+The cases above are those of `packages/umber-style/src/sharedTypes.test.tsx`, which `pnpm typecheck` compiles twice with the strict switch, with and without the `react-native` export condition (`tsconfig.strict.json`, `tsconfig.strict.native.json`). The server declarations are compiled with the `react-server` condition (`packages/umber-style/src/sharedServerTypes.test.tsx`).
 
 ## Vue
 
-Vue uses the web types for styles. A styled component's props are not typed: `styled` returns a component that takes any attributes. A function style receives the attributes as a `Record<string, unknown>`.
+Vue uses the web types for styles, in the same two modes: `declare module '@umber-style/vue' { interface StyleTypeOptions { isStrict: true } }` switches them to strict. A styled component's props are not typed: `styled` returns a component that takes any attributes. A function style receives the attributes as a `Record<string, unknown>`.
 
 ## Server components
 
@@ -204,7 +267,7 @@ These names describe the same shapes as the types that existing apps import toda
 | `PropsOf<C>`             | The props of a component or a tag                                                                                                               | each web binding                                   |
 | `CreateStyledComponent`  | What `styled(tag, options)` returns, with the props of the component given as type arguments: the type a wrapper of `styled` returns            | `@umber-style/react`                               |
 
-`@umber-style/react` (both builds) exports all of them, and `@umber-style/vue` all but `CreateStyledComponent`; `@umber-style/css` re-exports the six of the core; `@umber-style/styled` re-exports the component types of `@umber-style/react` with `CSSObject`, `Interpolation` and `Theme`; `@umber-style/cache` re-exports `UmberCache`. A file needs one import, from the package of its framework:
+`@umber-style/react` (both builds) exports all of them, and `@umber-style/vue` all but `CreateStyledComponent`; `@umber-style/css` re-exports the six of the core; `@umber-style/styled` re-exports the component types of `@umber-style/react` with `CSSObject`, `Interpolation` and `Theme`; each of them also re-exports `StyleTypeOptions`; `@umber-style/cache` re-exports `UmberCache`. A file needs one import, from the package of its framework:
 
 ```tsx
 import type { CSSObject, Keyframes, SerializedStyles, StyledComponent } from '@umber-style/react'
@@ -325,7 +388,11 @@ An engine made for the default style of a binding (`configure({ engine })`) is t
 ## Limits
 
 - The values of colours and lengths are not checked, on any platform.
-- A computed key written directly in a web style object is a type error, whatever its type: use `at()`. The cause is in TypeScript, and was reproduced with 7.0.2. The computed key becomes a `string` index signature of the object, which has to satisfy every index signature of the target, the custom property one included:
+- By default a misspelt key, a keyword that does not exist (`display: 'gird'`) and a selector without `&` compile, in a nested style as at the top: that is the price of the drop-in. The strict switch catches them again, for the whole program; it cannot be switched on for one file.
+- By default the extra keys of a style must hold a style or a value: an object typed with another key whose value is neither (a shared style with its `native` part, given to the `styled` of a web binding) is a type error where the strict types accepted it, because the strict types have no index signature for such a key.
+- By default a style typed by an interface, such as a variable of type `CSSProperties`, is not taken as an argument of `styled`, `css` or a sheet: an interface has no index signature. The `style` prop takes `CSSProperties`; elsewhere spread it, `{ ...inline }`.
+- The `style` declared by the props of a component's own (props that extend `HTMLAttributes` have one) is replaced by the `style` of the styled component, which takes everything it took; before it was the intersection of the two, in both modes.
+- With the strict switch, a computed key written directly in a web style object is a type error, whatever its type: use `at()`. The cause is in TypeScript, and was reproduced with 7.0.2. The computed key becomes a `string` index signature of the object, which has to satisfy every index signature of the target, the custom property one included:
 
   ```ts
   declare const key: `@media ${string}`
@@ -344,7 +411,7 @@ An engine made for the default style of a binding (`configure({ engine })`) is t
 - The props of a template are not inferred from its functions: give them with the type argument.
 - A function style reads the props of the tag too, and the props of the type argument win over them: a prop that both name (`size` of an `input`) has the type of the type argument, not an intersection of the two.
 - While `Theme` has no member of its own, the `theme` of `ThemeProvider` of the default style is not checked against the app's theme, and a function given to it with no type on its parameter gets `object`. `useTheme()` then returns `Theme`, which has none of the app's members: declare them in `Theme`, or cast.
-- The `style` prop of a styled component takes sheet entries and web style objects, not React's `CSSProperties`: props spread from `HTMLAttributes` into a styled component (`<Root {...rest} />` with `style` in `rest`) are a type error.
-- A style object whose type was inferred where nothing typed it (a function with no return type that is not written in the call, or a variable) has `display: string`, which is not one of the values of `display`: give it a return type of `WebStyleObject`, use `satisfies`, or write `'flex' as const`.
-- The examples were compiled by the type tests of `packages/react/src/typeNames.types.test.tsx`, `packages/react/src/styledWrapper.types.test.tsx`, `packages/react/src/augmentation.test.tsx` and `packages/vue/src/css.test.ts`. The wrapper of `styledWrapper.types.test.tsx` has the shape of the one of a design system that was compiled against these types; the two limits above are what that build still reported, in the components that use the wrapper.
+- With the strict switch, the `style` prop of a styled component takes sheet entries and web style objects, not React's `CSSProperties`: props spread from `HTMLAttributes` into a styled component (`<Root {...rest} />` with `style` in `rest`) are a type error. TypeScript reports it twice: the error, and "Expression produces a union type that is too complex to represent", which it hits while it explains the first. It was reproduced with a union that holds the strict style and an object of many keys that does not fit it; a union that holds only the properties does not give it, which points at the pattern index signatures of the strict style. The default types give neither error.
+- With the strict switch, a style object whose type was inferred where nothing typed it (a function with no return type that is not written in the call, or a variable) has `display: string`, which is not one of the values of `display`: give it a return type of `WebStyleObject`, use `satisfies`, or write `'flex' as const`.
+- The examples were compiled by the type tests of `packages/react/src/styleTypes.default.test.tsx`, `packages/react/src/typeNames.types.test.tsx`, `packages/react/src/styledWrapper.types.test.tsx`, `packages/react/src/augmentation.test.tsx` and `packages/vue/src/css.test.ts`; the strict ones with the switch (`packages/react/src/webStyle.test.tsx`, `packages/core/src/globalStyles.test.ts`). The wrapper of `styledWrapper.types.test.tsx` has the shape of the one of a design system that was compiled against these types; `styleTypes.default.test.tsx` holds the shapes of its components that the strict types reject: the `CSSProperties` of a spread, a widened value, a computed key.
 - The examples were compiled with TypeScript 7.0.2. Other versions were not tried.

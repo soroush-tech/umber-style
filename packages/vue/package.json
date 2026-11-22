@@ -51,7 +51,7 @@
   "scripts": {
     "build": "tsdown",
     "lint": "oxlint --deny-warnings",
-    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.defaultStyle.json",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.defaultStyle.json && tsc --noEmit -p tsconfig.strict.json",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "prepublishOnly": "pnpm build"

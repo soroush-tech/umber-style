@@ -11,5 +11,12 @@
     "skipLibCheck": true,
     "types": ["vitest/globals", "node"]
   },
-  "include": ["src", "bench"]
+  "include": ["src", "bench"],
+  "exclude": [
+    // These assert the strict style types, which styleTypes.strict.test.ts switches on for the whole
+    // program, so they are compiled together with it: tsconfig.strict.json.
+    "src/styleTypes.strict.test.ts",
+    "src/webStyle.test.ts",
+    "src/globalStyles.test.ts"
+  ]
 }

@@ -18,6 +18,7 @@ export type {
   Interpolation,
   Keyframes,
   SerializedStyles,
+  StyleTypeOptions,
   Theme,
   UmberCache,
 } from '@umber-style/core'

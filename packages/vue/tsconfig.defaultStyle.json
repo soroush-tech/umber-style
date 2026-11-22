@@ -1,6 +1,6 @@
 {
   "extends": "./tsconfig.json",
   "include": ["src"],
-  "exclude": [],
+  "exclude": ["src/styleTypes.strict.test.ts", "src/webStyle.test.ts"],
   "files": ["src/defaultStyle.test.ts"]
 }

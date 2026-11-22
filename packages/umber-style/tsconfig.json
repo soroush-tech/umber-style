@@ -29,6 +29,11 @@
     // with `as never` to do it (its props become `never`). The types of a shared style are covered by
     // sharedTypes.test.tsx and sharedConditions.test.tsx.
     "src/platformParts.test.tsx",
-    "src/sharedSource.test.tsx"
+    "src/sharedSource.test.tsx",
+    // These assert the strict style types, which styleTypes.strict.test.tsx switches on for the whole
+    // program, so they are compiled together with it: tsconfig.strict.json and tsconfig.strict.native.json.
+    "src/styleTypes.strict.test.tsx",
+    "src/sharedAnimation.test.tsx",
+    "src/sharedTypes.test.tsx"
   ]
 }

@@ -1,0 +1,7 @@
+{
+  "extends": "./tsconfig.json",
+  "include": ["src"],
+  // styleTypes.default.test.ts asserts the default style types.
+  "exclude": ["src/styleTypes.default.test.ts"],
+  "files": ["src/styleTypes.strict.test.ts", "src/webStyle.test.ts", "src/globalStyles.test.ts"]
+}

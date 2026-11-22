@@ -17,6 +17,9 @@
     "../vue/src/**/*.test.tsx",
     "src/platformParts.test.tsx",
     "src/sharedSource.test.tsx",
-    "src/sharedProviders.test.tsx"
+    "src/sharedProviders.test.tsx",
+    "src/styleTypes.strict.test.tsx",
+    "src/sharedAnimation.test.tsx",
+    "src/sharedTypes.test.tsx"
   ]
 }

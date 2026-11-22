@@ -15,6 +15,10 @@
   "exclude": [
     // It declares the `Theme` of the default style for the whole program, which no other test uses:
     // tsconfig.defaultStyle.json.
-    "src/defaultStyle.test.ts"
+    "src/defaultStyle.test.ts",
+    // These assert the strict style types, which styleTypes.strict.test.ts switches on for the whole
+    // program, so they are compiled together with it: tsconfig.strict.json.
+    "src/styleTypes.strict.test.ts",
+    "src/webStyle.test.ts"
   ]
 }

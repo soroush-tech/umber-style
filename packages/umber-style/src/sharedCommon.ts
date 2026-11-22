@@ -193,6 +193,7 @@ export type {
   GlobalStyles,
   KeyframesSteps,
   StyleObject,
+  StyleTypeOptions,
 } from '@umber-style/core'
 export type { NestedKey, SchemeKey, SchemeName, ThemeKey, WebNested, WebProperties, WebStyleObject }
 

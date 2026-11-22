@@ -25,6 +25,14 @@
     "src/defaultStyle.server.test.tsx",
     "src/defaultStyle.ssr.test.tsx",
     "src/index.test.ts",
-    "src/index.server.test.ts"
+    "src/index.server.test.ts",
+    // These assert the strict style types, which styleTypes.strict.test.tsx switches on for the whole
+    // program, so they are compiled together with it: tsconfig.strict.json.
+    "src/styleTypes.strict.test.tsx",
+    "src/sheetTypes.test.tsx",
+    "src/styledSystem.types.test.tsx",
+    "src/typeNames.types.test.tsx",
+    "src/webStyle.server.test.tsx",
+    "src/webStyle.test.tsx"
   ]
 }

@@ -1,0 +1,8 @@
+{
+  "extends": "./tsconfig.json",
+  "include": ["src"],
+  // defaultStyle.test.ts declares a `Theme` of its own; styleTypes.default.test.ts asserts the default
+  // style types.
+  "exclude": ["src/defaultStyle.test.ts", "src/styleTypes.default.test.ts"],
+  "files": ["src/styleTypes.strict.test.ts", "src/webStyle.test.ts"]
+}

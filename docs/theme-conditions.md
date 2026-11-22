@@ -11,7 +11,7 @@ Two functions make style keys. They come from the engine, from every binding, an
 - `when(theme, colorScheme?)` is a key for "the nearest theme is this theme".
 - `whenScheme('light' | 'dark')` is a key for "the nearest colour scheme is this one".
 
-The value under a key is a nested style. It may hold selectors and at-rules. In a web style object a key from `when()` is a computed key, so it is written with `at(key, style)`, which spreads `{ [key]: style }` and keeps the style checked: see [Typed styles](typed-styles.md). On React Native, and in a shared style outside its `web` part, the computed key is written directly (see below).
+The value under a key is a nested style. It may hold selectors and at-rules. In a web style object a key from `when()` is a computed key: the default types take it written directly, and with the strict ones it is written with `at(key, style)`, which spreads `{ [key]: style }` and keeps the style checked: see [Typed styles](typed-styles.md). On React Native, and in a shared style outside its `web` part, the computed key is written directly (see below).
 
 ```tsx
 import { at, createStyle } from '@umber-style/react'
@@ -105,5 +105,5 @@ const Card = styled(View)({
 - Call `when(theme)` after the base theme is known (`createStyle(theme)` or `configure({ theme })`). It makes the theme class like `themeClass` does, and if there is no base theme yet, the theme you pass gives the engine its shape (not a given base theme: see [Themes](themes.md#the-base-theme)).
 - `@scope` needs a browser that supports it. One that does not drops those rules and keeps the rest, so the style falls back to the base style. The versions are to be confirmed: see [Browser and platform support](browser-support.md).
 - The "nearest theme" behaviour is checked in a test with jsdom, which evaluates `@scope`, inside a layer too: a card under A, then B, then A gets the conditional style below the first A, not below B, and again below the second A (`packages/core/src/createEngine.conditions.test.ts`). `whenScheme` and the system-preference rule are checked as rule text only. No real browser was used.
-- Typing: a computed key made by `when()` written directly in a web style object is a type error, because TypeScript types a computed key as `string`: use `at()`, as above. The style inside `at()` is checked like any style. See [Typed styles](typed-styles.md).
+- Typing: with the strict style types, a computed key made by `when()` written directly in a web style object is a type error, because TypeScript types a computed key as `string`: use `at()`, as above. The style inside `at()` is checked like any style. See [Typed styles](typed-styles.md).
 - On React Native the types accept the condition keys and do not check what is inside them.

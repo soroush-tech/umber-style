@@ -71,7 +71,7 @@ These are two classes, because one class name cannot be in two layers. Each is w
 
 ## The `style` prop of a styled component
 
-A component made by `styled()` takes `style`, and this is the engine's own API, not an inline style. It takes sheet entries and style objects, in arrays, with `false`, `null` and `undefined` dropped. All of it is merged, in order, into one class, and no `style` attribute is rendered. A string is an error, because a string cannot be merged.
+A component made by `styled()` takes `style`, and this is the engine's own API, not an inline style. It takes sheet entries and style objects, in arrays, with `false`, `null` and `undefined` dropped; on React by default also a `CSSProperties` object, which is a style object too. All of it is merged, in order, into one class, and no `style` attribute is rendered. A string is an error, because a string cannot be merged.
 
 The rendered `Box` is:
 

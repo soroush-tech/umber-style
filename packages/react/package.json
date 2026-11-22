@@ -65,7 +65,7 @@
   "scripts": {
     "build": "tsdown",
     "lint": "oxlint --deny-warnings",
-    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.augmentation.json && tsc --noEmit -p tsconfig.server.json",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.augmentation.json && tsc --noEmit -p tsconfig.server.json && tsc --noEmit -p tsconfig.strict.json",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:browser": "vitest run --config vitest.browser.config.ts",

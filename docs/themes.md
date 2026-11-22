@@ -248,7 +248,7 @@ The same works with `@umber-style/vue` and `@umber-style/react-native`. The decl
 
 - The module declaration names `@umber-style/core`, and TypeScript resolves that name from the file that holds the declaration. It was verified with the workspace layout of this repository. With a package manager that does not let your app see a package it did not install itself, you may need to install `@umber-style/core` directly; that was reasoned, not tried.
 - `Theme` is one interface for the whole program. Two different themes in one program (two `createStyle` calls with different shapes) are typed by `createStyle`, not by `Theme`.
-- A key built at run time in a web style, such as the media query above, is written with `at()`: written directly it is a type error. See [Typed styles](typed-styles.md).
+- With the strict style types, a key built at run time in a web style, such as the media query above, is written with `at()`: written directly it is a type error. The default types take it directly. See [Typed styles](typed-styles.md).
 - A provider that changes only raw values (a breakpoint) declares nothing, and its own theme class is always `umber-theme-0`. No rule is written for it, and every such provider shares that name.
 - Under a nested provider the DOM has one more element, the wrapper. It has `display: contents`, so the layout is the same, but selectors that count elements see it: a child selector (`>`), a sibling selector (`+`, `~`), `:first-child` and the like.
 - Portal content without `ThemeScope` sees the outer theme (the variables of `:root`), not the theme of the nested provider above it in the tree.

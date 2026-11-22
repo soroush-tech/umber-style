@@ -59,7 +59,7 @@ What happens:
 - **Parsers made with `system()`.** A parser such as `system({ color: { property: 'color', scale: 'palette' } })` reads a scale of the theme, so `color="primary"` becomes `var(--umber-palette-primary)`.
 - **Variants.** `variant({ prop, variants })` selects a style by prop. The styles may name theme values, or use references from `engine.refs`, as above. `variant({ scale: 'buttons', prop: 'kind' })` reads the variants from a scale of the theme. An unknown variant gives a style with no declaration, and so no class.
 - **Prop filtering.** The `shouldForwardProp` of the package keeps system props (`p`, `mx` and the rest) off the element. It does not know your own variant prop: `kind="filled"` would reach the `button` as an attribute, so `forward` above filters it too.
-- **Types.** A parser is typed loosely, so `styled` takes it without a cast. An object next to a parser is still checked: `styled('div')(space, { backgroudColor: 'red' })` is a type error.
+- **Types.** A parser is typed loosely, so `styled` takes it without a cast. An object next to a parser is still checked as a style; with the strict switch of [Typed styles](typed-styles.md#the-default-types-and-the-strict-switch), `styled('div')(space, { backgroudColor: 'red' })` is a type error.
 
 The package is a development dependency of the repository's tests, not a dependency of any `@umber-style` package. Install it yourself if you use it.
 

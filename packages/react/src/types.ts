@@ -1,6 +1,7 @@
 import type {
   ComponentProps,
   Context,
+  CSSProperties,
   ElementType,
   FunctionComponent,
   JSX,
@@ -33,6 +34,7 @@ import type {
   StaticTemplateValue,
   StyleInput,
   StylerOptions,
+  StyleTypeOptions,
   TemplateValue,
   Theme as CoreTheme,
   ThemeInput,
@@ -61,6 +63,7 @@ export type {
   SchemeName,
   SheetEntry,
   StyleObject,
+  StyleTypeOptions,
   ThemeInput,
   ThemeKey,
   WebNested,
@@ -166,15 +169,23 @@ export interface StyledStatics {
  * is merged, in order, into the one class of the element, after its own styles and before
  * `className`. In the browser, a class made with a plain object is removed once no element uses it, so
  * a value that changes often leaves no class behind; each new value still writes a rule. A string is
- * an error.
+ * an error. By default it also takes React's `CSSProperties`, what the `style` of a plain element
+ * takes, so props spread from `HTMLAttributes` fit; with `isStrict` in `StyleTypeOptions` it does not.
  */
 export type StyleProp =
   | SheetEntry
   | WebStyleObject
+  | ElementStyle
   | false
   | null
   | undefined
   | readonly StyleProp[]
+
+/**
+ * React's `CSSProperties` by default: an interface, which has no index signature and so is not a
+ * `WebStyleObject` by itself. Nothing with the strict style types.
+ */
+type ElementStyle = StyleTypeOptions extends { isStrict: true } ? never : CSSProperties
 
 /**
  * The `as` of a styled component whose tag takes the props `Base`: the type of the tag's own `as` when it
@@ -188,6 +199,13 @@ type AsProp<Base> = Base extends { as?: infer As }
   : ElementType
 
 /**
+ * The component's own props `P` without a `style` of theirs (props that extend `HTMLAttributes` have
+ * one): the `style` of a styled component is `StyleProp`. Kept, `style` would be the intersection of
+ * the two, a union of intersections that every element of the component is compared with.
+ */
+type OwnProps<P extends object> = 'style' extends keyof P ? Omit<P, 'style'> : P
+
+/**
  * A component made by `styled`: it takes the props of the tag (`Base`: all of them, unless a
  * `shouldForwardProp` type guard named some), its own props `P`, `as` and `style`. As text it is a
  * selector: `.` and a class that every element of it has (its `target`, else its class when none of its
@@ -198,7 +216,7 @@ export type StyledComponent<
   P extends object,
   Base extends object = ComponentProps<C>,
 > = FunctionComponent<
-  Omit<Base, keyof P | 'as' | 'style'> & P & { as?: AsProp<Base>; style?: StyleProp }
+  Omit<Base, keyof P | 'as' | 'style'> & OwnProps<P> & { as?: AsProp<Base>; style?: StyleProp }
 > &
   StyledStatics
 
