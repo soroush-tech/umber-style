@@ -39,4 +39,5 @@ export const brandTheme = {
 /** Where the choice of scheme is stored. */
 export const STORAGE_KEY = 'umber-fixture-scheme'
 
+/** The shape of the themes of the fixtures. */
 export type AppTheme = typeof lightTheme

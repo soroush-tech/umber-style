@@ -1,5 +1,5 @@
 import { afterEach, vi } from 'vitest'
-import { warnAboutValues } from './warnStyle'
+import { warnAboutDroppedKey, warnAboutQuery, warnAboutValues } from './warnStyle'
 
 const NODE_ENV = process.env.NODE_ENV
 
@@ -91,6 +91,90 @@ describe('warnAboutValues', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     vi.stubGlobal('process', undefined)
     expect(() => warnAboutValues({ bottom: '9px' })).not.toThrow()
+    expect(warnAboutDroppedKey('&:focus', 'Gone')).toBeUndefined()
+    expect(warn).not.toHaveBeenCalled()
+  })
+})
+
+describe('the values that have no equivalent', () => {
+  it('warns about em, the viewport units, calc() and currentColor, in any case', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    warnAboutValues({
+      margin: '1.5em',
+      height: '100vh',
+      minHeight: '100dvh',
+      width: '50VW',
+      maxWidth: '10svmin',
+      left: 'calc(100% - 8px)',
+      borderColor: 'currentColor',
+      shadowColor: 'CURRENTCOLOR',
+    })
+    expect(warn.mock.calls.map(([text]) => text)).toEqual([
+      '@umber-style/react-native: "margin: 1.5em" is in em, which has no equivalent on React Native (a style does not know the font size around it); it is passed as it is. Write a number, or a length in rem.',
+      '@umber-style/react-native: "height: 100vh" is in a viewport unit, which has no equivalent in a React Native style; it is passed as it is. Write a percentage, or a number computed from the window size.',
+      '@umber-style/react-native: "minHeight: 100dvh" is in a viewport unit, which has no equivalent in a React Native style; it is passed as it is. Write a percentage, or a number computed from the window size.',
+      '@umber-style/react-native: "width: 50VW" is in a viewport unit, which has no equivalent in a React Native style; it is passed as it is. Write a percentage, or a number computed from the window size.',
+      '@umber-style/react-native: "maxWidth: 10svmin" is in a viewport unit, which has no equivalent in a React Native style; it is passed as it is. Write a percentage, or a number computed from the window size.',
+      '@umber-style/react-native: "left: calc(100% - 8px)" is a calc() expression, which React Native does not compute; it is passed as it is. Use add, subtract, multiply and divide, which return numbers.',
+      '@umber-style/react-native: "borderColor: currentColor" uses currentColor, which React Native does not have; it is passed as it is. Give the colour itself.',
+      '@umber-style/react-native: "shadowColor: CURRENTCOLOR" uses currentColor, which React Native does not have; it is passed as it is. Give the colour itself.',
+    ])
+  })
+
+  it('puts the name of the component in front when it is known, once for each name', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    warnAboutValues({ width: '3em' }, 'Card')
+    warnAboutValues({ width: '3em' }, 'Card')
+    warnAboutValues({ width: '3em' }, 'Panel')
+    expect(warn.mock.calls.map(([text]) => String(text).split(' "')[0])).toEqual([
+      '@umber-style/react-native: Card:',
+      '@umber-style/react-native: Panel:',
+    ])
+  })
+})
+
+describe('warnAboutDroppedKey', () => {
+  it('names the key, the component and the reason, once for each message', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    for (const key of [
+      '&:hover',
+      ':focus',
+      'a &',
+      '@media (hover: hover)',
+      '@media print',
+      '@supports (display: grid)',
+      '--accent',
+      'animation',
+      'transitionDuration',
+      '&:hover',
+    ]) {
+      warnAboutDroppedKey(key, 'Button')
+    }
+    warnAboutDroppedKey('&:hover', undefined)
+    const hint = 'A key for the web only goes in the web part of a shared style.'
+    expect(warn.mock.calls.map(([text]) => text)).toEqual([
+      `@umber-style/react-native: Button: "&:hover" is dropped: React Native has no selectors. ${hint}`,
+      `@umber-style/react-native: Button: ":focus" is dropped: React Native has no selectors. ${hint}`,
+      `@umber-style/react-native: Button: "a &" is dropped: React Native has no selectors. ${hint}`,
+      `@umber-style/react-native: Button: "@media (hover: hover)" is dropped: React Native does not evaluate the media feature "hover". ${hint}`,
+      `@umber-style/react-native: Button: "@media print" is dropped: React Native does not evaluate the media type "print". ${hint}`,
+      `@umber-style/react-native: Button: "@supports (display: grid)" is dropped: React Native has no at-rules. ${hint}`,
+      `@umber-style/react-native: Button: "--accent" is dropped: React Native has no custom properties. ${hint}`,
+      `@umber-style/react-native: Button: "animation" is dropped: animations do not run on React Native yet. ${hint}`,
+      `@umber-style/react-native: Button: "transitionDuration" is dropped: animations do not run on React Native yet. ${hint}`,
+      `@umber-style/react-native: "&:hover" is dropped: React Native has no selectors. ${hint}`,
+    ])
+  })
+
+  it('says nothing about the label, a condition key or a media query it evaluates, and nothing in production', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    warnAboutDroppedKey('label', 'Quiet')
+    warnAboutDroppedKey('@media (min-width: 40em)', 'Quiet')
+    warnAboutDroppedKey('@theme n0', 'Quiet')
+    warnAboutDroppedKey('@scheme dark', 'Quiet')
+    process.env.NODE_ENV = 'production'
+    warnAboutDroppedKey('&:active', 'Quiet')
+    warnAboutQuery('(hover: hover)', 'the media feature "hover"')
     expect(warn).not.toHaveBeenCalled()
   })
 })

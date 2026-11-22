@@ -70,14 +70,17 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 - **Bindings are thin:** `@umber-style/react`, `@umber-style/react-native` and `@umber-style/vue` adapt
   the engine to one platform and keep the same names (`styled`, `ThemeProvider`, `useTheme`,
   `StyleSheet`, `useStyle`, `apply`). Logic that two bindings need belongs in core. `umber-style` only
-  re-exports; it holds no logic.
+  re-exports; it holds no logic. `@umber-style/css`, `@umber-style/cache` and `@umber-style/server`
+  are built on core and know no framework: class names with no theme, the cache that
+  server-rendering set-ups read, and the CSS of one page as `data-umber` chunks.
 - **No library names:** never name another CSS-in-JS library, CSS framework or web framework in code,
   comments, tests, docs or config comments. The platforms (React, React Native, Vue) and
   `@soroush.tech/styled-system` may be named. A dependency name in a `package.json` is the one
   exception.
 - **No inline styles:** the engine never renders a `style` attribute on the web, and nothing in this
-  repository writes one (`style="..."`, `style={{...}}`). Style through the engine: the `style` prop of
-  a styled component takes sheet entries and objects and merges them into a class.
+  repository puts one on a plain element (`<div style="...">`, `<div style={{...}}>`). The `style`
+  prop of a styled component is the engine's own API: it takes sheet entries and objects and merges
+  them into a class.
 - **SSR-safe:** never touch browser-only APIs at module top level - guard with
   `typeof window !== 'undefined'` or move the access into an effect. The server build of the React
   binding has no hook and no context.
@@ -85,11 +88,11 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
   of their own.
 - **Test placement:** co-located next to source. Unit and integration tests are `*.test.ts(x)`
   (vitest). A file that needs another environment says so with a `// @vitest-environment node`
-  comment, or uses a `*.server.test.ts(x)` suffix in `@umber-style/react` (run with the `react-server`
-  condition).
+  comment, or uses a `*.server.test.ts(x)` suffix in `@umber-style/react` and `@umber-style/styled` (run with the
+  `react-server` condition).
 - **Which tier a test belongs in:** the lowest that can see the thing (`docs/testing.md`). Text of a rule, class names, what is inserted: a `*.test.ts(x)` unit test. What a browser's cascade or layout decides (which rule wins, a computed value, a transition): a `*.browser.test.ts(x)` in `core` or `react`, run by `pnpm test:browser`, outside coverage. What a framework does with the engine on a built page (first HTML, hydration, navigation, no script): an end-to-end test in `e2e/` on an app in `fixtures/`, run by `pnpm test:e2e`. A test that documents behaviour the engine does not have yet is marked as a known failure (`known` in `e2e/fixtures.ts`, `it.fails` in vitest) with a reason that starts with KNOWN; one that starts to pass fails the run.
 - **Fixtures are not packages:** fixture apps live in `fixtures/`, never in `packages/`: they are not registered with Codecov, not in the package matrix, and need no `LICENSE`.
-- **Benchmarks:** a benchmark lives next to what it measures, in `packages/<pkg>/bench/*.bench.ts(x)`; the helpers and the runner are in `bench/` (a workspace package outside `packages/`). `pnpm bench` runs them all, and `pnpm test` never runs them. To compare two versions, write a soroush-bench file: two single runs of this suite differ too much to compare. The CI gate is separate: the files in `bench/gate/` (`*.bench.ts` for soroush-bench) compare the built `dist` with the published release in a Docker sandbox; the release tag is the one line in `bench/gate/baseline.ts` (`docs/benchmarks.md`).
+- **Benchmarks:** every benchmark is a soroush-bench file (`*.bench.ts`, a default-exported config of two cases or more), run in its Docker sandbox. A local benchmark lives next to what it measures, in `packages/<pkg>/bench/`; it measures the built `dist`, loaded by path and typed by `src`, and its cases compare with each other. The shared inputs and the helper that lets a binding's file load built code (`prepareBuiltPackages`) are in `bench/src/` (a workspace package outside `packages/`). `pnpm bench` builds, then runs every local file one after the other (Docker must be running); `pnpm test` never runs them. The CI gate is separate: the files in `bench/gate/` compare the built `dist` with the published release; the release tag is the one line in `bench/gate/baseline.ts` (`docs/benchmarks.md`).
 - **100% coverage:** every package keeps 100% statements, branches, functions and lines, with no
   coverage-ignore comments. `pnpm test:coverage` fails below it.
 - **Lint and format:** `pnpm lint` runs `oxlint --deny-warnings` - any warning fails. Formatting is not
@@ -98,7 +101,8 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
   the pre-commit hook enforce it.
 - **Packages:** everything under `packages/` is a workspace package. `packages/packages.md` is the
   **standard** for packages - read it first, and follow it when creating or changing any package
-  (structure, exports, publishing, registration chores). The five packages are publishable and built with
+  (structure, exports, publishing, registration chores). Every package but `eslint-config` is publishable
+  (`core`, `cache`, `server`, `css`, `react`, `react-native`, `vue`, `styled`, `umber-style`) and built with
   tsdown (`pnpm build`); they consume source inside the workspace and `publishConfig` swaps in `dist` only
   when a tarball is made, so release with `pnpm` through the workflow, never `npm publish`. A publishable
   package must declare a license, ship a `LICENSE` file, and have `release-notes/<version>.md`;
@@ -127,15 +131,19 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 ## Layer conventions
 
-| Layer            | Folder                                                    | What it covers                                                                             |
-| ---------------- | --------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| Engine           | `packages/core`                                           | Tokens, class cache, theme classes, style serialization. No framework                      |
-| Bindings         | `packages/react`, `packages/react-native`, `packages/vue` | `styled`, `ThemeProvider`, theme hooks, sheets for one platform; thin over core            |
-| Umbrella         | `packages/umber-style`                                    | Re-exports core and the bindings as subpaths. Its tests prove one source runs on every one |
-| Lint config      | `packages/eslint-config`                                  | Private oxlint base and React layers, shared by every package                              |
-| Package standard | `packages/packages.md`                                    | Structure, exports, publishing, 100% coverage, licensing, linting                          |
-| Releasing        | `docs/releasing.md`, `.github/workflows/cd-packages.yml`  | Channels, the order of the packages, installing a prerelease, verifying a tarball          |
-| Documentation    | `docs/`                                                   | One set of pages by topic for every platform, written once; the index is `docs/README.md`  |
+| Layer            | Folder                                                    | What it covers                                                                              |
+| ---------------- | --------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| Engine           | `packages/core`                                           | Tokens, class cache, theme classes, style serialization. No framework                       |
+| Bindings         | `packages/react`, `packages/react-native`, `packages/vue` | `styled`, `ThemeProvider`, theme hooks, sheets for one platform; thin over core             |
+| Umbrella         | `packages/umber-style`                                    | Re-exports core and the bindings as subpaths. Its tests prove one source runs on every one  |
+| Plain layer      | `packages/css`                                            | `css`, `cx`, `keyframes`, `injectGlobal`: class names with no theme and no framework        |
+| Cache            | `packages/cache`                                          | `createCache({ key })`: the engine's cache with the members server-rendering set-ups read   |
+| Server           | `packages/server`                                         | `/create-instance`: the CSS of one page as chunks and `<style data-umber>` tags             |
+| Legacy entry     | `packages/styled`                                         | The `styled` of `@umber-style/react` as a default export, for code that imports it that way |
+| Lint config      | `packages/eslint-config`                                  | Private oxlint base and React layers, shared by every package                               |
+| Package standard | `packages/packages.md`                                    | Structure, exports, publishing, 100% coverage, licensing, linting                           |
+| Releasing        | `docs/releasing.md`, `.github/workflows/cd-packages.yml`  | Channels, the order of the packages, installing a prerelease, verifying a tarball           |
+| Documentation    | `docs/`                                                   | One set of pages by topic for every platform, written once; the index is `docs/README.md`   |
 
 ## Quick checklist before pushing
 

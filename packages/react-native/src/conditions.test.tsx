@@ -3,7 +3,7 @@ import { createElement } from 'react'
 import { Appearance } from 'react-native'
 import { createNativeThemeKey, matchesCondition, readSchemeName } from './conditions'
 import { createStyle } from './createStyle'
-import { hasConditions, toNativeStyle } from './toNativeStyle'
+import { collectKeys, toNativeStyle } from './toNativeStyle'
 
 const base = { palette: { primary: '#0000ff' } }
 const dark = { palette: { primary: '#8888ff' } }
@@ -86,6 +86,7 @@ describe('toNativeStyle with conditions', () => {
   })
 
   it('tells a style that has a condition key, in its native part too', () => {
+    const hasConditions = (style: Record<string, unknown>) => !!collectKeys(style)?.isConditional
     expect(hasConditions({ padding: 1 })).toBe(false)
     expect(hasConditions({ native: { padding: 1 } })).toBe(false)
     expect(hasConditions({ '@scheme dark': {} })).toBe(true)

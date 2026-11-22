@@ -217,18 +217,51 @@ describe('wrapping a styled component', () => {
     expect(rules()).toEqual([`@layer b-components{.${className}{color:red;margin:1px;}}`])
   })
 
-  it('static and dynamic inner and static outer: the outer reuses the base of the inner', () => {
+  it('static and dynamic inner and static outer: the outer has the base of the inner under its own label', () => {
     const { engine, rules } = setup()
     const inner = engine.createStyler(label('Inner'), asStyles({ color: 'red' }, byTone))
     const outer = engine.createStyler(label('Outer'), [{ margin: 1 }], inner.styles)
     const [innerBase] = inner.getClassName({ tone: 'blue' }).split(' ')
     const [outerBase, outerProps, ...rest] = outer.getClassName({ tone: 'blue' }).split(' ')
     expect(rest).toEqual([])
-    expect(outerBase).toBe(innerBase)
+    expect(innerBase).toMatch(/^b-inner-root-/)
+    expect(outerBase).toBe(innerBase.replace('inner', 'outer'))
     expect(outerProps).toMatch(/^b-outer-root-/)
-    expect(rules().filter((rule) => rule.includes(`.${innerBase}{`))).toHaveLength(1)
+    expect(rules().filter((rule) => rule.includes('{color:red;}'))).toEqual([
+      `@layer b-components{.${innerBase}{color:red;}}`,
+      `@layer b-components{.${outerBase}{color:red;}}`,
+    ])
     const written = rules().find((rule) => rule.includes(`.${outerProps}{`))
     expect(written).toBe(`@layer b-components{.${outerProps}{color:blue;margin:1px;}}`)
+  })
+
+  it('an outer without a label reuses the base of the inner, and its props class has no label', () => {
+    const { engine, rules } = setup()
+    const inner = engine.createStyler(label('Inner'), asStyles({ color: 'red' }, byTone))
+    const outer = engine.createStyler({}, [{ margin: 1 }], inner.styles)
+    const [innerBase] = inner.getClassName({ tone: 'blue' }).split(' ')
+    const [outerBase, outerProps] = outer.getClassName({ tone: 'blue' }).split(' ')
+    expect(outerBase).toBe(innerBase)
+    expect(outerProps).toMatch(/^b-[a-z0-9]+$/)
+    expect(rules().filter((rule) => rule.includes(`.${innerBase}{`))).toHaveLength(1)
+  })
+
+  it('an outer with the label of the inner, or a cache without labels, has the one base', () => {
+    const { engine, rules } = setup()
+    const inner = engine.createStyler(label('Same'), [{ color: 'red' }])
+    const outer = engine.createStyler(label('Same'), asStyles(byTone), inner.styles)
+    const [base, props, ...rest] = outer.getClassName({ tone: 'blue' }).split(' ')
+    expect(rest).toEqual([])
+    expect(base).toBe(inner.getClassName({}))
+    expect(props).toMatch(/^b-same-root-/)
+    expect(rules().filter((rule) => rule.includes('color:red'))).toHaveLength(1)
+
+    const plain = setup({ hasLabels: false }).engine
+    const plainInner = plain.createStyler(label('Inner'), [{ color: 'red' }])
+    const plainOuter = plain.createStyler(label('Outer'), asStyles(byTone), plainInner.styles)
+    const [plainBase, ...plainRest] = plainOuter.getClassName({ tone: 'blue' }).split(' ')
+    expect(plainBase).toBe(plainInner.getClassName({}))
+    expect(plainRest).toHaveLength(1)
   })
 
   it('dynamic inner and dynamic outer: no base, one props class for both', () => {
@@ -241,15 +274,20 @@ describe('wrapping a styled component', () => {
     expect(engine.cache.registered.get(className)).toMatchObject({ color: 'red', width: 3 })
   })
 
-  it('static inner and an outer that starts with a props function: the outer carries the base of the inner as it is', () => {
+  it('static inner and an outer that starts with a props function: the class of the inner, then the base and the props class under the label of the outer', () => {
     const { engine, rules } = setup()
     const inner = engine.createStyler(label('Inner'), [{ color: 'red' }])
     const outer = engine.createStyler(label('Outer'), asStyles(byTone), inner.styles)
     const innerClass = inner.getClassName({})
-    const [base, props] = outer.getClassName({ tone: 'blue' }).split(' ')
-    expect(base).toBe(innerClass)
+    const [selector, base, props, ...rest] = outer.getClassName({ tone: 'blue' }).split(' ')
+    expect(rest).toEqual([])
+    // The class of the inner stays, so that the inner as a selector matches the element as before.
+    expect(selector).toBe(innerClass)
+    expect(base).toBe(innerClass.replace('inner', 'outer'))
     expect(props).toMatch(/^b-outer-root-/)
-    expect(rules().filter((rule) => rule.includes('color:red'))).toHaveLength(1)
+    expect(rules().filter((rule) => rule.includes('color:red'))).toHaveLength(2)
+    const written = rules().find((rule) => rule.includes(`.${props}{`))
+    expect(written).toBe(`@layer b-components{.${props}{color:blue;}}`)
   })
 
   it('static inner and an outer that starts with plain objects and then has a function: a larger base under the label of the outer', () => {
@@ -262,15 +300,18 @@ describe('wrapping a styled component', () => {
     expect(engine.cache.registered.get(props)).toMatchObject({ color: 'blue' })
   })
 
-  it('wrapping twice keeps the same base for a component and for what wraps it', () => {
+  it('wrapping twice keeps the same base without labels, and gives each label its own base of the same declarations', () => {
     const { engine } = setup()
     const first = engine.createStyler(label('First'), asStyles({ color: 'red' }, byTone))
-    const second = engine.createStyler(label('Second'), asStyles(byTone), first.styles)
-    const third = engine.createStyler(label('Third'), [{ margin: 1 }], second.styles)
+    const second = engine.createStyler({}, asStyles(byTone), first.styles)
+    const third = engine.createStyler({}, [{ margin: 1 }], second.styles)
     const bases = [first, second, third].map(
       (styler) => styler.getClassName({ tone: 'a' }).split(' ')[0]
     )
     expect(new Set(bases).size).toBe(1)
+    const labelled = engine.createStyler(label('Third'), [{ margin: 1 }], second.styles)
+    const [base] = labelled.getClassName({ tone: 'a' }).split(' ')
+    expect(base).toBe(bases[0].replace('first', 'third'))
   })
 })
 

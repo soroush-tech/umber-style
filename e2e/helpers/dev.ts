@@ -15,11 +15,12 @@ export const SOURCE_FILES = {
 
 const HYDRATION = /hydrat|did not match|mismatch|server rendered HTML/i
 
+/** What the `messages` fixture collects from the page of a test. */
 export interface Messages {
   /** Every console message and page error seen so far, as `type: text`. */
   readonly all: string[]
   /** The messages that fail the test: a hydration message of any kind, an error, an uncaught error, a warning of the engine. */
-  problems(): string[]
+  readProblems(): string[]
 }
 
 /**
@@ -35,7 +36,7 @@ export const test = base.extend<{ messages: Messages }>({
       page.on('pageerror', (error) => all.push(`pageerror: ${error.message}`))
       const messages: Messages = {
         all,
-        problems: () =>
+        readProblems: () =>
           all.filter(
             (line) =>
               line.startsWith('error: ') ||
@@ -45,9 +46,10 @@ export const test = base.extend<{ messages: Messages }>({
           ),
       }
       await use(messages)
-      expect(messages.problems(), 'hydration messages, errors and warnings of the engine').toEqual(
-        []
-      )
+      expect(
+        messages.readProblems(),
+        'hydration messages, errors and warnings of the engine'
+      ).toEqual([])
     },
     { auto: true },
   ],
@@ -71,7 +73,7 @@ export function editSource(file: string, from: string, to: string): () => void {
 }
 
 /** The classes of the engine on the element with `testId`, without the markers that have no rule. */
-export async function engineClasses(page: Page, testId: string): Promise<string[]> {
+export async function readEngineClasses(page: Page, testId: string): Promise<string[]> {
   return page
     .getByTestId(testId)
     .evaluate((element) =>

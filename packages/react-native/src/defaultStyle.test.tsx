@@ -1,5 +1,4 @@
 import { render } from '@testing-library/react'
-import { NO_THEME_MESSAGE } from '@umber-style/core'
 import { createElement } from 'react'
 import { createDefaultStyle } from './defaultStyle'
 import { createStyle } from './createStyle'
@@ -74,12 +73,12 @@ describe('the default style on React Native', () => {
     expect(seen).toEqual([light, other])
   })
 
-  it('throws one clear error with no theme, and uses the theme of configure', () => {
+  it('gives an empty theme with no theme, so reading a token throws, and uses the theme of configure', () => {
     const bare = createDefaultStyle()
     const { View } = createStandIn()
     const Box = bare.styled(View)(({ theme }) => ({ padding: theme.space.small }))
     vi.spyOn(console, 'error').mockImplementation(() => undefined)
-    expect(() => render(<Box />)).toThrow(NO_THEME_MESSAGE)
+    expect(() => render(<Box />)).toThrow(TypeError)
 
     const configured = createDefaultStyle()
     configured.configure({ theme: light })
@@ -87,6 +86,15 @@ describe('the default style on React Native', () => {
     const Styled = configured.styled(Other)(({ theme }) => ({ padding: theme.space.small }))
     render(<Styled />)
     expect(calls[0].style).toEqual([{ padding: 4 }])
+  })
+
+  it('takes remBase and lengthKeys from configure', () => {
+    const { configure, styled } = createDefaultStyle()
+    configure({ theme: light, remBase: 20, lengthKeys: ['space'] })
+    const { View, calls } = createStandIn()
+    const Box = styled(View)({ padding: '0.5rem' })
+    render(<Box />)
+    expect(calls[0].style).toEqual([{ padding: 10 }])
   })
 
   it('throws from configure once it was used', () => {

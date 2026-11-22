@@ -1,14 +1,18 @@
 import {
   type BindingOptions,
+  createDeferredObject,
   createDeferredRecord,
   createLazyEngine,
-  type Theme,
+  globalStyles,
+  keyframes,
+  withTagShorthands,
   type WebStyleObject,
 } from '@umber-style/core'
-import { defineComponent, h, type ComputedRef } from 'vue'
+import { defineComponent, h, type Component, type ComputedRef } from 'vue'
 import { bindEngine } from './createStyle'
-import type { Style } from './types'
+import type { Style, StyledOptions, Theme } from './types'
 
+/** The options of `configure`: the engine options of the core, and the base theme. */
 export interface DefaultStyleOptions extends BindingOptions<Theme> {
   /** The base theme, for an app that has no provider at all. */
   theme?: Theme
@@ -34,7 +38,16 @@ export function createDefaultStyle() {
     pending = options
   }
 
-  const styled: Style<Theme>['styled'] = (tag, options) => getStyle().styled(tag, options)
+  // `styled.div` and the other tags are made on use, through the engine's own `styled`, when the
+  // styles are given: reading them (`Object.assign(wrapper, styled)` reads every tag) leaves `configure`
+  // open.
+  const styled = withTagShorthands(
+    ((tag: string | Component, options?: StyledOptions) =>
+      (...args: unknown[]) =>
+        (getStyle().styled(tag, options) as (...styles: unknown[]) => unknown)(
+          ...args
+        )) as unknown as Style<Theme>['styled']
+  )
 
   // An object sheet is made on first read, so a module can create one before `configure` is called.
   const StyleSheet: Style<Theme>['StyleSheet'] = {
@@ -62,6 +75,29 @@ export function createDefaultStyle() {
     },
   }) as unknown as Style<Theme>['ThemeProvider']
 
+  // A stand-in that renders the real ThemeScope, as the provider does.
+  const ThemeScope = defineComponent({
+    name: 'ThemeScope',
+    setup(_props, { slots }) {
+      const Real = getStyle().ThemeScope
+      return () => h(Real, null, slots)
+    },
+  }) as unknown as Style<Theme>['ThemeScope']
+
+  function useThemeClass(): ComputedRef<string | undefined> {
+    return getStyle().useThemeClass()
+  }
+
+  // A stand-in that renders the real Global, as the provider does.
+  const Global = defineComponent({
+    name: 'Global',
+    inheritAttrs: false,
+    setup(_props, { attrs }) {
+      const Real = getStyle().Global
+      return () => h(Real, attrs as never)
+    },
+  }) as unknown as Style<Theme>['Global']
+
   return {
     configure,
     getEngine: () => getStyle().engine,
@@ -70,10 +106,21 @@ export function createDefaultStyle() {
     useStyle,
     useTheme,
     ThemeProvider,
+    ThemeScope,
+    useThemeClass,
     apply: ((...entries) => getStyle().apply(...entries)) as Style<Theme>['apply'],
+    // The entry is made on first use, so a module can call it before `configure`.
+    css: ((...args: unknown[]) =>
+      createDeferredObject(() =>
+        (getStyle().css as (...all: unknown[]) => object)(...args)
+      )) as Style<Theme>['css'],
     when: ((theme, colorScheme) => getStyle().when(theme, colorScheme)) as Style<Theme>['when'],
     whenScheme: ((scheme) => getStyle().whenScheme(scheme)) as Style<Theme>['whenScheme'],
     themeClass: ((theme, colorScheme) =>
       getStyle().themeClass(theme, colorScheme)) as Style<Theme>['themeClass'],
+    // They need no engine, so a module can call them before `configure`.
+    keyframes: keyframes as Style<Theme>['keyframes'],
+    globalStyles: globalStyles as Style<Theme>['globalStyles'],
+    Global,
   }
 }

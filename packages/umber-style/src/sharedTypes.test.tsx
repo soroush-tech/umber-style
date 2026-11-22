@@ -11,12 +11,16 @@ import {
   at,
   createStyle,
   divide,
+  Global,
+  globalStyles,
+  keyframes,
   multiply,
   negate,
   StyleSheet,
   styled,
   subtract,
   useStyle,
+  type GlobalStyles,
   type SharedEntry,
   type SharedStyled,
   type SharedStyleObject,
@@ -236,5 +240,26 @@ describe('the web part of a shared style', () => {
       web: { gap: 8, ...at(`@media (width >= ${breakpoint})`, { gap: 16 }) },
     })
     render(<Box id="computed" />)
+  })
+})
+
+describe('keyframes, globalStyles and Global in shared code', () => {
+  it('types the steps, the handle and the props with the theme', () => {
+    const own = createStyle({ palette: { text: '#111111' } })
+    const fade = own.keyframes((theme) => ({ from: { opacity: 0, color: theme.palette.text } }))
+    expectTypeOf(fade).toEqualTypeOf<string>()
+    const base = own.globalStyles((theme) => ({ body: { color: theme.palette.text } }))
+    expectTypeOf(base).toEqualTypeOf<GlobalStyles<{ palette: { text: string } }>>()
+    // @ts-expect-error a key that the theme does not have
+    own.globalStyles((theme) => ({ body: { color: theme.palette.missing } }))
+    const spin = keyframes({ to: { opacity: 1 } })
+    const Box = styled(Host)({ opacity: 1, web: { animation: `${spin} 1s` } })
+    render(
+      <>
+        <own.Global styles={[base, { html: { margin: 0 } }]} />
+        <Global styles={globalStyles({ body: { margin: 0 } })} />
+        <Box id="animated" />
+      </>
+    )
   })
 })

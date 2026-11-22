@@ -1,0 +1,77 @@
+{
+  "name": "@umber-style/server",
+  "version": "0.1.0",
+  "description": "Server rendering over an UmberStyle cache: the CSS of one page as chunks and as style tags.",
+  "keywords": [
+    "styling",
+    "ssr",
+    "critical-css",
+    "css-variables",
+    "typescript"
+  ],
+  "license": "MIT",
+  "author": "Masoud Soroush <masoud@soroush.tech>",
+  "homepage": "https://umber-style.soroush.design",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/soroush-tech/umber-style.git",
+    "directory": "packages/server"
+  },
+  "bugs": {
+    "url": "https://github.com/soroush-tech/umber-style/issues"
+  },
+  "type": "module",
+  "sideEffects": false,
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    "./create-instance": "./src/createInstance.ts"
+  },
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      "./create-instance": {
+        "import": {
+          "types": "./dist/createInstance.d.mts",
+          "default": "./dist/createInstance.mjs"
+        },
+        "require": {
+          "types": "./dist/createInstance.d.cts",
+          "default": "./dist/createInstance.cjs"
+        }
+      }
+    },
+    "main": "./dist/createInstance.cjs",
+    "module": "./dist/createInstance.mjs",
+    "types": "./dist/createInstance.d.mts"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "lint": "oxlint --deny-warnings",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "prepublishOnly": "pnpm build"
+  },
+  "dependencies": {
+    "@umber-style/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@umber-style/cache": "workspace:*",
+    "@umber-style/css": "workspace:*",
+    "@umber-style/eslint-config": "workspace:*",
+    "@umber-style/react": "workspace:*",
+    "@vitest/coverage-v8": "^5.1.0",
+    "jsdom": "^31.0.0",
+    "oxlint": "^1.93.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "tsdown": "^0.23.7",
+    "typescript": "~7.0.2",
+    "vitest": "^5.1.0"
+  }
+}

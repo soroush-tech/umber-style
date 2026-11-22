@@ -1,8 +1,12 @@
 import {
+  type Cache,
   type ColorScheme,
+  createCssEntry,
   createEngine,
   type DeepPartial,
   type Engine,
+  findEntryCache,
+  globalStyles,
   isThemedSheet,
   type ObjectSheet,
   type SheetEntries,
@@ -10,10 +14,18 @@ import {
   type SheetStyles,
   type WebStyleObject,
 } from '@umber-style/core'
-import { createStampElement, createStyleElements } from './styleElements'
+import { useProvidedCache } from './CacheProvider'
+import { createGlobal } from './Global'
+import { readPrefixStyle } from './ProviderScope'
+import {
+  createGlobalElements,
+  createGlobalMarkerElements,
+  createStampElement,
+  createStyleElements,
+} from './styleElements'
 import { createStyled } from './styled'
 import { createThemeProvider } from './ThemeProvider'
-import { createThemeValue } from './ThemeValue'
+import { createThemeValue, type ThemeContexts } from './ThemeValue'
 import type { ServerStyleOptions, SheetDefinition, StyleOptions, WebStyle } from './types'
 
 export type { StyleOptions } from './types'
@@ -23,30 +35,38 @@ interface WebSheet<S extends SheetStyles> extends SheetDefinition<S, SheetEntry>
   resolve(theme?: unknown): { [K in keyof S]: SheetEntry }
 }
 
-/** Makes the React styling over an engine: `styled`, sheets, the theme provider and `useTheme`. */
+/** The contexts of the prefix of `engine`, which every style of that prefix shares; this engine's base theme is the one a provider of the server build merges over, unless another style of the prefix gave one. */
+function readSharedContexts<T>(engine: Engine<T>): ThemeContexts<T> {
+  const shared = readPrefixStyle(engine.cache.prefix)
+  shared.holder ??= engine
+  return shared.contexts as ThemeContexts<T>
+}
+
+/** Makes the React styling over an engine: `styled`, sheets, the theme provider and `useTheme`; `contexts` are those of its prefix unless given. */
 export function bindEngine<T extends object>(
   engine: Engine<T>,
-  { hasServerStyleElements = true }: ServerStyleOptions = {}
+  { hasServerStyleElements = true }: ServerStyleOptions = {},
+  contexts: ThemeContexts<T> = readSharedContexts(engine)
 ): WebStyle<T> {
-  const { ThemeValueProvider, useTheme, useThemeValue } = createThemeValue(engine)
+  const { useTheme, useThemeView, useThemeClass, ThemeScope } = createThemeValue(engine, contexts)
 
-  // Where there is no document (a server render), the style of a class is sent as style elements.
+  // Where there is no document (a server render), the style of a class is sent as style elements; not
+  // under a cache provider (`cache`), whose rules the app sends itself.
   const hasStyleElements = () => hasServerStyleElements && typeof document === 'undefined'
-  const renderStyleElements = (className: string) =>
-    hasStyleElements() ? createStyleElements(engine.cache, className) : []
-
-  // The real theme of the nearest provider, as references for tokens and real raw values.
-  const useThemeView = () => engine.createThemeView(useTheme())
+  const renderStyleElements = (className: string, cache?: Cache) =>
+    cache === undefined && hasStyleElements() ? createStyleElements(engine.cache, className) : []
 
   const themeClass = (partial: DeepPartial<T>, colorScheme?: ColorScheme) =>
     engine.themeClass(partial, colorScheme)
 
   // The context is read first, for every sheet, so that the hooks of a component never change; an object
-  // sheet is its own entries and uses no theme.
+  // sheet is its own entries and uses no theme. Under a cache provider the entries are those of the
+  // engine over its cache, for the same styles, so that what uses them writes there.
   const useStyle = ((sheet: object) => {
-    const real = useThemeValue()
-    if (!isThemedSheet(sheet)) return sheet
-    return sheet.resolve(real !== undefined ? engine.createThemeView(real) : undefined)
+    const cache = useProvidedCache()
+    const view = useThemeView(cache)
+    const entries = (isThemedSheet(sheet) ? sheet.resolve(view) : sheet) as SheetEntries<string>
+    return cache === undefined ? entries : engine.withCache(cache).adoptSheet(entries)
   }) as WebStyle<T>['useStyle']
 
   function create<K extends string>(styles: ObjectSheet<K>): SheetEntries<K>
@@ -65,28 +85,39 @@ export function bindEngine<T extends object>(
     styled: createStyled(engine, useThemeView, renderStyleElements),
     StyleSheet: { create },
     useStyle,
-    apply: (...entries) => ({ className: engine.css(...entries) || undefined }),
+    // The class is made in the cache of the entries: under a cache provider, the entries of `useStyle`
+    // are that cache's.
+    apply: (...entries) => ({
+      className: (findEntryCache(entries) ?? engine.cache).css(...entries) || undefined,
+    }),
+    css: ((...args: unknown[]) => createCssEntry(engine.cache, args)) as WebStyle<T>['css'],
     ThemeProvider: createThemeProvider({
+      engine,
+      contexts,
       getServerStyle: () =>
         hasStyleElements()
           ? {
               createStyleElements: renderStyleElements,
               createStamp: () => createStampElement(engine.cache),
-              findThemeIds: engine.findThemeIds,
-              themeId: engine.themeId,
             }
           : undefined,
-      learnTheme: (theme) => {
-        if (!engine.hasTheme) engine.setTheme(theme as T)
-      },
-      themeClass,
-      scopeClass: engine.scopeClass,
-      ThemeValueProvider,
     }),
+    ThemeScope,
+    ThemeContext: contexts.ThemeContext,
     useTheme,
+    useThemeClass,
     themeClass,
     when: engine.when,
     whenScheme: engine.whenScheme,
+    keyframes: engine.keyframes,
+    globalStyles,
+    // A server render sends the style elements of the sets, or, where it sends none, the marker that
+    // names them in the markup, with the prefix of the cache that holds them.
+    Global: createGlobal(engine, useThemeView, (sets, cache) =>
+      cache === undefined && hasStyleElements()
+        ? createGlobalElements(engine.cache, sets)
+        : createGlobalMarkerElements(cache ?? engine.cache, sets)
+    ),
   }
 }
 

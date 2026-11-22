@@ -131,19 +131,22 @@ describe('nested providers in a real browser', () => {
         </Row>
       )
     )
+    // The providers are nested under an outermost one, which renders no element: each renders a wrapper.
     const wrapped = only(
       render(
-        <Row>
-          <ThemeProvider theme={{ palette: { primary: '#008000' } }}>
-            <Item />
-          </ThemeProvider>
-          <ThemeProvider theme={{ palette: { primary: '#ff0000' } }}>
-            <Item />
-          </ThemeProvider>
-          <ThemeProvider theme={{ palette: { primary: '#0000ff' } }}>
-            <Item />
-          </ThemeProvider>
-        </Row>
+        <ThemeProvider theme={theme}>
+          <Row>
+            <ThemeProvider theme={{ palette: { primary: '#008000' } }}>
+              <Item />
+            </ThemeProvider>
+            <ThemeProvider theme={{ palette: { primary: '#ff0000' } }}>
+              <Item />
+            </ThemeProvider>
+            <ThemeProvider theme={{ palette: { primary: '#0000ff' } }}>
+              <Item />
+            </ThemeProvider>
+          </Row>
+        </ThemeProvider>
       )
     )
     expect(getComputedStyle(wrapped.firstElementChild!).display).toBe('contents')

@@ -9,13 +9,13 @@ const client = join(root, 'dist', 'client')
 const template = readFileSync(join(client, 'index.html'), 'utf8')
 const { render } = await import(pathToFileURL(join(root, 'dist', 'server', 'entry-server.js')).href)
 
-const types = { '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml' }
-const routes = new Set(['/', '/catalog', '/settings'])
+const CONTENT_TYPES = { '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml' }
+const ROUTES = new Set(['/', '/catalog', '/settings', '/promo'])
 
 createServer(async (request, response) => {
   const path = new URL(request.url, 'http://localhost').pathname
   try {
-    if (routes.has(path)) {
+    if (ROUTES.has(path)) {
       const { html, styleTag, boot, htmlClass } = await render(path)
       const page = template
         .replace('<!--html-class-->', htmlClass)
@@ -28,7 +28,9 @@ createServer(async (request, response) => {
     const file = join(client, normalize(path))
     if (!file.startsWith(client)) throw new Error('outside the client folder')
     response
-      .writeHead(200, { 'content-type': types[extname(file)] ?? 'application/octet-stream' })
+      .writeHead(200, {
+        'content-type': CONTENT_TYPES[extname(file)] ?? 'application/octet-stream',
+      })
       .end(readFileSync(file))
   } catch {
     response.writeHead(404).end('Not found')

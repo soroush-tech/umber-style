@@ -40,3 +40,32 @@ export function createDeferredRecord<V>(
     return built[key]
   })
 }
+
+/**
+ * An object that stands for the one `make` returns, which is made the first time the object is used in
+ * any way (a property read, `in`, a listing of its keys, a check of whether it is frozen): from then on it
+ * has the same properties, and is frozen as that one is. When `make` throws, the next use tries again. For a value that a module makes before the
+ * engine it needs may exist, such as a `css()` result of a default style before `configure` is called.
+ */
+export function createDeferredObject<V extends object>(make: () => V): V {
+  const target = {}
+  let isMade = false
+  const ensure = (): object => {
+    if (!isMade) {
+      const made = make()
+      isMade = true
+      Object.defineProperties(target, Object.getOwnPropertyDescriptors(made))
+      Object.setPrototypeOf(target, Object.getPrototypeOf(made))
+      if (Object.isFrozen(made)) Object.freeze(target)
+    }
+    return target
+  }
+  return new Proxy(target, {
+    get: (_target, key) => Reflect.get(ensure(), key),
+    has: (_target, key) => Reflect.has(ensure(), key),
+    ownKeys: () => Reflect.ownKeys(ensure()),
+    getOwnPropertyDescriptor: (_target, key) => Reflect.getOwnPropertyDescriptor(ensure(), key),
+    getPrototypeOf: () => Reflect.getPrototypeOf(ensure()),
+    isExtensible: () => Reflect.isExtensible(ensure()),
+  }) as V
+}

@@ -120,6 +120,23 @@ describe('WebStyleObject', () => {
   })
 })
 
+describe('times in a web style', () => {
+  it('take a number of milliseconds for a duration or a delay, not for the transition shorthand', () => {
+    const style: WebStyleObject = {
+      animationDuration: 1500,
+      animationDelay: [-200, '0s'],
+      transitionDuration: 0,
+      transitionDelay: '1s',
+    }
+    expectTypeOf(style.animationDuration).not.toBeAny()
+    const { engine, sheet } = setup()
+    // @ts-expect-error a number in the shorthand is not a time
+    engine.css({ transition: 300 })
+    engine.css(style)
+    expect(sheet.rules.join('')).toContain('animation-duration:1500ms;animation-delay:-200ms;')
+  })
+})
+
 describe('the arithmetic helpers in a web style', () => {
   it('are accepted as values, a negative margin included', () => {
     const space = 'var(--u-space-2)'

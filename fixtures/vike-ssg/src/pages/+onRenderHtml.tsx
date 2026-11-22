@@ -1,4 +1,4 @@
-import { bootScript } from '@umber-fixtures/shared/bootScript'
+import { createBootScript } from '@umber-fixtures/shared/bootScript'
 import { darkClass, lightClass, style } from '@umber-fixtures/shared/style'
 import { extractPageStyles } from '@umber-style/core'
 import { renderToString } from 'react-dom/server'
@@ -26,7 +26,7 @@ export const onRenderHtml: OnRenderHtmlAsync = async (pageContext) => {
     <title>UmberStyle fixture</title>
     <link rel="icon" href="data:," />
     ${dangerouslySkipEscape(styleTag)}
-    <script>${dangerouslySkipEscape(bootScript(lightClass, darkClass))}</script>
+    <script>${dangerouslySkipEscape(createBootScript(lightClass, darkClass))}</script>
   </head>
   <body>
     <div id="root">${dangerouslySkipEscape(html)}</div>

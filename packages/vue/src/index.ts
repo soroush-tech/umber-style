@@ -10,13 +10,20 @@ export const {
   useStyle,
   useTheme,
   ThemeProvider,
+  ThemeScope,
+  useThemeClass,
   apply,
+  css,
   themeClass,
   when,
   whenScheme,
+  keyframes,
+  globalStyles,
+  Global,
 } = defaults
 
 export { add, alpha, at, divide, multiply, negate, subtract } from '@umber-style/core'
+export { CacheProvider } from './CacheProvider'
 export * from './createStyle'
 export * from './defaultStyle'
 export * from './types'

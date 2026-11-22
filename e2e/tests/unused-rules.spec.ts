@@ -2,7 +2,7 @@ import type { APIRequestContext } from '@playwright/test'
 import type { FixtureConfig } from '../fixtures'
 import { PAGE_NAMES, waitForHydrated, writeReport } from '../helpers/navigation'
 import { collectUnusedRules } from '../helpers/rules'
-import { scenario, test, expect } from '../helpers/test'
+import { requireScenario, test, expect } from '../helpers/test'
 
 // Scenario E: on landing, the engine's style holds no rule that the page does not use. The first test
 // of each page measures and writes the numbers; the second asserts zero. A fixture that renders
@@ -20,7 +20,7 @@ for (const name of PAGE_NAMES) {
     request,
     fixture,
   }, info) => {
-    scenario('E', fixture, info, 'E-measure')
+    requireScenario('E', fixture, info, 'E-measure')
     await warmUp(request, fixture)
     const report = await collectUnusedRules(page, async () => {
       await page.goto(fixture.routes[name])
@@ -45,7 +45,7 @@ for (const name of PAGE_NAMES) {
     request,
     fixture,
   }, info) => {
-    scenario('E', fixture, info, `E:${name}`)
+    requireScenario('E', fixture, info, `E:${name}`)
     await warmUp(request, fixture)
     const report = await collectUnusedRules(page, async () => {
       await page.goto(fixture.routes[name])

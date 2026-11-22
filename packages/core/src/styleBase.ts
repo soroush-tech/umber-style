@@ -5,8 +5,9 @@ export function isStyleFunction(style: StyleInput): style is StyleFunction<never
   return typeof style === 'function'
 }
 
-/** Whether a style result adds no declaration of its own: nothing, or an object with no key but `label`. */
+/** Whether a style result adds no declaration of its own: nothing, an object with no key but `label`, or a list of such results. */
 function isEmptyResult(result: StyleResult): boolean {
+  if (Array.isArray(result)) return result.every(isEmptyResult)
   return !result || Object.keys(result).every((key) => key === 'label')
 }
 

@@ -39,9 +39,59 @@ describe('createThemeView', () => {
     const { engine } = setup()
     const other = { ...theme }
     expect(engine.createThemeView(other)).toBe(engine.createThemeView(other))
-    expect(engine.createThemeView(other)).not.toBe(engine.createThemeView({ ...theme }))
     expect(engine.createThemeView(theme)).toBe(engine.createThemeView(theme))
     expect(engine.refs.breakpoints).toBe(theme.breakpoints)
+  })
+
+  it('is the same object for themes that differ only in the values of their variables', () => {
+    const { engine } = setup()
+    const first = engine.createThemeView({ ...theme })
+    const dark = { ...theme, palette: { primary: '#000080' }, space: [0, 8] }
+    expect(engine.createThemeView(dark)).toBe(first)
+    expect(engine.createThemeView({ ...theme, breakpoints: ['300px'] })).not.toBe(first)
+    expect(engine.createThemeView({ ...theme, format: () => 'x' })).not.toBe(first)
+  })
+
+  it('compares the members that are not enumerable, and the accessors, of a raw value', () => {
+    const { engine } = setup()
+    const withHelper = (helper: () => string) =>
+      Object.defineProperty({ values: ['600px'] }, 'up', { value: helper })
+    const up = () => 'up'
+    const first = engine.createThemeView({ ...theme, breakpoints: withHelper(up) as never })
+    expect(engine.createThemeView({ ...theme, breakpoints: withHelper(up) as never })).toBe(first)
+    expect(
+      engine.createThemeView({ ...theme, breakpoints: withHelper(() => 'other') as never })
+    ).not.toBe(first)
+    const get = () => 1
+    const withGetter = (getter: () => number) => Object.defineProperty({}, 'size', { get: getter })
+    const byGetter = engine.createThemeView({ ...theme, components: withGetter(get) as never })
+    expect(engine.createThemeView({ ...theme, components: withGetter(get) as never })).toBe(
+      byGetter
+    )
+    expect(engine.createThemeView({ ...theme, components: withGetter(() => 2) as never })).not.toBe(
+      byGetter
+    )
+    expect(engine.createThemeView({ ...theme, components: { size: 1 } as never })).not.toBe(
+      byGetter
+    )
+    expect(engine.createThemeView({ ...theme, components: Object.create(null) })).not.toBe(byGetter)
+    expect(
+      engine.createThemeView({
+        ...theme,
+        components: { Button: { size: 'small' }, more: 1 } as never,
+      })
+    ).not.toBe(first)
+  })
+
+  it('keeps a few recent views, and forgets them for a new base theme', () => {
+    const { engine } = setup()
+    const first = engine.createThemeView({ ...theme, isDense: true })
+    for (let index = 0; index < 8; index++)
+      engine.createThemeView({ ...theme, format: () => `${index}` })
+    expect(engine.createThemeView({ ...theme, isDense: true })).not.toBe(first)
+    const kept = engine.createThemeView({ ...theme, isDense: true })
+    engine.setTheme({ ...theme })
+    expect(engine.createThemeView({ ...theme, isDense: true })).not.toBe(kept)
   })
 })
 

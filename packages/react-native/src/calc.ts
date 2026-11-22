@@ -1,3 +1,5 @@
+import { readNumber } from './units'
+
 /** What arithmetic on tokens takes on React Native: a number, a numeric string, or a percentage string. */
 export type Operand = string | number
 
@@ -16,15 +18,13 @@ interface Reading {
   isPercent: boolean
 }
 
-const NUMBER_PATTERN = /^(-?(?:\d+(?:\.\d*)?|\.\d+))(px|%)?$/i
-
 /** `value` rounded so that float noise (0.1 * 3) does not show; `-0` is `0`. */
 function tidy(value: number): number {
   return Math.round(value * 1e6) / 1e6 + 0
 }
 
 /** The error for a `value` that React Native cannot compute: the helper and the value are in the message. */
-function unsupported(name: string, value: unknown): TypeError {
+function createUnsupportedError(name: string, value: unknown): TypeError {
   return new TypeError(
     `@umber-style/react-native: ${name}() cannot compute ${JSON.stringify(value)}; it takes a number, a numeric string ("8", "8px") or a percentage ("50%"), and a percentage cannot be mixed with a number`
   )
@@ -44,15 +44,18 @@ function assertFinite(name: string, what: string, value: unknown): asserts value
   }
 }
 
-/** The number of `operand`, and whether it is a percentage; anything else cannot be computed. */
+/**
+ * The number of `operand`, and whether it is a percentage; anything else cannot be computed. A string is
+ * read as a style value is converted (`readNumber`), but `rem` is refused: a helper has no base for it.
+ */
 function read(name: string, operand: unknown): Reading {
   if (typeof operand !== 'string') {
     assertFinite(name, 'a value', operand)
     return { value: operand, isPercent: false }
   }
-  const match = NUMBER_PATTERN.exec(operand.trim())
-  if (match === null) throw unsupported(name, operand)
-  return { value: Number.parseFloat(match[1]), isPercent: match[2] === '%' }
+  const reading = readNumber(operand)
+  if (reading === undefined || reading.unit === 'rem') throw createUnsupportedError(name, operand)
+  return { value: reading.value, isPercent: reading.unit === '%' }
 }
 
 /** `value` as the percentage that a style takes. */
@@ -82,7 +85,7 @@ function sum(name: string, terms: readonly Term[]): number | Percent {
   const isPercent = readings.some((reading) => reading.isPercent)
   let total = 0
   for (const { operand, sign, value, isPercent: isPercentValue } of readings) {
-    if (isPercentValue !== isPercent && operand !== 0) throw unsupported(name, operand)
+    if (isPercentValue !== isPercent && operand !== 0) throw createUnsupportedError(name, operand)
     total += sign * value
   }
   return isPercent ? toPercent(total) : tidy(total)

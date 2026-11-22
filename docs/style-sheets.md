@@ -1,6 +1,6 @@
 # Style sheets and the style prop
 
-After this page you can keep named styles in a sheet, apply them to styled components and plain elements, override a component from outside, and write one component source that runs on the web and on React Native.
+After this page you can keep named styles in a sheet, make one style once with `css()` and pass it around, apply them to styled components and plain elements, override a component from outside, and write one component source that runs on the web and on React Native.
 
 ## `StyleSheet.create` and `useStyle`
 
@@ -71,17 +71,17 @@ These are two classes, because one class name cannot be in two layers. Each is w
 
 ## The `style` prop of a styled component
 
-A component made by `styled()` takes `style`, and this is the engine's own API, not an inline style. It takes sheet entries and style objects, in arrays, with `false`, `null` and `undefined` dropped. All of it is merged, in order, into one class, and **no `style` attribute is rendered**. A string is an error, because a string cannot be merged.
+A component made by `styled()` takes `style`, and this is the engine's own API, not an inline style. It takes sheet entries and style objects, in arrays, with `false`, `null` and `undefined` dropped. All of it is merged, in order, into one class, and no `style` attribute is rendered. A string is an error, because a string cannot be merged.
 
 The rendered `Box` is:
 
 ```html
-<div class="umber-theme-p5e9bg umber-boundary umber-scope">
-  <div class="umber-card-root-1l5hymm umber-card-root-qkafnl">
-    <p class="umber-qdsl9p">a plain element</p>
-  </div>
+<div class="umber-card-root-1l5hymm umber-card-root-qkafnl">
+  <p class="umber-qdsl9p">a plain element</p>
 </div>
 ```
+
+(The provider around it is the outermost one: it renders no element, and its theme is on `:root`.)
 
 and the rules for the card:
 
@@ -102,7 +102,18 @@ and the rules for the card:
 
 The component has two classes: its own (`umber-card-root-1l5hymm`) and one override class for everything it was given from outside. A component that has props-dependent styles has a base class and a props class instead of the one, see [Cascade layers and overrides](cascade-layers.md). The override class is in a later cascade layer, so it wins.
 
-Here three things were given (two entries and an object), so they are merged into one new class, which keeps the label of the component. When exactly **one** sheet entry is given, and nothing else that needs merging (no plain object, no second entry, no engine class in `className`), the entry's own class is the override class: no second class is made, and the same entry given to ten components is one rule. Class names that are not the engine's do not count: they pass through.
+Here three things were given (two entries and an object), so they are merged into one new class, which keeps the label of the component. When exactly one sheet entry is given, and nothing else that needs merging (no plain object, no second entry, no engine class in `className`), the entry's own class is the override class: no second class is made, and the same entry given to ten components is one rule. Class names that are not the engine's do not count: they pass through.
+
+### How long a class of `style` lives
+
+| Given in `style`                               | Result                                                             |
+| ---------------------------------------------- | ------------------------------------------------------------------ |
+| a `StyleSheet.create` entry or a `css()` value | its own cached class, permanent, shared by every user              |
+| a plain object, `{ width: x }`                 | a class for that value, removed when no element uses it            |
+| a list of both                                 | one merged class, removed when unused; the entry's own class stays |
+| anything on a plain element                    | the framework's own `style` attribute; the engine is not involved  |
+
+In the browser, an element that is given a plain object counts the class it renders, and the class is removed from the sheet one macrotask after the last element lets it go: a value that changes leaves no class behind. Two elements with the same value share the class. On a server nothing is removed. See "A value that changes" in [No inline styles](no-inline-styles.md) for what it costs.
 
 The `style` prop is only for components made by `styled()`. On a plain element, `style` is the platform's own prop: a sheet entry there is not turned into a class (and writes no style attribute, see [No inline styles](no-inline-styles.md)), and the types reject it. Use `apply` for a plain element.
 
@@ -115,6 +126,42 @@ The `style` prop is only for components made by `styled()`. On a plain element, 
 - React Native: `{ style: [...] }`, an array of the entries that are not falsy.
 
 On the web, `apply` also takes class names as strings and passes foreign ones through: `apply(styles.box, 'external')` is `external` followed by the engine class. The entries are merged into one class, with the last winning.
+
+## `css()`
+
+`css(...styles)` makes one style, once, for a module to pass around. It takes style objects, `css()` values and sheet entries, and lists of them, with `false`, `null` and `undefined` dropped, and merges them in order, the last winning. Used as a tag, it reads the template as CSS text (see [Writing styles](writing-styles.md)). It is exported by `@umber-style/react` (both builds), `@umber-style/vue`, `@umber-style/react-native`, `umber-style/react` and `umber-style/vue`, and is on what `createStyle()` returns.
+
+```tsx
+const { css, styled, apply } = createStyle(theme, { prefix: 'umber' })
+
+const card = css({ padding: 8, borderRadius: 4 })
+const danger = css(card, { backgroundColor: 'firebrick' })
+const raised = css`
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+`
+
+const Button = styled('button', { name: 'Button' })(card, { color: 'white' })
+
+const App = () => (
+  <>
+    <Button style={danger}>Delete</Button>
+    <p className={String(raised)}>raised</p>
+    <p {...apply(card, raised)}>both</p>
+  </>
+)
+```
+
+On the web the value is a sheet entry of the merged style: an entry like one of `StyleSheet.create`, with the same rules for when its rule is written (above). Equal styles give the same class, however they were written. It goes:
+
+- where a class name goes, as text: `String(value)` and `value.className` are its class name. React and Vue would turn it into text themselves, but React types `className` as a string, and Vue reads an object given to `class` as a map of class names, so `class: value` gives no class: write `String(value)` or `apply(value)`;
+- in the `style` prop of a styled component, alone (its own class in the `overrides` layer, permanent, shared by every user) or in a list (merged with the rest);
+- in another `css()`, in `apply`, among the styles of `styled` (`Button` above), and under a selector of global styles (`{ body: value }`).
+
+A function is a `TypeError`: `css()` has no props to call it with. Give a function style to `styled`.
+
+`css` of the default style (`import { css } from '@umber-style/react'`) can be called at module level before `configure()`: the value stands for the entry, which is made on its first use, with the options that `configure` gave. `css` of `createStyle()` makes the entry at once.
+
+On React Native `css()` returns the merged native style: each style is turned into a native style as a sheet entry is (lengths in `px` and `rem` become numbers, web-only keys are dropped), then merged, the last key winning. It goes in `style`, and the template form is read the same way: see [React Native](react-native.md).
 
 ## Overriding a component
 
@@ -187,7 +234,7 @@ Without layers (`hasLayers: false`) there is one merged class and the order of t
 
 ## One component source for web and mobile
 
-`umber-style/react` is the entry for code that runs on the web and on React Native. Under the `react-native` export condition it is the React Native binding at run time, and for the compiler it is always the same set of types, so one source type-checks the same under both. The names it has are the ones both bindings have: `styled`, `StyleSheet`, `useStyle`, `apply`, `ThemeProvider`, `useTheme`, `themeClass`, `when`, `whenScheme`, `configure`, `createStyle`, `createDefaultStyle`, `alpha`, `at` and the arithmetic helpers. Web-only members (`getEngine`, `engine`, `cache`) are not in its types: import them from `@umber-style/react`.
+`umber-style/react` is the entry for code that runs on the web and on React Native. Under the `react-native` export condition it is the React Native binding at run time, and for the compiler it is always the same set of types, so one source type-checks the same under both. The names it has are the ones both bindings have: `styled`, `StyleSheet`, `useStyle`, `apply`, `css`, `ThemeProvider`, `useTheme`, `themeClass`, `when`, `whenScheme`, `configure`, `createStyle`, `createDefaultStyle`, `alpha`, `at`, the arithmetic helpers, `keyframes`, `globalStyles` and `Global` (on React Native the last three compile and do nothing: see [Animations and global styles](animations-and-global-styles.md)). Web-only members (`getEngine`, `engine`, `cache`) are not in its types: import them from `@umber-style/react`.
 
 A tag name works on the web and throws on React Native, so a shared source gets its elements from a module that each platform resolves on its own. React Native's bundler picks `host.native.ts` over `host.ts`:
 
@@ -260,6 +307,11 @@ A sheet entry in the `style` prop only works on a component made by `styled()`. 
 - A length with a unit (`'10px'`) and a shorthand with several values type-check in shared code, because the platform's own types accept any string there. React Native warns about them in development; the web writes what you give.
 - An object sheet cannot use tokens, and on React Native it drops `when()` and `whenScheme()` keys. Both need a function sheet and `useStyle`.
 - The rule that one entry given alone is the override class holds with layers; without layers it is merged.
+- A class made from a plain object is removed only in the browser and only by a sheet that can remove rules. Each new value of such an object writes one rule and later removes one: slower than a style attribute.
+- The override class is in the `overrides` layer, so an `!important` rule of the app, or CSS outside the engine's layers, wins over it. A style attribute would win over every normal rule.
+- A `css()` value of the default style is a stand-in until its first use: any use (a read, a spread, `in`, a listing of its keys) makes it. A template given to it is read then, so a template that cannot be read throws at that first use, not at the call. A value given to `globalStyles` at module level is used there (the id of the global styles is made from it), so it makes the default style's engine, and a `configure()` after that throws.
+- `css()` takes no class name as a string, and no sheet entry that is only a class name (one that a cache did not make): both are errors, because their style is not known.
+- In a template a `css()` value is merged only when it stands alone on its line; see the limits of [Writing styles](writing-styles.md).
 - A shared source that uses `useStyle` or function sheets resolves them with the platform's own rules: on the web, entries are classes, on React Native they are registered objects.
 - The `host.native.ts` file was compiled in the React Native package, against the real `react-native` types, apart from the shared source that imports `./host`.
 - The shared source was run on the web in a test, and its React Native half is covered by the repository's test of one source on both platforms (`packages/umber-style/src/sharedSource.test.tsx`), which uses a stand-in for the platform.

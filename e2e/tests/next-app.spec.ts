@@ -1,6 +1,10 @@
 import { collectComputedStyles } from '../helpers/computedStyles'
-import { loadPage, navigateInBrowser, writeReport } from '../helpers/navigation'
-import { ENGINE_STYLE_SELECTOR, findMissingStyles } from '../helpers/rules'
+import { loadPage, navigateInBrowser, waitForHydrated, writeReport } from '../helpers/navigation'
+import {
+  collectKeyframesAndGlobals,
+  ENGINE_STYLE_SELECTOR,
+  findMissingStyles,
+} from '../helpers/rules'
 import { test, expect } from '../helpers/test'
 
 // Checks that only make sense for Next.js with the App Router: server components and client
@@ -103,10 +107,12 @@ test('(iii) a component has the same class names as a server component and as a 
   expect(client).toBe(server)
 })
 
-test('(iv) a server component reads the root theme of the request', async ({ page }) => {
+test('(iv) a server component reads the base theme, not the theme of the root provider', async ({
+  page,
+}) => {
   await page.goto('/probe')
   // The root layout of this route gives 641px; the base theme of the engine has 600px.
-  await expect(page.getByTestId('read-theme')).toHaveText('641px')
+  await expect(page.getByTestId('read-theme')).toHaveText('600px')
 })
 
 test('(v) client-side navigation between routes keeps everything styled', async ({
@@ -123,5 +129,44 @@ test('(v) client-side navigation between routes keeps everything styled', async 
     ).toEqual([])
     const styles = await collectComputedStyles(page)
     expect(styles[`page-${name}`].paddingLeft, `${name}: the page frame is styled`).not.toBe('0px')
+  }
+})
+
+test('(vi) a global rule that a server component wrote is gone after a navigation away from its page', async ({
+  page,
+}) => {
+  await page.goto('/stream')
+  await page.getByTestId('late').waitFor()
+  await waitForHydrated(page)
+  const heading = page.locator('[data-testid="page-stream"] h1')
+  await expect(heading).toHaveCSS('text-decoration-line', 'underline')
+  const countStreamRules = async () =>
+    (await collectKeyframesAndGlobals(page)).globals.filter((text) =>
+      text.startsWith('[data-testid="page-stream"] h1')
+    ).length
+  expect(await countStreamRules(), 'the global rule of the stream page').toBe(1)
+  // The rule came as a style element, which React keeps for the life of the document; the client
+  // component that the server's Global renders after it lets the browser's cache take the rule over,
+  // and deletes it from that element's sheet when the page is left. Scenario M's variant (b) is the
+  // same case with a rule that matches the bar of the shell.
+  await navigateInBrowser(page, 'home')
+  await expect
+    .poll(countStreamRules, { message: 'the global rule of the stream page, on home' })
+    .toBe(0)
+})
+
+test('(vii) a global rule that the root layout renders in a server component stays on every page', async ({
+  page,
+  fixture,
+}) => {
+  // The base styles of the shell: a server component of the root layout, which never unmounts.
+  await loadPage(page, fixture, 'home')
+  const countLayoutRules = async () =>
+    (await collectKeyframesAndGlobals(page)).globals.filter((text) => text.startsWith('#app-root'))
+      .length
+  expect(await countLayoutRules(), 'the global rule of the layout').toBe(1)
+  for (const name of ['catalog', 'settings', 'home'] as const) {
+    await navigateInBrowser(page, name)
+    expect(await countLayoutRules(), `the global rule of the layout, on ${name}`).toBe(1)
   }
 })

@@ -16,9 +16,12 @@ describe('theme conditions in Vue', () => {
       ...at(whenScheme('dark'), { boxShadow: 'none' }),
     })
     const root = document.createElement('div')
-    createApp(() => h(ThemeProvider, { theme: dark, colorScheme: 'dark' }, () => h(Card))).mount(
-      root
-    )
+    // The outermost provider renders no element: the dark one is nested under it.
+    createApp(() =>
+      h(ThemeProvider, { theme: base }, () =>
+        h(ThemeProvider, { theme: dark, colorScheme: 'dark' }, () => h(Card))
+      )
+    ).mount(root)
     const wrapper = root.firstElementChild as HTMLElement
     expect(wrapper.className).toBe(`${engine.themeClass(dark, 'dark')} v-scope`)
     const card = wrapper.firstElementChild?.className as string

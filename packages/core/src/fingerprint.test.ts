@@ -13,6 +13,7 @@ const base: FingerprintOptions = {
   hasBaseClass: true,
   hasScope: true,
   hasColorFallbacks: true,
+  hasValueRepair: false,
   tokens: '',
 }
 
@@ -43,5 +44,25 @@ describe('the fingerprint of the options', () => {
   it('treats an option that a stamp lacks as different', () => {
     const message = describeFingerprintDifferences('p=umber', createFingerprint(base))
     expect(message).toContain('hasScope (server: , browser: 1)')
+  })
+
+  it('writes hasValueRepair only when it is on, so that a stamp without it stays the same text', () => {
+    expect(createFingerprint({ ...base, hasValueRepair: true })).toBe(
+      'p=umber;x=;l=1;y=1;r=1;b=1;s=1;f=1;v=1;t='
+    )
+  })
+
+  it('reads a stamp that lacks hasValueRepair as off, and names it when the other has it on', () => {
+    const off = createFingerprint(base)
+    const on = createFingerprint({ ...base, hasValueRepair: true })
+    expect(describeFingerprintDifferences(off, off)).toBe('')
+    expect(describeFingerprintDifferences(on, on)).toBe('')
+    expect(describeFingerprintDifferences(on, off)).toContain(
+      'Differing options: hasValueRepair (server: 1, browser: 0).'
+    )
+    expect(describeFingerprintDifferences(off, on)).toContain(
+      'Differing options: hasValueRepair (server: 0, browser: 1).'
+    )
+    expect(describeFingerprintDifferences('p=umber', off)).not.toContain('hasValueRepair')
   })
 })

@@ -3,7 +3,7 @@ import { createStyle } from '@umber-style/vue'
 
 // One style for the server and the browser: the same prefix and themes make the same class names.
 export const style = createStyle(lightTheme, { prefix: 'umber' })
-export const { styled, ThemeProvider, themeClass } = style
+export const { styled, ThemeProvider, themeClass, Global, keyframes, globalStyles } = style
 
 export const lightClass = themeClass(lightTheme, 'light')
 export const darkClass = themeClass(darkTheme, 'dark')

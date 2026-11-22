@@ -1,6 +1,7 @@
 import { test as base, expect, type Page } from '@playwright/test'
 import { fixtureByName, type FixtureConfig } from '../fixtures'
 
+/** What `collectConsoleProblems` gathers from a page. */
 export interface ProblemWatcher {
   /** The console errors, hydration warnings and uncaught errors seen so far. */
   readonly problems: string[]
@@ -42,7 +43,7 @@ export const test = base.extend<{ fixture: FixtureConfig; watcher: ProblemWatche
 export { expect }
 
 /** Runs a test only for the fixtures that have the scenario; and marks it as a known failure when the fixture says so. */
-export function scenario(
+export function requireScenario(
   letter: string,
   fixture: FixtureConfig,
   info: {

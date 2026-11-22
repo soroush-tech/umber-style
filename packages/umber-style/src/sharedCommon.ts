@@ -1,21 +1,32 @@
 // What the types of `umber-style/react` share under every export condition: the styling that runs on the
-// web and on React Native, apart from the theme hook (`useTheme` in `shared.ts`, `readTheme` in
-// `shared.server.ts`). This file holds types and declarations only: it is never loaded.
+// web and on React Native, `useTheme` with it, and in server components (`shared.server.ts` adds
+// `readTheme`, `shared.ts` the context and the portal helpers). This file holds types and declarations
+// only: it is never loaded.
 import type { ComponentProps, ElementType, FunctionComponent, ReactElement } from 'react'
 import type {
   ColorScheme,
   DeepPartial,
+  GlobalStyles,
+  GlobalStylesInput,
+  KeyframesInput,
+  KeyframesOptions,
   NestedKey,
   SchemeKey,
   SchemeName,
   SheetEntry,
-  Theme,
+  StaticTemplateValue,
   ThemeKey,
   WebNested,
   WebProperties,
   WebStyleObject,
 } from '@umber-style/core'
-import type { DefaultStyleOptions, StyledOptions, ThemeProviderProps } from '@umber-style/react'
+import type {
+  DefaultStyleOptions,
+  GlobalProps,
+  StyledOptions,
+  Theme,
+  ThemeProviderProps,
+} from '@umber-style/react'
 import type { NativeStyleObject } from '@umber-style/react-native'
 
 /** The keys that the web style and the native style both have. */
@@ -72,11 +83,13 @@ export type SharedStyleProp =
   | undefined
   | readonly SharedStyleProp[]
 
+/** A component that `styled` made in shared code: the props of its tag and its own, with `as` and a shared `style`. */
 export type SharedStyledComponent<C extends ElementType, P extends object> = FunctionComponent<
   Omit<ComponentProps<C>, keyof P | 'as' | 'style'> &
     P & { as?: ElementType; style?: SharedStyleProp }
 >
 
+/** `styled` in shared code: a tag or a component and its options, then the styles of the component. */
 export type SharedStyled<T> = <C extends ElementType>(
   tag: C,
   options?: StyledOptions
@@ -84,9 +97,11 @@ export type SharedStyled<T> = <C extends ElementType>(
 
 /** A set of named styles; it only carries the types. */
 export interface SharedSheetDefinition<S extends SharedSheetStyles> {
+  /** Never set: it only gives the sheet the names of its entries. */
   readonly entries?: { [K in keyof S]: SharedEntry }
 }
 
+/** `StyleSheet` in shared code: it makes sheets of named styles. */
 export interface SharedStyleSheet<T> {
   /** A sheet given as an object is its entries, usable at once, with no hook and no theme. */
   create<K extends string>(styles: SharedObjectSheet<K>): { readonly [P in K]: SharedEntry }
@@ -98,49 +113,103 @@ export interface SharedStyleSheet<T> {
 
 /** The props that apply entries to a styled component: a class name on the web, a style array on React Native. */
 export interface SharedApplied {
+  /** The class names of the entries, on the web. */
   className?: string
+  /** The entries, on React Native. */
   style?: readonly SharedEntry[]
 }
 
+/** What `css()` takes in shared code: shared style objects, entries and `css()` results, nothing, and lists of them. */
+export type SharedCssArgument =
+  | SharedStyleObject
+  | SharedEntry
+  | false
+  | null
+  | undefined
+  | readonly SharedCssArgument[]
+
+/**
+ * `css()` in shared code: one style made once and passed around, from styles or from a tagged template. On
+ * the web it is a sheet entry (its text is its class name), on React Native the merged native style.
+ */
+export interface SharedCss {
+  // The styles last, so that a mistake in a style object is reported against a style.
+  (template: TemplateStringsArray, ...values: StaticTemplateValue[]): SharedEntry
+  (...styles: SharedCssArgument[]): SharedEntry
+}
+
+/** `apply` in shared code: the props that put sheet entries and class names on a styled component. */
 export type SharedApply = (
   ...entries: (SharedEntry | string | null | undefined | false)[]
 ) => SharedApplied
 
-/** The styling of one theme shape without its theme hook: the names that both platforms have. */
+/** The styling of one theme shape: the names that both platforms and server components have. */
 export interface SharedStyleBase<T> {
+  /**
+   * The real theme values. In a component of the client: of the nearest provider, else the base theme,
+   * else an empty object. In a server component: the base theme, the same in every render; mark a
+   * component `'use client'` for the nearest provider's values, its code unchanged.
+   */
+  useTheme(): T
+  /** Makes a styled component of a tag or a component. */
   styled: SharedStyled<T>
+  /** Makes sheets of named styles. */
   StyleSheet: SharedStyleSheet<T>
   /** The entries of a sheet; an object sheet is its own entries and is returned as it is. */
   useStyle<K extends string>(sheet: { readonly [P in K]: SharedEntry }): {
     readonly [P in K]: SharedEntry
   }
+  /** The entries of a sheet made from a function of the theme, resolved against the nearest provider. */
   useStyle<S extends SharedSheetStyles>(
     sheet: SharedSheetDefinition<S>
   ): { [K in keyof S]: SharedEntry }
+  /** The props that put sheet entries on a styled component: a class name on the web, a style array on React Native. */
   apply: SharedApply
+  /** One style made once and passed around: a sheet entry on the web, the merged native style on React Native. Pass it on; do not read it. */
+  css: SharedCss
+  /** Gives the subtree a theme, merged over the theme above. */
   ThemeProvider(props: ThemeProviderProps<T>): ReactElement
+  /** On the web, the class string of a theme (and a color scheme), for an element the app renders itself; on React Native, an empty string. */
   themeClass(theme: DeepPartial<T>, colorScheme?: ColorScheme): string
   /** A style key for "the nearest theme is this theme", at the top of a style or inside `web` or `native`. On the web it needs `@scope`; on React Native it matches the theme object of the nearest provider. */
   when(theme: DeepPartial<T>, colorScheme?: ColorScheme): ThemeKey
   /** A style key for "the nearest color scheme is this one": the nearest theme given that `colorScheme`, else the system preference. */
   whenScheme(scheme: SchemeName): SchemeKey
+  /** Registers an animation and returns its name, for `animationName` or `animation` in the `web` part. On React Native the name only: nothing runs it. */
+  keyframes(steps: KeyframesInput<T>, options?: KeyframesOptions): string
+  /** Makes global styles and returns their handle, for `Global`. */
+  globalStyles(styles: GlobalStylesInput<T>): GlobalStyles<T>
+  /** Writes global styles while it is rendered, on the web; renders nothing and does nothing on React Native. */
+  Global(props: GlobalProps<T>): ReactElement | null
 }
 
-export type { DefaultStyleOptions, StyledOptions, ThemeProviderProps }
+export type { DefaultStyleOptions, GlobalProps, StyledOptions, ThemeProviderProps }
 export type { StyleOptions } from '@umber-style/react'
 export type { SheetEntry, Theme }
-export type { AlphaColor, StyleObject } from '@umber-style/core'
+export type {
+  AlphaColor,
+  GlobalInput,
+  GlobalStyleObject,
+  GlobalStyles,
+  KeyframesSteps,
+  StyleObject,
+} from '@umber-style/core'
 export type { NestedKey, SchemeKey, SchemeName, ThemeKey, WebNested, WebProperties, WebStyleObject }
 
 export declare const configure: (options: DefaultStyleOptions) => void
 export declare const styled: SharedStyled<Theme>
 export declare const StyleSheet: SharedStyleSheet<Theme>
 export declare const useStyle: SharedStyleBase<Theme>['useStyle']
+export declare const useTheme: SharedStyleBase<Theme>['useTheme']
 export declare const ThemeProvider: SharedStyleBase<Theme>['ThemeProvider']
 export declare const apply: SharedApply
+export declare const css: SharedCss
 export declare const themeClass: SharedStyleBase<Theme>['themeClass']
 export declare const when: SharedStyleBase<Theme>['when']
 export declare const whenScheme: SharedStyleBase<Theme>['whenScheme']
+export declare const keyframes: SharedStyleBase<Theme>['keyframes']
+export declare const globalStyles: SharedStyleBase<Theme>['globalStyles']
+export declare const Global: SharedStyleBase<Theme>['Global']
 /** `color` at `opacity` (0 to 1): a CSS mix on the web, rgba() on React Native. */
 export declare const alpha: (color: string, opacity: number) => string
 /** `{ [key]: style }` typed so that it spreads into a web style, for a key that is computed: `web: { ...at(`@media (width >= ${bp})`, { gap: 16 }) }`. */

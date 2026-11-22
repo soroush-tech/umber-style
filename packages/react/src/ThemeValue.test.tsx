@@ -1,46 +1,40 @@
 import { render } from '@testing-library/react'
-import { NO_THEME_MESSAGE } from '@umber-style/core'
-import { createThemeValue } from './ThemeValue'
+import { createEngine, createLazyEngine, EMPTY_THEME } from '@umber-style/core'
+import { createThemeContexts, createThemeValue } from './ThemeValue'
 
 const base = { a: { b: 1, c: 2 } }
 
-describe('createThemeValue', () => {
-  it('merges a theme over the base of the holder, and over the provider above', () => {
-    const { ThemeValueProvider, useTheme } = createThemeValue({ baseTheme: base })
+describe('createThemeValue with no provider above', () => {
+  it('gives the base theme and its view, no wrapper class, and the children alone in ThemeScope', () => {
+    const engine = createEngine(base)
+    const { useTheme, useThemeView, useThemeClass, ThemeScope } = createThemeValue(
+      engine,
+      createThemeContexts()
+    )
     const seen: unknown[] = []
     const Probe = () => {
-      seen.push(useTheme())
-      return null
+      seen.push(useTheme(), useThemeView(), useThemeClass())
+      return <i />
     }
-    render(
-      <>
+    const { container } = render(
+      <ThemeScope>
         <Probe />
-        <ThemeValueProvider theme={{ a: { b: 5 } }}>
-          <ThemeValueProvider theme={{ a: { c: 7 } }}>
-            <Probe />
-          </ThemeValueProvider>
-        </ThemeValueProvider>
-      </>
+      </ThemeScope>
     )
-    expect(seen[0]).toBe(base)
-    expect(seen[1]).toEqual({ a: { b: 5, c: 7 } })
+    expect(seen).toEqual([base, engine.refs, undefined])
+    expect(container.innerHTML).toBe('<i></i>')
   })
 
-  it('takes the theme as it is when there is no base, and throws without a provider', () => {
-    const { ThemeValueProvider, useTheme } = createThemeValue<typeof base>({ baseTheme: undefined })
+  it('gives an empty theme, and its view, when there is no base theme either', () => {
+    const engine = createLazyEngine<typeof base>()
+    const { useTheme, useThemeView } = createThemeValue(engine, createThemeContexts())
     const seen: unknown[] = []
     const Probe = () => {
-      seen.push(useTheme())
+      seen.push(useTheme(), useThemeView())
       return null
     }
-    const theme = { a: { b: 9, c: 9 } }
-    render(
-      <ThemeValueProvider theme={theme}>
-        <Probe />
-      </ThemeValueProvider>
-    )
-    expect(seen[0]).toBe(theme)
-    vi.spyOn(console, 'error').mockImplementation(() => undefined)
-    expect(() => render(<Probe />)).toThrow(NO_THEME_MESSAGE)
+    render(<Probe />)
+    expect(seen[0]).toBe(EMPTY_THEME)
+    expect(seen[1]).toEqual({})
   })
 })

@@ -1,6 +1,7 @@
 import { at, createCache, createEngine, createMemorySheet } from '@umber-style/core'
 import { bindEngine } from './createStyle.server'
 import { findAll, resolveTree } from './vitest.resolveTree'
+import { playScopes } from './vitest.providerScope'
 import type { CacheFunction } from './serverContext'
 
 const base = { palette: { primary: '#0000ff', surface: '#ffffff' } }
@@ -27,7 +28,7 @@ describe('theme conditions in the server build', () => {
       ...at(when(dark), { border: '1px solid white' }),
       ...at(whenScheme('light'), { opacity: 0.5 }),
     })
-    const tree = await resolveTree(<Card>x</Card>)
+    const tree = playScopes(await resolveTree(<Card>x</Card>))
     const [card] = findAll(tree, 'div')
     const name = card.props.className as string
     const [element] = findAll(tree, 'style')
@@ -42,14 +43,19 @@ describe('theme conditions in the server build', () => {
 
   it('keys the theme element by the theme class, and puts every class on the wrapper', async () => {
     const { ThemeProvider, engine } = setup()
-    const tree = await resolveTree(
-      <ThemeProvider theme={dark} colorScheme="dark">
-        x
-      </ThemeProvider>
+    const tree = playScopes(
+      await resolveTree(
+        <ThemeProvider theme={base}>
+          <ThemeProvider theme={dark} colorScheme="dark">
+            x
+          </ThemeProvider>
+        </ThemeProvider>
+      )
     )
     const [wrapper] = findAll(tree, 'div')
     expect(wrapper.props.className).toBe(`${engine.themeClass(dark, 'dark')} s-scope`)
     const hrefs = findAll(tree, 'style').map((element) => element.props.href)
-    expect(hrefs).toEqual([engine.themeId(dark, 'dark'), 's-scope'])
+    // The outermost provider sends its root theme; the nested one its theme class and the scope.
+    expect(hrefs).toEqual([engine.declareRoot(base), engine.themeId(dark, 'dark'), 's-scope'])
   })
 })

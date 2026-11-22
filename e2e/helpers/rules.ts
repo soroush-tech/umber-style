@@ -23,6 +23,34 @@ export async function collectEngineRuleCount(page: Page): Promise<number> {
   }, ENGINE_STYLE_SELECTOR)
 }
 
+/** The animations and the global rules that the browser holds from the engine's style elements. */
+export interface KeyframesAndGlobals {
+  /** The name of each `@keyframes` rule of the engine's style elements, once for each rule. */
+  keyframes: string[]
+  /** The text of each rule in the global layer of the engine's style elements, once for each rule, as the browser writes it. */
+  globals: string[]
+}
+
+/** The `@keyframes` rules and the rules of the global layer that the browser parsed from the engine's style elements. */
+export async function collectKeyframesAndGlobals(page: Page): Promise<KeyframesAndGlobals> {
+  return page.evaluate(
+    ({ selector, layer }) => {
+      const keyframes: string[] = []
+      const globals: string[] = []
+      for (const element of document.querySelectorAll<HTMLStyleElement>(selector)) {
+        for (const rule of element.sheet?.cssRules ?? []) {
+          if (rule instanceof CSSKeyframesRule) keyframes.push(rule.name)
+          if (rule instanceof CSSLayerBlockRule && rule.name === layer) {
+            for (const inner of rule.cssRules) globals.push(inner.cssText)
+          }
+        }
+      }
+      return { keyframes, globals }
+    },
+    { selector: ENGINE_STYLE_SELECTOR, layer: `${ENGINE_PREFIX}-global` }
+  )
+}
+
 /** The number of engine style elements in the document. */
 export async function countEngineStyleElements(page: Page): Promise<number> {
   return page.evaluate(
@@ -31,11 +59,13 @@ export async function countEngineStyleElements(page: Page): Promise<number> {
   )
 }
 
+/** A rule of the engine's sheets that matched no element while the page loaded. */
 export interface UnusedRule {
   /** The text of the rule, as the sheet has it. */
   text: string
 }
 
+/** What `collectUnusedRules` reports: the rules counted, the unused ones, and the ones left out. */
 export interface RuleUsageReport {
   /** The rules that can be "used" at load: style rules of the engine's sheets, less the ignored ones. */
   total: number
@@ -58,8 +88,17 @@ export interface RuleUsageReport {
  * - `themeClass`: a theme class rule (`.umber-theme-*`) is offered for switching: the theme that is not
  *   applied at load is not used at load, and is meant to be there.
  * - `layerOrder`: the `@layer a, b, c;` statement has no selector.
+ * - `keyframes`: a step of a `@keyframes` rule is used by an animation, not matched to an element.
+ * - `fontFace`: a `@font-face` rule declares a font, it matches no element.
  */
-export type IgnoreReason = 'state' | 'media' | 'property' | 'themeClass' | 'layerOrder'
+export type IgnoreReason =
+  | 'state'
+  | 'media'
+  | 'property'
+  | 'themeClass'
+  | 'layerOrder'
+  | 'keyframes'
+  | 'fontFace'
 
 interface Entry {
   styleSheetId: string
@@ -93,9 +132,17 @@ export async function collectUnusedRules(
     unused: [],
     bytesTotal: 0,
     bytesUnused: 0,
-    ignored: { state: 0, media: 0, property: 0, themeClass: 0, layerOrder: 0 },
+    ignored: {
+      state: 0,
+      media: 0,
+      property: 0,
+      themeClass: 0,
+      layerOrder: 0,
+      keyframes: 0,
+      fontFace: 0,
+    },
   }
-  const viewportMatches = (query: string) =>
+  const matchesViewport = (query: string) =>
     page.evaluate((text) => matchMedia(text).matches, query).catch(() => true)
 
   for (const [styleSheetId, header] of headers) {
@@ -103,21 +150,21 @@ export async function collectUnusedRules(
     const { text } = await session.send('CSS.getStyleSheetText', { styleSheetId })
     // The protocol reports the rules that were used, and not the others: a rule is unused when the
     // text of the sheet has it and no used entry starts where it starts.
-    const used = new Set(
+    const usedStarts = new Set(
       (ruleUsage as Entry[])
         .filter((entry) => entry.styleSheetId === styleSheetId && entry.used)
         .map((entry) => entry.startOffset)
     )
     for (const rule of listRules(text)) {
       const around = rule.context.join(' ')
-      const reason = await ignoreReason(rule.text, around, viewportMatches)
+      const reason = await findIgnoreReason(rule.text, around, matchesViewport)
       if (reason) {
         report.ignored[reason] += 1
         continue
       }
       report.total += 1
       report.bytesTotal += rule.text.length
-      if (!used.has(rule.start)) {
+      if (!usedStarts.has(rule.start)) {
         report.unused.push({ text: rule.text })
         report.bytesUnused += rule.text.length
       }
@@ -177,10 +224,10 @@ async function isEngineSheet(session: CDPSession, ownerNode?: number): Promise<b
   }
 }
 
-async function ignoreReason(
+async function findIgnoreReason(
   ruleText: string,
   around: string,
-  viewportMatches: (query: string) => Promise<boolean>
+  matchesViewport: (query: string) => Promise<boolean>
 ): Promise<IgnoreReason | undefined> {
   if (
     /^\s*@property/.test(ruleText) ||
@@ -189,11 +236,13 @@ async function ignoreReason(
     return 'property'
   }
   if (/^\s*@layer\s[^{]*;?\s*$/.test(ruleText)) return 'layerOrder'
+  if (/(^|\s)@keyframes\s/.test(around)) return 'keyframes'
+  if (/^\s*@font-face\b/.test(ruleText)) return 'fontFace'
   const selector = ruleText.slice(0, ruleText.indexOf('{'))
   if (/\.umber-theme-[a-z0-9]+\b/.test(selector) && !/\s/.test(selector.trim())) return 'themeClass'
   if (STATE_PATTERN.test(selector)) return 'state'
   const media = /@media\s*([^{]*)\{/.exec(around)
-  if (media && !(await viewportMatches(media[1].trim()))) return 'media'
+  if (media && !(await matchesViewport(media[1].trim()))) return 'media'
   return undefined
 }
 
@@ -207,11 +256,17 @@ function readCheckerSource(): string {
   return checkerSource
 }
 
+/** A problem that `findMissingStyles` finds in the page: a problem of the core's checker. */
 export interface MissingStyle {
+  /** What is missing: a rule for a class, or a value for a variable. */
   kind: 'class-without-rule' | 'variable-without-value'
+  /** The class, or the variable. */
   name: string
+  /** A short description of the element: `tag[test id or id]`. */
   element: string
+  /** What is wrong, in a sentence. */
   message: string
+  /** What makes two problems the same one. */
   key: string
 }
 

@@ -32,9 +32,30 @@ describe('findMissingStyles', () => {
     expect(findMissingStyles(document.querySelector('p') as Element)).toEqual([])
   })
 
+  it('leaves out the theme class of a theme that declares nothing, which has no rule', () => {
+    addStyle('.u-a{color:red;}')
+    document.body.innerHTML = '<div class="u-theme-0 u-boundary u-scope"><p class="u-a"></p></div>'
+    expect(findMissingStyles().map(({ message }) => message)).toEqual([
+      'div[] has the class u-scope, which no rule names',
+    ])
+  })
+
   it('reads the rules of style elements that React hoisted, too', () => {
     addStyle('.u-a{color:red;}', 'data-precedence')
     document.body.innerHTML = '<p class="u-a"></p>'
+    expect(findMissingStyles()).toEqual([])
+  })
+
+  it('reads the rules of data-umber style elements, of classes and of the global key', () => {
+    addStyle('')
+    const classes = document.createElement('style')
+    classes.setAttribute('data-umber', 'u u-a')
+    classes.textContent = '.u-a{color:var(--u-x);}'
+    const global = document.createElement('style')
+    global.setAttribute('data-umber', 'u-global u-theme-1')
+    global.textContent = '.u-theme-1{--u-x:red;}'
+    document.head.append(classes, global)
+    document.body.innerHTML = '<div class="u-theme-1"><p class="u-a"></p></div>'
     expect(findMissingStyles()).toEqual([])
   })
 
@@ -110,6 +131,45 @@ describe('findMissingStyles', () => {
     )
     document.body.innerHTML = '<p class="u-a"></p>'
     expect(findMissingStyles().map((problem) => problem.name)).toEqual(['--u-x'])
+  })
+
+  it('finds a global rule for html, body or :root that uses a variable which nothing above declares', () => {
+    addStyle(
+      '@layer u-global{body{color:var(--u-x);margin:var(--u-y);padding:var(--u-z, 1px);}}' +
+        ':root{background:var(--u-y);}body:hover{color:var(--u-q);}.body{color:var(--u-q);}' +
+        '*{border-color:var(--u-q);}html body p{color:var(--u-q);}body .u-a{color:var(--u-q);}' +
+        'html{font-family:serif;}'
+    )
+    document.body.innerHTML = '<p></p>'
+    const problems = findMissingStyles()
+    expect(problems.map((problem) => problem.message)).toEqual([
+      'html[] has no value for --u-y, which the global rule :root uses: a rule for html or body sees the variables of a theme declared on :root (the outermost provider) or on <html> (its theme class)',
+      'body[] has no value for --u-x, --u-y, which the global rule body uses: a rule for html or body sees the variables of a theme declared on :root (the outermost provider) or on <html> (its theme class)',
+    ])
+    expect(problems[1]).toMatchObject({
+      kind: 'root-without-theme',
+      name: '--u-x',
+      element: 'body[]',
+      key: 'root:body',
+    })
+  })
+
+  it('finds no problem in a global rule when the theme class is on <html>, and leaves body with a class to the other check', () => {
+    addStyle('.u-t{--u-x:1;}body{color:var(--u-x);}.u-a{color:red;}')
+    document.documentElement.className = 'u-t'
+    expect(findMissingStyles()).toEqual([])
+    document.documentElement.className = ''
+    document.body.className = 'u-a'
+    expect(findMissingStyles()).toMatchObject([
+      { kind: 'variable-without-value', key: 'variable:--u-x:body' },
+    ])
+    document.body.className = ''
+  })
+
+  it('finds no problem in a global rule when the root theme declares the variables on :root', () => {
+    addStyle('@layer u-theme{:where(:root){--u-x:1;}}@layer u-global{html,body{color:var(--u-x);}}')
+    document.body.innerHTML = '<p></p>'
+    expect(findMissingStyles()).toEqual([])
   })
 
   it('ignores a style element that has no sheet', () => {

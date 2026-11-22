@@ -180,7 +180,8 @@ describe('an entry that a framework merged with others', () => {
 describe('createSheetEntry with a source', () => {
   it('reads its class name through the source, so that it is written when it is read', () => {
     const use = vi.fn(() => 'used')
-    const entry = createSheetEntry('named', { style: { color: 'red' }, use })
+    const { cache } = setup()
+    const entry = createSheetEntry('named', { style: { color: 'red' }, cache, use })
     expect(use).not.toHaveBeenCalled()
     expect(entry.className).toBe('used')
     expect(`${entry}`).toBe('used')

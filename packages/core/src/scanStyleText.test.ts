@@ -62,6 +62,16 @@ describe('scanStyleText', () => {
     expect(scanStyleText('u', text).classes.size).toBe(0)
   })
 
+  it('finds the names of @keyframes rules, empty ones too, and the variables their steps use', () => {
+    const text =
+      '@keyframes fade-1a{0%{opacity:0;}100%{color:var(--u-x);}}@keyframes  empty-2b {}' +
+      '@layer u-components{.u-a{animation:fade-1a 1s;}}'
+    const found = scanStyleText('u', text)
+    expect(found.keyframes).toEqual(new Set(['fade-1a', 'empty-2b']))
+    expect([...found.classes]).toEqual(['u-a'])
+    expect([...found.variables]).toEqual(['--u-x'])
+  })
+
   it('is not fooled by braces and semicolons in strings', () => {
     const text = `.u-a::before{content:"}{;";}.u-b::after{content:'it\\'s }';}.u-c{color:red;}`
     expect([...scanStyleText('u', text).classes]).toEqual(['u-a', 'u-b', 'u-c'])
@@ -72,6 +82,32 @@ describe('scanStyleText', () => {
     scanStyleText('u', '.u-b{color:red;}.u-c{color:red', found)
     scanStyleText('u', '.u-d{content:"never closed', found)
     expect([...found.classes]).toEqual(['u-a', 'u-b'])
+  })
+
+  it('counts the top-level rules, and lists those that may be global rules with their places', () => {
+    const text =
+      '@layer u-theme,u-global;@property --u-a{syntax:"*";inherits:true;}' +
+      '@keyframes k{to{opacity:1;}}@layer u-global{body{margin:0;}}' +
+      '@layer u-components{.u-a{color:red;}}@layer other{p{color:red;}} ;' +
+      '.u-b{color:red;} html, body{color:var(--u-a);}@media (width >= 1px){body{margin:1px;}}'
+    const found = scanStyleText('u', text)
+    expect(found.ruleCount).toBe(9)
+    expect(found.globals).toEqual([
+      [3, '@layer u-global{body{margin:0;}}'],
+      [7, 'html, body{color:var(--u-a);}'],
+      [8, '@media (width >= 1px){body{margin:1px;}}'],
+    ])
+    expect(found.variables).toEqual(new Set(['--u-a']))
+  })
+
+  it('lists the places of the rules of a root theme, in the theme layer or in none, as no global rule', () => {
+    const text =
+      '@layer u-theme,u-global;@layer u-theme{:where(:root){--u-a:var(--u-b);}}' +
+      ':where(:root){--u-a:1;}@layer u-theme{.u-theme-x{--u-a:2;}}:root{color:var(--u-c);}'
+    const found = scanStyleText('u', text)
+    expect(found.roots).toEqual([1, 2])
+    expect(found.globals).toEqual([[4, ':root{color:var(--u-c);}']])
+    expect(found.variables).toEqual(new Set(['--u-c']))
   })
 
   it('reads a large text in one pass', () => {

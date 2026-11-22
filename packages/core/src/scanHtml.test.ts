@@ -1,6 +1,23 @@
-import { scanHtml } from './scanHtml'
+import { createGlobalMarker, scanHtml } from './scanHtml'
 
 const classes = (html: string) => [...scanHtml(html).classes]
+
+describe('createGlobalMarker', () => {
+  it('names the sets that have rules, under the name of the prefix, and is none without one', () => {
+    const sets = [
+      { id: 'u-global-a', rules: ['a{}'] },
+      { id: 'u-global-b', rules: [] },
+      { id: 'u-global-c', rules: ['c{}'] },
+    ]
+    expect(createGlobalMarker('u', sets)).toEqual({
+      name: 'u-global',
+      ids: 'u-global-a u-global-c',
+    })
+    expect(createGlobalMarker('u', [sets[1]])).toBeUndefined()
+    const { name, ids } = createGlobalMarker('u', sets) as { name: string; ids: string }
+    expect([...scanHtml(`<!--${name} ${ids}-->`).rendered]).toEqual(['u-global-a', 'u-global-c'])
+  })
+})
 
 describe('scanHtml', () => {
   it('reads the class attributes, quoted either way and bare', () => {
@@ -25,6 +42,32 @@ describe('scanHtml', () => {
     )
     expect([...found.carried]).toEqual(['u-a', 'u-b'])
     expect([...found.classes]).toEqual(['u-a'])
+  })
+
+  it('reads the ids that the markers of global rules name: a <meta> of React and a comment of Vue', () => {
+    const found = scanHtml(
+      '<meta name="u-global" content="u-global-a u-global-b"/>' +
+        '<META CONTENT=u-global-c NAME=u-global>' +
+        '<!--[--><!--u-global u-global-d--><!----><!-- --><!--$--><p class="x">' +
+        '<meta content="u-global-e" name="u-global" />'
+    )
+    expect([...found.rendered]).toEqual([
+      'u-global-a',
+      'u-global-b',
+      'u-global-c',
+      'u-global-d',
+      'u-global-e',
+    ])
+    expect([...found.classes]).toEqual(['x'])
+  })
+
+  it('reads no marker from another meta, another comment, or the name and content of another element', () => {
+    const found = scanHtml(
+      '<meta name="u-options" content="p=u"><meta name="description" content="u-global-a">' +
+        '<!--u-options u-global-b--><!--u-global--><!--note u-global-c-->' +
+        '<input name="u-global" content="u-global-d"><meta content="u-global-e">'
+    )
+    expect([...found.rendered]).toEqual([])
   })
 
   it('skips comments, scripts, styles, textareas and titles', () => {

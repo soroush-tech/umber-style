@@ -1,5 +1,6 @@
 import { render } from '@testing-library/react'
 import { system } from '@soroush.tech/styled-system/core'
+import { layout } from '@soroush.tech/styled-system/layout'
 import { space } from '@soroush.tech/styled-system/space'
 import shouldForwardProp from '@soroush.tech/styled-system/should-forward-prop'
 import { variant } from '@soroush.tech/styled-system/variant'
@@ -127,5 +128,38 @@ describe('styled-system parsers as style functions', () => {
     const element = container.firstElementChild as HTMLElement
     expect(element.getAttributeNames().sort()).toEqual(['class', 'data-x', 'id'])
     expect(cssOf()).toContain('padding:var(--p-space-2);')
+  })
+})
+
+describe('a parser after a function style that sets the same properties', () => {
+  // A parser sets a property it was not given a value for to undefined: `layout({ size: undefined })`
+  // is `{ width: undefined, height: undefined }`. Such a value declares nothing, and leaves the
+  // declaration of a style before it.
+  type SizeProps = { size?: number }
+  const sizeStyle = ({ size = 40 }: SizeProps) => ({ width: size, height: size })
+  const safeLayout = (props: SizeProps) => layout({ ...props, size: undefined })
+  const isForwarded = (prop: string) => prop !== 'size'
+
+  it.each([
+    ['alone', []],
+    ['before a function that returns nothing', [() => ({})]],
+    ['before space', [space]],
+    ['before layout with no size', [safeLayout]],
+  ])('keeps the size of the earlier style, %s', (_name, after) => {
+    const { styled, ThemeProvider, sheet } = setup()
+    const Avatar = styled('span', { shouldForwardProp: isForwarded })<SizeProps>(
+      sizeStyle,
+      ...after
+    )
+    const { container } = render(
+      <ThemeProvider theme={baseTheme}>
+        <Avatar size={80} />
+        <Avatar />
+      </ThemeProvider>
+    )
+    const [large, small] = [...container.querySelectorAll('span')].map((span) => span.className)
+    expect(large).not.toBe(small)
+    expect(sheet.rules).toContain(`.${large}{width:80px;height:80px;}`)
+    expect(sheet.rules).toContain(`.${small}{width:40px;height:40px;}`)
   })
 })

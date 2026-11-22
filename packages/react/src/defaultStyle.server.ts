@@ -1,11 +1,23 @@
+import type { ElementType } from 'react'
 import {
+  createDeferredObject,
   createDeferredRecord,
   createLazyEngine,
-  type Theme,
+  globalStyles,
+  keyframes,
+  withTagShorthands,
   type WebStyleObject,
 } from '@umber-style/core'
 import { bindEngine } from './createStyle.server'
-import type { DefaultStyleOptions, ServerStyle, Styled, WebThemeProviderProps } from './types'
+import type {
+  DefaultStyleOptions,
+  GlobalProps,
+  ServerStyle,
+  Styled,
+  StyledOptions,
+  Theme,
+  WebThemeProviderProps,
+} from './types'
 
 /** Makes the default styling for server components: one engine, made on first use. */
 export function createDefaultStyle() {
@@ -27,7 +39,16 @@ export function createDefaultStyle() {
     pending = options
   }
 
-  const styled = ((tag, options) => getStyle().styled(tag, options)) as Styled<Theme>
+  // `styled.div` and the other tags are made on use, through the engine's own `styled`, when the
+  // styles are given: reading them (`Object.assign(wrapper, styled)` reads every tag) leaves `configure`
+  // open.
+  const styled = withTagShorthands(
+    ((tag: ElementType, options?: StyledOptions) =>
+      (...args: unknown[]) =>
+        (getStyle().styled(tag, options) as (...styles: unknown[]) => unknown)(
+          ...args
+        )) as unknown as Styled<Theme>
+  )
 
   // An object sheet is made on first read, so a module can create one before `configure` is called.
   const StyleSheet: ServerStyle<Theme>['StyleSheet'] = {
@@ -41,12 +62,16 @@ export function createDefaultStyle() {
 
   const useStyle = ((sheet: never) => getStyle().useStyle(sheet)) as ServerStyle<Theme>['useStyle']
 
-  function readTheme(): Theme {
-    return getStyle().readTheme()
+  function useTheme(): Theme {
+    return getStyle().useTheme()
   }
 
   function ThemeProvider(props: WebThemeProviderProps<Theme>) {
     return getStyle().ThemeProvider(props)
+  }
+
+  function Global(props: GlobalProps<Theme>) {
+    return getStyle().Global(props)
   }
 
   return {
@@ -55,13 +80,23 @@ export function createDefaultStyle() {
     styled,
     StyleSheet,
     useStyle,
-    readTheme,
+    useTheme,
+    readTheme: useTheme,
     ThemeProvider,
     apply: ((...entries) => getStyle().apply(...entries)) as ServerStyle<Theme>['apply'],
+    // The entry is made on first use, so a module can call it before `configure`.
+    css: ((...args: unknown[]) =>
+      createDeferredObject(() =>
+        (getStyle().css as (...all: unknown[]) => object)(...args)
+      )) as ServerStyle<Theme>['css'],
     when: ((theme, colorScheme) =>
       getStyle().when(theme, colorScheme)) as ServerStyle<Theme>['when'],
     whenScheme: ((scheme) => getStyle().whenScheme(scheme)) as ServerStyle<Theme>['whenScheme'],
     themeClass: ((theme, colorScheme) =>
       getStyle().themeClass(theme, colorScheme)) as ServerStyle<Theme>['themeClass'],
+    // They need no engine, so a module can call them before `configure`.
+    keyframes: keyframes as ServerStyle<Theme>['keyframes'],
+    globalStyles: globalStyles as ServerStyle<Theme>['globalStyles'],
+    Global,
   }
 }

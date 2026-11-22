@@ -21,7 +21,7 @@
     "test:e2e": "pnpm --filter @umber-fixtures/e2e test:e2e",
     "test:e2e:dev": "pnpm --filter @umber-fixtures/e2e test:e2e:dev",
     "test:browser": "pnpm -r --if-present test:browser",
-    "bench": "node bench/bin/run.mjs"
+    "bench": "pnpm build && node bench/bin/local.mjs"
   },
   "devDependencies": {
     "ai-watermark-guard": "^0.2.0",
