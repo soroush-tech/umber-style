@@ -235,7 +235,7 @@ export default function Page() {
               </Flex>
             </Grid>
             <Flex borderColor="color-mix(in srgb, currentColor 40%, transparent)" borderStyle="dashed" borderWidth="1px" data-name="footArt" flex="5 1 0" gap={0} minHeight="400px" minWidth="0" p={0} position="relative">
-              <Image alt="blueprint" height="100%" left="0" objectFit="contain" position="absolute" src="/10b7f8e20e2a3be4b1434c97596bf05ad0ff26fefed6c274dc46953a76d836b4.svg" top="0" width="100%" />
+              <Image alt="blueprint" height="100%" left="0" objectFit="contain" position="absolute" src="/10b7f8e20e2a3be4b1434c97596bf05ad0ff26fefed6c274dc46953a76d836b4.svg" top="0" width="100%" style={{ backgroundColor: 'rgba(26, 13, 1, 0.5)' }} />
             </Flex>
           </Flex>
           <Grid borderBottomStyle="solid" borderBottomWidth="1px" borderTopStyle="solid" borderTopWidth="1px" data-name="specs" display="grid" gap={0} gridTemplateColumns="repeat(4, 1fr)" maxWidth="1760px" p={0} style={{"borderBottomColor":"color-mix(in srgb, currentColor 30%, transparent)","borderTopColor":"color-mix(in srgb, currentColor 30%, transparent)"}} width="100%">
