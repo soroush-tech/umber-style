@@ -4,6 +4,7 @@ import { Grid } from '@soroush.tech/design-system/Grid'
 import { Image } from '@soroush.tech/design-system/Image'
 import { Link } from '@soroush.tech/design-system/Link'
 import { Typography } from '@soroush.tech/design-system/Typography'
+import { CodeTabs } from '../../components/CodeTabs'
 
 export default function Page() {
   return (
@@ -33,6 +34,7 @@ export default function Page() {
               </Flex>
             </Flex>
             <Flex data-name="panel" flex="6 1 0" flexDirection="column" gap={3} minWidth="0" p={0} pb={8} pt={5} px={5} style={{"backgroundColor":"rgba(47, 91, 234, 1)","backgroundImage":"linear-gradient(140deg, transparent 25%, currentColor 115%), radial-gradient(color-mix(in srgb, currentColor 40%, transparent) 1px, transparent 1.5px)","backgroundSize":"auto, 8px 8px","borderRadius":"28px","color":"#E0457B"}}>
+              <CodeTabs defaultTab={"react"} />
               <Flex alignSelf="flex-start" data-name="tabs" flexDirection="row" gap={0.5} p={0.5} style={{"backgroundColor":"rgba(255, 251, 240, 1)","borderRadius":"12px"}}>
                 <Typography borderRadius="md" data-name="tab1" fontFamily="'Space Grotesk Variable', 'Space Grotesk', sans-serif" m={0} px={2} py={1} style={{"backgroundColor":"rgba(47, 23, 2, 1)","color":"#F7F1E1","fontSize":"15px","fontWeight":600}} variant="body2">React</Typography>
                 <Typography data-name="tab2" fontFamily="'Space Grotesk Variable', 'Space Grotesk', sans-serif" m={0} px={2} py={1} style={{"color":"#2F1702","fontSize":"15px"}} variant="body2">Vue</Typography>
