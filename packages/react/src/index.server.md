@@ -5,7 +5,7 @@ Build: server (the entry under the `react-server` condition: no hook, no context
 ## What it does
 
 It is the public entry of `@umber-style/react` for server components. It makes the server default style once
-and exports its members: `configure`, `getEngine`, `styled`, `StyleSheet`, `useStyle`, `useTheme`,
+and exports its members: `configure`, `getEngine`, `styled`, `StyleSheet`, `useStyle`, `useStyleValue`, `useTheme`,
 `readTheme`, `ThemeProvider`, `apply`, `css`, `themeClass`, `when`, `whenScheme`, `keyframes`,
 `globalStyles`, `Global`. It re-exports the core's math helpers, `createStyle.server` and `defaultStyle.server`,
 and the types.

@@ -8,7 +8,7 @@ It holds the public types of the binding: the options (`StyleOptions`, `DefaultS
 `ServerStyleOptions`, `StyledOptions`), the theme (`Theme`), the styled component types (`Styled`,
 `StyledComponent`, `CreateStyledComponent`, `StyledStatics`, `StyleProp`, `PropsOf`), the props of the
 components (`ThemeProviderProps`, `WebThemeProviderProps`, `ThemeScopeProps`, `CacheProviderProps`,
-`GlobalProps`), and the shape of a whole style (`Style`, `WebStyle`, `ServerStyle`). It re-exports the style
+`GlobalProps`), the setter of `useStyleValue` (`StyleValueSetter`), and the shape of a whole style (`Style`, `WebStyle`, `ServerStyle`). It re-exports the style
 types of the core that an app annotates with.
 
 ## Why it exists
@@ -24,7 +24,7 @@ flowchart TD
   core["types of @umber-style/core"] --> theme["Theme extends core Theme"]
   core --> reexp["re-exported style types"]
   theme --> styleNode["Style T,E: what every platform has"]
-  styleNode --> web["WebStyle: client build, adds apply, css, ThemeProvider, ThemeScope, useThemeClass, ThemeContext, engine, cache"]
+  styleNode --> web["WebStyle: client build, adds apply, css, useStyleValue, ThemeProvider, ThemeScope, useThemeClass, ThemeContext, engine, cache"]
   web --> server["ServerStyle: WebStyle minus ThemeContext, ThemeScope, useThemeClass; useTheme + readTheme"]
   opts["StyledOptions, StyleOptions"] --> styledT["CreateStyledComponent: function, template, styles"]
   styledT --> comp["StyledComponent: props of tag + own props + as + style"]

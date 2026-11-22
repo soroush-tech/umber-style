@@ -20,7 +20,7 @@ and `templateStyle.ts` use the name and types; `index.ts` exports `keyframes` an
 
 ```mermaid
 flowchart TD
-  call["keyframes(first, options)"] --> tpl{"first is template strings?"}
+  entry["keyframes(first, options)"] --> tpl{"first is template strings?"}
   tpl -->|yes| parse["parseKeyframesTemplate, then keyframes again"]
   tpl -->|no| label{"label matches the identifier pattern?"}
   label -->|no| errL["throw TypeError"]
@@ -42,8 +42,27 @@ result is sorted. A stand-in value is turned into its path, and a nested style i
 `TypeError`. Later, `createKeyframesRule(name, readTheme, context)` compiles the registered steps again with
 the cache's own context, reading the real theme only for a function.
 
+```mermaid
+flowchart TD
+  scan["findAnimationNames(rules)"] --> empty{"registry empty?"}
+  empty -->|yes| none["return the empty list"]
+  empty -->|no| find["next 'animation' in the rule"]
+  find --> found{"found?"}
+  found -->|no| nextRule["next rule"]
+  found -->|yes| starts{"after '{' or ';', then ':' or '-name:'?"}
+  starts -->|no| find
+  starts -->|yes| semi{"a ';' follows?"}
+  semi -->|yes| toSemi["value ends at the ';'"]
+  semi -->|no| toEnd["value ends with the rule"]
+  toSemi --> words["keep each registered word, once"]
+  toEnd --> words
+  words --> find
+```
+
 `findAnimationNames(rules)` scans compiled rules for `animation` at the start of a declaration (after `{` or
-`;`), takes the value up to the next `;`, and keeps each word that is a registered name, once.
+`;`), takes the value up to the next `;` (or to the end of the rule when no `;` follows), and keeps each word
+that is a registered name, once. The next search starts after the end of that value, so the scan always moves
+forward and ends.
 
 ## The data
 
@@ -67,5 +86,9 @@ default scoping, so a name does not change with the options of an engine.
 ## Limits
 
 - A step holds declarations only; a selector or at-rule in it throws.
-- `findAnimationNames` expects each declaration to end with `;` (the doc comment). A rule whose `animation`
-  value has no closing `;` makes `indexOf(';', start)` return -1, which the loop does not guard against.
+- `findAnimationNames` is written for compiled rules, whose declarations each end with `;`. For text with
+  a value that has no closing `;`, the value runs to the end of the rule, so the words after it (a `}`, a
+  later selector) are read as part of it: a registered name there is found, which is the one place such
+  text could differ from the compiled form. Before the guard, such a value sent the search back to the start
+  of the rule and the call never returned (`ends a value with no closing ; at the end of the rule, and
+  returns`).

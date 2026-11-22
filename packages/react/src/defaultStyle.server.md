@@ -4,7 +4,7 @@ Build: server (components build: no hook, no context). The client counterpart is
 
 ## What it does
 
-`createDefaultStyle()` makes the default styling for server components: `styled`, `StyleSheet`, `useStyle`,
+`createDefaultStyle()` makes the default styling for server components: `styled`, `StyleSheet`, `useStyle`, `useStyleValue`,
 `useTheme`, `readTheme` (the same function), `ThemeProvider`, `apply`, `css`, `when`, `whenScheme`,
 `themeClass`, `keyframes`, `globalStyles`, `Global`, plus `configure` and `getEngine`. Each forwards to a
 style bound on first use.

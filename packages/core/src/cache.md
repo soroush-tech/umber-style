@@ -22,7 +22,7 @@ and `@umber-style/server` build on its public members.
 
 ```mermaid
 flowchart TD
-  call["css, cssIn, cssWith(values)"] --> sort["sortClassValues: styles, raw class names, entries"]
+  entry["css, cssIn, cssWith(values)"] --> sort["sortClassValues: styles, raw class names, entries"]
   sort --> sole{"one entry only, and no 'after'?"}
   sole -->|yes| use["entry.use(layer): its class, written if new"]
   sole -->|no| prep["prepareClass: merge styles, compile to rules for '&', name = prefix-label-hash"]
@@ -63,10 +63,13 @@ The rest of the closure, in the order of the file:
   that arrive later (a `MutationObserver` on `head` and `body`), with `scanStyleText`. What it finds
   (classes, layer order, `@property` and `@keyframes` rules, theme classes with their variables, global
   rules, root rules) is marked as inserted, so nothing from a server render is written again. Root rules are the exception:
-  they are not kept. Those found before the cache declares its root theme wait in `pageRoots` and are
-  deleted at the declaration; those of an element that arrives after it are deleted as it is scanned,
-  because they would come later in the document than the rule of the cache and win with old values. Before it
-  does, `createCache` compares the options stamp of the server with its own and throws on a difference.
+  they are not kept. Those found before the cache declares its root theme wait in `pageRoots`, which every
+  declaration of another root theme empties, deleting them. Those of an element that arrives after the
+  first declaration are deleted as it is scanned: they come later in the document than the rule of the
+  cache, so they would win with the server's values. A theme switched while the page streams (a second
+  declaration) would then be undone by a chunk that arrives after the switch, until the next declaration
+  (`cache.root.test.ts`, `are removed on arrival after a switch of the theme`). Before it reads the page,
+  `createCache` compares the options stamp of the server with its own and throws on a difference.
 - Themes. `insertTheme` registers a theme class. With pruning a class declares only used variables, and
   `markUsed` adds more as rules refer to them, following values that refer to other variables. `insertRoot`
   declares one `:where(:root)` rule in the theme layer; another id replaces it.
@@ -76,6 +79,14 @@ The rest of the closure, in the order of the file:
   layer order, `@property` rules, `@keyframes` rules, root and theme rules trimmed to the variables the page
   uses, global rules, then class rules; `extractPage` joins the two parts.
 - `withStyleOptions` gives a view of the same cache that compiles with other declaration options.
+- The document. `cache.document` is the document the cache serves (that of its sheet, else the global one,
+  none on a server): what `declareLiveValue` of `liveValue.ts` writes the rule of a value into.
+- The nonce. `CacheOptions.nonce` is held as `cache.nonce` (a view of `withStyleOptions` has it too) and
+  given to the DOM sheet the cache makes for itself; `createDomSheet` sets it as the `nonce` attribute of
+  an element it creates, before the element is in the document, in either way of writing. An element that
+  the document had (a server's, or an empty one) is used as it is. The nonce is in no rule, class name or
+  fingerprint: it is for the elements, and the tags of `extractStyles.ts`, `@umber-style/server` and the
+  bindings read it from the cache.
 
 ## The data
 
@@ -118,9 +129,10 @@ The rest of the closure, in the order of the file:
 ## Limits
 
 - A sheet without `remove` cannot release held classes or global rules; they stay and count as written.
+- A nonce is set only on a style element the sheet creates. Written with `insertRule`, the sheet uses the
+  element of a server when there is one, which carries the server's nonce or none; the cache does not check.
+  `options.nonce` is not read when a `sheet` is given.
 - Page global rules whose rule objects cannot all be matched to the page are left in place when released
   (`removeGlobal`, `removeHeld` return without deleting).
 - The root theme of a page is the one in the sheet; one cache that renders pages with different root
   themes must render and extract one page before the next (doc comment of `extractPage`).
-- In `extractPageParts` a local `held` shadows the outer map of held classes; it is a different thing there
-  (global entries). It works, and is easy to misread.

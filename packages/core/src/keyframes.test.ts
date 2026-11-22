@@ -292,4 +292,15 @@ describe('findAnimationNames', () => {
       ])
     ).toEqual([])
   })
+
+  it(
+    'ends a value with no closing ; at the end of the rule, and returns',
+    { timeout: 1000 },
+    () => {
+      expect(findAnimationNames([`.a{animation:${spin}}`, `.b{animation-name:${fade}`])).toEqual([
+        spin,
+        fade,
+      ])
+    }
+  )
 })

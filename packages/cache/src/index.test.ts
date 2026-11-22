@@ -223,6 +223,20 @@ describe('how the style element of the cache is written', () => {
     expect([readText('speedy'), readText('both')]).toEqual(['', ''])
     expect(readText('slow')).toContain('{color:red;}')
   })
+
+  it('carries the nonce it is given, in either way of writing, and keeps it as `nonce`', () => {
+    const text = createCache({ key: 'strict', nonce: 'n0nce', hasDevChecks: false })
+    const fast = createCache({ key: 'fast', nonce: 'n0nce', speedy: true, hasDevChecks: false })
+    text.css({ color: 'red' })
+    fast.css({ color: 'red' })
+    for (const key of ['strict', 'fast']) {
+      expect(document.querySelector(`style[data-style="${key}"]`)?.getAttribute('nonce')).toBe(
+        'n0nce'
+      )
+    }
+    expect([text.nonce, fast.nonce]).toEqual(['n0nce', 'n0nce'])
+    expect(text.sheet.tags.map((tag) => tag.getAttribute('nonce'))).toEqual(['n0nce'])
+  })
 })
 
 describe('the options of createCache', () => {

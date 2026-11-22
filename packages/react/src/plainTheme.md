@@ -7,7 +7,8 @@ Build: server (only `ThemeProvider.server.ts` imports it; it needs no React).
 `toPlainTheme(theme)` returns `{ theme, dropped }`: the part of a theme that can cross from a server
 component to a client component, and the dotted paths of what was left out. It keeps strings, numbers,
 booleans, `null`, `undefined`, arrays and plain objects, deeply. It drops functions, symbols and objects
-that are not plain (class instances, `Date`, `Map`).
+that are not plain (class instances, `Date`, `Map`), and a member that refers back to an object it is
+inside of (a cycle).
 
 ## Why it exists
 
@@ -24,7 +25,9 @@ flowchart TD
   kind -->|yes| drop["record path, return DROPPED"]
   kind -->|no| prim{"not an object, or null?"}
   prim -->|yes| keep["return as is"]
-  prim -->|no| arr{"array?"}
+  prim -->|no| cyc{"an object it is inside of?"}
+  cyc -->|yes| drop
+  cyc -->|no| arr{"array?"}
   arr -->|yes| items["convert each item; a dropped item becomes undefined"]
   arr -->|no| plain{"plain object?"}
   plain -->|no| drop
@@ -36,6 +39,10 @@ flowchart TD
   same2 -->|yes| orig2["return the same object"]
   same2 -->|no| copy2["return a copy"]
 ```
+
+The objects on the way down from the theme to `value` are in a `Set` (`ancestors`): each object is added
+before its members are converted and taken out after, so an object that two members share is converted in
+both places, and only an object met again inside itself is a cycle.
 
 ## The data
 
@@ -50,11 +57,21 @@ the root path is `''`. A whole theme that cannot cross gives `{}`.
 - The result for a theme object is made once (`WeakMap`), so a payload that names one theme in several
   places holds one object.
 - Only own enumerable members are read.
+- It returns for a theme with a cycle: the member that closes the cycle is left out and its path listed
+  (`leaves out a member that refers back to an object it is inside of, and returns`). A theme with no cycle
+  gives what it gave before: an object shared by two members is not a cycle (`keeps an object that two
+  members share, which is not a cycle`).
 
 ## Decisions
 
-- Drop and report, not throw: the app keeps rendering, with a development warning from the caller.
+- Drop and report, not throw: the app keeps rendering, with a development warning from the caller. A cycle
+  is treated like any other member that cannot cross.
+- The guard is a set of the objects on the current path, not of every object seen: a theme that shares one
+  object in two places crosses as it did.
 
 ## Limits
 
-- A cycle in the theme is not detected.
+- The recursion follows the depth of a theme: a theme nested deeper than the stack allows throws a
+  `RangeError`.
+- What is left out of a cycle depends on where the walk enters it: the member that closes the cycle, met
+  last, is the one dropped.

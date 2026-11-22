@@ -5,7 +5,7 @@ Build: client. The server build's entry is `index.server.ts`.
 ## What it does
 
 It is the public entry of `@umber-style/react`. It makes the default style once, exports its members by name
-(`styled`, `StyleSheet`, `useStyle`, `useTheme`, `ThemeProvider`, `ThemeScope`, `useThemeClass`,
+(`styled`, `StyleSheet`, `useStyle`, `useStyleValue`, `useTheme`, `ThemeProvider`, `ThemeScope`, `useThemeClass`,
 `ThemeContext`, `apply`, `css`, `themeClass`, `when`, `whenScheme`, `keyframes`, `globalStyles`, `Global`,
 `configure`, `getEngine`), and re-exports the math helpers of the core, `CacheProvider`, `useMediaQuery`,
 `createStyle`, `defaultStyle` and the types.

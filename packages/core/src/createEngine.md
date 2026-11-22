@@ -86,8 +86,9 @@ passes, a number, `true` or a function warns once and becomes `undefined`).
   between classes, so anything that comes in is merged into one class.
 - A view is planned once with the props of the first call; a function that read no prop then takes the
   same path for every later call with that view.
-- Engine options that only a cache holds (`CACHE_OPTIONS`) are ignored, with a warning, when a cache is
-  given: the cache decides.
+- Engine options that only a cache holds (`CACHE_OPTIONS`: `suffix`, `hasLabels`, `hasLayers`, `hasPruning`,
+  `hasScope`, `hasRuleText`, `nonce`) are ignored, with a warning, when a cache is given: the cache decides.
+  `nonce` is passed to the cache the engine makes, for its style element and the tags made from it.
 - Warning about unmatched `modes`, `registered` and `alwaysDeclare` paths happens in `sync()`, with checks on.
 
 ## Limits
@@ -96,5 +97,3 @@ passes, a number, `true` or a function warns once and becomes `undefined`).
   warner, so it does not use the `[prefix]` of `createWarner` the same way (the prefix is added in the
   message by hand) and the set is shared by every engine.
 - A wrapped component with function styles has no single class, so it cannot be a selector (`css.ts`).
-- The comment on `createEngineChecks` says "the options of the cache column given with a `cache`", which
-  reads as a leftover; the code warns about the options of `CACHE_OPTIONS`.

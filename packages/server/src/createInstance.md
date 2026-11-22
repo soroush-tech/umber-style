@@ -4,7 +4,8 @@
 
 `createInstance(cache)` returns the server functions of one cache: `extractCriticalToChunks(html)` gives
 the CSS a page needs in two chunks, `extractCritical(html)` gives it in one piece,
-`constructStyleTagsFromChunks(chunks)` writes `<style data-umber>` elements, and
+`constructStyleTagsFromChunks(chunks)` writes `<style data-umber>` elements (with the nonce of the cache,
+when it has one), and
 `renderStylesToString(html)` puts those elements into the HTML. The subpath
 `@umber-style/server/create-instance` exports it as the default.
 
@@ -29,7 +30,10 @@ flowchart TD
   chunks --> tags["constructStyleTagsFromChunks"]
   tags --> filter{"css is ''?"}
   filter -->|yes| drop["no element for that chunk"]
-  filter -->|no| tag["style data-umber='key ids...' css"]
+  filter -->|no| nonce{"the cache has a nonce?"}
+  nonce -->|yes| withNonce["style data-umber='key ids...' nonce='escaped nonce' css"]
+  nonce -->|no| tag["style data-umber='key ids...' css"]
+  withNonce --> render
   tag --> render["renderStylesToString"]
   render --> head{"html has a head tag?"}
   head -->|yes| afterHead["tags right after the head"]
@@ -57,6 +61,10 @@ the same attribute on the client (the first word is the key, the rest are names 
 ## Decisions
 
 - The key of each chunk comes from `cache.prefix`.
+- The nonce comes from the cache (`createCache({ key, nonce })` of `@umber-style/cache`), where a server
+  that makes a cache for each request has the nonce of that request. It is escaped once, when the instance
+  is made, by `createNonceAttribute` of the core, which `createStyleTag` and `extractPageStyles` use too,
+  so every tag of a server is written the same way.
 - The head is found with `/<head(?:\s[^>]*)?>/i`, so `<header>` is not a head; with no head, such as a
   fragment, the tags go at the start.
 
@@ -66,3 +74,5 @@ the same attribute on the client (the first word is the key, the rest are names 
   value of the head tag. No test covers that.
 - It extracts from the class names present in the HTML string; a class made after the HTML was built is
   not seen.
+- The nonce is read once, when the instance is made: a cache whose `nonce` changed later (it is a read-only
+  member, so only by a cast) keeps the first one here.

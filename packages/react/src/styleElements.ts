@@ -9,11 +9,16 @@ export interface StyleText {
   readonly text: string
 }
 
-/** The `<style href precedence>` element of `style`, in the precedence of the prefix of `cache`. */
+/**
+ * The `<style href precedence>` element of `style`, in the precedence of the prefix of `cache`, with the
+ * nonce of the cache when it has one: React keeps the rules of such an element only when its nonce is the
+ * style nonce of the render (`nonce: { style }` of React's server render), and sets it on the element it
+ * makes in the browser.
+ */
 const toElement =
   (cache: Cache) =>
   ({ href, text }: StyleText): ReactElement =>
-    createElement('style', { key: href, href, precedence: cache.prefix }, text)
+    createElement('style', { key: href, href, precedence: cache.prefix, nonce: cache.nonce }, text)
 
 /**
  * The style elements of the animations in `names` that `sent` does not hold yet, which it adds them to:

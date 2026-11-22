@@ -42,7 +42,8 @@ request and a partial theme, the base theme as plain data (`readBase`, one objec
 ## The data
 
 - `ServerProviderParts<T>`: `readFirstSlot()` and `readBaseTheme()`.
-- `ScopeTheme` (defined in `ProviderScope.tsx`): the data sent to the browser part.
+- `ScopeTheme` (defined in `ProviderScope.tsx`): the data sent to the browser part, with the `nonce` of the
+  engine's cache when it has one (left out otherwise, so that a payload holds nothing for it).
 - A cache of descriptions: `WeakMap` from a theme object to a `Map` keyed by `colorScheme|className|as|isFirst`,
   each entry kept while the engine's base theme is the same object.
 

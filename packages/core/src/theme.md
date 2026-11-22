@@ -15,7 +15,8 @@ color scheme), so that the same theme always gets the same class, and a changed 
 cache writes the rule, but the naming and the text format are theme concerns, kept here so the server
 (`createThemeId`, used by the React server `ThemeProvider` to name a class without a cache write) and the
 client agree. Importers: `cache.ts` (the text and rule helpers), `createEngine.ts`
-(`createThemeClass`, `declareRootTheme`), and `index.ts`, which re-exports `createThemeId`.
+(`createThemeClass`, `declareRootTheme`), `scanStyleText.ts` (`ROOT_SELECTOR`, to find the root rule in the
+text of a page), and `index.ts`, which re-exports `createThemeId`.
 
 ## The logic
 
@@ -66,4 +67,3 @@ the test, the rule is `.ds-theme-<hash>{--a:b;--c:d;}`, and with `colorScheme: '
 ## Limits
 
 - Declaration order changes the hash: the same declarations in another order are another theme class.
-- `ROOT_SELECTOR` is also defined in `scanStyleText.ts`; the two must stay equal.

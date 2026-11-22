@@ -99,6 +99,13 @@ describe('the default style', () => {
     expect(sheet.rules.filter((rule) => rule.startsWith('.d-theme-'))).toHaveLength(0)
   })
 
+  it('has useStyleValue, a value named after the prefix of its cache', () => {
+    const { useStyleValue } = setup()
+    const Probe = () => <i>{String(useStyleValue(3, 'px')[0])}</i>
+    render(<Probe />)
+    expect(screen.getByText(/^var\(--d-value-\w+, 3px\)$/)).toBeTruthy()
+  })
+
   it('has useTheme give an empty object without a provider, and the theme of configure({ theme })', () => {
     const bare = setup()
     const Probe = () => <i>{JSON.stringify(bare.useTheme())}</i>

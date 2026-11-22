@@ -57,6 +57,25 @@ describe('createInstance', () => {
     )
   })
 
+  it('writes the nonce of the cache into every style element, escaped, and into no CSS', () => {
+    const cache = createCache({ key: 'app', nonce: 'req"1' })
+    const engine = createEngine(theme, { cache })
+    const box = engine.css({ color: engine.refs.palette.primary })
+    engine.insertGlobal({ body: { margin: 0 } })
+    const html = `<p class="${box}">x</p>`
+    const { extractCriticalToChunks, constructStyleTagsFromChunks, renderStylesToString } =
+      createInstance(cache)
+    const chunks = extractCriticalToChunks(html)
+    const [global, classes] = chunks.styles
+    const tags = constructStyleTagsFromChunks(chunks)
+    expect(tags).toBe(
+      `<style data-umber="app-global ${global.ids.join(' ')}" nonce="req&quot;1">${global.css}</style>` +
+        `<style data-umber="app ${box}" nonce="req&quot;1">${classes.css}</style>`
+    )
+    expect(global.css + classes.css).not.toContain('req')
+    expect(renderStylesToString(`<head></head>${html}`)).toBe(`<head>${tags}</head>${html}`)
+  })
+
   it('extracts the critical CSS in one piece: the chunks joined', () => {
     const { cache, html } = setup()
     const { extractCritical, extractCriticalToChunks } = createInstance(cache)

@@ -37,7 +37,7 @@ flowchart TD
 
 `EngineOptions` adds to the token options: `prefix`, `suffix`, `hasLabels`, `hasLayers`,
 `hasColorFallbacks`, `hasValueRepair`, `hasVendorPrefixes`, `hasScope`, `hasPruning`, `hasBaseClass`,
-`hasDevChecks`, `hasRuleText`, `alwaysDeclare` and `cache`. Each comment gives its default (for example
+`hasDevChecks`, `hasRuleText`, `nonce`, `alwaysDeclare` and `cache`. Each comment gives its default (for example
 `hasLayers` default true, `hasValueRepair` default false, `hasVendorPrefixes` default true).
 `StylerOptions` has `name`, `slot` (default `root`) and `label`.
 
@@ -55,8 +55,6 @@ flowchart TD
   cache's.
 - Options marked "used when the engine makes its cache" have no effect on a cache that is passed in,
   except `hasVendorPrefixes`, which also applies over a given cache.
-- The doc comment of `StylerOptions` says "and what it takes from the styles of the one it wraps", but
-  the interface has only `name`, `slot` and `label`; the reason is not recorded.
 
 ## Limits
 

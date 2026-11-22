@@ -32,6 +32,14 @@ export {
   type KeyframesSteps,
 } from './keyframes'
 export * from './lazyRecord'
+export {
+  createLiveValue,
+  declareLiveValue,
+  isLiveValue,
+  writeLiveValue,
+  type LiveRule,
+  type LiveValue,
+} from './liveValue'
 export * from './mergeDeep'
 export type { RegisteredSyntax } from './registered'
 export { createGlobalMarker, type GlobalMarker } from './scanHtml'
@@ -56,6 +64,7 @@ export {
 export { readSharedState } from './sharedState'
 export * from './styleTypes'
 export * from './tagShorthands'
+export { isTemplateStrings, parseKeyframesTemplate, parseStyleTemplate } from './templateStyle'
 export {
   createThemeClass,
   createThemeId,
@@ -69,4 +78,3 @@ export * from './tokens'
 export * from './types'
 export type * from './umberCache'
 export * from './webStyle'
-export { isTemplateStrings, parseKeyframesTemplate, parseStyleTemplate } from './templateStyle'

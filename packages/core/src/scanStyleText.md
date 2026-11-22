@@ -61,7 +61,7 @@ theme classes, are not put in `classes`.
 - It survives text that ends inside a block or a string (`adds to the findings it is given, and survives
   text that ends inside a block or a string`).
 - A root theme, `:where(:root){...}` in the `<prefix>-theme` layer or in none, is listed in `roots` and is
-  never a global rule.
+  never a global rule. The selector is `ROOT_SELECTOR` of `theme.ts`, the one the cache writes the rule with.
 - A layer statement, `@property`, `@keyframes` and a rule of a class `.<prefix>-...` are not global rules.
 
 ## Decisions
@@ -76,6 +76,5 @@ theme classes, are not put in `classes`.
 ## Limits
 
 - CSS comments are not skipped; text with comments is outside what it reads.
-- `ROOT_SELECTOR` (`:where(:root)`) is defined here and again in `theme.ts`; the two must stay equal.
 - A class name with an uppercase letter ends at that letter, since only lowercase letters, digits, `-` and
   `_` are name characters.

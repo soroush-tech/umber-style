@@ -10,9 +10,10 @@ const theme = { palette: { primary: '#1b5fd1', text: '#1a1a1a' } }
 
 describe('the prop filter of the Vue entry, given as shouldForwardProp', () => {
   it('keeps the attributes that only the styles read off the element, and forwards the others', async () => {
-    const { styled } = createStyle(theme, { prefix: 'umber' })
+    const style = createStyle(theme, { prefix: 'umber' })
+    const { styled } = style
 
-    const Box = styled('div', { shouldForwardProp: isPropValid })(({ tone }) => ({
+    const Box = styled('div', { shouldForwardProp: isPropValid })(({ theme, tone }) => ({
       color: tone === 'primary' ? theme.palette.primary : theme.palette.text,
     }))
 
@@ -20,6 +21,10 @@ describe('the prop filter of the Vue entry, given as shouldForwardProp', () => {
       render: () => h(Box, { tone: 'primary', tabindex: 0, onClick: () => {} }),
     })
     expect(await renderToString(app)).toMatch(/^<div tabindex="0" class="umber-[^"]+"><\/div>$/)
+    // The style function reads the tokens of its theme: references, not the values of the module's theme.
+    const { css } = style.cache.extract()
+    expect(css).toMatch(/\{color:var\(--umber-palette-primary\);\}/)
+    expect(css).not.toContain('#1b5fd1;}')
   })
 
   it('is not the default: without it, the element gets every attribute', async () => {

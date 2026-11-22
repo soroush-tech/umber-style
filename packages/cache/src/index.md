@@ -55,6 +55,9 @@ bound to it, so `get`, `has` and `size` still work.
 - `onInsert` is the cache's own: passing it throws a `TypeError` (the check is for plain JavaScript; the
   type already forbids it).
 - `hasRuleText` wins over `speedy`; `speedy: true` means `hasRuleText: false`.
+- `nonce` is an option of the engine's cache, passed on as it is: the cache's own style element carries
+  it, `cache.nonce` holds it, and `@umber-style/server` writes it into its tags. A server that makes a cache
+  for each request gives each its request's nonce.
 - No browser global is read at module top level: `document` is read inside the call, guarded by
   `typeof document`. Without a document `sheet.tags` is `[]`.
 - Two caches with different keys keep their rules apart (test "keeps the rules of two caches apart").

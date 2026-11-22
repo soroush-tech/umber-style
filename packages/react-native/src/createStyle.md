@@ -12,7 +12,7 @@ The default style (`defaultStyle.ts`) and an app's own style (`createStyle`) mus
 different holders of the base theme. This file wires the pieces (`ThemeValue.tsx`, `styled.ts`,
 `toNativeStyle.ts`, `windowState.ts`, `nativeTheme.ts`) into the `NativeStyle<T>` interface of `types.ts`.
 It also owns sheets: registering a sheet's entries with the platform and resolving them for conditions and
-the window. Importers: `defaultStyle.ts` (`bindHolder`, `NativeHolder`) and `index.ts` (`createStyle`).
+the window. Importers: `defaultStyle.ts` (`bindHolder`) and `index.ts` (`createStyle`).
 
 ## The logic
 
@@ -38,7 +38,8 @@ flowchart TD
 
 `RegisteredSheet` holds `entries` (as registered with the platform StyleSheet), `source` (the styles before
 conversion), `keys` (a `StyleKeys` for each entry), `isConditional`, `queries`, `hasScheme` and a lazy
-`byWindow` map from a window key to entries. `NativeHolder<T>` is `{ baseTheme }`.
+`byWindow` map from a window key to entries. The holder is a `ThemeHolder<T>` of `ThemeValue.tsx`,
+`{ baseTheme }`: `createStyle` makes one with its theme, `defaultStyle.ts` one that `configure` fills.
 
 ## What it guarantees
 
@@ -68,4 +69,3 @@ conversion), `keys` (a `StyleKeys` for each entry), `isConditional`, `queries`, 
 ## Limits
 
 - Only `remBase` and `lengthKeys` of the options are used; the rest warn in development.
-- `NativeHolder` repeats the shape of `ThemeHolder` in `ThemeValue.tsx`.

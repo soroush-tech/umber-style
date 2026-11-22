@@ -381,6 +381,17 @@ describe('options', () => {
     createInstance({ key: 'fast', hasRuleText: false }).css({ color: 'red' })
     expect(readText('fast')).toBe('')
   })
+
+  it('makes its style element with the nonce it is given, and writes the nonce into its tag', () => {
+    const instance = createInstance({ key: 'strict', nonce: 'r4nd0m' })
+    instance.css({ color: 'red' })
+    const element = document.querySelector('style[data-style="strict"]')
+    expect(element?.getAttribute('nonce')).toBe('r4nd0m')
+    expect(instance.cache.nonce).toBe('r4nd0m')
+    expect(createStyleTag(instance.cache)).toMatch(
+      /^<style data-style="strict" data-options="[^"]*" nonce="r4nd0m">/
+    )
+  })
 })
 
 describe('a shared cache', () => {

@@ -1,4 +1,5 @@
 import { isAlphaColor } from './alpha'
+import { isLiveValue, type LiveValue } from './liveValue'
 import { readStandIn } from './standIn'
 
 /** A value of arithmetic on tokens: a CSS value (a reference such as `var(--space-2)`, a length) or a number. */
@@ -14,6 +15,11 @@ interface Length {
 interface Term {
   operand: Operand
   sign: 1 | -1
+}
+
+/** `given` as an operand is read: a stand-in of `keyframes` as its path, a value of `useStyleValue` as the reference to its variable. */
+function readOperand(given: unknown): unknown {
+  return isLiveValue(given) ? String(given) : readStandIn(given)
 }
 
 const LENGTH_PATTERN = /^(-?(?:\d+(?:\.\d*)?|\.\d+))([a-z]+|%)$/i
@@ -77,9 +83,14 @@ const OPERATIONS: Record<Operator, (value: number, factor: number) => number> = 
   '/': (value, factor) => value / factor,
 }
 
-/** `value` (a stand-in of `keyframes` as its path) multiplied or divided by `factor`, as a number, a literal length or a calc. */
-function scale(name: string, given: Operand, factor: number, operator: Operator): Operand {
-  const value = readStandIn(given)
+/** `value` (a stand-in of `keyframes` as its path, a value as its reference) multiplied or divided by `factor`, as a number, a literal length or a calc. */
+function scale(
+  name: string,
+  given: Operand | LiveValue,
+  factor: number,
+  operator: Operator
+): Operand {
+  const value = readOperand(given)
   assertOperand(name, value)
   assertFinite(name, operator === '*' ? 'the factor' : 'the divisor', factor)
   if (factor === 0) {
@@ -135,47 +146,47 @@ function sum(terms: Term[]): Operand {
   return sumNumbers(terms) ?? sumLengths(terms) ?? toCalc(terms)
 }
 
-/** The terms of `values` with `sign`, without the zeros that change nothing; each is checked, a stand-in as its path. */
-function toTerms(name: string, given: readonly Operand[], sign: 1 | -1): Term[] {
-  const values = given.map((value) => readStandIn(value))
+/** The terms of `values` with `sign`, without the zeros that change nothing; each is checked, a stand-in as its path, a value as its reference. */
+function toTerms(name: string, given: readonly (Operand | LiveValue)[], sign: 1 | -1): Term[] {
+  const values = given.map((value) => readOperand(value))
   for (const value of values) assertOperand(name, value)
-  return values.filter((value) => value !== 0).map((operand) => ({ operand, sign }))
+  return (values as Operand[]).filter((value) => value !== 0).map((operand) => ({ operand, sign }))
 }
 
 /** `value` times `factor`: a number for numbers, otherwise a CSS value that the browser computes. */
 export function multiply(value: number, factor: number): number
-export function multiply(value: Operand, factor: number): Operand
-export function multiply(value: Operand, factor: number): Operand {
+export function multiply(value: Operand | LiveValue, factor: number): Operand
+export function multiply(value: Operand | LiveValue, factor: number): Operand {
   return scale('multiply', value, factor, '*')
 }
 
 /** `value` divided by `divisor`; a `divisor` of 0 throws a `RangeError`. */
 export function divide(value: number, divisor: number): number
-export function divide(value: Operand, divisor: number): Operand
-export function divide(value: Operand, divisor: number): Operand {
+export function divide(value: Operand | LiveValue, divisor: number): Operand
+export function divide(value: Operand | LiveValue, divisor: number): Operand {
   return scale('divide', value, divisor, '/')
 }
 
 /** The sum of `values`; a number next to a string is a length in px. */
 export function add(...values: number[]): number
-export function add(...values: Operand[]): Operand
-export function add(...values: Operand[]): Operand {
+export function add(...values: (Operand | LiveValue)[]): Operand
+export function add(...values: (Operand | LiveValue)[]): Operand {
   const terms = toTerms('add', values, 1)
   return terms.length === 0 ? 0 : sum(terms)
 }
 
 /** `value` minus each of `values`; a number next to a string is a length in px. */
 export function subtract(value: number, ...values: number[]): number
-export function subtract(value: Operand, ...values: Operand[]): Operand
-export function subtract(value: Operand, ...values: Operand[]): Operand {
-  const first = readStandIn(value)
+export function subtract(value: Operand | LiveValue, ...values: (Operand | LiveValue)[]): Operand
+export function subtract(value: Operand | LiveValue, ...values: (Operand | LiveValue)[]): Operand {
+  const first = readOperand(value)
   assertOperand('subtract', first)
   return sum([{ operand: first, sign: 1 }, ...toTerms('subtract', values, -1)])
 }
 
 /** `value` times -1: a negative margin from a token. */
 export function negate(value: number): number
-export function negate(value: Operand): Operand
-export function negate(value: Operand): Operand {
+export function negate(value: Operand | LiveValue): Operand
+export function negate(value: Operand | LiveValue): Operand {
   return scale('negate', value, -1, '*')
 }

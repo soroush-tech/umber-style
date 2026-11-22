@@ -183,7 +183,9 @@ export function findAnimationNames(rules: readonly string[]): readonly string[] 
     while (index !== -1) {
       const start = findValueStart(rule, index)
       if (start !== -1) {
-        index = rule.indexOf(';', start)
+        const end = rule.indexOf(';', start)
+        // A value with no closing `;` (text the engine did not compile) ends with the rule.
+        index = end === -1 ? rule.length : end
         addRegistered(rule.slice(start, index), names)
       }
       index = rule.indexOf(ANIMATION, index + 1)

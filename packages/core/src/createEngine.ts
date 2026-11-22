@@ -296,6 +296,7 @@ const CACHE_OPTIONS = [
   'hasPruning',
   'hasScope',
   'hasRuleText',
+  'nonce',
 ] as const
 
 /** Warns, once for each message, about the options of `CACHE_OPTIONS` given to an engine that was given a cache too. */
@@ -354,6 +355,7 @@ function selectCache(options: EngineOptions, prefix: string): Cache {
     hasBaseClass: options.hasBaseClass,
     hasDevChecks: options.hasDevChecks,
     hasRuleText: options.hasRuleText,
+    nonce: options.nonce,
     tokenSignature: createTokenSignature([rawKeys, lengthKeys, modes, registered, alwaysDeclare]),
   })
 }
@@ -363,7 +365,8 @@ function selectCache(options: EngineOptions, prefix: string): Cache {
  * cache, or a development build), the warner, what wraps the theme view that a style function gets (with
  * the checks, it warns about a read with a token reference as the key; without them it is the view
  * itself, and no wrapper is made), and what is told about a declaration that global styles leave out.
- * With the checks, the options of the cache column given with a `cache` are warned about at once.
+ * With the checks, the options that only a cache takes (`CACHE_OPTIONS`), given together with a `cache`,
+ * are warned about at once.
  */
 function createEngineChecks(
   options: EngineOptions,

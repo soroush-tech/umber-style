@@ -276,6 +276,21 @@ describe('the browser part of a provider of the server build', () => {
     )
     expect(container.innerHTML).toBe('<b></b>')
   })
+
+  it('gives every style element it renders the nonce of the cache, outermost and nested', () => {
+    const engine = createEngine(light, { prefix: p, nonce: 'n0nce' })
+    const { ThemeProvider } = bindServer(engine, requestCache)
+    mount(
+      <ThemeProvider theme={light}>
+        <ThemeProvider theme={brand}>
+          <b />
+        </ThemeProvider>
+      </ThemeProvider>
+    )
+    const nonces = styleElements().map((element) => element.getAttribute('nonce'))
+    expect(nonces.length).toBeGreaterThan(1)
+    expect(nonces).toEqual(nonces.map(() => 'n0nce'))
+  })
 })
 
 describe('the browser part of a provider of the server build, with the client build', () => {

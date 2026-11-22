@@ -111,6 +111,14 @@ export interface CacheOptions {
   /** Where rules go. Default: a DOM sheet when `document` exists, otherwise an in-memory one. */
   sheet?: Sheet
   /**
+   * The nonce of a content security policy that allows style elements by nonce (`style-src 'nonce-...'`):
+   * set on the style element that the cache makes for its own sheet, and written by `createStyleTag`,
+   * `extractPageStyles`, the server package and the bindings into the style elements they make from the
+   * cache. It is never part of a rule, a class name or the stamp of the options. Not read when a `sheet`
+   * is given: give it to `createDomSheet` then.
+   */
+  nonce?: string
+  /**
    * Called after each group of rules the cache writes to its sheet, with a name for the group and its
    * CSS text as written: the layer order statement (`<prefix>-layers`), a class, a theme class (each time
    * variables are added to it, the first time under the class name, later under `<class>-<hash>`), a set
@@ -250,6 +258,10 @@ export interface Cache {
   readonly prefix: string
   /** Whether rules go into cascade layers. */
   readonly hasLayers: boolean
+  /** The nonce that the style elements made from this cache carry (`CacheOptions.nonce`), or undefined. */
+  readonly nonce?: string
+  /** The document the cache serves: that of its sheet, else the global one; none on a server. */
+  readonly document?: Document
   /** The statement that declares the layers in order, `@layer <prefix>-theme,...;`, or '' without layers. It is the first rule of the sheet. */
   readonly layerOrder: string
   /** The style object of each class this cache made, by class name. */
@@ -487,6 +499,11 @@ export interface DomSheetOptions {
   hasRuleText?: boolean
   /** Called with a rule that `insertRule` rejected, and the message of the browser; the rule is skipped. Not called for rules written as text, which the browser parses. */
   onReject?: (rule: string, message: string) => void
+  /**
+   * The nonce of a content security policy, set as the `nonce` attribute of the style element when the
+   * sheet makes one, before it goes into the document. An element that the document had is used as it is.
+   */
+  nonce?: string
 }
 
 // How each style element of the engine is written: by text nodes or by `insertRule`, never both, because
@@ -592,20 +609,23 @@ function createRuleSheet(
  * it rejects when it parses the text); without it a rule goes in with `insertRule`, and one the browser
  * rejects is skipped. Rules that
  * others insert into or delete from the element do not confuse it. Its `document` is that document: a
- * cache over it reads that one (an iframe's, for a container in the iframe).
+ * cache over it reads that one (an iframe's, for a container in the iframe). An element it makes carries
+ * `options.nonce`, so that a policy that allows style elements by nonce allows it.
  */
 export function createDomSheet(
   key: string,
   container: Node = document.head,
   options: DomSheetOptions = {}
 ): Sheet {
-  const { hasRuleText = !isProduction(), onReject } = options
+  const { hasRuleText = !isProduction(), onReject, nonce } = options
   const mode = hasRuleText ? 'text' : 'rules'
   const owner = container.ownerDocument as Document
   let element = findSheetElement(owner, key, mode)
   if (!element) {
     element = owner.createElement('style')
     element.dataset.style = key
+    // Set before the element is in the document, which is when a policy checks it.
+    if (nonce !== undefined) element.setAttribute('nonce', nonce)
     container.appendChild(element)
   }
   elementModes.set(element, mode)
@@ -782,11 +802,11 @@ function assertServerStamp(page: Document, prefix: string, fingerprint: string):
   if (difference !== '') throw new Error(difference)
 }
 
-/** The sheet a cache makes for itself: in the head of its page, else in memory; a rule the browser rejects is told to `warn`. */
+/** The sheet a cache makes for itself: in the head of its page, its element with `nonce`, else in memory; a rule the browser rejects is told to `warn`. */
 function createOwnSheet(
   prefix: string,
   page: Document | undefined,
-  hasRuleText: boolean | undefined,
+  { hasRuleText, nonce }: Pick<CacheOptions, 'hasRuleText' | 'nonce'>,
   warn: ((key: string, message: string) => void) | undefined
 ): Sheet {
   const onReject = warn
@@ -795,7 +815,9 @@ function createOwnSheet(
         warn(message, message)
       }
     : undefined
-  return page ? createDomSheet(prefix, page.head, { hasRuleText, onReject }) : createMemorySheet()
+  return page
+    ? createDomSheet(prefix, page.head, { hasRuleText, onReject, nonce })
+    : createMemorySheet()
 }
 
 /** Makes a cache: it turns styles into classes and inserts each class's rules once. */
@@ -870,7 +892,7 @@ export function createCache(options: CacheOptions = {}): Cache {
   const pageThemes = new Map<string, Set<string>>()
   // The class a props class was made after (its base class), by class name.
   const afters = new Map<string, string>()
-  const sheet = options.sheet ?? createOwnSheet(prefix, page, options.hasRuleText, warnValue)
+  const sheet = options.sheet ?? createOwnSheet(prefix, page, options, warnValue)
   const registered = new Map<string, StyleObject>()
   const entries = new Map<string, SheetEntry>()
   const scoping = { prefix, hasScope }
@@ -1671,18 +1693,18 @@ export function createCache(options: CacheOptions = {}): Cache {
       .filter((name) => insertedRules.has(name))
       .sort((first, second) => (readSortKey(first) < readSortKey(second) ? -1 : 1))
     // The global rules of this page: those of the app, and those of a component that the page rendered.
-    const held = [...globals].filter(
+    const pageSets = [...globals].filter(
       ([id, entry]) => entry.appCount > 0 || rendered.has(id) || carried.has(id)
     )
     const pageAnimations = [
       ...classIds.flatMap((id) => animations.get(id) ?? []),
-      ...held.flatMap(([, entry]) => entry.animations),
+      ...pageSets.flatMap(([, entry]) => entry.animations),
     ]
     const keyframesRules = [...new Set([...pageAnimations, ...named])]
       .filter((name) => isKeyframesName(name) && !carried.has(name))
       .sort(compareCodeUnits)
       .map((name) => readKeyframesRule(name))
-    const allGlobalRules = held.flatMap(([, entry]) => entry.rules)
+    const allGlobalRules = pageSets.flatMap(([, entry]) => entry.rules)
     // The root theme of the page is the one in the sheet: the one that the last render declared.
     const rootIds = root === undefined ? [] : [root.id]
     const allThemeIds = [...rootIds, ...themeIds]
@@ -1697,7 +1719,7 @@ export function createCache(options: CacheOptions = {}): Cache {
       .sort(compareCodeUnits)
     const newRoots = rootIds.filter((id) => !carried.has(id))
     const newThemes = themeIds.filter((id) => !carried.has(id))
-    const newGlobals = held.filter(([id]) => !carried.has(id))
+    const newGlobals = pageSets.filter(([id]) => !carried.has(id))
     const newClasses = classIds.filter((id) => !carried.has(id))
     const rootRules = newRoots.flatMap((id) => {
       const theme = roots.get(id) as RootTheme
@@ -1763,6 +1785,8 @@ export function createCache(options: CacheOptions = {}): Cache {
   const self: Cache = {
     prefix,
     hasLayers,
+    nonce: options.nonce,
+    document: page,
     layerOrder,
     registered,
     ...createCompilers(own),

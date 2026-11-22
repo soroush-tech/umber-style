@@ -86,6 +86,7 @@ export const fixtures: readonly FixtureConfig[] = [
     sharesProcess: true,
     scenarios: ['A', 'B', 'C', 'D', 'F', 'H', 'I', 'J', 'K', 'L', 'M'],
     known: {},
+    only: 'vue-ssr*.spec.ts',
   },
 ]
 

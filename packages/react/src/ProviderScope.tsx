@@ -153,6 +153,8 @@ export interface ScopeTheme {
   readonly base?: ScopeBase
   /** The style elements of the other classes of the wrapper: the scope class, and the classes in `className`. */
   readonly styles: readonly StyleText[]
+  /** The nonce of the cache (`CacheOptions.nonce`), which every style element of the provider carries. */
+  readonly nonce?: string
 }
 
 /** The props of `ProviderScope`: what a provider of the server build hands to its browser part. */
@@ -307,7 +309,11 @@ export function ProviderScope({
     React.Fragment,
     null,
     styles.list.map(({ href, text }) =>
-      React.createElement('style', { key: href, href, precedence: prefix }, text)
+      React.createElement(
+        'style',
+        { key: href, href, precedence: prefix, nonce: theme?.nonce },
+        text
+      )
     ),
     wrapper === undefined
       ? content

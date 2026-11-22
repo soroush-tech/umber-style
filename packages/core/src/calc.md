@@ -3,7 +3,7 @@
 ## What it does
 
 Arithmetic on tokens: `multiply`, `divide`, `add`, `subtract` and `negate`. Each takes numbers and CSS
-values (an `Operand` is a string or a number) and returns a number when it can, a literal length when it can,
+values (an `Operand` is a string or a number, and a value of `useStyleValue` is taken as one) and returns a number when it can, a literal length when it can,
 and otherwise one `calc(...)` string for the browser to compute.
 
 ## Why it exists
@@ -17,7 +17,7 @@ values are known, and becomes a `calc()` only where it has to. They are exported
 
 ```mermaid
 flowchart TD
-  start["multiply, divide, negate(value, factor)"] --> read["readStandIn, then check operand and factor"]
+  start["multiply, divide, negate(value, factor)"] --> read["readOperand: a value as its reference, a stand-in as its path; then check operand and factor"]
   read --> zero{"factor is 0?"}
   zero -->|"yes, divide"| range["throw RangeError"]
   zero -->|"yes, multiply"| retZero["return 0"]
@@ -41,11 +41,13 @@ flowchart TD
 `toTerm` turns a number into `Npx` and puts parentheses around an operand that is already one whole `calc(...)`
 (`unwrapCalc` checks that the first parenthesis closes only at the end, so `calc(a) + calc(b)` is not one
 calc). `tidy` rounds to six decimals and adds `0` so that `-0` becomes `0`. A stand-in from `keyframes` is
-read as its path before anything else.
+read as its path before anything else, and a value of `useStyleValue` as its reference (`readOperand`): the
+helpers return text for it, never a value object, so what a style gets is a string.
 
 ## The data
 
-An operand is a number, a literal length (`'8px'`, `' 1.5REM '`, `'50%'`, `'.5em'`, with the unit
+An operand is a value of `useStyleValue` (`liveValue.ts`), read as the reference to its variable,
+`var(--<prefix>-value-<id>, <first>)`, so it is carried into a calc like a token; or a number, a literal length (`'8px'`, `' 1.5REM '`, `'50%'`, `'.5em'`, with the unit
 lowered), or any other string, which is carried into a calc as it is. Examples from `calc.test.ts`:
 
 ```

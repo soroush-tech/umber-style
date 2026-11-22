@@ -3,7 +3,7 @@
 ## What it does
 
 `bindEngine(engine)` builds the whole Vue styling of one engine and returns the `Style<T>` object: `engine`,
-`cache`, `styled`, `StyleSheet`, `useStyle`, `apply`, `css`, `ThemeProvider`, `ThemeScope`, `useTheme`,
+`cache`, `styled`, `StyleSheet`, `useStyle`, `useStyleValue` (`useStyleValue.ts`), `apply`, `css`, `ThemeProvider`, `ThemeScope`, `useTheme`,
 `useThemeClass`, `themeClass`, `when`, `whenScheme`, `keyframes`, `globalStyles` and `Global`.
 `createStyle(theme, options)` makes an engine (or takes `options.engine`) and binds it.
 

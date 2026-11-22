@@ -17,6 +17,7 @@ import { createGlobal } from './Global'
 import { createStyled } from './styled'
 import { createThemeKeys, createThemeProvider, createThemeScope } from './ThemeProvider'
 import type { Sheet, Style, StyleOptions } from './types'
+import { createUseStyleValue } from './useStyleValue'
 
 export type { StyleOptions } from './types'
 
@@ -63,6 +64,7 @@ export function bindEngine<T extends object>(engine: Engine<T>): Style<T> {
       ) as SheetEntries<string>
       return cache === undefined ? entries : engine.withCache(cache).adoptSheet(entries)
     }) as Style<T>['useStyle'],
+    useStyleValue: createUseStyleValue(() => engine.cache),
     // The class is made in the cache of the entries: under a cache provider, those of `useStyle`.
     apply: (...entries) => ({
       class: (findEntryCache(entries) ?? engine.cache).css(...entries) || undefined,

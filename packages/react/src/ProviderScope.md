@@ -47,7 +47,8 @@ build, once one exists).
   to `{ scope }`, where `scope` is `{ as, className }` of the nearest nested wrapper, or `null`.
 - `PrefixStyle`: `{ contexts, holder? }`, one for each prefix, in `readPrefixStyle`'s map.
 - `ScopeTheme`: everything the server build computed for either outcome: `as`, `className`, `classId`,
-  `rootId`, `layerOrder`, `tokens`, `properties`, `isWhole`, optional `base`, `styles`.
+  `rootId`, `layerOrder`, `tokens`, `properties`, `isWhole`, optional `base`, `styles`, and the optional
+  `nonce` of the cache, which every style element rendered here carries as its `nonce` prop.
 - A style element as data is a `StyleText`: `{ href, text }`.
 
 ## What it guarantees
@@ -61,6 +62,8 @@ build, once one exists).
 - `keepRootRule` leaves one root rule of the prefix in the style elements React keeps, and touches no
   element of the browser's cache or a registry.
 - The server and the browser write the same text from the same props, with the core's tokens and no engine.
+- Every style element it renders has the `nonce` of `ScopeTheme`, so under a policy that allows style
+  elements by nonce React keeps their rules on the server and the browser lets in the ones it adds.
 
 ## Decisions
 

@@ -429,6 +429,37 @@ So the developer tools show which components styled the element, and a test find
 
 Every class the merge makes carries the joined label: the override class with layers, the one merged class of the element without them (`umber-Typography-Link-<hash>`). The base and props classes of the root stay the root's own.
 
+## A value that changes without a render
+
+A plain object in `style` is the default way to give a component a value: each value is a class, and the class of the old value goes when nothing uses it (see [No inline styles](no-inline-styles.md#a-value-that-changes)). For a value that changes many times a second (a slider's thumb, a progress bar, a scroll position) `useStyleValue` writes the class once and changes a CSS variable instead:
+
+```tsx
+const style = createStyle({}, { prefix: 'sb' })
+const Thumb = style.styled('div', { name: 'Thumb' })({ position: 'absolute' })
+
+function Slider() {
+  const [left, setLeft] = style.useStyleValue(10, '%')
+  return <Thumb data-testid="thumb" style={{ left: `${left}`, top: multiply(left, 2) }} />
+}
+```
+
+`setLeft(next)`, or `setLeft((previous) => previous + 5)`, changes the declaration of the variable in place. In `packages/react/src/useStyleValue.test.tsx` 300 calls change the declared value each time, the component renders once, and its class stays the same; in Chromium (`useStyleValue.browser.test.tsx`) the computed `left` follows each of 300 calls with no rule written or removed, and a `transition: left 2s linear` on the element runs (`left` is `100px` halfway between `0px` and `200px`).
+
+The two differences from `useState`:
+
+- The setter renders nothing. What reads the number in JavaScript reads `left.get()`; nothing that rendered from it renders again.
+- `left` is not a number. In a style it is the reference to its variable, `var(--<prefix>-value-<id>, 10%)`: write it in a template string (`${left}`) or give it to `add`, `subtract`, `multiply`, `divide` and `negate`, which take it as they take a token. `left + 1` is a type error. `left.get()` is the number.
+
+**The unit.** The variable holds the number as the engine writes a number for any custom property: as it is, with no unit. Give the unit as the second argument (`useStyleValue(0, 'px')`, `useStyleValue(10, '%')`) and the variable holds `0px`, `10%`, so `left: ${left}` is a length. A unit is `%` or letters; another throws a `TypeError`, and so does a number that is not finite.
+
+**Where it is declared.** While the component is mounted its variable is declared in a rule of its own, `:root{--<prefix>-value-<id>:10%;}`, in the theme layer (`@layer <prefix>-theme`, or no layer without layers), in a style element of its own, `<style data-style="<prefix>-values">`, written with `insertRule`, so a change touches that one declaration and parses nothing. The element carries the nonce of the cache. Under a `CacheProvider` the variable is named after the provider's prefix and declared in its cache's document (an iframe's: tested in Chromium too). The rule is removed when the component unmounts. No `style` attribute is rendered.
+
+**A server render.** The reference carries the first number as its fallback, so the class that a server sends with the page shows it with no rule and no script: `{left:var(--ss-value-..., 25%);}` (`useStyleValue.ssr.test.tsx`). The variable is named from `useId`, so the browser makes the same class, and hydration writes nothing again; the rule is declared once the component is mounted. In the server components build `useStyleValue` gives a value whose reference is its first number, and its setter changes only `get()`, with a warning in development: a server component does not run in the browser.
+
+**Vue.** `useStyleValue(initial, unit?)` in `setup` gives the value in the shape of a ref: `${left}` in a style, `left.value = 40` to change it with no render, `left.value` and `left.get()` to read it (`packages/vue/src/useStyleValue.test.ts`).
+
+Use a plain object in `style` for a value that changes now and then (a size from a prop, a measured width): it is the default, and costs a class per value. Use `useStyleValue` for one that changes on every frame. Measured by `packages/react/bench/values-setter.bench.ts` in jsdom (50 changes, then one macrotask): 1.40 ms through the setter, 9.19 ms through a render with a plain object in `style`.
+
 ## Limits
 
 - What the template form does not read: an at-rule that is a statement (`@import`, `@charset`) is an error; `/*` inside an unquoted `url(...)` starts a comment (quote the URL); an interpolation is a statement of its own only when it stands alone on its line, so `${card} color: red;` reads `${card} color` as a property name; a value is text, so a number without a unit (`padding: 8`) is written as `8`, where the object `{ padding: 8 }` writes `8px`; a nested selector without `&` (`a:hover { }`) is a descendant of the element.
@@ -448,3 +479,9 @@ Every class the merge makes carries the joined label: the override class with la
 - A `label` is not checked: a space or a character that a class name cannot hold is written into the class name as it is.
 - Only the tags of React's JSX types are own members of `styled` (in Vue too, which shares the list). `Object.assign` does not copy another name that a shorthand would make on access, such as a custom element: write `styled('my-element')` for it.
 - A value that a function style returns that is not a style is checked in development only, where `process.env.NODE_ENV` is `development`. A key whose value is `undefined`, `null` or `false` cannot be used to remove an earlier declaration: give the property another value, such as `initial` or `auto`.
+- `useStyleValue` does not exist on React Native: a variable does not exist there, and its form on the platform waits for its animations (a later task). A source that calls it runs on the web only.
+- The value of `useStyleValue` is placed in a style through a template string or a helper. The value object itself is not a style value: the types reject it, and given from plain JavaScript it is read as a nested style. The helpers take it as an operand; their factor is still a number (`multiply(left, 2)`), so a unit is given to the value, not to `multiply`.
+- Each component that calls `useStyleValue` has a variable of its own, so each has a class of its own for the style that reads it. The variable is named from `useId`: two React roots of one page with the same `identifierPrefix` could give two components the same name.
+- The cache of a value is the one above the component when it first rendered: a `CacheProvider` that changes its `value` later does not move it.
+- The rule of a value is declared in an effect (an insertion effect in React, `onMounted` in Vue): until then, and on a page with no script, the fallback (the first number) is in effect. `extractPageStyles` does not send the rule: there is none on a server.
+- The benchmark runs in jsdom, which computes no layout and paints nothing: what a browser does after the change is in neither case. The frame times of a real slider (the Definition of Done of the issue) were not measured here.

@@ -47,7 +47,8 @@ export function subscribeToWindow(listener: () => void): () => void {
       platformAppearance.addChangeListener(notify),
       platformAccessibility.addEventListener('reduceMotionChanged', setReducedMotion)
     )
-    void platformAccessibility.isReduceMotionEnabled().then(setReducedMotion)
+    // A platform that fails to answer leaves the value as it was: no preference until a change says otherwise.
+    void platformAccessibility.isReduceMotionEnabled().then(setReducedMotion, () => undefined)
   }
   return () => {
     listeners.delete(listener)

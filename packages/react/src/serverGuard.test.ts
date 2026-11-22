@@ -61,6 +61,7 @@ describe('the server build', () => {
       'styled.server.ts',
       'styledParts.ts',
       'types.ts',
+      'useStyleValue.server.ts',
     ])
   })
 

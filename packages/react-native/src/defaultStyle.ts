@@ -7,7 +7,8 @@ import {
   type Theme,
 } from '@umber-style/core'
 import type { NativeStyleObject } from './nativeStyle'
-import { bindHolder, type NativeHolder } from './createStyle'
+import { bindHolder } from './createStyle'
+import type { ThemeHolder } from './ThemeValue'
 import type { NativeTheme } from './nativeTheme'
 import { platformStyleSheet } from './platform'
 import type {
@@ -29,7 +30,7 @@ export interface DefaultStyleOptions extends StyleOptions<Theme> {
 
 /** Makes the default styling: one holder of the base theme, behind `styled`, `ThemeProvider` and the rest. */
 export function createDefaultStyle() {
-  const holder: NativeHolder<Theme> = { baseTheme: undefined }
+  const holder: ThemeHolder<Theme> = { baseTheme: undefined }
   let bound: NativeStyle<Theme> | undefined
   let settings: DefaultStyleOptions = {}
   // The context exists before the style is used, so that it can be exported.

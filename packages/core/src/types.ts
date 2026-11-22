@@ -36,6 +36,12 @@ export interface EngineOptions extends TokenOptions {
   hasDevChecks?: boolean
   /** Whether the style element of the cache holds its rules as text, readable through `textContent`, rather than written with `insertRule` (see `DomSheetOptions`). Default: on when `process.env.NODE_ENV` is not `production`; used when the engine makes its cache. */
   hasRuleText?: boolean
+  /**
+   * The nonce of a content security policy that allows style elements by nonce, for the style elements
+   * made from the cache (`CacheOptions.nonce`): the browser's sheet, the tags of a server render and the
+   * style elements of the bindings. Used when the engine makes its cache.
+   */
+  nonce?: string
   /** Theme paths (dotted, or top-level keys) whose variables are always declared, for code outside the engine that reads them. */
   alwaysDeclare?: readonly string[]
   /** The cache to use; one is made when not given. */
@@ -57,7 +63,7 @@ export type StyleFunction<T, P> = (props: P & { theme: T }) => StyleResult
 /** A style object, or a function of the props and the theme; the defaults accept any function. */
 export type StyleInput<T = never, P = never> = WebStyleObject | StyleFunction<T, P>
 
-/** The label of a styled component, and what it takes from the styles of the one it wraps. */
+/** How a styled component labels its class: a name and a slot, or a label written as it is. */
 export interface StylerOptions {
   /** With `slot`, the label of the class: `name-slot` in kebab-case. */
   name?: string

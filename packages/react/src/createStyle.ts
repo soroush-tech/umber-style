@@ -27,6 +27,7 @@ import { createStyled } from './styled'
 import { createThemeProvider } from './ThemeProvider'
 import { createThemeValue, type ThemeContexts } from './ThemeValue'
 import type { ServerStyleOptions, SheetDefinition, StyleOptions, WebStyle } from './types'
+import { createUseStyleValue } from './useStyleValue'
 
 export type { StyleOptions } from './types'
 
@@ -85,6 +86,7 @@ export function bindEngine<T extends object>(
     styled: createStyled(engine, useThemeView, renderStyleElements),
     StyleSheet: { create },
     useStyle,
+    useStyleValue: createUseStyleValue(() => engine.cache),
     // The class is made in the cache of the entries: under a cache provider, the entries of `useStyle`
     // are that cache's.
     apply: (...entries) => ({

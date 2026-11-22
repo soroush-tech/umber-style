@@ -26,7 +26,7 @@ flowchart TD
   rules -->|yes| skip["no element: a class of someone else"]
   rules -->|no| anims["cache.getAnimations(name): each @keyframes once"]
   anims --> text["href = name, text = layerOrder + rules"]
-  text --> elems["style href precedence=prefix"]
+  text --> elems["style href precedence=prefix nonce=cache.nonce"]
   sets["global sets"] --> hasRules{"set has rules, id not sent?"}
   hasRules -->|yes| gAnims["animations first, then the set"]
   hasRules -->|no| skip2["none"]
@@ -38,7 +38,7 @@ flowchart TD
 
 - `StyleText`: `{ href, text }`. A class element is `{ href: name, text: layerOrder + rules }`; an animation is
   `{ href: animationName, text: keyframes rule }`.
-- Precedence of every element is `cache.prefix`.
+- Precedence of every element is `cache.prefix`; its `nonce` is `cache.nonce` (none when the cache has none).
 
 ## What it guarantees
 
@@ -55,7 +55,15 @@ flowchart TD
 
 - The marker for global rules replaces style elements under a cache provider, so the CSS extracted for a page
   holds its sets and another page's does not.
+- The nonce is a prop of each element, not something written into the text. React's server render merges the
+  elements of one precedence into one `<style>` and writes on it the style nonce of the render
+  (`nonce: { style }`), keeping the rules of an element only when its `nonce` prop is that nonce
+  (`nonce.ssr.test.tsx`); in the browser React sets the prop on the element it makes. So the cache and the
+  render must be given the same nonce.
 
 ## Limits
 
 - `collectStyleTexts` sends an animation only once for each call; across calls React's `href` dedupes it.
+- The nonce is the cache's, fixed when the engine made it: a server that renders many requests with one engine
+  sends the same nonce in each. A nonce for each request needs a cache for each request (a `CacheProvider`,
+  under which no style element is rendered here, and the registry writes its own).

@@ -4,7 +4,8 @@
 
 The public entry of `@umber-style/core`. It re-exports the engine from the files of `src/`: the cache, the
 engine factory, the style and token types, the helpers (`alpha`, `calc`, `at`, `hash`, `mergeDeep`, lazy
-records), the page extraction, `keyframes`, `globalStyles`, the theme functions and the template readers.
+records), the page extraction (and the escaped `nonce` attribute of a tag), `keyframes`, `globalStyles`, the
+values of `useStyleValue` (`liveValue.ts`), the theme functions and the template readers.
 It holds no logic of its own.
 
 ## Why it exists
@@ -18,7 +19,7 @@ that internal helpers stay private.
 ```mermaid
 flowchart LR
   whole["export * from alpha, at, cache, calc, createEngine, extractStyles, findMissingStyles, hash, lazyRecord, mergeDeep, scope, styleTypes, tagShorthands, themeInput, tokens, types, webStyle"]
-  named["named exports: findCache, css helpers, isDevelopment, globalStyles, keyframes, serialize helpers, sheetEntry helpers, readSharedState, theme functions, template readers, createGlobalMarker"]
+  named["named exports: findCache, css helpers, isDevelopment, globalStyles, keyframes, liveValue, serialize helpers, sheetEntry helpers, readSharedState, theme functions, template readers, createGlobalMarker"]
   types["type-only: RegisteredSyntax, umberCache types"]
   whole --> entry["index.ts"]
   named --> entry
@@ -32,7 +33,10 @@ flowchart LR
   `fingerprint.ts`, `referenceKeys.ts`, `codeAt.ts`, `cacheRegistry.ts` apart from `findCache`) is internal.
 - Of `devChecks.ts` only `isDevelopment` is exported; of `css.ts` five functions; of `serialize.ts` four
   names and two types.
-- `index.test.ts` pins the surface.
+- `index.test.ts` pins the surface, and compares every value exported with the table of
+  `docs/plain-javascript.md`, which must list each one once and nothing else.
+- Of `liveValue.ts` the value, its rule, the test and the writer are exported; `readLiveName` and
+  `readLiveText` stay internal.
 
 ## Decisions
 
@@ -42,5 +46,6 @@ flowchart LR
 
 ## Limits
 
-- The last export line (`templateStyle`) is out of the alphabetical order of the rest; the code does not
-  say whether that is on purpose.
+- The exports are in the alphabetical order of their files. The order of the lines does not decide when
+  a file is evaluated for the files that others import first: `templateStyle.ts`, for example, is loaded
+  through `cache.ts` and `keyframes.ts` before its own line is reached.

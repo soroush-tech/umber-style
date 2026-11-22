@@ -19,6 +19,7 @@ import { createRequestSlot, type CacheFunction } from './serverContext'
 import { createStyled } from './styled.server'
 import { createThemeProvider } from './ThemeProvider.server'
 import type { ServerStyle, SheetDefinition, StyleOptions } from './types'
+import { createServerStyleValue } from './useStyleValue.server'
 
 export type { StyleOptions } from './types'
 
@@ -84,6 +85,7 @@ export function bindEngine<T extends object>(
     styled: createStyled(engine, readViewTheme),
     StyleSheet: { create },
     useStyle,
+    useStyleValue: createServerStyleValue(engine.cache),
     apply: (...entries) => ({ className: engine.css(...entries) || undefined }),
     css: ((...args: unknown[]) => createCssEntry(engine.cache, args)) as ServerStyle<T>['css'],
     ThemeProvider: createThemeProvider(engine, { readFirstSlot, readBaseTheme }),

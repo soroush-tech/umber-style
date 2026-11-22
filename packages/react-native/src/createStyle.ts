@@ -9,7 +9,7 @@ import {
   readStaticTemplate,
   rejectFunctions,
 } from '@umber-style/core'
-import { createThemeValue } from './ThemeValue'
+import { createThemeValue, type ThemeHolder } from './ThemeValue'
 import type {
   GlobalProps,
   NativeStyle,
@@ -170,17 +170,12 @@ function useThemeClass(): string | undefined {
   return undefined
 }
 
-/** Where the base theme lives: set by the outermost provider, or by the app. */
-export interface NativeHolder<T> {
-  baseTheme: T | undefined
-}
-
 /**
  * Makes the React Native styling over a holder of the base theme; the theme context is made here unless
  * given. Of `options`, `remBase` and `lengthKeys` are used: a theme is converted under `lengthKeys`.
  */
 export function bindHolder<T extends object>(
-  holder: NativeHolder<T>,
+  holder: ThemeHolder<T>,
   context?: Context<NativeTheme<T> | undefined>,
   options: StyleOptions<T> = {}
 ): NativeStyle<T> {
