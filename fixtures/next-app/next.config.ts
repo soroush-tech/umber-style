@@ -6,6 +6,7 @@ const config: NextConfig = {
     '@umber-fixtures/shared',
     '@umber-style/react',
     '@umber-style/core',
+    '@umber-style/cache',
     '@umber-style/is-prop-valid',
   ],
   // The production build is what the tests run against.

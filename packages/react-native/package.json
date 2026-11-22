@@ -68,6 +68,7 @@
   },
   "devDependencies": {
     "@soroush.tech/bench": "^2.2.3",
+    "@soroush.tech/styled-system": "^6.0.1",
     "@testing-library/react": "^16.3.3",
     "@types/node": "^26.6.6",
     "@types/react": "^19.3.0",

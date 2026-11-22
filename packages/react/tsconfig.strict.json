@@ -8,6 +8,8 @@
     "src/defaultStyle.test.tsx",
     "src/defaultStyle.server.test.tsx",
     "src/defaultStyle.ssr.test.tsx",
+    "src/configureFromLibrary.docs.test.tsx",
+    "src/watchProvidedCaches.test.tsx",
     "src/index.test.ts",
     "src/index.server.test.ts",
     "src/styleTypes.default.test.tsx"

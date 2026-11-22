@@ -12,8 +12,10 @@
   },
   "dependencies": {
     "@umber-fixtures/shared": "workspace:*",
+    "@umber-style/cache": "workspace:*",
     "@umber-style/core": "workspace:*",
     "@umber-style/react": "workspace:*",
+    "@umber-style/server": "workspace:*",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "vike": "0.4.270"

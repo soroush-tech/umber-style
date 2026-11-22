@@ -25,6 +25,31 @@ configure({ prefix: 'umber', theme: lightTheme })
 
 `configure` takes the options of `createStyle` and a `theme`. It throws if the default style has already been used.
 
+### A library that wraps the engine
+
+A design system that re-exports the default style configures it for its users. Do it in a function that the app calls, not in a module that the library imports only for its side effect:
+
+```ts
+// engine.ts of the library
+import { configure } from '@umber-style/react'
+import { lightTheme } from './theme'
+
+let isConfigured = false
+
+/** Configures the engine of the library. The app calls it once, before it renders. */
+export function setUpEngine(): void {
+  if (isConfigured) return
+  isConfigured = true
+  configure({ prefix: 'soroush', theme: lightTheme })
+}
+```
+
+A library whose `package.json` says `"sideEffects": false` tells the bundler that a module can be dropped when nothing it exports is used. `import './engine'` uses nothing, so a production build may leave the module out: `configure` never runs, and nothing says so, because an unconfigured default style works, with the prefix `css` and the default options. A function that the app calls is used, so it is kept. If the library keeps a module for its side effect, list it in `sideEffects` (`"sideEffects": ["./dist/engine.js"]`).
+
+The call must also run before the first `styled(...)(...)` of the default style, because that call makes the engine with the options `configure` gave so far; `configure` throws after it. A component module that calls `styled` at its top level and is imported before the module that configures binds the default style unconfigured.
+
+In development, a component of a default style that was never configured warns once when it renders under a `CacheProvider` whose cache has another key (the `key` of `createCache`): the warning names both prefixes and these two causes. A configured style may use a cache of any key, and a cache with the key `css` is the default prefix on purpose: neither warns. See [The cache and server packages](cache-and-server.md).
+
 **`@umber-style/styled`** has the `styled` of the default style as its default export, for code that imports it that way. It is the same function, so `configure` from `@umber-style/react` sets it up, and under the `react-server` condition it is the `styled` of the server build:
 
 ```tsx

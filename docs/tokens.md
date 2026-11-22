@@ -80,6 +80,42 @@ In shared code (`umber-style/react`) a token is typed as the number it is on Rea
 
 Every binding exports them, Vue's included, and so does `@umber-style/core`.
 
+#### A theme written for the web
+
+A token on React Native is a number, so a theme written for the web, with its lengths as text, is converted where the provider merges it, once for each theme object (the whole rule is in [Values with CSS units](react-native.md#values-with-css-units)):
+
+- Only the length keys of the theme are read: `space`, `sizes`, `radii`, `fontSizes` and `borderWidths`, or the `lengthKeys` option of `createStyle` or `configure` when it is given (a list replaces the default).
+- Under them, a string in `px` or with no unit is that number, at any depth, and one in `rem` is the number times `remBase` (16 unless `createStyle(theme, { remBase })` or `configure({ remBase })` says otherwise).
+- A percentage, `auto`, a function and a value that is not a string stay as they are, and so does every other key: the palette, `lineHeights`, `breakpoints` with its helpers.
+- Converting the theme warns about nothing. A value that stays a string is checked when a style uses it, in development: `em`, the viewport units, `calc()` and `currentColor` warn under any key, and a length in `px` or `rem` under a key that takes a plain number (`opacity`, `zIndex`, `flex`) warns too.
+
+From `nativeTheme.test.ts`:
+
+```ts
+// the theme as it was written
+{
+  space: ['0px', '4px', '8px', '0', '-2px', '1.5px', '.5rem'],
+  sizes: { icon: { small: '16px', large: '2rem' }, full: '100%', fit: 'auto' },
+  radii: { sm: '2px', md: 4 },
+  fontSizes: ['12px', '1rem'],
+  borderWidths: { thin: '1px' },
+}
+// what useTheme() and a style function read
+{
+  space: [0, 4, 8, 0, -2, 1.5, 8],
+  sizes: { icon: { small: 16, large: 32 }, full: '100%', fit: 'auto' },
+  radii: { sm: 2, md: 4 },
+  fontSizes: [12, 16],
+  borderWidths: { thin: 1 },
+}
+```
+
+With `createStyle(theme, { remBase: 10 })`, a `fontSizes.body` of `'1rem'` reads `10`, and a style `{ padding: '2rem' }` is `{ padding: 20 }` (`createStyle.test.tsx`). A style `{ margin: '1.5em' }` is passed as it is, with this warning in development (`warnStyle.test.ts`):
+
+```text
+@umber-style/react-native: "margin: 1.5em" is in em, which has no equivalent on React Native (a style does not know the font size around it); it is passed as it is. Write a number, or a length in rem.
+```
+
 ### String forms of token maths
 
 Code written for real values often builds strings from tokens. With a token the text is a reference, and three such forms are not valid CSS (but see the contrived case in [Limits](#limits)): the browser drops the declaration. `hasValueRepair: true` (an option of the engine and of the cache, default `false`) rewrites them in each value:

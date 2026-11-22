@@ -8,28 +8,30 @@ The suite measures UmberStyle against itself: it has no other library in it. Its
 
 Each benchmark file sits next to what it measures, in `packages/<package>/bench/`, and measures the built `dist` of that package. One operation of each case is described in a comment at the top of its file. The cases of a file compare with each other; a file never compares two versions (that is the gate's job, below).
 
-| Package        | File                            | What it measures                                                                                                                        |
-| -------------- | ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| `core`         | `classes-creation.bench.ts`     | Class creation: a small and a large style the cache has not seen (a miss), and the same or an equal style again (a hit)                 |
-| `core`         | `classes-merging.bench.ts`      | Merging two and five classes, and a class with a new style object                                                                       |
-| `core`         | `classes-rules.bench.ts`        | A small and a large style object compiled to rules, and the large one merged                                                            |
-| `core`         | `extraction.bench.ts`           | `extract()` and `createStyleTag` of a cache with 400 classes, `extractPageStyles` for one page out of ten, and the scan of its HTML     |
-| `core`         | `helpers-arithmetic.bench.ts`   | Each arithmetic helper on a token and on a literal                                                                                      |
-| `core`         | `helpers-alpha.bench.ts`        | `alpha` on a token and on a literal colour                                                                                              |
-| `core`         | `pruning-scan.bench.ts`         | Scanning rules for the variables they use                                                                                               |
-| `core`         | `pruning-mark-used.bench.ts`    | A newly used variable added to five theme classes, one that is used already, and the fresh cache the first needs                        |
-| `core`         | `sheets-object.bench.ts`        | An object sheet on first and later access, and an entry used as a class                                                                 |
-| `core`         | `sheets-function.bench.ts`      | A function sheet resolved for a new theme view and for the same one                                                                     |
-| `core`         | `tokens-references.bench.ts`    | Tokens, a theme view and the declarations of a small theme (about 20 tokens) and a large one (about 280)                                |
-| `core`         | `tokens-theme-classes.bench.ts` | A theme class of each theme for a new object and for the same object, and a nested partial theme                                        |
-| `react`        | `string-elements.bench.ts`      | `renderToString` of 48 elements: fixed styles, a function of the theme, a prop-driven style over 48 combinations, an override, an entry |
-| `react`        | `string-trees.bench.ts`         | `renderToString` of nested providers three deep, and of a tree of 500 styled elements with and without style elements                   |
-| `react`        | `server-elements.bench.ts`      | The same 48-element cases resolved with the server components build, under the `react-server` condition                                 |
-| `react`        | `server-trees.bench.ts`         | The tree of 500 resolved with the server components build, with two sets of props                                                       |
-| `vue`          | `render-elements.bench.ts`      | The same 48-element cases, server-rendered with Vue                                                                                     |
-| `vue`          | `render-trees.bench.ts`         | The tree of 500 and nested providers, server-rendered with Vue                                                                          |
-| `react-native` | `styles-elements.bench.ts`      | The same 48-element cases and the tree, resolved against a stand-in for the platform module                                             |
-| `react-native` | `styles-sheets.bench.ts`        | A function sheet resolved for a new theme and for the same one, and an entry of an object sheet                                         |
+| Package        | File                            | What it measures                                                                                                                                                             |
+| -------------- | ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `core`         | `classes-creation.bench.ts`     | Class creation: a small and a large style the cache has not seen (a miss), and the same or an equal style again (a hit)                                                      |
+| `core`         | `classes-merging.bench.ts`      | Merging two and five classes, and a class with a new style object                                                                                                            |
+| `core`         | `classes-rules.bench.ts`        | A small and a large style object compiled to rules, and the large one merged                                                                                                 |
+| `core`         | `extraction.bench.ts`           | `extract()` and `createStyleTag` of a cache with 400 classes, `extractPageStyles` for one page out of ten, and the scan of its HTML                                          |
+| `core`         | `helpers-arithmetic.bench.ts`   | Each arithmetic helper on a token and on a literal                                                                                                                           |
+| `core`         | `helpers-alpha.bench.ts`        | `alpha` on a token and on a literal colour                                                                                                                                   |
+| `core`         | `pruning-scan.bench.ts`         | Scanning rules for the variables they use                                                                                                                                    |
+| `core`         | `pruning-mark-used.bench.ts`    | A newly used variable added to five theme classes, one that is used already, and the fresh cache the first needs                                                             |
+| `core`         | `sheets-object.bench.ts`        | An object sheet on first and later access, and an entry used as a class                                                                                                      |
+| `core`         | `sheets-function.bench.ts`      | A function sheet resolved for a new theme view and for the same one                                                                                                          |
+| `core`         | `tokens-references.bench.ts`    | Tokens, a theme view and the declarations of a small theme (about 20 tokens) and a large one (about 280)                                                                     |
+| `core`         | `tokens-theme-classes.bench.ts` | A theme class of each theme for a new object and for the same object, and a nested partial theme                                                                             |
+| `css`          | `class-name.bench.ts`           | `css(style)` of this package next to `engine.css(style)` of the core, for a style the cache holds (a hit) and one it has not seen (a miss)                                   |
+| `css`          | `versus-styled.bench.ts`        | One element of the same small style rendered to a string: a `div` with the class of `css`, and a styled component of `@umber-style/react` with and without its style element |
+| `react`        | `string-elements.bench.ts`      | `renderToString` of 48 elements: fixed styles, a function of the theme, a prop-driven style over 48 combinations, an override, an entry                                      |
+| `react`        | `string-trees.bench.ts`         | `renderToString` of nested providers three deep, and of a tree of 500 styled elements with and without style elements                                                        |
+| `react`        | `server-elements.bench.ts`      | The same 48-element cases resolved with the server components build, under the `react-server` condition                                                                      |
+| `react`        | `server-trees.bench.ts`         | The tree of 500 resolved with the server components build, with two sets of props                                                                                            |
+| `vue`          | `render-elements.bench.ts`      | The same 48-element cases, server-rendered with Vue                                                                                                                          |
+| `vue`          | `render-trees.bench.ts`         | The tree of 500 and nested providers, server-rendered with Vue                                                                                                               |
+| `react-native` | `styles-elements.bench.ts`      | The same 48-element cases and the tree, resolved against a stand-in for the platform module                                                                                  |
+| `react-native` | `styles-sheets.bench.ts`        | A function sheet resolved for a new theme and for the same one, and an entry of an object sheet                                                                              |
 
 The inputs the files share (the small and the large theme, the styles, the 48 prop combinations) and the helper that lets a binding's file load built code are in `bench/src/`, a workspace package that is not under `packages/`, so the package matrix of the continuous integration does not see it. The files import them by relative path.
 
@@ -39,7 +41,7 @@ Docker has to be running (`docker info`). From the root of the repository:
 
 ```sh
 pnpm bench                   # build, then every file
-pnpm bench core              # the files of one package: core, react, vue or react-native
+pnpm bench core              # the files of one package: core, css, react, vue or react-native
 pnpm bench classes           # the files whose name has "classes" in it
 pnpm bench react string      # a package and a part of a file name together
 pnpm bench --rounds 5 --md   # options go to soroush-bench as they are, for every file

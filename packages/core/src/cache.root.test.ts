@@ -198,3 +198,37 @@ describe('the root rules of a page that a server rendered', () => {
     expect((kept.sheet as CSSStyleSheet).cssRules).toHaveLength(1)
   })
 })
+
+describe('the root rules of a registry element streamed into the body', () => {
+  const settle = () => new Promise((resolve) => setTimeout(resolve, 0))
+
+  /** A style element of a registry, `data-umber="u <ids>"`, added to the body as a late chunk is. */
+  function addLateElement(css: string) {
+    const element = document.createElement('style')
+    element.setAttribute('data-umber', 'u u-root-late')
+    element.textContent = css
+    document.body.appendChild(element)
+    return element
+  }
+  const hasRoot = (element: HTMLStyleElement) =>
+    [...(element.sheet as CSSStyleSheet).cssRules].some((rule) => rule.cssText.includes(':root'))
+
+  afterEach(() => {
+    document.body.innerHTML = ''
+  })
+
+  it('are removed with those of the head when the element is there before the browser cache declares its root theme', () => {
+    const late = addLateElement(':where(:root){--u-a:1;--u-b:2;}')
+    const cache = createCache({ hasLayers: false, prefix: 'u', sheet: createMemorySheet() })
+    declareRootTheme(cache, dark)
+    expect(hasRoot(late)).toBe(false)
+  })
+
+  it.fails('KNOWN: a root rule that arrives in the body after the browser cache declared its root theme is kept, after the rule of the cache in the document, so its old values win', async () => {
+    const cache = createCache({ hasLayers: false, prefix: 'u', sheet: createMemorySheet() })
+    declareRootTheme(cache, dark)
+    const late = addLateElement(':where(:root){--u-a:1;--u-b:2;}')
+    await settle()
+    expect(hasRoot(late)).toBe(false)
+  })
+})

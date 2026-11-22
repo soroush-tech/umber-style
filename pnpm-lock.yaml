@@ -69,6 +69,9 @@ importers:
       '@umber-fixtures/shared':
         specifier: workspace:*
         version: link:../shared
+      '@umber-style/cache':
+        specifier: workspace:*
+        version: link:../../packages/cache
       '@umber-style/core':
         specifier: workspace:*
         version: link:../../packages/core
@@ -190,12 +193,18 @@ importers:
       '@umber-fixtures/shared':
         specifier: workspace:*
         version: link:../shared
+      '@umber-style/cache':
+        specifier: workspace:*
+        version: link:../../packages/cache
       '@umber-style/core':
         specifier: workspace:*
         version: link:../../packages/core
       '@umber-style/react':
         specifier: workspace:*
         version: link:../../packages/react
+      '@umber-style/server':
+        specifier: workspace:*
+        version: link:../../packages/server
       react:
         specifier: ^19.3.1
         version: 19.3.1
@@ -474,6 +483,9 @@ importers:
       '@soroush.tech/bench':
         specifier: ^2.2.3
         version: 2.2.3
+      '@soroush.tech/styled-system':
+        specifier: ^6.0.1
+        version: 6.0.1(@emotion/is-prop-valid@1.4.0)
       '@testing-library/react':
         specifier: ^16.3.3
         version: 16.3.3(@testing-library/dom@10.4.2)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
