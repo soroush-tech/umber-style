@@ -70,6 +70,54 @@ describe('withCache', () => {
   })
 })
 
+describe('the options of the style under another cache', () => {
+  it('keeps value repair, colour fallbacks and the base class of the engine, which describe how its styles are written', () => {
+    const engine = createEngine(theme, {
+      prefix: 'css',
+      hasValueRepair: true,
+      hasColorFallbacks: false,
+      hasBaseClass: false,
+    })
+    const other = createSheetCache('frame')
+    const derived = engine.withCache(other.cache)
+    const name = derived.css({ color: `${derived.refs.palette.primary}20`, margin: '-var(--gap)' })
+    expect(other.sheet.rules).toContain(
+      `@layer frame-components{.${name}{color:color-mix(in srgb, var(--frame-palette-primary) 12.55%, transparent);margin:calc(var(--gap) * -1);}}`
+    )
+    const styler = derived.createStyler({ label: 'Box' }, [{ padding: 0 }, () => ({ margin: 0 })])
+    expect(styler.getClassName({}).split(' ')).toHaveLength(1)
+  })
+
+  it('takes from the cache what the engine was not given, and what the cache holds: layers, labels, the suffix', () => {
+    const engine = createEngine(theme, { prefix: 'css' })
+    const sheet = createMemorySheet()
+    const cache = createCache({
+      prefix: 'frame',
+      sheet,
+      hasValueRepair: true,
+      hasColorFallbacks: false,
+      hasLayers: false,
+      suffix: '-x',
+    })
+    const name = engine.withCache(cache).css({ label: 'Box', color: 'var(--c)20' })
+    expect(name).toMatch(/^frame-Box-\w+-x$/)
+    expect(sheet.rules).toEqual([
+      `.${name}{color:color-mix(in srgb, var(--c) 12.55%, transparent);}`,
+    ])
+  })
+
+  it('writes the same class for the same styles and options through either engine', () => {
+    const engine = createEngine(theme, { prefix: 'css', hasValueRepair: true })
+    const other = createSheetCache('frame')
+    const first = engine.withCache(other.cache).css({ color: 'var(--c)20' })
+    const second = createEngine(theme, { cache: other.cache, hasValueRepair: true }).css({
+      color: 'var(--c)20',
+    })
+    expect(second).toBe(first)
+    expect(other.cache.css({ color: 'var(--c)20' })).not.toBe(first)
+  })
+})
+
 describe('an entry of another cache', () => {
   it('is written into the cache that is given it, under its own class, and not into the cache that made it', () => {
     const base = createSheetCache('css')
@@ -121,5 +169,48 @@ describe('findEntryCache', () => {
     const entry = cache.createEntry({ color: 'red' })
     expect(findEntryCache(['name', { color: 'blue' }, entry])).toBe(cache)
     expect(findEntryCache(['name', null])).toBeUndefined()
+  })
+})
+
+describe('the options of the cache given to an engine with a cache', () => {
+  it('are ignored, and warned about once with the development checks', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const { cache } = createSheetCache('wo')
+    createEngine(theme, { cache, hasDevChecks: true, suffix: '-x', hasLayers: false })
+    createEngine(theme, { cache, hasDevChecks: true, hasValueRepair: true })
+    createEngine(theme, { cache, suffix: '-x' })
+    expect(warn.mock.calls).toEqual([
+      [
+        '[wo] The engine was given a cache and the options suffix, hasLayers, which the cache decides: they are ignored. Give them to createCache, or leave out the cache.',
+      ],
+    ])
+    warn.mockRestore()
+  })
+})
+
+describe('the paths of the token options', () => {
+  it('are warned about once each when they match no key of the theme, a * standing for any key', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const options = {
+      prefix: 'tp',
+      hasDevChecks: true,
+      modes: { 'palette.primry': 'raw', 'palette.*': 'inline', 'space.9': 'raw' },
+      registered: { 'palette.accent': true, sizes: true },
+      alwaysDeclare: ['palette', 'zIndex'],
+    } as const
+    createEngine(theme, options)
+    createEngine(theme, { ...options, hasDevChecks: false })
+    expect(warn.mock.calls.map(([message]) => message)).toEqual(
+      [
+        ['modes', 'palette.primry'],
+        ['modes', 'space.9'],
+        ['registered', 'sizes'],
+        ['alwaysDeclare', 'zIndex'],
+      ].map(
+        ([option, path]) =>
+          `[tp] The ${option} path "${path}" matches no key of the theme, so it does nothing: check it against the theme.`
+      )
+    )
+    warn.mockRestore()
   })
 })

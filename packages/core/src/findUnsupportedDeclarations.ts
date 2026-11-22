@@ -19,6 +19,8 @@ const KEYFRAMES_AT_RULE = '@keyframes'
 const IMPORTANT = 'important'
 /** A value that starts with a vendor prefix: a keyword or a function written for another browser. */
 const VENDOR_VALUE = /^-(?:webkit|moz|ms|o)-/i
+/** The vendor prefixes of a property, for its prefixed form in the same rule. */
+const VENDOR_PREFIXES = ['-webkit-', '-moz-', '-ms-', '-o-']
 
 /**
  * `CSS.supports` of the browser, or undefined where there is none to trust: no `CSS` (a server), one
@@ -158,7 +160,9 @@ export function describeClass(className: string, label: string): string {
  * (`-moz-available`, `-webkit-linear-gradient(...)`). For a value with `var(`, which is valid until it
  * is used, the browser is asked whether it knows the property at all. `!important` is not part of the
  * question. At-rules with descriptors (`@property`, `@font-face`) are not asked about. A class is named with
- * the label that `readLabel` gives for it, when there is one.
+ * the label that `readLabel` gives for it, when there is one. A property that the browser does not
+ * support is not reported when the same rule has a vendor-prefixed form of it that the browser supports
+ * (`-webkit-user-select:none;user-select:none;` in Safari): that form applies.
  */
 export function findUnsupportedDeclarations(
   texts: readonly string[],
@@ -177,6 +181,24 @@ export function findUnsupportedDeclarations(
   return messages
 }
 
+/** What the browser is asked about a value: `inherit` for one with `var(`, which is valid until it is used, else the value without `!important`. */
+function toAsked(value: string): string {
+  const plain = stripImportant(value)
+  return plain.includes('var(') ? 'inherit' : plain
+}
+
+/** Whether `declarations` has a vendor-prefixed form of the property `name` (`-webkit-user-select`) that the browser supports: the standard one is then not needed here. */
+function hasSupportedTwin(
+  declarations: ReadonlyMap<string, string>,
+  name: string,
+  supports: Supports
+): boolean {
+  return VENDOR_PREFIXES.some((prefix) => {
+    const twin = declarations.get(prefix + name)
+    return twin !== undefined && supports(prefix + name, toAsked(twin))
+  })
+}
+
 /** Adds to `messages` a message for each last declaration of `rule` (named `owner`) that the browser does not support (see `findUnsupportedDeclarations`). */
 function addRuleMessages(
   rule: StyleRuleText,
@@ -184,11 +206,10 @@ function addRuleMessages(
   supports: Supports,
   messages: string[]
 ): void {
-  for (const [name, value] of readLastDeclarations(rule.body)) {
-    const plain = stripImportant(value)
-    if (name.startsWith('-') || VENDOR_VALUE.test(plain)) continue
-    const asked = plain.includes('var(') ? 'inherit' : plain
-    if (supports(name, asked)) continue
+  const declarations = readLastDeclarations(rule.body)
+  for (const [name, value] of declarations) {
+    if (name.startsWith('-') || VENDOR_VALUE.test(stripImportant(value))) continue
+    if (supports(name, toAsked(value)) || hasSupportedTwin(declarations, name, supports)) continue
     messages.push(`${owner} declares ${name}:${value}, which this browser does not support`)
   }
 }

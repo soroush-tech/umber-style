@@ -1,4 +1,5 @@
 import { createCache, createDomSheet, createMemorySheet } from './cache'
+import { keyframes } from './keyframes'
 
 afterEach(() => {
   document.head.innerHTML = ''
@@ -237,5 +238,122 @@ describe('createCache over a sheet written by text', () => {
     expect(element?.textContent).toBe(`.${name}{color:red;}.${name}{color:red;}`)
     createCache({ prefix: 'fast', hasRuleText: false }).css({ color: 'red' })
     expect(document.querySelector('style[data-style="fast"]')?.textContent).toBe('')
+  })
+})
+
+describe('withStyleOptions', () => {
+  it('is the cache itself for its own options, and one view for each other set of options', () => {
+    const cache = createCache({ prefix: 'w', sheet: createMemorySheet() })
+    expect(cache.withStyleOptions({})).toBe(cache)
+    expect(cache.withStyleOptions({ hasColorFallbacks: true, hasValueRepair: false })).toBe(cache)
+    const view = cache.withStyleOptions({ hasValueRepair: true })
+    expect(cache.withStyleOptions({ hasValueRepair: true, hasColorFallbacks: true })).toBe(view)
+    expect(cache.withStyleOptions({ hasColorFallbacks: false })).not.toBe(view)
+  })
+
+  it('writes through the view with its options into the same sheet, classes and entries', () => {
+    const sheet = createMemorySheet()
+    const cache = createCache({ prefix: 'w', sheet, hasLayers: false })
+    const view = cache.withStyleOptions({ hasValueRepair: true, hasColorFallbacks: false })
+    const repaired = view.css({ color: 'var(--c)20' })
+    const plain = cache.css({ color: 'var(--c)20' })
+    const entry = view.createEntry({ margin: '-var(--m)' })
+    const held = view.cssHeld({}, { padding: '-var(--p)' })
+    const fade = view.compileGlobal({ body: { color: 'var(--c)20' } })
+    expect(view.cssIn('overrides', { color: 'var(--c)20' })).toBe(repaired)
+    expect(view.cssWith({ label: 'Box' }, { color: 'var(--c)20' })).toMatch(/^w-Box-/)
+    expect(cache.registered.get(repaired)).toEqual({ color: 'var(--c)20' })
+    expect(sheet.rules).toEqual([
+      `.${repaired}{color:color-mix(in srgb, var(--c) 12.55%, transparent);}`,
+      `.${plain}{color:var(--c)20;}`,
+      `.${held.className}{padding:calc(var(--p) * -1);}`,
+      expect.stringMatching(/^\.w-Box-\w+\{color:color-mix/),
+    ])
+    expect(String(entry)).toMatch(/^w-/)
+    expect(sheet.rules.at(-1)).toBe(`.${entry.className}{margin:calc(var(--m) * -1);}`)
+    expect(fade.rules).toEqual(['body{color:color-mix(in srgb, var(--c) 12.55%, transparent);}'])
+    expect(view.adoptEntry(entry)).toBe(entry)
+    expect(cache.adoptEntry(entry)).toBe(entry)
+  })
+
+  it('writes the animations of a class of the view with its options', () => {
+    const sheet = createMemorySheet()
+    const cache = createCache({ prefix: 'w', sheet, hasLayers: false })
+    const name = keyframes({ to: { opacity: 'var(--o)', color: 'var(--c)20' } }, { label: 'wv' })
+    cache.withStyleOptions({ hasValueRepair: true }).css({ animation: `${name} 1s` })
+    expect(sheet.rules[0]).toBe(
+      `@keyframes ${name}{100%{opacity:var(--o);color:color-mix(in srgb, var(--c) 12.55%, transparent);}}`
+    )
+  })
+})
+
+describe('input that the cache leaves out, with the development checks', () => {
+  it('warns once about a value given to css that is not a style, with the label of the class', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const cache = createCache({ prefix: 'lo', sheet: createMemorySheet(), hasDevChecks: true })
+    const fn = () => ({})
+    expect(cache.css(5 as never, true as never, fn as never)).toBe('')
+    cache.css(5 as never)
+    cache.cssWith({ label: 'Box' }, [true as never, { color: 'red' }])
+    cache.cssHeld({}, 7 as never)
+    expect(warn.mock.calls.map(([message]) => message)).toEqual([
+      '[lo] css() was given 5, which is not a style: it is left out. Give a style object, a css() value, a class name, or a list of them.',
+      '[lo] css() was given true, which is not a style: it is left out. Give a style object, a css() value, a class name, or a list of them.',
+      '[lo] css() was given a function, which is not a style: it is left out. Give a style object, a css() value, a class name, or a list of them.',
+      '[lo] css() was given true for "Box", which is not a style: it is left out. Give a style object, a css() value, a class name, or a list of them.',
+      '[lo] css() was given 7, which is not a style: it is left out. Give a style object, a css() value, a class name, or a list of them.',
+    ])
+    warn.mockRestore()
+  })
+
+  it('warns about an @scheme key that names no scheme, at any depth, and not without the checks', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const cache = createCache({ prefix: 'lo', sheet: createMemorySheet(), hasDevChecks: true })
+    const name = cache.css({
+      '@scheme blue': { color: 'blue' },
+      '&:hover': { '@scheme Dark': { color: 'red' }, '@scheme dark': { color: 'red' } },
+    })
+    createCache({ prefix: 'lo', sheet: createMemorySheet() }).css({
+      '@scheme blue': { color: 'blue' },
+    })
+    expect(warn.mock.calls.map(([message]) => message)).toEqual(
+      ['@scheme blue', '@scheme Dark'].map(
+        (key) =>
+          `[lo] the class ${name} has the key "${key}": a color scheme is light or dark, so it is written as an at-rule that the browser does not know, and drops. Use whenScheme('light') or whenScheme('dark').`
+      )
+    )
+    warn.mockRestore()
+  })
+})
+
+describe('a rule that the browser rejects', () => {
+  afterEach(() => {
+    document.head.innerHTML = ''
+  })
+
+  it('is skipped by a sheet written by insertRule, which tells onReject with the message', () => {
+    const onReject = vi.fn()
+    const sheet = createDomSheet('rj', document.head, { hasRuleText: false, onReject })
+    sheet.insert('.a{color:red;}')
+    sheet.insert('}{')
+    expect(sheet.rules).toEqual(['.a{color:red;}'])
+    expect(onReject).toHaveBeenCalledWith('}{', expect.any(String))
+  })
+
+  it('is warned about once by a cache with the development checks, with its selector', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const cache = createCache({ prefix: 'rj', hasRuleText: false, hasDevChecks: true })
+    cache.insertOnce('bad', ['@layer rj-components{.a{color:red;}}}{'])
+    cache.insertOnce('other', ['}{'])
+    const messages = warn.mock.calls.map(([message]) => String(message))
+    expect(messages.filter((message) => message.includes('rejected'))).toEqual([
+      expect.stringMatching(
+        /^\[rj\] the browser rejected the rule of \.a \(.+\): it is left out\.$/
+      ),
+      expect.stringMatching(
+        /^\[rj\] the browser rejected the rule of \}\{ \(.+\): it is left out\.$/
+      ),
+    ])
+    warn.mockRestore()
   })
 })

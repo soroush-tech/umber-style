@@ -12,8 +12,10 @@ export interface TokenOptions {
   /** Top-level theme keys whose numbers are lengths, declared with px. Default ['space', 'sizes', 'radii', 'fontSizes', 'borderWidths']. */
   lengthKeys?: readonly string[]
   /**
-   * The mode of a token, by dotted theme path ('zIndex', 'transitions.duration', 'palette.primary').
-   * The most specific path wins, and an entry beats `rawKeys`. Default mode: `variable`.
+   * The mode of a token, by dotted theme path ('zIndex', 'transitions.duration', 'palette.primary'), or
+   * by a pattern in which `*` stands for any one key ('typography.*.fontSize'). The longest path wins, an
+   * exact path before a pattern of the same length and a pattern with fewer `*` before one with more,
+   * and an entry beats `rawKeys`. Default mode: `variable`.
    */
   modes?: Readonly<Record<string, TokenMode>>
   /**
@@ -90,7 +92,41 @@ function findByPath<V>(entries: ReadonlyMap<string, V>, path: readonly string[])
   return undefined
 }
 
-/** The dotted paths above each key of `modes`: 'a.b.c' gives 'a' and 'a.b'. */
+/** Whether the dotted path `pattern`, split, with `*` for any one key, is `path`. */
+function matchesPattern(pattern: readonly string[], path: readonly string[]): boolean {
+  return (
+    pattern.length === path.length &&
+    pattern.every((part, index) => part === '*' || part === path[index])
+  )
+}
+
+/** The `modes` entries with a `*` in their path, the fewest `*` first: the more specific pattern wins. */
+function collectPatterns(modes: ReadonlyMap<string, TokenMode>): [string[], TokenMode][] {
+  return [...modes]
+    .map(([key, mode]): [string[], TokenMode] => [key.split('.'), mode])
+    .filter(([parts]) => parts.includes('*'))
+    .sort(
+      ([first], [second]) =>
+        first.filter((part) => part === '*').length - second.filter((part) => part === '*').length
+    )
+}
+
+/** The mode of the longest path that `path` starts with: at each length the entry of that exact path, else the first pattern that matches it. */
+function findMode(
+  modes: ReadonlyMap<string, TokenMode>,
+  patterns: readonly [string[], TokenMode][],
+  path: readonly string[]
+): TokenMode | undefined {
+  for (let length = path.length; length > 0; length--) {
+    const start = path.slice(0, length)
+    const mode =
+      modes.get(start.join('.')) ?? patterns.find(([parts]) => matchesPattern(parts, start))?.[1]
+    if (mode !== undefined) return mode
+  }
+  return undefined
+}
+
+/** The dotted paths above each key of `modes`: 'a.b.c' gives 'a' and 'a.b' (with a `*` as it is written). */
 function collectParents(modes: ReadonlyMap<string, TokenMode>): Set<string> {
   const parents = new Set<string>()
   for (const key of modes.keys()) {
@@ -103,19 +139,38 @@ function collectParents(modes: ReadonlyMap<string, TokenMode>): Set<string> {
   return parents
 }
 
+/** Whether `node` has the dotted `path` (a key, a deeper path; `*` stands for any one key). */
+function hasPath(node: unknown, path: readonly string[]): boolean {
+  if (path.length === 0) return true
+  if (typeof node !== 'object' || node === null) return false
+  const [first, ...rest] = path
+  const values = first === '*' ? Object.values(node) : [(node as Record<string, unknown>)[first]]
+  return values.some((value) => value !== undefined && hasPath(value, rest))
+}
+
+/** The paths of `paths` (dotted, `*` for any one key) that `theme` does not have: an option given for them does nothing. */
+export function findMissingPaths(theme: object, paths: Iterable<string>): string[] {
+  return [...paths].filter((path) => !hasPath(theme, path.split('.')))
+}
+
 /** Turns a theme into variable references and the declarations that give them values. */
 export function createTokens<T extends object>(theme: T, options: TokenOptions = {}): Tokens<T> {
   const { prefix = '', rawKeys = DEFAULT_RAW_KEYS, lengthKeys = DEFAULT_LENGTH_KEYS } = options
   const modes = new Map(Object.entries(options.modes ?? {}))
   const registered = new Map(Object.entries(options.registered ?? {}))
   const parents = collectParents(modes)
+  const patterns = collectPatterns(modes)
+  const patternParents = [...parents]
+    .map((parent) => parent.split('.'))
+    .filter((parts) => parts.includes('*'))
 
   const toName = (path: readonly string[]) =>
     `--${[prefix, ...path.map(toSegment)].filter(Boolean).join('-')}`
 
-  /** The mode of the token at `path`: the longest path in `modes`, else `rawKeys`, else variable. */
+  /** The mode of the token at `path`: the longest path in `modes` (an exact path before a pattern), else `rawKeys`, else variable. */
   const readMode = (path: readonly string[]): TokenMode => {
-    const mode = findByPath(modes, path)
+    // Without a pattern the exact paths are all there is to read.
+    const mode = patterns.length === 0 ? findByPath(modes, path) : findMode(modes, patterns, path)
     if (mode !== undefined) return mode
     return rawKeys.includes(path[0]) ? 'raw' : 'variable'
   }
@@ -123,7 +178,10 @@ export function createTokens<T extends object>(theme: T, options: TokenOptions =
   /** Whether everything under `path` keeps its real value: one mode that writes no variable, and no entry deeper down. */
   const isKept = (path: readonly string[]): boolean => {
     const mode = readMode(path)
-    return (mode === 'raw' || mode === 'inline') && !parents.has(path.join('.'))
+    const hasDeeper =
+      parents.has(path.join('.')) ||
+      (patternParents.length > 0 && patternParents.some((parts) => matchesPattern(parts, path)))
+    return (mode === 'raw' || mode === 'inline') && !hasDeeper
   }
 
   /** Whether `value` is a number under a length key: it is a length, written in px unless it is 0. */

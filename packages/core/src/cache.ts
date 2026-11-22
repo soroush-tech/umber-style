@@ -1,7 +1,7 @@
 import { registerCache } from './cacheRegistry'
 import { hashString } from './hash'
 import { createDevChecker, createWarner, isDevelopment, isProduction } from './devChecks'
-import { findInvalidValues } from './findInvalidValues'
+import { findInvalidValues, findUnknownSchemeKeys } from './findInvalidValues'
 import { describeClass } from './findUnsupportedDeclarations'
 import { createFingerprint, describeFingerprintDifferences } from './fingerprint'
 import { compileGlobalRules, type GlobalStyleObject } from './globalStyles'
@@ -16,10 +16,30 @@ import {
   type EntrySource,
   type SheetEntry,
 } from './sheetEntry'
-import { compileRules, mergeStyles, readLabel, type StyleObject } from './serialize'
+import {
+  compileStyleRules,
+  mergeStyles,
+  readLabel,
+  type CompileContext,
+  type StyleObject,
+} from './serialize'
 import { createThemeRule, ROOT_SELECTOR, toDeclarationText } from './theme'
 import { scanVariables } from './variables'
 import type { WebStyleObject } from './webStyle'
+
+/**
+ * The options of a cache that describe how the author wrote a style, and so how its declarations are
+ * written: an engine keeps its own over a cache it is given (`Cache.withStyleOptions`), where the other
+ * options of the cache (the names, the layers, the sheet) are the cache's.
+ */
+export interface StyleOptions {
+  /** Whether an `alpha()` value gets a fallback declaration before its color-mix() value (`CacheOptions.hasColorFallbacks`). */
+  hasColorFallbacks?: boolean
+  /** Whether the string forms of token maths that are never valid CSS are rewritten (`CacheOptions.hasValueRepair`). */
+  hasValueRepair?: boolean
+  /** Whether a declaration that a supported browser needs in a prefixed form gets that form first (`CacheOptions.hasVendorPrefixes`). */
+  hasVendorPrefixes?: boolean
+}
 
 /** The options of `createCache`: the names it makes, the layers, the checks, and where its rules go. */
 export interface CacheOptions {
@@ -49,6 +69,13 @@ export interface CacheOptions {
    * `calc()` of a time. Custom properties are left alone. Default false.
    */
   hasValueRepair?: boolean
+  /**
+   * Whether a declaration that a supported browser still needs in a prefixed form is written after that
+   * form, in the same rule: `user-select:none` as `-webkit-user-select:none;user-select:none;` (the
+   * table is `PREFIXED_FORMS`, `docs/browser-support.md`). A form the style declares itself is not written
+   * again. The class name does not depend on it. Default true; false writes the standard declarations only.
+   */
+  hasVendorPrefixes?: boolean
   /**
    * Whether a style written with `when()` or `whenScheme()` is scoped with `@scope`, so that it follows the
    * nearest theme. Default true. Without it the rule is the plain descendant form `:where(.theme) .class`,
@@ -314,6 +341,13 @@ export interface Cache {
    * that is the same as a written one, or that a server render sent, is not written again.
    */
   registerProperties(rules: Readonly<Record<string, string>>): void
+  /**
+   * Gives the cache what reads the declared value of each variable of a theme, by name (the engine gives
+   * those of its base theme), adding to those it has: value repair reads the unit of a token from it, so
+   * that `var(--x)px` is the reference alone when `--x` is declared in px. `read` is called the first time
+   * value repair needs a value, and only then.
+   */
+  registerValues(read: () => Readonly<Record<string, string>>): void
   /** Gives the cache the theme that steps written as a function of the theme are resolved against, read when a `@keyframes` rule is first written (the engine gives its references). */
   setKeyframesTheme(read: () => unknown): void
   /**
@@ -368,7 +402,18 @@ export interface Cache {
   extractPageParts(classNames: Iterable<string>, options?: PageExtractOptions): PageParts
   /** The options that change the CSS or the class names, as a short text: the server stamps it on its style output and the browser compares it with its own. */
   readonly fingerprint: string
+  /**
+   * This cache with other style options (see `StyleOptions`): the same sheet, classes, themes and global
+   * rules, and the same everything else, but the declarations of what it compiles are written with these
+   * options, an option that is not given keeping the cache's own. The same options give the same object;
+   * the options of the cache give the cache itself. What an engine uses over a cache it was given.
+   */
+  withStyleOptions(options: StyleOptions): Cache
 }
+
+/** What a message about a `NaN` value adds: where such a value comes from, and the ways out. */
+const NAN_HINT =
+  ' A NaN often comes from arithmetic on a token in a style function (theme.space[2] * 2), where the token is a reference such as var(--x), not a number: use multiply() or calc(), give the token a raw or inline mode (modes), or read the real value from useTheme().'
 
 /** The start of every variable name, and of the ids that mark a used variable. */
 const VARIABLE_START = '--'
@@ -394,6 +439,18 @@ interface ThemeEntry {
 }
 
 const PREFIX_PATTERN = /^[a-z][a-z0-9-]*$/
+
+/** The style options that a compile of a cache uses, every one set, with what is made from them once. */
+interface WrittenAs extends Required<StyleOptions> {
+  /** What the compiler is given for the rules a class is named from: no prefixed form, so that the name is the same with them or without. */
+  readonly naming: CompileContext
+  /** What the compiler is given for a text that nothing writes. */
+  readonly plain: CompileContext
+  /** What the compiler is given for rules that are written: what value repair leaves is reported. */
+  readonly reported: CompileContext
+  /** Makes an entry of another cache one of this cache, written with these options. */
+  readonly adopt: (entry: SheetEntry) => SheetEntry
+}
 
 /** A sheet that keeps its rules in memory, for a server render or a test. */
 export function createMemorySheet(): Sheet {
@@ -427,6 +484,8 @@ export interface DomSheetOptions {
    * `production`, off in production and where there is no `process`.
    */
   hasRuleText?: boolean
+  /** Called with a rule that `insertRule` rejected, and the message of the browser; the rule is skipped. Not called for rules written as text, which the browser parses. */
+  onReject?: (rule: string, message: string) => void
 }
 
 // How each style element of the engine is written: by text nodes or by `insertRule`, never both, because
@@ -486,8 +545,18 @@ function createTextSheet(element: HTMLStyleElement, owner: Document): Sheet {
   }
 }
 
+/** The selector of the innermost rule of `rule`, the first one: `.a` of `@layer x{.a{color:red;}}`. */
+function readRuleSelector(rule: string): string {
+  const head = rule.slice(0, rule.indexOf('}')).split('{')
+  return (head.at(-2) ?? rule).trim()
+}
+
 /** A sheet that writes with `insertRule`: it keeps the browser's object of each rule, and removes a rule by finding where that object is at the time. */
-function createRuleSheet(element: HTMLStyleElement, owner: Document): Sheet {
+function createRuleSheet(
+  element: HTMLStyleElement,
+  owner: Document,
+  onReject: DomSheetOptions['onReject']
+): Sheet {
   const sheet = element.sheet as CSSStyleSheet
   const rules: string[] = []
   const objects: CSSRule[] = []
@@ -499,8 +568,9 @@ function createRuleSheet(element: HTMLStyleElement, owner: Document): Sheet {
         const index = sheet.insertRule(rule, sheet.cssRules.length)
         objects.push(sheet.cssRules[index])
         rules.push(rule)
-      } catch {
+      } catch (error) {
         // A rule the browser rejects is skipped.
+        onReject?.(rule, (error as Error).message)
       }
     },
     remove(index) {
@@ -524,7 +594,7 @@ export function createDomSheet(
   container: Node = document.head,
   options: DomSheetOptions = {}
 ): Sheet {
-  const { hasRuleText = !isProduction() } = options
+  const { hasRuleText = !isProduction(), onReject } = options
   const mode = hasRuleText ? 'text' : 'rules'
   const owner = container.ownerDocument as Document
   let element = findSheetElement(owner, key, mode)
@@ -534,7 +604,7 @@ export function createDomSheet(
     container.appendChild(element)
   }
   elementModes.set(element, mode)
-  return hasRuleText ? createTextSheet(element, owner) : createRuleSheet(element, owner)
+  return hasRuleText ? createTextSheet(element, owner) : createRuleSheet(element, owner, onReject)
 }
 
 /**
@@ -630,6 +700,15 @@ interface SortedValues {
   entry: EntrySource | undefined
   /** The entry when the one style is its own, set once every value is read. */
   sole: EntrySource | undefined
+  /** Told about each value that is left out because it is not a style. */
+  report: ((value: unknown) => void) | undefined
+}
+
+/** Whether `value` is not a style, a class name or an entry (a number, `true`, a function): it is left out, and `report` is told. */
+function isLeftOut(value: unknown, report: ((value: unknown) => void) | undefined): boolean {
+  if (typeof value === 'string' || isSheetEntry(value)) return false
+  report?.(value)
+  return true
 }
 
 /** Adds `items` to `sorted`, in order, a list read item by item (see `sortClassValues`). */
@@ -649,9 +728,7 @@ function addClassValues(
       sorted.styles.push(value as StyleObject)
       continue
     }
-    // A number, `true` or a function is not a style (what a style function returned, warned about in
-    // development): it is left out.
-    if (typeof value !== 'string' && !isSheetEntry(value)) continue
+    if (isLeftOut(value, sorted.report)) continue
     const source = typeof value === 'string' ? undefined : readEntrySource(adopt(value))
     if (source) {
       sorted.styles.push(source.style)
@@ -671,9 +748,16 @@ function addClassValues(
 function sortClassValues(
   values: readonly ClassValue[],
   registered: ReadonlyMap<string, StyleObject>,
-  adopt: (entry: SheetEntry) => SheetEntry
+  adopt: (entry: SheetEntry) => SheetEntry,
+  report?: (value: unknown) => void
 ): SortedValues {
-  const sorted: SortedValues = { styles: [], rawClasses: [], entry: undefined, sole: undefined }
+  const sorted: SortedValues = {
+    styles: [],
+    rawClasses: [],
+    entry: undefined,
+    sole: undefined,
+    report,
+  }
   addClassValues(values, registered, adopt, sorted)
   if (sorted.styles.length === 1) sorted.sole = sorted.entry
   return sorted
@@ -693,13 +777,20 @@ function assertServerStamp(page: Document, prefix: string, fingerprint: string):
   if (difference !== '') throw new Error(difference)
 }
 
-/** The sheet a cache makes for itself: in the head of its page, else in memory. */
+/** The sheet a cache makes for itself: in the head of its page, else in memory; a rule the browser rejects is told to `warn`. */
 function createOwnSheet(
   prefix: string,
   page: Document | undefined,
-  hasRuleText: boolean | undefined
+  hasRuleText: boolean | undefined,
+  warn: ((key: string, message: string) => void) | undefined
 ): Sheet {
-  return page ? createDomSheet(prefix, page.head, { hasRuleText }) : createMemorySheet()
+  const onReject = warn
+    ? (rule: string, reason: string) => {
+        const message = `the browser rejected the rule of ${readRuleSelector(rule)} (${reason}): it is left out.`
+        warn(message, message)
+      }
+    : undefined
+  return page ? createDomSheet(prefix, page.head, { hasRuleText, onReject }) : createMemorySheet()
 }
 
 /** Makes a cache: it turns styles into classes and inserts each class's rules once. */
@@ -712,6 +803,7 @@ export function createCache(options: CacheOptions = {}): Cache {
     hasPruning = true,
     hasColorFallbacks = true,
     hasValueRepair = false,
+    hasVendorPrefixes = true,
     hasScope = true,
     hasBaseClass = true,
   } = options
@@ -728,6 +820,7 @@ export function createCache(options: CacheOptions = {}): Cache {
     hasScope,
     hasColorFallbacks,
     hasValueRepair,
+    hasVendorPrefixes,
     tokens: options.tokenSignature ?? '',
   })
   const page = readPage(options)
@@ -739,11 +832,28 @@ export function createCache(options: CacheOptions = {}): Cache {
   const checkLater =
     hasDevChecks && page ? createDevChecker(prefix, undefined, page, readClassLabel) : undefined
   const warnValue = hasDevChecks ? createWarner(prefix) : undefined
-  /** Warns about each value of `style` that no CSS property takes, named by `owner`. */
+  /** Warns about each value of `style` that no CSS property takes, and each `@scheme` key that names no scheme, named by `owner`. */
   const reportValues = (owner: string, style: StyleObject): void => {
+    const warn = warnValue as (key: string, message: string) => void
     for (const { key, kind } of findInvalidValues(style)) {
-      const message = `${owner} declares "${key}" as ${kind}, which is never a CSS value: give a string or a number.`
-      ;(warnValue as (key: string, message: string) => void)(message, message)
+      // NaN is what arithmetic on a token gives in a style function, where the token is a reference.
+      const hint = kind === 'NaN' ? NAN_HINT : ''
+      const message = `${owner} declares "${key}" as ${kind}, which is never a CSS value: give a string or a number.${hint}`
+      warn(message, message)
+    }
+    for (const key of findUnknownSchemeKeys(style)) {
+      const message = `${owner} has the key "${key}": a color scheme is light or dark, so it is written as an at-rule that the browser does not know, and drops. Use whenScheme('light') or whenScheme('dark').`
+      warn(message, message)
+    }
+  }
+  /** With the development checks, what tells about a value given to `css` that is not a style, for a class labelled `label`. */
+  const createLeftOutReporter = (label: string | undefined) => {
+    if (warnValue === undefined) return undefined
+    const owner = label ? ` for "${label}"` : ''
+    return (value: unknown): void => {
+      const shown = typeof value === 'function' ? 'a function' : String(value)
+      const message = `css() was given ${shown}${owner}, which is not a style: it is left out. Give a style object, a css() value, a class name, or a list of them.`
+      warnValue(message, message)
     }
   }
   // The ids of what is written, or was found on the page: class names, the layer order, `@property` rules.
@@ -755,12 +865,42 @@ export function createCache(options: CacheOptions = {}): Cache {
   const pageThemes = new Map<string, Set<string>>()
   // The class a props class was made after (its base class), by class name.
   const afters = new Map<string, string>()
-  const sheet = options.sheet ?? createOwnSheet(prefix, page, options.hasRuleText)
+  const sheet = options.sheet ?? createOwnSheet(prefix, page, options.hasRuleText, warnValue)
   const registered = new Map<string, StyleObject>()
   const entries = new Map<string, SheetEntry>()
   const scoping = { prefix, hasScope }
 
   const insertedRules = new Map<string, readonly string[]>()
+  // The declared value of each variable of the themes of the engines over this cache, for value repair.
+  // They are read when value repair first needs one: a cache that repairs nothing never makes them.
+  const tokenValues = new Map<string, string>()
+  const pendingValues: (() => Readonly<Record<string, string>>)[] = []
+  const registerValues = (read: () => Readonly<Record<string, string>>): void => {
+    pendingValues.push(read)
+  }
+  const readValue = (name: string): string | undefined => {
+    for (const read of pendingValues.splice(0)) {
+      for (const [variable, value] of Object.entries(read())) tokenValues.set(variable, value)
+    }
+    return tokenValues.get(name)
+  }
+  // A reference followed by a unit that value repair leaves is warned about with the development checks.
+  const reportRepair = warnValue
+    ? (message: string) => (warnValue as (key: string, message: string) => void)(message, message)
+    : undefined
+  /** The style options `options` with what the compiler is given for them, made once. */
+  const toWrittenAs = (options: Required<StyleOptions>): WrittenAs => {
+    const plain: CompileContext = { ...options, scoping, readValue }
+    const written: WrittenAs = {
+      ...options,
+      plain,
+      naming: { ...plain, hasVendorPrefixes: false },
+      reported: { ...plain, report: reportRepair },
+      adopt: (entry) => adoptEntry(entry, written),
+    }
+    return written
+  }
+  const own = toWrittenAs({ hasColorFallbacks, hasValueRepair, hasVendorPrefixes })
   // The `@property` rule of each registered variable, and the variables of each theme class.
   let propertyRules: Readonly<Record<string, string>> = {}
   const themeNames = new Map<string, readonly string[]>()
@@ -875,43 +1015,43 @@ export function createCache(options: CacheOptions = {}): Cache {
     )
   }
 
-  /** The `@keyframes` rule of `name`: the one written, else made now. */
-  const readKeyframesRule = (name: string): string =>
-    insertedRules.get(name)?.[0] ??
-    createKeyframesRule(name, readKeyframesTheme, hasColorFallbacks, hasValueRepair)
+  /** The `@keyframes` rule of `name`: the one written, else made now, written as `written` says. */
+  const readKeyframesRule = (name: string, written: WrittenAs = own): string =>
+    insertedRules.get(name)?.[0] ?? createKeyframesRule(name, readKeyframesTheme, written.reported)
 
   /** Writes the `@keyframes` rule of the registered `name` once, outside every layer, unless the page has it. */
-  const writeKeyframes = (name: string): void => {
+  const writeKeyframes = (name: string, written: WrittenAs): void => {
     const id = `@keyframes:${name}`
     if (insertedIds.has(id)) return
-    const rule = readKeyframesRule(name)
+    const rule = readKeyframesRule(name, written)
     insertOnce(id, [rule])
     insertedRules.set(name, [rule])
   }
 
-  /** Inserts the rules of a class once, after the `@keyframes` rules of the animations they use; with `indexes`, the places of its rules are added to it. */
+  /** Inserts the rules of a class once, after the `@keyframes` rules of the animations they use (written as `written` says); with `indexes`, the places of its rules are added to it. */
   const insertClass = (
     className: string,
     rules: readonly string[],
     layer: ClassLayer,
+    written: WrittenAs,
     indexes?: number[]
   ): void => {
     if (insertedIds.has(className)) return
     const names = findAnimationNames(rules)
     if (names.length > 0) {
       animations.set(className, names)
-      names.forEach(writeKeyframes)
+      for (const name of names) writeKeyframes(name, written)
     }
     insertOnce(className, rules, layer, indexes)
   }
 
-  const insertKeyframes = (name: string): void => {
+  const insertKeyframes = (name: string, written: WrittenAs): void => {
     if (!isKeyframesName(name)) {
       throw new TypeError(
         `insertKeyframes(): "${name}" is not a name that keyframes() returned, so there is no rule to write.`
       )
     }
-    writeKeyframes(name)
+    writeKeyframes(name, written)
   }
 
   const markUsed = (names: Iterable<string>): void => {
@@ -1065,8 +1205,8 @@ export function createCache(options: CacheOptions = {}): Cache {
   // The held classes to remove after the delay, if nothing holds them then.
   const releasing = new Set<string>()
 
-  const compileGlobal = (styles: GlobalStyleObject): GlobalRules => {
-    const flat = compileGlobalRules(styles, hasColorFallbacks, scoping, hasValueRepair)
+  const compileGlobal = (styles: GlobalStyleObject, written: WrittenAs): GlobalRules => {
+    const flat = compileGlobalRules(styles, written.reported)
     if (warnValue) reportGlobalValues(styles)
     const rules = wrapInLayer(flat, 'global')
     const id = `${prefix}-global-${hashString(rules.join(''))}`
@@ -1094,8 +1234,11 @@ export function createCache(options: CacheOptions = {}): Cache {
   }
 
   /** Writes the rules of `global`, or takes them over from the page, after the `@keyframes` rules they use. */
-  const writeGlobal = ({ id, rules, animations: names }: GlobalRules): GlobalEntry => {
-    names.forEach(writeKeyframes)
+  const writeGlobal = (
+    { id, rules, animations: names }: GlobalRules,
+    written: WrittenAs
+  ): GlobalEntry => {
+    for (const name of names) writeKeyframes(name, written)
     // A style element that React put in the head in this commit is not read yet: the watch reports it
     // after the commit, so what it has noticed is read now.
     if (!hasPageRules(rules)) readArrived()
@@ -1150,11 +1293,12 @@ export function createCache(options: CacheOptions = {}): Cache {
   }
 
   const insertGlobal = (
+    written: WrittenAs,
     global: GlobalRules,
     { isRendered = false }: GlobalInsertOptions = {}
   ): (() => void) => {
     const { id } = global
-    const entry = globals.get(id) ?? writeGlobal(global)
+    const entry = globals.get(id) ?? writeGlobal(global, written)
     const forApp = isRendered ? 0 : 1
     entry.count++
     entry.appCount += forApp
@@ -1194,38 +1338,45 @@ export function createCache(options: CacheOptions = {}): Cache {
     return [prefix, label, hash].filter(Boolean).join('-') + suffix
   }
 
-  /** The merged style of `styles` (the label first) and the name of its class; undefined when it has no rule. */
+  /** The merged style of `styles` (the label first) and the name of its class, compiled as `written` says; undefined when it has no rule. */
   const prepareClass = (
     layer: ClassLayer,
     label: string | undefined,
     after: string,
-    styles: readonly StyleObject[]
+    styles: readonly StyleObject[],
+    written: WrittenAs
   ): { merged: StyleObject; className: string } | undefined => {
     if (styles.length === 0) return undefined
     const merged = mergeStyles(label ? [{ label }, ...styles] : styles)
-    const rules = compileRules('&', merged, hasColorFallbacks, scoping, hasValueRepair)
+    const rules = compileStyleRules('&', merged, written.naming)
     if (rules.length === 0) return undefined
     return { merged, className: nameClass(layer, merged, rules, after) }
   }
 
-  /** The rules of the class `className` with the style `merged`; with the development checks, its values are checked first. */
-  const compileClass = (className: string, merged: StyleObject): readonly string[] => {
+  /** The rules of the class `className` with the style `merged`, as `written` says; with the development checks, its values are checked first. */
+  const compileClass = (
+    className: string,
+    merged: StyleObject,
+    written: WrittenAs
+  ): readonly string[] => {
     if (warnValue) reportValues(describeClass(className, readLabel(merged)), merged)
-    return compileRules(`.${className}`, merged, hasColorFallbacks, scoping, hasValueRepair)
+    return compileStyleRules(`.${className}`, merged, written.reported)
   }
 
-  const cssWith = (options: ClassOptions, ...values: ClassValue[]): string => {
+  const cssWith = (written: WrittenAs, options: ClassOptions, values: ClassValue[]): string => {
     const { layer = 'components', label, after = '' } = options
-    const { styles, rawClasses, sole } = sortClassValues(values, registered, adoptEntry)
+    const { adopt } = written
+    const report = createLeftOutReporter(label)
+    const { styles, rawClasses, sole } = sortClassValues(values, registered, adopt, report)
     if (sole && after === '') return [...rawClasses, sole.use(layer)].filter(Boolean).join(' ')
-    const prepared = prepareClass(layer, label, after, styles)
+    const prepared = prepareClass(layer, label, after, styles, written)
     if (prepared === undefined) return rawClasses.join(' ')
     const { merged, className } = prepared
     // A held class that is made here for good is held no more.
     if (held.size > 0) held.delete(className)
     registered.set(className, merged)
     if (after !== '') afters.set(className, after)
-    insertClass(className, compileClass(className, merged), layer)
+    insertClass(className, compileClass(className, merged, written), layer, written)
     return [...rawClasses, className].join(' ')
   }
 
@@ -1233,8 +1384,13 @@ export function createCache(options: CacheOptions = {}): Cache {
    * Registers and writes the held class `className`, or takes it over from the page when the page has
    * it. A class written by this cache is removed after the delay unless it is held by then.
    */
-  const writeHeld = (className: string, merged: StyleObject, layer: ClassLayer): HeldEntry => {
-    const rules = compileClass(className, merged)
+  const writeHeld = (
+    className: string,
+    merged: StyleObject,
+    layer: ClassLayer,
+    written: WrittenAs
+  ): HeldEntry => {
+    const rules = compileClass(className, merged, written)
     const isPage = insertedIds.has(className)
     const entry: HeldEntry = {
       count: 0,
@@ -1245,7 +1401,7 @@ export function createCache(options: CacheOptions = {}): Cache {
         if (holder === undefined) {
           // Made permanent meanwhile, or removed before this element held it.
           if (registered.has(className)) return () => undefined
-          holder = writeHeld(className, merged, layer)
+          holder = writeHeld(className, merged, layer, written)
         }
         const current = holder
         current.count++
@@ -1260,7 +1416,7 @@ export function createCache(options: CacheOptions = {}): Cache {
     }
     held.set(className, entry)
     registered.set(className, merged)
-    insertClass(className, rules, layer, entry.indexes)
+    insertClass(className, rules, layer, written, entry.indexes)
     if (!isPage) scheduleRelease(className)
     return entry
   }
@@ -1313,13 +1469,19 @@ export function createCache(options: CacheOptions = {}): Cache {
     if (releasing.size === 1) setTimeout(flushReleases, 0)
   }
 
-  const cssHeld = (options: Omit<ClassOptions, 'after'>, ...values: ClassValue[]): HeldClass => {
+  const cssHeld = (
+    written: WrittenAs,
+    options: Omit<ClassOptions, 'after'>,
+    values: ClassValue[]
+  ): HeldClass => {
     const { layer = 'components', label } = options
-    const { styles, rawClasses, sole } = sortClassValues(values, registered, adoptEntry)
+    const { adopt } = written
+    const report = createLeftOutReporter(label)
+    const { styles, rawClasses, sole } = sortClassValues(values, registered, adopt, report)
     if (sole || sheet.remove === undefined) {
-      return { className: cssWith(options, ...values), hold: undefined }
+      return { className: cssWith(written, options, values), hold: undefined }
     }
-    const prepared = prepareClass(layer, label, '', styles)
+    const prepared = prepareClass(layer, label, '', styles, written)
     if (prepared === undefined) return { className: rawClasses.join(' '), hold: undefined }
     const { merged, className: name } = prepared
     const className = [...rawClasses, name].join(' ')
@@ -1327,17 +1489,14 @@ export function createCache(options: CacheOptions = {}): Cache {
     if (entry === undefined) {
       // A class that is registered and not held is permanent.
       if (registered.has(name)) return { className, hold: undefined }
-      entry = writeHeld(name, merged, layer)
+      entry = writeHeld(name, merged, layer, written)
     }
     return { className, hold: entry.hold }
   }
 
-  const cssIn = (layer: ClassLayer, ...values: ClassValue[]): string =>
-    cssWith({ layer }, ...values)
-
-  const createEntry = (style: WebStyleObject): SheetEntry => {
+  const createEntry = (style: WebStyleObject, written: WrittenAs): SheetEntry => {
     const merged = mergeStyles([style as StyleObject])
-    const rules = compileRules('&', merged, hasColorFallbacks, scoping, hasValueRepair)
+    const rules = compileStyleRules('&', merged, written.naming)
     const names: Partial<Record<EntryRole, string>> = {}
     const getRoleName = (role: EntryRole): string => {
       names[role] ??= rules.length === 0 ? '' : nameClass(role, merged, rules, '')
@@ -1352,11 +1511,15 @@ export function createCache(options: CacheOptions = {}): Cache {
         if (held.size > 0) held.delete(name)
         if (name !== '' && !registered.has(name)) {
           registered.set(name, merged)
-          insertClass(name, compileClass(name, merged), role)
+          insertClass(name, compileClass(name, merged, written), role, written)
         }
         return name
       },
-      readStyles: () => toEntryStyles(rules),
+      // The text has the prefixed forms that the class writes; the name was made without them.
+      readStyles: () =>
+        toEntryStyles(
+          written.hasVendorPrefixes ? compileStyleRules('&', merged, written.plain) : rules
+        ),
     }
     const entry = createSheetEntry(getRoleName('components'), source)
     entries.set(getRoleName('components'), entry)
@@ -1365,15 +1528,15 @@ export function createCache(options: CacheOptions = {}): Cache {
 
   // The entry of this cache made for each entry of another cache, by what that cache gave its entry.
   const adopted = new WeakMap<EntrySource, SheetEntry>()
-  const adoptEntry = (entry: SheetEntry): SheetEntry => {
+  const adoptEntry = (entry: SheetEntry, written: WrittenAs): SheetEntry => {
     const source = readEntrySource(entry)
     if (source === undefined || source.cache === self) return entry
-    let own = adopted.get(source)
-    if (own === undefined) {
-      own = createEntry(source.style as WebStyleObject)
-      adopted.set(source, own)
+    let made = adopted.get(source)
+    if (made === undefined) {
+      made = createEntry(source.style as WebStyleObject, written)
+      adopted.set(source, made)
     }
-    return own
+    return made
   }
 
   /** Takes in what rules on the page say: the classes, the layer order, the `@property` and `@keyframes` rules and the themes that are written, and the variables the rules use. */
@@ -1509,7 +1672,7 @@ export function createCache(options: CacheOptions = {}): Cache {
     const keyframesRules = [...new Set([...pageAnimations, ...named])]
       .filter((name) => isKeyframesName(name) && !carried.has(name))
       .sort(compareCodeUnits)
-      .map(readKeyframesRule)
+      .map((name) => readKeyframesRule(name))
     const allGlobalRules = held.flatMap(([, entry]) => entry.rules)
     // The root theme of the page is the one in the sheet: the one that the last render declared.
     const rootIds = root === undefined ? [] : [root.id]
@@ -1554,18 +1717,47 @@ export function createCache(options: CacheOptions = {}): Cache {
     return { css: global.css + classes.css, ids: [...global.ids, ...classes.ids] }
   }
 
+  /** The members of a cache that compile a style, written as `written` says (see `withStyleOptions`). */
+  const createCompilers = (written: WrittenAs) => ({
+    css: (...values: ClassValue[]) => cssWith(written, {}, values),
+    cssIn: (layer: ClassLayer, ...values: ClassValue[]) => cssWith(written, { layer }, values),
+    cssWith: (classOptions: ClassOptions, ...values: ClassValue[]) =>
+      cssWith(written, classOptions, values),
+    cssHeld: (classOptions: Omit<ClassOptions, 'after'>, ...values: ClassValue[]) =>
+      cssHeld(written, classOptions, values),
+    createEntry: (style: WebStyleObject) => createEntry(style, written),
+    adoptEntry: (entry: SheetEntry) => adoptEntry(entry, written),
+    compileGlobal: (styles: GlobalStyleObject) => compileGlobal(styles, written),
+    insertKeyframes: (name: string) => insertKeyframes(name, written),
+    insertGlobal: (global: GlobalRules, insertOptions?: GlobalInsertOptions) =>
+      insertGlobal(written, global, insertOptions),
+  })
+
+  // The cache with other style options, by those options: made once each.
+  const views = new Map<string, Cache>()
+  const withStyleOptions = (styleOptions: StyleOptions): Cache => {
+    const options: Required<StyleOptions> = {
+      hasColorFallbacks: styleOptions.hasColorFallbacks ?? hasColorFallbacks,
+      hasValueRepair: styleOptions.hasValueRepair ?? hasValueRepair,
+      hasVendorPrefixes: styleOptions.hasVendorPrefixes ?? hasVendorPrefixes,
+    }
+    const key = Object.values(options).join(':')
+    if (key === `${hasColorFallbacks}:${hasValueRepair}:${hasVendorPrefixes}`) return self
+    let view = views.get(key)
+    if (view === undefined) {
+      view = { ...self, ...createCompilers(toWrittenAs(options)) }
+      views.set(key, view)
+    }
+    return view
+  }
+
   const self: Cache = {
     prefix,
     hasLayers,
     layerOrder,
     registered,
-    css: (...values) => cssIn('components', ...values),
-    cssIn,
-    cssWith,
-    cssHeld,
-    createEntry,
+    ...createCompilers(own),
     findEntry: (className) => entries.get(className),
-    adoptEntry,
     hasBaseClass,
     hasDevChecks,
     hasScope,
@@ -1579,13 +1771,11 @@ export function createCache(options: CacheOptions = {}): Cache {
     insertTheme,
     insertRoot,
     registerProperties,
+    registerValues,
     setKeyframesTheme: (read) => {
       readKeyframesTheme = read
     },
-    insertKeyframes,
     getAnimations: (className) => animations.get(className) ?? [],
-    compileGlobal,
-    insertGlobal,
     insertOnce,
     getRules: (id) => insertedRules.get(id) ?? [],
     getFullRules,
@@ -1596,6 +1786,7 @@ export function createCache(options: CacheOptions = {}): Cache {
     extractPage,
     extractPageParts,
     fingerprint,
+    withStyleOptions,
   }
   // A cache that writes into a style element of a document is the one `findCache` gives for its prefix there.
   if (sheet.document) registerCache(sheet.document, self)

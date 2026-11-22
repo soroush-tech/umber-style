@@ -21,6 +21,20 @@ const readStyles = (tree: Awaited<ReturnType<typeof resolveTree>>) =>
   findAll(tree, 'style').map((element) => [element.props.href, element.children.join('')])
 
 describe('Global in the server components build', () => {
+  it('renders the global rules of a function of the theme that returns a css template', async () => {
+    const { Global, css } = setup()
+    const reset = (view: typeof theme) => css`
+      html,
+      body {
+        color: ${view.palette.text};
+      }
+    `
+    const tree = await resolveTree(<Global styles={[reset]} />)
+    expect(readStyles(tree).map(([, text]) => text)).toEqual([
+      '@layer r-theme,r-global,r-components,r-overrides;@layer r-global{html,body{color:var(--r-palette-text);}}',
+    ])
+  })
+
   it('renders the style elements of each set and of its animations, with the base theme whatever the provider gives', async () => {
     const { Global, ThemeProvider, keyframes, globalStyles, engine } = setup()
     const fade = keyframes({ from: { opacity: 0 } }, { label: 'fade' })

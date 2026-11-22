@@ -37,9 +37,16 @@ function createRegistered(map: ReadonlyMap<string, StyleObject>): UmberCache['re
  * Makes a cache keyed by `options.key`: the engine's cache (`createCache` of `@umber-style/core`, with the
  * key as its prefix and the other options as they are), with `key`, `compat`, `inserted`, `registered`,
  * `sheet` and `insert`. The engine calls `insert` for every group of rules it writes, so that a function
- * put in its place sees each new rule once.
+ * put in its place sees each new rule once. Throws a `TypeError` for an `onInsert` option, which the
+ * cache sets itself.
  */
 export default function createCache(options: UmberCacheOptions): UmberCache {
+  // A type error already; a call from plain JavaScript would lose its function without a word.
+  if ('onInsert' in options) {
+    throw new TypeError(
+      "createCache(): `onInsert` is the cache's own: it calls `insert` for every group of rules it writes. Replace `cache.insert` to see each rule."
+    )
+  }
   const { key, speedy, ...rest } = options
   const hasRuleText = rest.hasRuleText ?? (speedy === undefined ? undefined : !speedy)
   // `cache` is made below, before the engine writes a rule.

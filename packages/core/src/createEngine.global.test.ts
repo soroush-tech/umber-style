@@ -1,3 +1,4 @@
+import type { WebStyleObject } from './webStyle'
 import { createCache, createMemorySheet } from './cache'
 import { createEngine, createLazyEngine, NO_THEME_MESSAGE } from './createEngine'
 import { globalStyles } from './globalStyles'
@@ -135,5 +136,36 @@ describe('global styles in an engine', () => {
       engine.cache.layerOrder,
       '@layer g-global{html{-webkit-text-size-adjust:100%;}}',
     ])
+  })
+})
+
+describe('global styles of a css() value', () => {
+  it('writes its nested rules as global rules, and warns about a declaration with no selector once with the checks', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const engine = createEngine(theme, {
+      cache: createCache({ prefix: 'gv', sheet: createMemorySheet(), hasLayers: false }),
+      hasDevChecks: true,
+    })
+    // A selector without `&` is a descendant in a class: the typed style does not take it.
+    const value = engine.cache.createEntry({
+      label: 'Reset',
+      margin: 0,
+      'html, body': { margin: 0 },
+    } as WebStyleObject)
+    const sets = engine.resolveGlobal([
+      value,
+      (view: AppTheme) => [value, { body: { color: view.palette.text } }],
+    ])
+    expect(sets.map(({ rules }) => rules)).toEqual([
+      ['html,body{margin:0;}'],
+      ['html,body{margin:0;}'],
+      ['body{color:var(--gv-palette-text);}'],
+    ])
+    expect(warn.mock.calls).toEqual([
+      [
+        '[gv] Global styles: the css() value "Reset" declares "margin" outside a selector. A global rule needs a selector, so it is left out: put it under one (html, body, :root).',
+      ],
+    ])
+    warn.mockRestore()
   })
 })

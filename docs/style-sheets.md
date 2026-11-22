@@ -145,7 +145,8 @@ On the web the value is a sheet entry of the merged style: an entry like one of 
 
 - where a class name goes, as text: `String(value)` and `value.className` are its class name. React and Vue would turn it into text themselves, but React types `className` as a string, and Vue reads an object given to `class` as a map of class names, so `class: value` gives no class: write `String(value)` or `apply(value)`;
 - in the `style` prop of a styled component, alone (its own class in the `overrides` layer, permanent, shared by every user) or in a list (merged with the rest);
-- in another `css()`, in `apply`, among the styles of `styled` (`Button` above), and under a selector of global styles (`{ body: value }`).
+- in another `css()`, in `apply`, among the styles of `styled` (`Button` above), and under a selector of global styles (`{ body: value }`);
+- as the `styles` of `Global`, alone, in a list, or returned by a function of the theme: its nested rules are then global rules as they are written (`html,body{margin:0;}`), and a declaration outside every selector is left out with a warning in development (see [Animations and global styles](animations-and-global-styles.md#what-styles-takes)). Its `styles` text still reads as a class would write it (`& html{...}`).
 
 On the web the value also has `name` and `styles`. Reading either writes no rule:
 

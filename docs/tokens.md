@@ -84,11 +84,12 @@ Every binding exports them, Vue's included, and so does `@umber-style/core`.
 
 Code written for real values often builds strings from tokens. With a token the text is a reference, and three such forms are not valid CSS (but see the contrived case in [Limits](#limits)): the browser drops the declaration. `hasValueRepair: true` (an option of the engine and of the cache, default `false`) rewrites them in each value:
 
-| Written                                      | The text the engine sees | Written out as                                                                                                                                 |
-| -------------------------------------------- | ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| `` `${color}1F` `` (two hex digits of alpha) | `var(--x)1F`             | what `alpha(color, 0x1F / 255)` writes: `color-mix(in srgb, var(--x) 12.16%, transparent)`. `ff` gives `var(--x)` and `00` gives `transparent` |
-| `` `-${space}` ``                            | `-var(--x)`              | what `negate(space)` writes: `calc(var(--x) * -1)`                                                                                             |
-| `` `${duration}ms` ``, `` `${duration}s` ``  | `var(--x)ms`             | `calc(var(--x) * 1ms)`, `calc(var(--x) * 1s)`                                                                                                  |
+| Written                                      | The text the engine sees | Written out as                                                                                                                                              |
+| -------------------------------------------- | ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `` `${color}1F` `` (two hex digits of alpha) | `var(--x)1F`             | what `alpha(color, 0x1F / 255)` writes: `color-mix(in srgb, var(--x) 12.16%, transparent)`. `ff` gives `var(--x)` and `00` gives `transparent`              |
+| `` `-${space}` ``                            | `-var(--x)`              | what `negate(space)` writes: `calc(var(--x) * -1)`                                                                                                          |
+| `` `${duration}ms` ``, `` `${duration}s` ``  | `var(--x)ms`             | `calc(var(--x) * 1ms)`, `calc(var(--x) * 1s)` when `--x` holds a plain number; `var(--x)` when it holds that unit                                           |
+| `` `${space[1]}px` ``, `` `${size}rem` ``    | `var(--x)px`             | `var(--x)` when `--x` is declared in that unit (a number under a `lengthKeys` key is declared in `px`); `calc(var(--x) * 1px)` when it holds a plain number |
 
 ```ts
 const theme = {
@@ -113,9 +114,11 @@ const className = engine.css({
 
 - A form is rewritten in a value alone and inside a longer value, as many times as it is there, and in each item of a fallback list. A reference with a fallback (`var(--x, 8px)`) is one reference, and the forms inside its fallback are rewritten too. Global rules and the steps of `keyframes` are rewritten as a class is.
 - What is left alone: a reference followed by a space, a comma, `)`, `/` or the end of the value; two hex digits or a unit followed by another letter, digit, `-` or `_` (`var(--x)1Fa`, `var(--x)sec`); a minus that is not at the start of the value or after a space, a comma or `(` (`calc(1px - var(--x))` has a space after it); a custom property (a key that starts with `--`), which takes any text; an `alpha()` result, which is valid already.
-- The time form needs a variable that holds a number: `150` makes `calc(var(--x) * 1ms)` a time of `150ms`. Length units (`px`, `rem`, `%`) are not rewritten. A number under a `lengthKeys` key is declared with `px` already, so `` `${space[2]}px` `` would be `calc(8px * 1px)`, which is not valid either: write `space[2]` alone, or add the key to `lengthKeys`.
+- A unit after a reference is read against the declared value of the token, the value of the base theme (`--x:4px`, `--x:150`), or the fallback of a reference whose token is not known (`var(--gap, 8px)px`). The same unit gives the reference alone, a plain number gives `calc(var(--x) * 1<unit>)`, and a value with another unit (`1.5rem` before `px`), a value that is not a number (`auto`), or a token with no known value is left as it is, which the browser drops: with the development checks of the cache it is warned about once, with the rule and the declaration. A time unit after a reference whose value is not known keeps the `calc()` it had before. The units: `ms`, `s`, `px`, `rem`, `em`, `%`, `vh`, `vw`, `vmin`, `vmax`, `svh`, `lvh`, `dvh`, `svw`, `lvw`, `dvw`, `ch`, `ex`, `lh`, `rlh`, `cm`, `mm`, `in`, `pt`, `pc`, `deg`, `grad`, `rad`, `turn`: each one a `calc()` can multiply a number by, none of them two hex digits. `fr` is not among them: a `calc()` cannot hold it.
 - Without the option nothing is rewritten, and a value costs nothing more. With it, a value that holds no `var(` costs one check.
 - The option is part of the stamp of options that a server page carries (`v=1`). It is written only when the option is on, so the stamp of a page without it is the text it was before.
+
+A theme whose themes declare one token in two units (`4px` in one, `0.25rem` in another) is read in the unit of the base theme. The unit tests are in `serialize.repair.test.ts` and `createEngine.repair.test.ts`; `valueRepair.browser.test.ts` checks in Chromium that `var(--x)px` of a `4px` token computes to `4px`, `var(--x)rem` of a `1.25rem` token to `20px`, and a plain `3` with `px` to `3px`.
 
 Arithmetic in JavaScript cannot be repaired: `theme.space[2] * 2` and `parseFloat(theme.space[2])` run before the engine sees anything, and a reference is not a number. Use one of the three routes: the helpers above (`multiply(space[2], 2)`), `useTheme()` where JavaScript needs the real value (see [Themes](themes.md)), or a token mode that keeps the real value (`inline` or `raw`, below).
 
@@ -197,12 +200,31 @@ const className = engine.css({
 
 The class is `umber-f8wdob`, and its rule is `z-index:100;color:var(--umber-palette-primary, #1b5fd1);transition-duration:var(--umber-transitions-duration-short);`. The arithmetic helpers treat `var(--x, 8px)` as one opaque value, as they do `var(--x)`.
 
+A path can be a pattern in which `*` stands for any one key: `'typography.*.fontSize': 'raw'` gives the `fontSize` of every variant of `typography` its real value. The longest path still wins; at one length an exact path wins over a pattern, and a pattern with fewer `*` over one with more. From `tokens.modes.test.ts`:
+
+```ts
+const { refs } = createTokens(typeTheme, {
+  prefix: 'p',
+  modes: { 'typography.*.fontSize': 'raw', 'typography.body.fontSize': 'variable' },
+})
+// refs.typography.h1 is { fontSize: '2rem', lineHeight: 'var(--p-typography-h1-line-height)' }
+// refs.typography.body.fontSize is 'var(--p-typography-body-font-size)'
+```
+
+With the development checks the engine warns, once each, about a path of `modes`, `registered` or `alwaysDeclare` that matches no key of the base theme (a misspelt path does nothing): `[umber] The modes path "palette.primry" matches no key of the theme, so it does nothing: check it against the theme.`
+
 Two more options decide which tokens are lengths and which are raw by default:
 
 | Option       | Type       | Default                                                    | Effect                                                                                             |
 | ------------ | ---------- | ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
 | `rawKeys`    | `string[]` | `['breakpoints', 'components']`                            | Top-level keys that stay real values. A list you give replaces the default list                    |
 | `lengthKeys` | `string[]` | `['space', 'sizes', 'radii', 'fontSizes', 'borderWidths']` | Top-level keys whose numbers are lengths, declared with `px`. A list you give replaces the default |
+
+### A token used as a key
+
+In a style function a token is a reference, so code written for real values that looks a value up by a token gets `undefined`: `theme.space[theme.layout.margin]` reads `theme.space['var(--umber-layout-margin)']`, and the declaration is lost. With the development checks the theme view a style function gets warns about such a read, once for each message, with the label of the component, the path that was read and the token: `[umber] A style function of "Box" reads theme.space[var(--umber-layout-margin)]: var(--umber-layout-margin) is a token reference, not the value of the token, so the lookup gives undefined. Give "layout.margin" a raw mode (modes: { 'layout.margin': 'raw' }), or read the real value from useTheme().` The two ways out: a `raw` (or `inline`) mode for that token, by its path or a pattern, so that it is its real value in a style function; or `useTheme()`, which gives the real values, where the lookup happens in a component. A whole branch listed in `rawKeys` works too, and gives up the variables of every token in it.
+
+For the warning the view is wrapped in a `Proxy` while the checks are on. Without them (in production) a style function gets the view itself: no wrapper is made, and the cost is nothing (`referenceKeys.test.ts` checks that the theme a style function gets is the very object of `engine.refs`). Only a read of the theme view is watched: a token used as the key of an object of your own (`sizes[theme.typography.h1.fontSize]`) is not seen.
 
 ## Only the variables in use
 
@@ -297,5 +319,5 @@ What the tests do check: the rule text and where it is written. In jsdom, which 
 - The arithmetic helpers do not know a variable's value. `multiply('var(--x)', 2)` is a `calc()` that the browser computes, so it cannot be used where a plain number is needed (a `z-index`, for example).
 - On React Native, `alpha` cannot mix: a colour it cannot read as a literal (a named colour, `hsl()`) is returned at full opacity, whatever the opacity is.
 - `lengthKeys` and `rawKeys` take top-level keys only. For anything deeper use `modes`.
-- `hasValueRepair` reads the text, not the value of a variable. A reference followed by two digits is valid in one contrived case, when the variable and the digits read as two items of a list (`flex: var(--grow)10`, where `--grow` is `1`, is `flex: 1 10`); the option rewrites it as alpha all the same. Parentheses inside a quoted string of a fallback are counted as any other. Only `ms` and `s` are rewritten as units.
+- `hasValueRepair` reads the text, and for a unit the value of the base theme, not the value the variable has in the page. A reference followed by two digits is valid in one contrived case, when the variable and the digits read as two items of a list (`flex: var(--grow)10`, where `--grow` is `1`, is `flex: 1 10`); the option rewrites it as alpha all the same. Parentheses inside a quoted string of a fallback are counted as any other. A token declared in one unit in the base theme and in another in a theme class is repaired for the base theme's unit; the other theme then gets a value the browser drops. Only the units listed above are read; another one after a reference (`fr`, `x`, `dpi`) is left as it is, with no warning.
 - Browser versions for `color-mix()` and `@property` are to be confirmed: see [Browser and platform support](browser-support.md).

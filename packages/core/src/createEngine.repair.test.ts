@@ -67,7 +67,7 @@ describe('hasValueRepair in an engine', () => {
     ])
   })
 
-  it('leaves the option to the cache that is given', () => {
+  it('keeps the option over a cache that is given, as it describes how the styles are written', () => {
     const { engine, sheet } = setup({ hasValueRepair: true })
     const other = createEngine<AppTheme>(theme, {
       prefix: 'e',
@@ -77,7 +77,9 @@ describe('hasValueRepair in an engine', () => {
     engine.css({ color: `${engine.refs.palette.primary}1F` })
     expect(sheet.rules.join('')).toContain(MIX)
     const className = other.css({ color: `${other.refs.palette.primary}1F` })
-    expect(other.cache.getRules(className)[0]).toContain('color:var(--e-palette-primary)1F;')
+    expect(other.cache.getRules(className)[0]).toContain(
+      'color:color-mix(in srgb, var(--e-palette-primary) 12.16%, transparent);'
+    )
   })
 
   it('declares a token that is used only inside a rewritten form', () => {
@@ -119,5 +121,48 @@ describe('hasValueRepair in an engine', () => {
   it('is part of the stamp only when it is on', () => {
     expect(setup({ hasValueRepair: true }).engine.cache.fingerprint).toContain(';f=1;v=1;t=')
     expect(setup().engine.cache.fingerprint).not.toContain('v=')
+  })
+})
+
+describe('hasValueRepair in an engine: a reference followed by a unit', () => {
+  const unitTheme = {
+    fontSizes: [12, 14],
+    sizes: { header: '3.5rem' },
+    layout: { gutter: 3, inset: 'auto' },
+  }
+
+  it('reads the unit of each token from its declared value: the same unit, a plain number, another one', () => {
+    const sheet = createMemorySheet()
+    const cache = createCache({ prefix: 'u', sheet, hasLayers: false, hasDevChecks: true })
+    const engine = createEngine(unitTheme, { cache, hasValueRepair: true })
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const { fontSizes, sizes, layout } = engine.refs
+    const className = engine.css({
+      fontSize: `${fontSizes[0]}px`,
+      height: `${sizes.header}rem`,
+      marginTop: `${layout.gutter}px`,
+      width: `${sizes.header}px`,
+      left: `${layout.inset}px`,
+    })
+    expect(sheet.rules).toEqual([
+      `.${className}{font-size:var(--u-font-sizes-0);height:var(--u-sizes-header);margin-top:calc(var(--u-layout-gutter) * 1px);width:var(--u-sizes-header)px;left:var(--u-layout-inset)px;}`,
+    ])
+    expect(warn.mock.calls.map(([message]) => message)).toEqual([
+      `[u] .${className} declares width:var(--u-sizes-header)px, which puts "px" after var(--u-sizes-header), whose value 3.5rem has another unit: it is left as it is, and the browser drops it. Write the value in px, or the reference alone.`,
+      `[u] .${className} declares left:var(--u-layout-inset)px, which puts "px" after var(--u-layout-inset), whose value auto is not a number: it is left as it is, and the browser drops it. Write the reference alone.`,
+    ])
+    warn.mockRestore()
+  })
+
+  it('repairs global rules and keyframes steps the same way', () => {
+    const sheet = createMemorySheet()
+    const cache = createCache({ prefix: 'u', sheet, hasLayers: false })
+    const engine = createEngine(unitTheme, { cache, hasValueRepair: true })
+    const { fontSizes } = engine.refs
+    const [set] = engine.resolveGlobal({ body: { fontSize: `${fontSizes[1]}px` } })
+    expect(set.rules).toEqual(['body{font-size:var(--u-font-sizes-1);}'])
+    const grow = engine.keyframes((view) => ({ to: { fontSize: `${view.fontSizes[1]}px` } }))
+    engine.insertKeyframes(grow)
+    expect(sheet.rules).toContain(`@keyframes ${grow}{100%{font-size:var(--u-font-sizes-1);}}`)
   })
 })

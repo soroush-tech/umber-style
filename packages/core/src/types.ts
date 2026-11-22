@@ -17,6 +17,8 @@ export interface EngineOptions extends TokenOptions {
   hasColorFallbacks?: boolean
   /** Whether the string forms of token maths that are never valid CSS (`var(--x)1F`, `-var(--x)`, `var(--x)ms`) are rewritten in each value. Default false; used when the engine makes its cache. */
   hasValueRepair?: boolean
+  /** Whether a declaration that a supported browser still needs in a prefixed form (`user-select`, see `docs/browser-support.md`) is written after that form. Default true; used when the engine makes its cache, and over a cache it is given. */
+  hasVendorPrefixes?: boolean
   /** Whether a `when()` or `whenScheme()` style is scoped with `@scope`. Default true; used when the engine makes its cache. Without it the rule is a plain descendant selector, which is wrong for nested themes. */
   hasScope?: boolean
   /** Whether a theme class declares only the variables that rules refer to. Default true; used when the engine makes its cache. */

@@ -60,3 +60,40 @@ describe('the string forms of token maths in a real browser', () => {
     expect(computed.transitionDelay).toBe('0s')
   })
 })
+
+describe('a reference followed by a unit in a real browser', () => {
+  const unitTheme = {
+    space: [0, 4, 8],
+    fontSizes: { md: '1.25rem' },
+    layout: { gutter: 3, turn: 45 },
+  }
+
+  /** The computed style of an element whose style puts a unit after tokens, under the theme class. */
+  function renderUnits(hasValueRepair: boolean): CSSStyleDeclaration {
+    const engine = createEngine(unitTheme, { prefix: nextPrefix(), hasValueRepair })
+    const { space, fontSizes, layout } = engine.refs
+    const className = engine.css({
+      paddingLeft: `${space[1]}px`,
+      fontSize: `${fontSizes.md}rem`,
+      marginTop: `${layout.gutter}px`,
+      rotate: `${layout.turn}deg`,
+    })
+    return getComputedStyle(wrap(wrap(document.body, engine.themeClass(unitTheme)), className))
+  }
+
+  it('computes the length of a token in that unit, and a plain number times the unit, with hasValueRepair', () => {
+    const computed = renderUnits(true)
+    expect(computed.paddingLeft).toBe('4px')
+    expect(computed.fontSize).toBe('20px')
+    expect(computed.marginTop).toBe('3px')
+    expect(computed.rotate).toBe('45deg')
+  })
+
+  it('drops each of them without the option', () => {
+    const computed = renderUnits(false)
+    expect(computed.paddingLeft).toBe('0px')
+    expect(computed.fontSize).toBe('16px')
+    expect(computed.marginTop).toBe('0px')
+    expect(computed.rotate).toBe('none')
+  })
+})
