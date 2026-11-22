@@ -182,7 +182,7 @@ export type ClassValue =
 export interface ClassOptions {
   /** The layer of the class. Default `components`. */
   layer?: ClassLayer
-  /** A label for the class; it wins over the labels of the values. */
+  /** A label for the class, written first: the labels of the values are joined after it (`Typography-Link`). */
   label?: string
   /**
    * A class of this cache that is written before this one, and that this one is only used with (the base
@@ -217,8 +217,9 @@ export interface Cache {
   readonly registered: ReadonlyMap<string, StyleObject>
   /**
    * One class for all of `values`: style objects, and class names this cache made (resolved back
-   * to their styles), merged left to right so the last wins. Other class names pass through in
-   * front of it. Returns '' when there is nothing. The class is in the `components` layer.
+   * to their styles), merged left to right so the last wins; their labels are joined in that order
+   * (see `mergeStyles`). Other class names pass through in front of it. Returns '' when there is
+   * nothing. The class is in the `components` layer.
    */
   css(...values: ClassValue[]): string
   /** `css`, with the layer of the class given: `overrides` for what a component is given from outside. */
@@ -1049,7 +1050,7 @@ export function createCache(options: CacheOptions = {}): Cache {
     return [prefix, label, hash].filter(Boolean).join('-') + suffix
   }
 
-  /** The merged style of `styles` (the label last) and the name of its class; undefined when it has no rule. */
+  /** The merged style of `styles` (the label first) and the name of its class; undefined when it has no rule. */
   const prepareClass = (
     layer: ClassLayer,
     label: string | undefined,
@@ -1057,7 +1058,7 @@ export function createCache(options: CacheOptions = {}): Cache {
     styles: readonly StyleObject[]
   ): { merged: StyleObject; className: string } | undefined => {
     if (styles.length === 0) return undefined
-    const merged = mergeStyles(label ? [...styles, { label }] : styles)
+    const merged = mergeStyles(label ? [{ label }, ...styles] : styles)
     const rules = compileRules('&', merged, hasColorFallbacks, scoping, hasValueRepair)
     if (rules.length === 0) return undefined
     return { merged, className: nameClass(layer, merged, rules, after) }

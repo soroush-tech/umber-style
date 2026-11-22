@@ -119,8 +119,9 @@ export interface StyledOptions<_Props = unknown> extends StylerOptions {
    * which forwards to a string tag the attributes of HTML and SVG (by their React names), `data-*`,
    * `aria-*`, event handlers and React's own props, and every prop to a custom element (a tag with a
    * hyphen) and to a component. `theme`, `className` and `style` are the component's own and are never
-   * forwarded, and so is `as` where it replaces a string tag; a component that is not made by `styled`
-   * is always rendered, and is given `as` as a prop.
+   * forwarded, and so is `as` where it replaces what is rendered: `as` always replaces a string tag, and
+   * replaces a component that is not made by `styled` only when this filter returns false for `as`;
+   * without such a filter that component is rendered, and is given `as` as a prop.
    */
   shouldForwardProp?: (prop: string) => boolean
   /**
@@ -177,7 +178,8 @@ export type StyleProp =
 
 /**
  * The `as` of a styled component whose tag takes the props `Base`: the type of the tag's own `as` when it
- * has one (a component that is not made by `styled` is given `as` as a prop), else any element type.
+ * has one (a component that is not made by `styled` is given `as` as a prop, unless `shouldForwardProp`
+ * keeps it off), else any element type.
  */
 type AsProp<Base> = Base extends { as?: infer As }
   ? unknown extends As

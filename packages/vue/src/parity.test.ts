@@ -138,7 +138,7 @@ describe('styling a styled component', () => {
     const root = mount(() => h(Fancy, { tone: 'x', title: 't' }, () => 'hi'))
     expect(root.querySelectorAll('*')).toHaveLength(1)
     const button = root.querySelector('button') as HTMLElement
-    expect(button.className).toMatch(/^p-fancy-root-/)
+    expect(button.className).toMatch(/^p-base-root-fancy-root-/)
     expect(ruleOf(button.className)).toBe(`.${button.className}{color:red;margin:4px;}`)
     expect(button.hasAttribute('tone')).toBe(false)
     expect(button.getAttribute('title')).toBe('t')

@@ -59,7 +59,7 @@ const App = () => (
   <div class="umber-card-header-15j3uve">Title</div>
   <span class="umber-badge-root-n8ncc0">new</span>
   <div class="umber-row-root-1sgg100"></div>
-  <button class="umber-wide-button-root-1r6qi7r">Save</button>
+  <button class="umber-button-root-wide-button-root-1r6qi7r">Save</button>
 </section>
 ```
 
@@ -174,7 +174,7 @@ Give a function the type of your props with the type argument, as `Badge` does: 
 
 ## Which props reach the element
 
-`theme`, `className` and `style` are the component's own and never reach the element, and so is `as` where it replaces a string tag (see [`as`](#as)). Of the other props, a string tag such as `'span'` receives by default only:
+`theme`, `className` and `style` are the component's own and never reach the element, and so is `as` where it replaces what is rendered (see [`as`](#as)). Of the other props, a string tag such as `'span'` receives by default only:
 
 - the attributes of HTML and SVG, by the names React gives them (`id`, `title`, `type`, `disabled`, `tabIndex`, `htmlFor`, `viewBox`, `strokeWidth`, `xlinkHref` and the rest);
 - `data-*` and `aria-*` attributes, and event handlers (`onClick`, `onPointerDownCapture`: `on` followed by a capital letter);
@@ -191,7 +191,7 @@ const App = () => (
 )
 ```
 
-renders `<button type="submit" data-test="b" aria-label="go" class="...">` with the click handler, and neither `variant` nor `isActive`. A custom element (a tag with a hyphen, `'my-element'`) receives every prop, because its attributes are its own. A component (a tag that is not a string) receives every prop but `theme` and `style`, and `className` with the engine's classes in it; a component that is not made by `styled` receives `as` too.
+renders `<button type="submit" data-test="b" aria-label="go" class="...">` with the click handler, and neither `variant` nor `isActive`. A custom element (a tag with a hyphen, `'my-element'`) receives every prop, because its attributes are its own. A component (a tag that is not a string) receives every prop but `theme` and `style`, and `className` with the engine's classes in it; a component that is not made by `styled` receives `as` too, unless a `shouldForwardProp` keeps it off.
 
 `shouldForwardProp` replaces that default: with it, a prop reaches the element or the component exactly when it returns `true`, whatever is rendered. In `Badge` above, `(prop) => prop !== 'tone'` keeps `tone` off and forwards everything else, an unknown attribute included.
 
@@ -212,21 +212,29 @@ const WideCard = styled(Card, { target: 'wide' })({ width: '100%' })
 
 ## `as`
 
-The `as` prop renders another element or component in place of a string tag:
+The `as` prop renders another element or component in place of the one the component was made from:
 
 ```tsx
 <Card as="section">...</Card>
 ```
 
-The class is the same. What `as` does depends on what the component was made from:
+The class is the same. One rule decides whether `as` replaces what is rendered:
 
-| Made from                                                                                       | `as`                                                                                                                                                                    |
-| ----------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| A string tag: `styled('button')`                                                                | Replaces the tag. It is not forwarded, and the filter is the one of the tag that is rendered                                                                            |
-| A styled component: `styled(Button)`                                                            | The two are one element (see [Wrapping a styled component](#wrapping-a-styled-component)): `as` replaces the tag at the end of the chain, as for a string tag           |
-| Any other component (a function or class component, `forwardRef`, `memo`): `styled(Typography)` | Is not used by the styled component. The component is always rendered, and `as` is passed to it as a prop like any other, through `shouldForwardProp` when you give one |
+```ts
+rendered = (!shouldForwardProp('as') && props.as) || base
+```
 
-A styled component made from a styled component made from `Typography` is still made from `Typography`, so `as` goes to it. A component that takes `as` itself decides what to render:
+`base` is what the component was made from (for a styled component made from a styled component, the tag or component at the end of the chain), and `shouldForwardProp` is the filter in effect: the one you give, else the one inherited from the wrapped styled component, else the default for `base`. A filter that keeps `as` off lets it replace the base; one that forwards it passes it on as a prop.
+
+| Made from                                                                                       | Without `shouldForwardProp`                                                                                                                                                     | With `shouldForwardProp`                                                                                                             |
+| ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| A string tag: `styled('button')`                                                                | The default does not forward `as`, which is not an HTML attribute: `as` replaces the tag                                                                                        | `as` replaces the tag too: a filter given for a string tag is not asked about `as`                                                   |
+| A styled component: `styled(Button)`                                                            | The two are one element (see [Wrapping a styled component](#wrapping-a-styled-component)): the rule is applied to the base at the end of the chain, with the filter it inherits | The same, with the filter you give                                                                                                   |
+| Any other component (a function or class component, `forwardRef`, `memo`): `styled(Typography)` | The default forwards every prop, `as` included: the component is rendered, and `as` is one of its props                                                                         | It returns `false` for `as`: `as` replaces the component. It returns `true`: the component is rendered, and `as` is one of its props |
+
+Where `as` replaces the base, `as` itself is not forwarded, and the props of what is rendered go through the filter in effect when there is one (for a string and for a component alike), else through the default of what is rendered: the attributes of HTML and SVG for a string, every prop for a component.
+
+A styled component made from a styled component made from `Typography` is still made from `Typography`, so the rule is applied to `Typography`. A component that takes `as` itself decides what to render:
 
 ```tsx
 const join = (...names: (string | false | undefined)[]) => names.filter(Boolean).join(' ')
@@ -252,25 +260,38 @@ const App = () => (
 )
 ```
 
-renders `<a href="#top" class="typography typography-inherit typography-primary umber-...">top</a>`: `Typography` rendered the `a`, its own classes are there, `color` and `variant` were its props and are not attributes, and `underline` was kept off by `shouldForwardProp`. In React, `as` of such a component is typed by the component's own `as` (here `'span' | 'a'`); made from a tag or a styled component, it is any element type.
+renders `<a href="#top" class="typography typography-inherit typography-primary umber-...">top</a>`: the filter forwards `as`, so `Typography` rendered the `a`, its own classes are there, `color` and `variant` were its props and are not attributes, and `underline` was kept off by `shouldForwardProp`.
+
+A filter that keeps `as` off, such as one that forwards only the attributes of HTML, makes `as` replace the component:
+
+```tsx
+const TableElement = (props: ComponentProps<'table'>) => <table {...props} />
+const Table = styled(TableElement, {
+  shouldForwardProp: (prop) => prop === 'id',
+})({ borderCollapse: 'collapse' })
+// <Table as="div" id="t" /> is <div id="t" class="umber-...">: TableElement is not rendered.
+// <Table /> is <table class="umber-...">.
+```
+
+In React, `as` of a component that is not made by `styled` is typed by the component's own `as` when it has one (`'span' | 'a'` for `Typography`); otherwise, and made from a tag or a styled component, it is any element type.
 
 ## Wrapping a styled component
 
-`styled(Button)(more)` does not render a `Button` inside a new element. It makes one component with the styles of `Button` first and yours after, rendered as the same element with one class. In the example, `WideButton` is one `button` with `background-color`, `color` and `width`. The label is the outer one (`wide-button-root`). `shouldForwardProp` is inherited from the wrapped component unless you give one.
+`styled(Button)(more)` does not render a `Button` inside a new element. It makes one component with the styles of `Button` first and yours after, rendered as the same element with one class. In the example, `WideButton` is one `button` with `background-color`, `color` and `width`. Its label is the labels of both, the inner first: `button-root-wide-button-root`. `shouldForwardProp` is inherited from the wrapped component unless you give one.
 
-The label of the wrapper wins for every class of the wrapper: given a `label` (or a `name`), the base class and the props class both carry it, so `Popover = styled(Paper, { label: 'Popover' })` is found as `Popover` in its class names. A wrapper given no label keeps the label of the wrapped component on its base class, and its props class has no label:
+Every class of a wrapper carries the labels of the whole chain, joined by `-`, the innermost first (see [The labels of merged styles](#the-labels-of-merged-styles)): the base class and the props class of `Popover = styled(Paper, { label: 'Popover' })` are `umber-Paper-Popover-<hash>`, so the element is found as `Paper` and as `Popover` in its class names. A wrapper given no label adds none, and its classes carry the labels of the components it wraps:
 
 ```tsx
 const byVariant = ({ variant }: { variant?: string }) => ({ fontWeight: variant ? 700 : 400 })
 const Typography = styled('span', { label: 'Typography' })({ margin: 0 }, byVariant)
 const Wrapper = styled(Typography, { label: 'W' })({ padding: 1 })
 const Plain = styled(Typography)({ padding: 1 })
-// <Typography variant="a" /> is <span class="umber-Typography-1 umber-Typography-2">
-// <Wrapper variant="a" />    is <span class="umber-W-1 umber-W-3">
-// <Plain variant="a" />      is <span class="umber-Typography-1 umber-4">
+// <Typography variant="a" /> is <span class="umber-Typography-147y03t umber-Typography-1kjq2di">
+// <Wrapper variant="a" />    is <span class="umber-Typography-W-147y03t umber-Typography-W-ddxxt2">
+// <Plain variant="a" />      is <span class="umber-Typography-147y03t umber-Typography-bk7s8f">
 ```
 
-`umber-W-1` has the declarations of `umber-Typography-1` (the same hash), written again under the label of the wrapper.
+`umber-Typography-W-147y03t` has the declarations of `umber-Typography-147y03t` (the same hash), written again under the labels of the wrapper.
 
 Wrapping any other component works, and then the styles go to that component as a `className`:
 
@@ -285,9 +306,9 @@ The component must accept `className` and put it on an element, as it must for a
 
 Wrapping a component that has a base class keeps that base. The wrapper's styles come after the styles of the wrapped component, and the split is made on the whole list:
 
-- the wrapped component has props-dependent styles: the wrapper's element carries the same base (under the wrapper's label, when it has one), and the rest of the list (the props part of the wrapped component, then all of the wrapper's styles) is its props part;
-- the wrapped component has none (it is all base) and the wrapper's styles start with a function that reads props: the element carries the class of the wrapped component as it is, and the wrapper's styles are the props part. With a label of its own, the wrapper has the base under its label after that class, which stays so that the wrapped component as a selector (`${Paper}`) still matches the element: `<div class="umber-Paper-1 umber-Popover-1 umber-Popover-2">`;
-- the wrapped component has none and the wrapper's styles start with plain objects: the plain objects are added to the base, which is then a new, larger class under the wrapper's label. The declarations of the wrapped component are written again in it. The other choice, keeping the base of the wrapped component and adding the objects as a second fixed class, would write fewer declarations once, but it would put them in the props part, so that they would be repeated in every distinct props class. A wrapper without any props-dependent style also keeps the single class it always had.
+- the wrapped component has props-dependent styles: the wrapper's element carries the same base (under the labels of the chain, when the wrapper has a label of its own), and the rest of the list (the props part of the wrapped component, then all of the wrapper's styles) is its props part;
+- the wrapped component has none (it is all base) and the wrapper's styles start with a function that reads props: the element carries the class of the wrapped component as it is, and the wrapper's styles are the props part. With a label of its own, the wrapper has the base under the labels of both after that class, which stays so that the wrapped component as a selector (`${Paper}`) still matches the element: `<div class="umber-Paper-1 umber-Paper-Popover-1 umber-Paper-Popover-2">`;
+- the wrapped component has none and the wrapper's styles start with plain objects: the plain objects are added to the base, which is then a new, larger class under the labels of the chain. The declarations of the wrapped component are written again in it. The other choice, keeping the base of the wrapped component and adding the objects as a second fixed class, would write fewer declarations once, but it would put them in the props part, so that they would be repeated in every distinct props class. A wrapper without any props-dependent style also keeps the single class it always had.
 
 ## Template strings
 
@@ -369,13 +390,42 @@ A number for `animationDuration` (and `animationDelay`, `transitionDuration`, `t
 
 A `className` you give a styled component is kept, and any class the engine made in it is merged into the component's overrides. The `style` prop takes sheet entries and objects and turns them into a class. Both are covered in [Style sheets and the style prop](style-sheets.md) and [Cascade layers and overrides](cascade-layers.md).
 
+### The labels of merged styles
+
+A component that is not made by `styled` often gives its `className` to a styled root. An engine class that arrives there is read back to its styles and merged into the root's override class, and that class carries the labels of everything merged into it: the labels of the root first, then the labels of the class that came in:
+
+```tsx
+const Root = styled('span', { label: 'Typography' })({ margin: 0 })
+const Typography = ({ className, children }: { className?: string; children?: ReactNode }) => (
+  <Root className={className}>{children}</Root>
+)
+const Link = styled(Typography, { label: 'Link' })({ color: 'blue' })
+const NavLink = styled(Link, { label: 'NavLink' })({ fontWeight: 700 })
+// <Typography /> is <span class="umber-Typography-147y03t">
+// <Link />       is <span class="umber-Typography-147y03t umber-Typography-Link-3n5swy">
+// <NavLink />    is <span class="umber-Typography-147y03t umber-Typography-Link-NavLink-13lzy4r">
+```
+
+So the developer tools show which components styled the element, and a test finds it by `-Link-` as well as by `-Typography-`. It is the rule of every merge of labels, in a chain of styled components (above) as through `className`, and in `css()` and `cache.css`:
+
+- the labels are joined by `-` in the order of the merge, the inner component first: `<prefix>-<inner>-<outer>-<hash>`;
+- a label that is already written, as a whole run of the `-`-separated parts before it, is not written again: `styled(Button, { label: 'Button' })` adds nothing;
+- a style or a class with no label adds none: the class of `styled(Typography)` given to the root leaves `umber-Typography-<hash>`;
+- with `hasLabels: false` no class has a label, and the names are `<prefix>-<hash>`;
+- a class name that is not the engine's passes through untouched, and a `className` with no engine class in it merges nothing.
+
+Every class the merge makes carries the joined label: the override class with layers, the one merged class of the element without them (`umber-Typography-Link-<hash>`). The base and props classes of the root stay the root's own.
+
 ## Limits
 
 - What the template form does not read: an at-rule that is a statement (`@import`, `@charset`) is an error; `/*` inside an unquoted `url(...)` starts a comment (quote the URL); an interpolation is a statement of its own only when it stands alone on its line, so `${card} color: red;` reads `${card} color` as a property name; a value is text, so a number without a unit (`padding: 8`) is written as `8`, where the object `{ padding: 8 }` writes `8px`; a nested selector without `&` (`a:hover { }`) is a descendant of the element.
 - The template form is not offered by `styled` on React Native in this release; `css` and `keyframes` take it there.
 - A styled component is a selector only by its `target` or, without a function style, by its class. A component that wraps it has its own class, so `${Button}` does not match the elements of `styled(Button)(...)`, except where the wrapper's styles start with a function that reads props (see [Wrapping a styled component](#wrapping-a-styled-component)); a `target` is kept by every wrapper.
-- A wrapper with a label of its own writes the base of the wrapped component again under its label: one more rule of the same declarations for each such wrapper. Without a label it shares the base.
-- `as` of a component that is not made by `styled` is that component's prop: the styled component does not check it, and a component that ignores it renders what it always renders. React Native keeps its own rule: there `styled` takes components only, and `as` replaces the component (see [React Native](react-native.md)). In Vue, `shouldForwardProp` is used for a string tag only, so `as` always reaches such a component. With `hasLayers: false`, an element that is given something in `style` or an engine class in `className` has one merged class and not the component's class: use a `target`.
+- A wrapper with a label of its own writes the base of the wrapped component again under the labels of the chain: one more rule of the same declarations for each such wrapper. Without a label it shares the base.
+- A class merged through `className` is one class for each distinct joined label: the same styles given to two roots (`Typography-Link`, `Button-Link`) are two rules of the same declarations, one for each pair that meets. A class name grows by one label for each labelled level of a chain.
+- A label that is a whole run of the `-`-separated parts of the labels before it is not written again: a component labelled `root` that wraps one labelled `button-root` adds nothing. Labels are not checked for this when they are given.
+- `as` always replaces a string tag, also when a `shouldForwardProp` given for it returns `true` for `as`: there the one-line rule would forward `as` as an attribute and keep the tag.
+- `as` of a component that is not made by `styled` is that component's prop, unless the filter keeps it off: the styled component does not check it, and a component that ignores it renders what it always renders. A filter is asked about `as` once, when the styled component is made. React Native keeps its own rule: there `styled` takes components only, and `as` replaces the component (see [React Native](react-native.md)). In Vue, `shouldForwardProp` is used for a string tag only, so `as` always reaches such a component. With `hasLayers: false`, an element that is given something in `style` or an engine class in `className` has one merged class and not the component's class: use a `target`.
 - A key built at run time (a media query made from a breakpoint, for example) written directly in a web style object is a type error: write it with `at(key, style)`. See [Typed styles](typed-styles.md).
 - The default filter knows the attributes of HTML and SVG under their React names. A lowercase or hyphenated spelling (`tabindex`, `stroke-width`) and an attribute that is not in the specifications (a vendor attribute, a new one) do not reach the element unless `shouldForwardProp` lets them, and a prop of your own that has the name of an attribute (`color`, `size`, `label`, `width`) does reach it.
 - The shorthands are typed for the tags of React's JSX types (React) and Vue's (Vue). At run time any name that starts with a lowercase letter is made into a tag, except `then`.

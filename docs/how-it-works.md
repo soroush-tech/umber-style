@@ -50,7 +50,7 @@ There is no CSS processor and no build step. The serializer is a function that r
 A cache turns a style into a class name and inserts the rules once. The class name is `<prefix>-<label>-<hash>`:
 
 - `prefix` is the cache's prefix (`css` by default).
-- `label` is the style's `label`, which `styled` sets from `name` and `slot` (`umber-button-root-15gvy7r`). It is left out without a name, or with `hasLabels: false`.
+- `label` is the style's `label`, which `styled` sets from `name` and `slot` (`umber-button-root-15gvy7r`). It is left out without a name, or with `hasLabels: false`. The labels of merged styles are joined in order (`umber-Typography-Link-3n5swy`): see [Writing styles](writing-styles.md#the-labels-of-merged-styles).
 - `hash` is a hash of the compiled rules. The same style always gives the same class, in the same or another process, so a server and a browser agree on names.
 
 Several styles merge into one class: later keys win, nested objects merge key by key. `cache.css(a, b)` is one class for both.

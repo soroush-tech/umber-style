@@ -116,7 +116,7 @@ describe('createStyler', () => {
       { margin: 4 },
     ])
     const className = outer.getClassName({})
-    expect(className).toMatch(/^e-fancy-root-/)
+    expect(className).toMatch(/^e-base-root-fancy-root-/)
     expect(ruleOf(className)).toBe(`.${className}{color:red;margin:4px;}`)
   })
 

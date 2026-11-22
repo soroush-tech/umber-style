@@ -93,7 +93,7 @@ describe('styled', () => {
     const { container } = render(<Fancy>x</Fancy>)
     expect(container.querySelectorAll('*')).toHaveLength(1)
     const { className } = screen.getByRole('button')
-    expect(className).toMatch(/^t-fancy-root-[a-z0-9]+$/)
+    expect(className).toMatch(/^t-base-root-fancy-root-[a-z0-9]+$/)
     expect(ruleOf(className)).toBe(`.${className}{color:red;margin:4px;}`)
     expect(Fancy._tag).toBe('button')
     expect(Fancy._styles).toHaveLength(4)

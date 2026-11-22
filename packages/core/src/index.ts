@@ -36,7 +36,13 @@ export * from './mergeDeep'
 export type { RegisteredSyntax } from './registered'
 export { createGlobalMarker, type GlobalMarker } from './scanHtml'
 export * from './scope'
-export * from './serialize'
+export {
+  compileRules,
+  mergeStyles,
+  readLabel,
+  type StyleObject,
+  type StyleValue,
+} from './serialize'
 export {
   createSheetEntry,
   findEntryCache,

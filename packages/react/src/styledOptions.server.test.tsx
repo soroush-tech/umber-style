@@ -1,5 +1,5 @@
 import { createCache, createEngine, createMemorySheet } from '@umber-style/core'
-import type { ReactNode } from 'react'
+import type { ComponentProps, ReactNode } from 'react'
 import { bindEngine } from './createStyle.server'
 import { findAll, resolveTree } from './vitest.resolveTree'
 import type { CacheFunction } from './serverContext'
@@ -49,7 +49,7 @@ describe('styled in the server components build', () => {
     expect(sheet.rules.filter((rule) => rule.includes(override))).toHaveLength(1)
   })
 
-  it('labels the base and the props class of a wrapper of a styled component with the label of the wrapper', async () => {
+  it('labels the base and the props class of a wrapper of a styled component with the inner label and the label of the wrapper', async () => {
     const { styled } = setup()
     const byVariant = ({ variant }: { variant?: string }) => ({ fontWeight: variant ? 700 : 400 })
     const Typography = styled('span', { label: 'Typography' })({ margin: 0 }, byVariant)
@@ -65,8 +65,8 @@ describe('styled in the server components build', () => {
     )
     expect(typography[0]).toMatch(/^s-Typography-\w+$/)
     expect(wrapper).toEqual([
-      typography[0].replace('Typography', 'W'),
-      expect.stringMatching(/^s-W-\w+$/),
+      typography[0].replace('Typography', 'Typography-W'),
+      expect.stringMatching(/^s-Typography-W-\w+$/),
     ])
   })
 
@@ -102,5 +102,44 @@ describe('styled in the server components build', () => {
       className: expect.stringMatching(/^typography-inherit s-\w+$/),
     })
     expect(button.props).toEqual({ href: '#b', className: expect.stringMatching(/^s-\w+$/) })
+  })
+
+  it('replaces a component whose filter does not forward `as`, with what that filter lets through', async () => {
+    const { styled } = setup()
+    const TableElement = (props: ComponentProps<'table'>) => <table {...props} />
+    const Table = styled(TableElement, {
+      shouldForwardProp: (prop) => prop === 'id',
+    })({ borderCollapse: 'collapse' })
+    const tree = await resolveTree(
+      <>
+        <Table as="div" id="t" {...{ tone: 'x' }} />
+        <Table />
+      </>
+    )
+    const [div] = findAll(tree, 'div')
+    expect(div.props).toEqual({ id: 't', className: expect.stringMatching(/^s-\w+$/) })
+    expect(findAll(tree, 'table')).toHaveLength(1)
+  })
+
+  it('joins the labels of a class given in className after the labels of the element', async () => {
+    const { styled } = setup()
+    const Root = styled('span', { label: 'Typography' })({ margin: 0 })
+    const Typography = ({ className }: { className?: string }) => <Root className={className} />
+    const Link = styled(Typography, { label: 'Link' })({ color: 'blue' })
+    const NavLink = styled(Link, { label: 'NavLink' })({ fontWeight: 700 })
+    const tree = await resolveTree(
+      <>
+        <Link />
+        <NavLink />
+      </>
+    )
+    const [link, navLink] = findAll(tree, 'span').map((span) =>
+      (span.props.className as string).split(' ')
+    )
+    expect(link).toEqual([
+      expect.stringMatching(/^s-Typography-\w+$/),
+      expect.stringMatching(/^s-Typography-Link-\w+$/),
+    ])
+    expect(navLink).toEqual([link[0], expect.stringMatching(/^s-Typography-Link-NavLink-\w+$/)])
   })
 })

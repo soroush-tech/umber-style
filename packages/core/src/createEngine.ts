@@ -18,6 +18,7 @@ import {
   type KeyframesOptions,
   type KeyframesSteps,
 } from './keyframes'
+import { joinLabels } from './serialize'
 import { isStyleFunction, splitLeading } from './styleBase'
 import { isSameView } from './sameView'
 import { createThemeClass, declareRootTheme, toDeclarationText } from './theme'
@@ -223,6 +224,9 @@ function toKebabCase(text: string): string {
 function isPlainStyle(value: ClassValue): boolean {
   return typeof value === 'object' && value !== null && !isSheetEntry(value)
 }
+
+/** The `{ label }` styles that `createStyler` puts before the styles of each component: a wrapper finds the labels of the components it wraps among their styles. */
+const labelStyles = new WeakSet<object>()
 
 /** The label of a styled component: `label` as it is, else `name-slot`, or '' with neither. */
 function createLabel({ name, slot = 'root', label }: StylerOptions): string {
@@ -466,7 +470,12 @@ function createFamilyEngine<T extends object>(
     inherited: readonly StyleInput[] = []
   ): Styler => {
     const label = createLabel(stylerOptions)
-    const list = [...inherited, ...(label ? [{ label }] : []), ...styles]
+    const ownLabel = label ? [{ label }] : []
+    for (const style of ownLabel) labelStyles.add(style)
+    const list = [...inherited, ...ownLabel, ...styles]
+    // The labels of the components of the chain, inner first: every class of the styles carries them all.
+    const labels = list.filter((style) => labelStyles.has(style as object)) as { label: string }[]
+    const fullLabel = labels.reduce((joined, style) => joinLabels(joined, style.label), '')
     const hasFunction = list.some(isStyleFunction)
     // What a function returns is checked in development only; a list needs no work of its own here,
     // because the cache reads lists in order.
@@ -514,21 +523,19 @@ function createFamilyEngine<T extends object>(
     // A wrapped component with no function has one class, which is its selector (`${Inner}`).
     const isInheritedStatic = !inherited.some(isStyleFunction)
     /**
-     * The base class and what goes in front of the props class, for the base `base`. A base made of the
-     * wrapped component's styles alone would carry the wrapped component's label: it takes the label of
-     * this component. When the wrapped component has no function, the base is its class, which the
-     * element carried before; it stays in front, so that the wrapped component as a selector still
-     * matches the element.
+     * The base class and what goes in front of the props class, for the base `base`. It carries the
+     * labels of the whole chain, also when it is made of the wrapped component's styles alone. When the
+     * wrapped component has no function and this one has a label of its own, the base is the wrapped
+     * component's class under more labels; that class, which the element carried before, stays in
+     * front, so that the wrapped component as a selector still matches the element.
      */
     const createBase = (base: StyleResult[]): Pick<Plan, 'baseClass' | 'leading'> => {
       if (!base.some(Boolean)) return { baseClass: '', leading: '' }
       const styles = base as WebStyleObject[]
-      if (!label || base.length > inherited.length) {
-        const baseClass = cache.css(...styles)
+      const baseClass = cache.css(...styles, ...labels)
+      if (!label || base.length > inherited.length || !isInheritedStatic) {
         return { baseClass, leading: baseClass }
       }
-      const baseClass = cache.css(...styles, { label })
-      if (!isInheritedStatic) return { baseClass, leading: baseClass }
       const before = cache.css(...styles)
       return { baseClass, leading: before === baseClass ? baseClass : `${before} ${baseClass}` }
     }
@@ -542,10 +549,9 @@ function createFamilyEngine<T extends object>(
       const { base, propsFrom } = splitLeading(list, props, view)
       if (isChecked) checkStyleResult(cache.prefix, label, base)
       const hasProps = propsFrom < list.length
-      const lead = label ? [{ label }] : []
       return {
         ...createBase(base),
-        propsStyles: hasProps ? [...lead, ...list.slice(propsFrom)] : [],
+        propsStyles: hasProps ? [...labels, ...list.slice(propsFrom)] : [],
       }
     }
     const getPlan = (props: Record<string, unknown>, theme: unknown): Plan => {
@@ -581,9 +587,13 @@ function createFamilyEngine<T extends object>(
       if (hasExtras && !cache.hasLayers) return getMerged(props, theme, extras)
       const own = getOwn(getPlan(props, theme), props, theme)
       if (!hasExtras) return own
-      // The override class takes the label of the component, so that it can be told from the others;
-      // one sheet entry given alone is used as it is.
-      const overrides = cache.cssWith({ layer: 'overrides', label: label || undefined }, ...extras)
+      // The override class takes the labels of the component, so that it can be told from the others,
+      // and an engine class given in `className` adds its own after them; one sheet entry given alone is
+      // used as it is.
+      const overrides = cache.cssWith(
+        { layer: 'overrides', label: fullLabel || undefined },
+        ...extras
+      )
       return [own, overrides].filter(Boolean).join(' ')
     }
 
@@ -599,7 +609,7 @@ function createFamilyEngine<T extends object>(
         if (!cache.hasLayers) return cache.cssHeld({}, ...resolveAll(list, props, theme), ...extras)
         const own = getOwn(getPlan(props, theme), props, theme)
         const overrides = cache.cssHeld(
-          { layer: 'overrides', label: label || undefined },
+          { layer: 'overrides', label: fullLabel || undefined },
           ...extras
         )
         return {
