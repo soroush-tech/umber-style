@@ -176,8 +176,41 @@ What does depend on the theme is whatever is not a token: a breakpoint, a number
 
 The web bindings (`@umber-style/react`, `@umber-style/vue`) use this model. React Native has no CSS and no variables, so `@umber-style/react-native` skips it: a style function receives the real values and returns an object for the platform's own `StyleSheet`. The names (`styled`, `ThemeProvider`, `useTheme`, `StyleSheet`, `useStyle`, `apply`) are the same, so one source can run on both: see [Style sheets and the style prop](style-sheets.md).
 
+## Two copies in one program
+
+A program can load the core twice: a package bundled into a server build next to one that is left external, or two versions installed in one tree. What one copy registers, another must find: a name that `keyframes()` of one copy returned is written by the cache of the other, and a class that a styled component of one copy makes must have the same labels in a program with one copy (the browser) as in a program with two (the server), or the first HTML and the browser would not agree.
+
+So the state that copies must share lives in one registry on `globalThis`, under `Symbol.for('umber-style.registry')`, which every copy reaches alike. The registry is a `Map` whose own shape never changes. Each entry is keyed `<package>.<name>@<shape>` (`core.keyframes@1`): a release that changes what an entry holds gives it a new shape number, so an older copy keeps reading the entry it knows and the two simply stop sharing that one entry; nothing an older copy reads changes under it.
+
+| Entry                                                      | What it holds                                                                                |
+| ---------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `core.keyframes@1`                                         | The steps of every name `keyframes()` returned                                               |
+| `core.caches@1`                                            | The cache of each prefix in each document, which `findCache` gives                           |
+| `core.element-modes@1`, `core.written-text@1`              | How each style element is written (text or `insertRule`), and which text nodes a cache wrote |
+| `core.label-styles@1`                                      | The label marks that a wrapper finds among the styles of the component it wraps              |
+| `react.default-style@1`, `react.server-default-style@1`    | The default style of each build of the React binding                                         |
+| `react.cache-provider@1`, `react.marks@1`                  | The context of `CacheProvider`, and the marks of the nearest provider                        |
+| `react.prefix-styles@1`                                    | The theme contexts of each prefix                                                            |
+| `vue.default-style@1`, `vue.cache-provider@1`              | The default style of the Vue binding, and the key of its `CacheProvider`                     |
+| `react-native.default-style@1`, `react-native.theme-ids@1` | The default style of the React Native binding, and the ids that `when(theme)` names          |
+| `css.default-instance@1`                                   | The default instance of `@umber-style/css`                                                   |
+
+The rest stays in each copy: what is only remembered to go faster (the CSS names of properties, the parsed templates, the parsed media queries, the plain data of a theme), the warnings already given, and the subscriptions of React Native to the platform, which each copy makes for itself and which give each the same answers.
+
+Every entry was module state before: it lived as long as the process, and was seen by every request a server rendered. On `globalThis` it lives as long and is seen by the same requests, so a server keeps requests apart exactly as before. None of it holds the styles of a request: the names and labels are made from the code of the components, the caches of a page are keyed by a document (a server has none), the contexts hold no value outside a render, and a request that uses its own cache (`createCache`, a `CacheProvider`) keeps it out of the registry.
+
+In development (`process.env.NODE_ENV` is `development`) a second copy warns once when it first reads the registry. Two versions:
+
+```text
+[umber-style] @umber-style/core 0.2.0 is loaded next to @umber-style/core 0.2.1. The copies share the state that both versions store alike, and keep the rest apart. It usually happens when a package is bundled into a build next to one that is left external, or when two versions are installed in one tree: install one version, and bundle the packages of UmberStyle together or not at all.
+```
+
+Two copies of one version say `Two copies of @umber-style/core 0.2.0 are loaded. They share their state, but the code is loaded twice.` with the same advice, and only where there is a document (a browser, or a test environment that has one). A server of server components loads the core once for the server components and once for the render of the client components, by design (the development server of the Next.js App Router does), and those two copies share everything: that is not warned about.
+
 ## Limits
 
+- A copy of version 0.1.0 has no registry: it shares nothing with a later copy, and a later copy does not see it to warn.
+- The copies are tested as two module instances in one test (`copies.test.ts` of the core, the bindings and `@umber-style/css`), not as two builds of an app.
 - The explanation of one class for every theme holds for the `variable` and `reference` token modes. In `inline` mode the real value is written into the rule, so a theme that changes it makes another class. See [Tokens](tokens.md).
 - Classes and `@keyframes` rules are never removed from the cache or from the style sheet while the page lives; only global rules are. A style that is built from many different values (a measured number, for example) adds one class and its rules for each value. See [No inline styles](no-inline-styles.md).
 - The base of a component is only as good as the test that a function reads no prop. A prop that is read inside a function that the style returns, or later (a callback), is not seen; a style that reads module state that changes is not pure, and the base would keep its first result for a theme. Style functions are expected to be pure functions of their props and the theme.

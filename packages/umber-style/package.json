@@ -1,6 +1,6 @@
 {
   "name": "umber-style",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "UmberStyle in one package: the engine at the root, and the React, React Native and Vue bindings as subpaths.",
   "keywords": [
     "styling",
@@ -120,10 +120,10 @@
     "prepublishOnly": "pnpm build"
   },
   "dependencies": {
-    "@umber-style/core": "workspace:*",
-    "@umber-style/react": "workspace:*",
-    "@umber-style/react-native": "workspace:*",
-    "@umber-style/vue": "workspace:*"
+    "@umber-style/core": "workspace:^",
+    "@umber-style/react": "workspace:^",
+    "@umber-style/react-native": "workspace:^",
+    "@umber-style/vue": "workspace:^"
   },
   "peerDependencies": {
     "react": "^19.2.8",

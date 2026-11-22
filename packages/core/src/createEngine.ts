@@ -19,6 +19,7 @@ import {
   type KeyframesSteps,
 } from './keyframes'
 import { joinLabels } from './serialize'
+import { readSharedState } from './sharedState'
 import { isStyleFunction, splitLeading } from './styleBase'
 import { createReferenceGuard } from './referenceKeys'
 import { isSameView } from './sameView'
@@ -245,8 +246,8 @@ function isPlainStyle(value: ClassValue): boolean {
   return typeof value === 'object' && value !== null && !isSheetEntry(value)
 }
 
-/** The `{ label }` styles that `createStyler` puts before the styles of each component: a wrapper finds the labels of the components it wraps among their styles. */
-const labelStyles = new WeakSet<object>()
+/** The `{ label }` styles that `createStyler` puts before the styles of each component: a wrapper finds the labels of the components it wraps among their styles, also those of a component made by another copy of the core. */
+const labelStyles = readSharedState('core.label-styles@1', () => new WeakSet<object>())
 
 /** The label of a styled component: `label` as it is, else `name-slot`, or '' with neither. */
 function createLabel({ name, slot = 'root', label }: StylerOptions): string {

@@ -1,16 +1,17 @@
 import { defineComponent, inject, provide, type InjectionKey, type PropType } from 'vue'
-import type { Cache } from '@umber-style/core'
+import { readSharedState, type Cache } from '@umber-style/core'
 
-/** What the nearest `CacheProvider` provides: its cache. */
-const CACHE_KEY: InjectionKey<Cache> = Symbol('cache')
-
-// Whether a `CacheProvider` has been set up in this module: until then no component looks for one, so
-// that an app that has none pays nothing.
-let isProvided = false
+// The key under which the nearest `CacheProvider` provides its cache, and whether one has been set up:
+// until then no component looks for one, so that an app that has none pays nothing. Both are shared by
+// every copy of the binding in the program, so that a component of one copy sees the provider of another.
+const provided = readSharedState('vue.cache-provider@1', () => ({
+  key: Symbol('cache') as InjectionKey<Cache>,
+  isProvided: false,
+}))
 
 /** The cache of the nearest `CacheProvider`, or undefined with none above. Call it in `setup` or in a functional component. */
 export function injectCache(): Cache | undefined {
-  return isProvided ? inject(CACHE_KEY, undefined) : undefined
+  return provided.isProvided ? inject(provided.key, undefined) : undefined
 }
 
 /**
@@ -27,8 +28,8 @@ export const CacheProvider = defineComponent({
     value: { type: Object as PropType<Cache>, required: true },
   },
   setup(props, { slots }) {
-    isProvided = true
-    provide(CACHE_KEY, props.value)
+    provided.isProvided = true
+    provide(provided.key, props.value)
     return () => slots.default?.()
   },
 })

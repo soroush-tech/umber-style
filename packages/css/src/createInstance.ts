@@ -12,6 +12,8 @@ import {
   type KeyframesSteps,
   type Sheet,
   type StyleObject,
+  type UmberCache,
+  type UmberSheet,
   type WebStyleObject,
 } from '@umber-style/core'
 
@@ -53,8 +55,11 @@ export interface InjectGlobalFunction {
   (...styles: InjectGlobalInput[]): void
 }
 
-/** A cache made by other code, that an instance shares: it may carry the sheet it writes to. */
-export type SharedCache = Cache & { readonly sheet?: Sheet }
+/**
+ * A cache made by other code, that an instance shares: it may carry the sheet it writes to, or, as a cache
+ * of `@umber-style/cache` does, the style elements that hold its rules (`UmberSheet`).
+ */
+export type SharedCache = Cache & { readonly sheet?: Sheet | UmberSheet }
 
 /** The options of `createInstance`: those of the core's `createCache`, with `key` for `prefix`, or a cache to share. */
 export interface InstanceOptions extends Omit<CacheOptions, 'prefix'> {
@@ -68,13 +73,14 @@ export interface InstanceOptions extends Omit<CacheOptions, 'prefix'> {
   /**
    * A cache to use instead of making one, so that the classes of this instance and those of other code
    * live in one cache. Its options are its own: the other cache options are not read, and a `key` that
-   * differs from its prefix throws. The sheet is `sheet`, or the cache's own `sheet` member.
+   * differs from its prefix throws. The sheet of the instance is `sheet`, or the cache's own `sheet`
+   * member: for a cache of `@umber-style/cache`, its style elements.
    */
   cache?: SharedCache
 }
 
-/** The functions of one instance, bound to its cache. */
-export interface CssInstance {
+/** The functions of one instance, bound to its cache; `S` is the type of its sheet. */
+export interface CssInstance<S extends Sheet | UmberSheet = Sheet> {
   /**
    * One class for style objects and class names this cache made (resolved back to their styles), merged
    * left to right so the last wins; a string that holds `:` or `{` is CSS text, read as a template is and
@@ -95,8 +101,8 @@ export interface CssInstance {
   injectGlobal: InjectGlobalFunction
   /** The cache. After `flush`, it reads the new one. */
   readonly cache: Cache
-  /** The sheet the cache writes to. */
-  readonly sheet: Sheet
+  /** The sheet the cache writes to; for an instance given a cache of `@umber-style/cache` and no `sheet`, the style elements of that cache. */
+  readonly sheet: S
   /**
    * Removes every rule from the sheet and starts a new, empty cache over it: the classes, the global
    * rules and the hydrated ids are forgotten, and a style is written again when it is next used. Throws
@@ -160,8 +166,15 @@ function readTemplate<R>(name: string, result: R | ((input: never) => unknown)):
   return result as R
 }
 
+/** Makes an instance over a cache of `@umber-style/cache`: its sheet is the style elements of that cache. */
+export default function createInstance(
+  options: InstanceOptions & { cache: UmberCache; sheet?: undefined }
+): CssInstance<UmberSheet>
 /** Makes an instance: a cache of its own (or the one given) and the functions bound to it. */
-export default function createInstance(options: InstanceOptions = {}): CssInstance {
+export default function createInstance(options?: InstanceOptions): CssInstance
+export default function createInstance(
+  options: InstanceOptions = {}
+): CssInstance<Sheet | UmberSheet> {
   const { key, cache: given, sheet: givenSheet, hasLayers = false, ...cacheOptions } = options
   if (given && key !== undefined && key !== given.prefix) {
     throw new TypeError(
@@ -176,7 +189,9 @@ export default function createInstance(options: InstanceOptions = {}): CssInstan
       'createInstance(): the given cache has no `sheet` member: give the sheet it writes to as `sheet` too.'
     )
   }
-  const makeCache = (): Cache => createCache({ ...cacheOptions, prefix, hasLayers, sheet })
+  // Only an instance that was not given its cache makes one, and its sheet is then a sheet of the core.
+  const makeCache = (): Cache =>
+    createCache({ ...cacheOptions, prefix, hasLayers, sheet: sheet as Sheet })
   let current = given ?? makeCache()
   // The ids that `hydrate` marked: the global rules among them are not written by `injectGlobal`.
   const hydrated = new Set<string>()
@@ -247,7 +262,8 @@ export default function createInstance(options: InstanceOptions = {}): CssInstan
           'flush(): this instance was given its cache, which other code shares, so it cannot empty it.'
         )
       }
-      for (let index = sheet.rules.length - 1; index >= 0; index--) sheet.remove?.(index)
+      const own = sheet as Sheet
+      for (let index = own.rules.length - 1; index >= 0; index--) own.remove?.(index)
       hydrated.clear()
       current = makeCache()
     },

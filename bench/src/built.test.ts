@@ -11,7 +11,7 @@ afterEach(() => {
 })
 
 describe('prepareBuiltPackages', () => {
-  it('runs in production, sends the core to its build, and loads a redirect in its place', () => {
+  it('runs in production, sends the core and the React prop filter to their builds, and loads a redirect in its place', () => {
     // Registered after, so it runs first: it records where the core was sent and loads a built-in
     // module instead.
     const sent: string[] = []
@@ -19,7 +19,7 @@ describe('prepareBuiltPackages', () => {
     const observer = registerHooks({
       resolve(specifier, context, nextResolve) {
         const result = nextResolve(specifier, context)
-        if (specifier !== '@umber-style/core') return result
+        if (!specifier.startsWith('@umber-style/')) return result
         sent.push(result.url)
         return { url: 'node:path', shortCircuit: true }
       },
@@ -27,7 +27,11 @@ describe('prepareBuiltPackages', () => {
     try {
       expect(process.env.NODE_ENV).toBe('production')
       load('@umber-style/core')
-      expect(sent).toEqual([new URL('../../packages/core/dist/index.cjs', import.meta.url).href])
+      load('@umber-style/is-prop-valid/react')
+      expect(sent).toEqual([
+        new URL('../../packages/core/dist/index.cjs', import.meta.url).href,
+        new URL('../../packages/is-prop-valid/dist/react.cjs', import.meta.url).href,
+      ])
       expect(load('umber-bench-probe').platform).toBeTypeOf('function')
     } finally {
       observer.deregister()

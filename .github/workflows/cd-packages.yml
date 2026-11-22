@@ -29,6 +29,7 @@ on:
           - cache
           - core
           - css
+          - is-prop-valid
           - react
           - react-native
           - server

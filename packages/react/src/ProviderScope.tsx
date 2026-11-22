@@ -8,6 +8,7 @@ import {
   createThemeRule,
   createTokens,
   mergeTheme,
+  readSharedState,
   ROOT_SELECTOR,
   toDeclarationText,
   type ColorScheme,
@@ -37,12 +38,15 @@ export interface ProviderMark {
 export type ProviderMarks = ReadonlyMap<unknown, ProviderMark>
 
 const NO_MARKS: ProviderMarks = new Map()
-let marksContext: React.Context<ProviderMarks> | undefined
+// The context of the marks, shared by every copy of the binding in the program.
+const sharedMarks = readSharedState('react.marks@1', () => ({
+  context: undefined as React.Context<ProviderMarks> | undefined,
+}))
 
 /** The context of the marks, made on first use: where this module is loaded with the server build of React, nothing renders it. */
 export function getMarksContext(): React.Context<ProviderMarks> {
-  marksContext ??= React.createContext(NO_MARKS)
-  return marksContext
+  sharedMarks.context ??= React.createContext(NO_MARKS)
+  return sharedMarks.context
 }
 
 /** `marks`, with `mark` as the nearest provider of `key`. */
@@ -79,15 +83,19 @@ export interface PrefixStyle {
   holder?: { readonly givenTheme: unknown }
 }
 
-const prefixStyles = new Map<string, PrefixStyle>()
-let claim: { readPrefix(): string; style: PrefixStyle } | undefined
+// The styles of each prefix, and the default style's claim, shared by every copy of the binding in the
+// program: a style of one copy and a provider of another read the same contexts.
+const prefixes = readSharedState('react.prefix-styles@1', () => ({
+  styles: new Map<string, PrefixStyle>(),
+  claim: undefined as { readPrefix(): string; style: PrefixStyle } | undefined,
+}))
 
 /**
  * The default style's claim on a prefix: its contexts exist before its engine and its prefix, which
  * `readPrefix` gives on demand. The prefix is the one it will have when its options are set.
  */
 export function claimPrefixStyle(readPrefix: () => string, style: PrefixStyle): void {
-  claim = { readPrefix, style }
+  prefixes.claim = { readPrefix, style }
 }
 
 /**
@@ -96,10 +104,11 @@ export function claimPrefixStyle(readPrefix: () => string, style: PrefixStyle): 
  * share its marks, and so does the browser part of a provider of the server build, which needs no engine.
  */
 export function readPrefixStyle(prefix: string): PrefixStyle {
-  let style = prefixStyles.get(prefix)
+  const { styles, claim } = prefixes
+  let style = styles.get(prefix)
   if (style === undefined) {
     style = claim?.readPrefix() === prefix ? claim.style : { contexts: createThemeContexts() }
-    prefixStyles.set(prefix, style)
+    styles.set(prefix, style)
   }
   return style
 }

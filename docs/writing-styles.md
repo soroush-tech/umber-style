@@ -174,10 +174,10 @@ Give a function the type of your props with the type argument, as `Badge` does: 
 
 ## Which props reach the element
 
-`theme`, `className` and `style` are the component's own and never reach the element, and so is `as` where it replaces what is rendered (see [`as`](#as)). Of the other props, a string tag such as `'span'` receives by default only:
+`theme`, `className` and `style` are the component's own and never reach the element, and so is `as` where it replaces what is rendered (see [`as`](#as)). Of the other props, a string tag such as `'span'` receives by default only those that `@umber-style/is-prop-valid/react` is true for (see [Prop filters](prop-filters.md)):
 
-- the attributes of HTML and SVG, by the names React gives them (`id`, `title`, `type`, `disabled`, `tabIndex`, `htmlFor`, `viewBox`, `strokeWidth`, `xlinkHref` and the rest);
-- `data-*` and `aria-*` attributes, and event handlers (`onClick`, `onPointerDownCapture`: `on` followed by a capital letter);
+- the attributes of HTML and SVG, by the names React gives them (`id`, `title`, `type`, `disabled`, `tabIndex`, `htmlFor`, `viewBox`, `strokeWidth`, `xlinkHref` and the rest), and their older spellings (`class`, `for`, `autofocus`);
+- `data-*` and `aria-*` attributes in any case, `x-*`, and event handlers (`onClick`, `onPointerDownCapture`: `on` followed by a character whose code is below 91, a capital letter, a digit, `-` or `:`);
 - React's own props: `children`, `ref`, `key`, `dangerouslySetInnerHTML`, `defaultValue`, `defaultChecked`, `suppressHydrationWarning`, `suppressContentEditableWarning`.
 
 So a prop that only the styles read stays off the element:
@@ -195,7 +195,7 @@ renders `<button type="submit" data-test="b" aria-label="go" class="...">` with 
 
 `shouldForwardProp` replaces that default: with it, a prop reaches the element or the component exactly when it returns `true`, whatever is rendered. In `Badge` above, `(prop) => prop !== 'tone'` keeps `tone` off and forwards everything else, an unknown attribute included.
 
-The list of HTML and SVG attributes adds about 3 KB to the React binding, minified (1.7 KB gzipped). The Vue binding has no default filter: see [Vue](vue.md).
+The list is a module of `@umber-style/is-prop-valid`, a dependency of the binding that an app's bundler includes once: about 4.4 KB minified (2.3 KB gzipped). The Vue and React Native bindings have no default filter, and take the entry of their platform as `shouldForwardProp` when you give it: see [Prop filters](prop-filters.md), [Vue](vue.md) and [React Native](react-native.md).
 
 The filter is applied to what is finally rendered: if you change the element with `as`, the default filter is only used when the new element is a string, and a `shouldForwardProp` you give is used for any element.
 

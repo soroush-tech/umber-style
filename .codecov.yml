@@ -18,6 +18,7 @@ coverage:
           - core
           - css
           - eslint-config
+          - is-prop-valid
           - react
           - react-native
           - server
@@ -46,6 +47,9 @@ flag_management:
     - name: eslint-config
       paths:
         - packages/eslint-config/
+    - name: is-prop-valid
+      paths:
+        - packages/is-prop-valid/
     - name: react
       paths:
         - packages/react/
@@ -91,6 +95,10 @@ component_management:
       name: eslint-config
       paths:
         - packages/eslint-config/**
+    - component_id: is-prop-valid
+      name: is-prop-valid
+      paths:
+        - packages/is-prop-valid/**
     - component_id: react
       name: react
       paths:

@@ -1,6 +1,6 @@
 {
   "name": "@umber-style/cache",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "The UmberStyle cache with the members that server-rendering setups read: key, compat, insert, inserted, registered and sheet.",
   "keywords": [
     "styling",
@@ -55,7 +55,7 @@
     "prepublishOnly": "pnpm build"
   },
   "dependencies": {
-    "@umber-style/core": "workspace:*"
+    "@umber-style/core": "workspace:^"
   },
   "devDependencies": {
     "@types/node": "^26.6.6",

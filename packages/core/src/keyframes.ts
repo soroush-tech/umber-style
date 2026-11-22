@@ -2,6 +2,7 @@ import { isAlphaColor, type AlphaColor } from './alpha'
 import { hashString } from './hash'
 import { DEFAULT_SCOPING } from './scope'
 import { compileStyleRules, mergeStyles, type CompileContext, type StyleObject } from './serialize'
+import { readSharedState } from './sharedState'
 import { createStandIn, readStandIn } from './standIn'
 import type { TemplateValue } from './styleTypes'
 import { isTemplateStrings, parseKeyframesTemplate } from './templateStyle'
@@ -32,8 +33,9 @@ const NAME_SUFFIX = '-name:'
 const NONE: readonly string[] = []
 
 // The steps of every name that `keyframes` returned. A name is a hash of the steps, so it is the same in
-// every engine and is kept for the process: an engine made later knows the names made before it.
-const registry = new Map<string, KeyframesInput<never>>()
+// every engine and is kept for the process: an engine made later knows the names made before it, and so
+// does the engine of another copy of the core, which reads the same registry.
+const registry = readSharedState('core.keyframes@1', () => new Map<string, KeyframesInput<never>>())
 
 /** The value of `key` in a step, with a stand-in (alone or in a list) turned into its path; a nested style is a `TypeError`. */
 function readStepValue(offset: string, key: string, value: unknown): unknown {

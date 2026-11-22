@@ -2,7 +2,7 @@
 
 UmberStyle is a styling engine for React, React Native, Vue and plain JavaScript. Every theme token becomes a CSS variable, so a style is the same for every theme and is computed once. A theme is a class on an element: switching it re-renders nothing. React Native has no CSS, so there the same API hands your styles the real values.
 
-**Status:** UmberStyle is at version 0.1.0 and the API can still change. How the packages reach npm, and how to try a prerelease, is in [Releasing](releasing.md).
+**Status:** UmberStyle is at version 0.2.0 and the API can still change. How the packages reach npm, and how to try a prerelease, is in [Releasing](releasing.md).
 
 These pages are the one set of documentation for every package below. A documentation site will be built from them later; until then they are read in this folder.
 
@@ -13,6 +13,7 @@ These pages are the one set of documentation for every package below. A document
 | [Getting started](getting-started.md)                           | Install a package and render a themed button on any platform                                                         |
 | [How it works](how-it-works.md)                                 | Follow a style object to a CSS rule, read the text format of a rule, and see why one class serves every theme        |
 | [Writing styles](writing-styles.md)                             | Use `styled`, labels, function styles, `shouldForwardProp`, `as` and wrapping                                        |
+| [Prop filters](prop-filters.md)                                 | Keep the props of a component off the element on each platform with `@umber-style/is-prop-valid`                     |
 | [Style sheets and the style prop](style-sheets.md)              | Share styles with `StyleSheet`, `useStyle` and `apply`, and override a component                                     |
 | [Themes](themes.md)                                             | Nest providers, read values, and type your theme                                                                     |
 | [The root theme and switching](root-theme.md)                   | Switch light and dark with no render, add a theme at run time, render a static page                                  |
@@ -38,17 +39,18 @@ These pages are the one set of documentation for every package below. A document
 
 ## The packages
 
-| Package                     | What it is                                                                                          |
-| --------------------------- | --------------------------------------------------------------------------------------------------- |
-| `@umber-style/core`         | The engine: tokens, the class cache, theme classes. It knows no framework                           |
-| `@umber-style/react`        | `styled`, `ThemeProvider`, `useTheme`, `StyleSheet`, `useStyle`, `apply` for React                  |
-| `@umber-style/react-native` | The same names for React Native, over the real theme values                                         |
-| `@umber-style/vue`          | The same names for Vue, with a reactive `useTheme`                                                  |
-| `umber-style`               | Re-exports the core at its root and each binding as `umber-style/react`, `/react-native`, `/vue`    |
-| `@umber-style/css`          | Class names from styles, with no framework and no theme: `css`, `cx`, `keyframes`, `injectGlobal`   |
-| `@umber-style/cache`        | `createCache({ key })`: the engine's cache with the members a server-rendering set-up reads         |
-| `@umber-style/server`       | `@umber-style/server/create-instance`: the CSS of one page as chunks and `<style data-umber>` tags  |
-| `@umber-style/styled`       | Legacy: the `styled` of `@umber-style/react` as a default export, for code that imports it that way |
+| Package                      | What it is                                                                                                      |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `@umber-style/core`          | The engine: tokens, the class cache, theme classes. It knows no framework                                       |
+| `@umber-style/react`         | `styled`, `ThemeProvider`, `useTheme`, `StyleSheet`, `useStyle`, `apply` for React                              |
+| `@umber-style/react-native`  | The same names for React Native, over the real theme values                                                     |
+| `@umber-style/vue`           | The same names for Vue, with a reactive `useTheme`                                                              |
+| `umber-style`                | Re-exports the core at its root and each binding as `umber-style/react`, `/react-native`, `/vue`                |
+| `@umber-style/css`           | Class names from styles, with no framework and no theme: `css`, `cx`, `keyframes`, `injectGlobal`               |
+| `@umber-style/cache`         | `createCache({ key })`: the engine's cache with the members a server-rendering set-up reads                     |
+| `@umber-style/server`        | `@umber-style/server/create-instance`: the CSS of one page as chunks and `<style data-umber>` tags              |
+| `@umber-style/is-prop-valid` | `/react`, `/vue`, `/react-native`: whether a prop is one that an element of that platform takes (no root entry) |
+| `@umber-style/styled`        | Legacy: the `styled` of `@umber-style/react` as a default export, for code that imports it that way             |
 
 ## How these pages were checked
 

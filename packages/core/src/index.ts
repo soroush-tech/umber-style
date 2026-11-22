@@ -53,6 +53,7 @@ export {
   type EntrySource,
   type SheetEntry,
 } from './sheetEntry'
+export { readSharedState } from './sharedState'
 export * from './styleTypes'
 export * from './tagShorthands'
 export {

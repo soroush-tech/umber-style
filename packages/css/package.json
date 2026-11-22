@@ -1,6 +1,6 @@
 {
   "name": "@umber-style/css",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "UmberStyle's plain layer: a style goes to a cache and comes back as a class name. No framework, no theme.",
   "keywords": [
     "styling",
@@ -66,7 +66,7 @@
     "prepublishOnly": "pnpm build"
   },
   "dependencies": {
-    "@umber-style/core": "workspace:*"
+    "@umber-style/core": "workspace:^"
   },
   "devDependencies": {
     "@soroush.tech/bench": "^2.2.3",

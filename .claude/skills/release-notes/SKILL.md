@@ -25,8 +25,9 @@ request. The bump decides which sections the notes need:
 | **MAJOR** | `X+1.0.0`  | Any change that breaks backward compatibility (minor and patch back to 0) |
 
 Raising the peer range of `react`, `react-native` or `vue` past what consumers have is a break
-(`docs/releasing.md`). The packages depend on each other by exact version, so a package whose
-dependency got a new version needs a release of its own to use it.
+(`docs/releasing.md`). The packages depend on each other by caret range (`workspace:^`, published
+as `^<version>`): a patch or, from 1.0.0, a minor of a dependency reaches its dependents without a
+release of theirs; under 1.0.0 a new minor of a dependency needs a release of each dependent.
 
 ## Required contents
 

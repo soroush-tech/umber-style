@@ -50,13 +50,18 @@ edits it.
 
 ## Dependencies first
 
-A workspace dependency is `workspace:*`, which pnpm publishes as the exact version: `umber-style@0.1.0`
-depends on `@umber-style/core@0.1.0`, so every package shares one engine. The order, from each
-`package.json`'s `dependencies`:
+A sibling in `dependencies` or `peerDependencies` is `workspace:^`, which pnpm publishes as
+`^<the sibling's version>`: `umber-style@0.2.0` depends on `@umber-style/core` `^0.2.0`. Up to 0.1.0
+it was `workspace:*`, an exact version, so a patch released alone nested a second copy of the
+package under every dependent that pinned the older one; from 0.2.0 a package can be patched alone.
+A `devDependency` on a sibling stays `workspace:*`, and `pnpm smoke:packed` fails on any other form
+(`docs/releasing.md`). A prerelease publishes `^X.Y.Z-<channel>.N`, which takes the later
+prereleases of the same version and its release. The order, from each `package.json`'s
+`dependencies`:
 
-1. `core`
-2. `cache`, `css`, `server`, `react`, `react-native`, `vue` - each depends on `core` alone
-   (`server` uses `cache`, `css` and `react` in its tests only)
+1. `core` and `is-prop-valid`, which depend on no sibling
+2. `cache`, `css`, `server`, `react-native`, `vue` - each depends on `core` alone (`server` uses
+   `cache`, `css` and `react` in its tests only) - and `react` (`core` and `is-prop-valid`)
 3. `styled` (depends on `react`) and `umber-style` (depends on `core`, `react`, `react-native`,
    `vue`)
 

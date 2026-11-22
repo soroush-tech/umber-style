@@ -281,6 +281,21 @@ const name = instance.css(fromEngine, { margin: 0 })
 
 The options of a shared cache are its own: the other options are not read, and a `key` that differs from its prefix throws a `TypeError`. A class of the instance is in the cache's layers when the cache has them.
 
+A cache of `@umber-style/cache` is taken as it is, with no `sheet` and no cast: it carries its style elements as its `sheet` member, and the instance's `sheet` is that member (typed `UmberSheet`). A styled component under `<CacheProvider value={cache}>` and a class of the instance then live in one cache, and one server instance extracts both, each in the cache's layers (`packages/server/src/sharedCache.test.tsx`):
+
+```tsx
+import createCache from '@umber-style/cache'
+import createCssInstance from '@umber-style/css/create-instance'
+import createInstance from '@umber-style/server/create-instance'
+
+const cache = createCache({ key: 'shop' })
+const instance = createCssInstance({ cache })
+const badge = instance.css({ margin: 4 })
+// render the page under <CacheProvider value={cache}>, then:
+const { css } = createInstance(cache).extractCritical(html)
+// css holds `@layer shop-components{.${badge}{margin:4px;}}` and the rules of the page's components
+```
+
 ## Everything `@umber-style/css` exports
 
 | Export                                              | What it is                                                                          |

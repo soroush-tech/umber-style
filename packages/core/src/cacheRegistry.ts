@@ -1,7 +1,9 @@
 import type { Cache } from './cache'
+import { readSharedState } from './sharedState'
 
-// The cache of each prefix in each document: the first one made that writes into a style element there.
-const registry = new WeakMap<Document, Map<string, Cache>>()
+// The cache of each prefix in each document: the first one made that writes into a style element there,
+// by any copy of the core, so that code of another copy finds it.
+const registry = readSharedState('core.caches@1', () => new WeakMap<Document, Map<string, Cache>>())
 
 /** Records `cache` as the cache of its prefix in `page`, unless a cache of that prefix was recorded there before. */
 export function registerCache(page: Document, cache: Cache): void {

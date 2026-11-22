@@ -252,6 +252,8 @@ Under the `react-server` condition `@umber-style/react` has `useTheme` (a plain 
 
 These names describe the same shapes as the types that existing apps import today (the list of names comes from the issue), so that code written against them compiles with only the scope of its imports changed. They are UmberStyle's own types: code that mixes them with types of another library may not line up.
 
+One import of an app that moves over changes by more than the scope: the prop filter. Its path names the platform, because each platform takes other props: `import isPropValid from '@umber-style/is-prop-valid/react'` (or `/vue`, `/react-native`), and the package has no root entry. See [Prop filters](prop-filters.md).
+
 | Name                     | What it is                                                                                                                                      | Declared in                                        |
 | ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
 | `CSSObject`              | A style written as an object on the web: `WebStyleObject` under another name                                                                    | `@umber-style/core`                                |

@@ -1,0 +1,90 @@
+{
+  "name": "@umber-style/is-prop-valid",
+  "version": "0.2.0",
+  "description": "Whether a prop is one that an element takes: the attributes of HTML and SVG under React's names or Vue's, and the props of React Native's built-in components.",
+  "keywords": [
+    "styling",
+    "props",
+    "attributes",
+    "react",
+    "react-native",
+    "vue",
+    "typescript"
+  ],
+  "license": "MIT",
+  "author": "Masoud Soroush <masoud@soroush.tech>",
+  "homepage": "https://umber-style.soroush.design",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/soroush-tech/umber-style.git",
+    "directory": "packages/is-prop-valid"
+  },
+  "bugs": {
+    "url": "https://github.com/soroush-tech/umber-style/issues"
+  },
+  "type": "module",
+  "sideEffects": false,
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    "./react": "./src/react.ts",
+    "./vue": "./src/vue.ts",
+    "./react-native": "./src/react-native.ts"
+  },
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      "./react": {
+        "import": {
+          "types": "./dist/react.d.mts",
+          "default": "./dist/react.mjs"
+        },
+        "require": {
+          "types": "./dist/react.d.cts",
+          "default": "./dist/react.cjs"
+        }
+      },
+      "./vue": {
+        "import": {
+          "types": "./dist/vue.d.mts",
+          "default": "./dist/vue.mjs"
+        },
+        "require": {
+          "types": "./dist/vue.d.cts",
+          "default": "./dist/vue.cjs"
+        }
+      },
+      "./react-native": {
+        "import": {
+          "types": "./dist/react-native.d.mts",
+          "default": "./dist/react-native.mjs"
+        },
+        "require": {
+          "types": "./dist/react-native.d.cts",
+          "default": "./dist/react-native.cjs"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "tsdown",
+    "lint": "oxlint --deny-warnings",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "prepublishOnly": "pnpm build"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "@types/react": "^19.3.0",
+    "@umber-style/eslint-config": "workspace:*",
+    "@vitest/coverage-v8": "^5.1.0",
+    "oxlint": "^1.93.0",
+    "react-native": "^0.88.1",
+    "tsdown": "^0.23.7",
+    "typescript": "~7.0.2",
+    "vitest": "^5.1.0",
+    "vue": "^3.5.45"
+  }
+}

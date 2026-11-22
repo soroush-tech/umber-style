@@ -39,6 +39,7 @@ const PACKAGES = [
   { dir: 'cache', name: '@umber-style/cache' },
   { dir: 'server', name: '@umber-style/server' },
   { dir: 'css', name: '@umber-style/css' },
+  { dir: 'is-prop-valid', name: '@umber-style/is-prop-valid' },
   { dir: 'react', name: '@umber-style/react' },
   { dir: 'styled', name: '@umber-style/styled' },
   { dir: 'react-native', name: '@umber-style/react-native' },
@@ -63,6 +64,9 @@ const ENTRIES = {
     'merge',
   ],
   '@umber-style/css/create-instance': [],
+  '@umber-style/is-prop-valid/react': ['default', 'isPropValid'],
+  '@umber-style/is-prop-valid/vue': ['default', 'isPropValid'],
+  '@umber-style/is-prop-valid/react-native': ['default', 'isPropValid'],
   '@umber-style/react': [
     'createStyle',
     'styled',
@@ -152,6 +156,24 @@ const listLeaves = (value, place = []) =>
     ? [{ place: place.join('.'), path: value }]
     : Object.entries(value ?? {}).flatMap(([key, child]) => listLeaves(child, [...place, key]))
 
+// 0. Each sibling a package depends on is declared `workspace:^`, which publishes `^<its version>`:
+// an exact version (what `workspace:*` publishes) nests a second copy of the sibling under a package
+// as soon as the sibling is released alone. devDependencies never reach a consumer and are not read.
+const SIBLINGS = new Set(PACKAGES.map(({ name }) => name))
+const readManifest = (dir) =>
+  JSON.parse(readFileSync(join(repoRoot, 'packages', dir, 'package.json'), 'utf8'))
+const listSiblingRanges = (pkg) =>
+  ['dependencies', 'peerDependencies'].flatMap((field) =>
+    Object.entries(pkg[field] ?? {})
+      .filter(([name]) => SIBLINGS.has(name))
+      .map(([name, range]) => ({ field, name, range }))
+  )
+for (const { dir, name } of PACKAGES) {
+  for (const { field, name: sibling, range } of listSiblingRanges(readManifest(dir))) {
+    check(range === 'workspace:^', `${name}: ${field} ${sibling} is workspace:^ (${range})`)
+  }
+}
+
 for (const { dir } of PACKAGES) {
   if (!existsSync(join(repoRoot, 'packages', dir, 'dist'))) {
     console.error(`packages/${dir}/dist is missing: run \`pnpm build\` first.`)
@@ -190,9 +212,13 @@ try {
     )
     const root = join(into, 'package')
     const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'))
+    // A package with no root entry (`is-prop-valid`) has no main, module or types to point at.
+    const hasRoot = '.' in (pkg.exports ?? {})
     const paths = [
       ...listLeaves(pkg.exports),
-      ...['main', 'module', 'types'].map((key) => ({ place: key, path: pkg[key] })),
+      ...['main', 'module', 'types']
+        .filter((key) => hasRoot || pkg[key] !== undefined)
+        .map((key) => ({ place: key, path: pkg[key] })),
     ]
     check(pkg.private !== true, `${name}: not private`)
     check(
@@ -213,6 +239,13 @@ try {
         !JSON.stringify(pkg.peerDependencies ?? {}).includes('workspace:'),
       `${name}: no workspace range left in its dependencies`
     )
+    for (const { field, name: sibling, range } of listSiblingRanges(pkg)) {
+      const expected = `^${readManifest(PACKAGES.find((entry) => entry.name === sibling).dir).version}`
+      check(
+        range === expected,
+        `${name}: ${field} ${sibling} is published as ${expected} (${range})`
+      )
+    }
     const other = readdirSync(root).filter(
       (entry) => !['dist', 'LICENSE', 'README.md', 'package.json'].includes(entry)
     )
@@ -326,6 +359,13 @@ same(mods['umber-style/react'].styled, mods['@umber-style/react'].styled, 'umber
 same(mods['@umber-style/styled'].default, mods['@umber-style/react'].styled, '@umber-style/styled and react')
 same(mods['umber-style/react-native'].styled, mods['@umber-style/react-native'].styled, 'umber-style/react-native')
 same(mods['umber-style/vue'].styled, mods['@umber-style/vue'].styled, 'umber-style/vue')
+// The prop filters: one function for each platform, and no root entry.
+for (const [platform, prop] of [['react', 'tabIndex'], ['vue', 'tabindex'], ['react-native', 'testID']]) {
+  const isPropValid = mods['@umber-style/is-prop-valid/' + platform].default
+  if (isPropValid(prop) !== true || isPropValid('variant') !== false) throw new Error('is-prop-valid/' + platform + ' answers wrong')
+}
+const hasRoot = await load('@umber-style/is-prop-valid').then(() => true, () => false)
+if (hasRoot) throw new Error('@umber-style/is-prop-valid has a root entry')
 // The plain layer: a class name from a style, its rule in the cache, and a separate instance.
 const plain = mods['@umber-style/css']
 const card = plain.css({ padding: 8 })
@@ -462,6 +502,9 @@ import { createEngine as createUmbrellaEngine } from 'umber-style'
 import createCache from '@umber-style/cache'
 import type { UmberCache } from '@umber-style/cache'
 import createInstance from '@umber-style/server/create-instance'
+import isPropValid from '@umber-style/is-prop-valid/react'
+import isVuePropValid from '@umber-style/is-prop-valid/vue'
+import isNativePropValid from '@umber-style/is-prop-valid/react-native'
 import { createStyle as createShared } from 'umber-style/react'
 import { createStyle as createUmbrellaNative } from 'umber-style/react-native'
 import { createStyle as createUmbrellaVue } from 'umber-style/vue'
@@ -478,6 +521,7 @@ export const tags: string = createInstance(umberCache).constructStyleTagsFromChu
 export const base: Theme | undefined = undefined
 export const plainClass: string = cx(css({ padding: 4 }), false, { open: true })
 export const ownClass: string = createCssInstance({ key: 'typed' }).css\`color: red;\`
+export const propFilters: ((prop: string) => boolean)[] = [isPropValid, isVuePropValid, isNativePropValid]
 
 const web = createStyle(theme, { prefix: 'smoke' })
 export const Box = web.styled('div', { name: 'Box' })(({ theme: view }) => {

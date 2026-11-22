@@ -1,3 +1,4 @@
+import { readSharedState } from '@umber-style/core'
 import createInstance from './createInstance'
 
 export type {
@@ -23,7 +24,7 @@ export type {
   UmberCache,
 } from '@umber-style/core'
 
-/** The default instance: key `css`, rules outside every cascade layer. */
+/** The default instance: key `css`, rules outside every cascade layer. Every copy of the package in the program shares it, so that a class one copy made is merged and extracted by another. */
 export const {
   css,
   cx,
@@ -35,4 +36,4 @@ export const {
   hydrate,
   getRegisteredStyles,
   merge,
-} = createInstance({ key: 'css' })
+} = readSharedState('css.default-instance@1', () => createInstance({ key: 'css' }))

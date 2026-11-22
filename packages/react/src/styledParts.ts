@@ -7,7 +7,7 @@ import {
   type StyleInput,
   type Styler,
 } from '@umber-style/core'
-import { isDomProp } from './domProps'
+import { isPropValid } from '@umber-style/is-prop-valid/react'
 import type { StyledOptions, StyledStatics } from './types'
 
 /** Whether `tag` is a component made by `styled`. */
@@ -18,7 +18,7 @@ function isStyledComponent(tag: ElementType): tag is ElementType & StyledStatics
 /** The filter of the props of `element`: the one given, whatever the element is; else for a string tag the attributes of HTML and SVG (a custom element, with a hyphen in its name, receives every prop), and none for a component. */
 function readFilter(element: ElementType, given: ((prop: string) => boolean) | undefined) {
   if (given || typeof element !== 'string') return given
-  return element.includes('-') ? undefined : isDomProp
+  return element.includes('-') ? undefined : isPropValid
 }
 
 /** What both builds of `styled` share: the styler, and the element and props that a component renders. */
