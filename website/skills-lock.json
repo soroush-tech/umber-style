@@ -1,0 +1,24 @@
+{
+  "version": 2,
+  "skills": {
+    "component-tree": {
+      "source": "./docs/skills",
+      "sourceType": "local",
+      "computedHash": "3d0ca7d6c3ac1a6df008708acb4e81add4ec179fac20364cd44c6381ff5fab93"
+    },
+    "soroush-design-system": {
+      "source": "soroush-tech/design-system",
+      "sourceType": "github",
+      "commit": "7e0ca3442128159a4acf1b0907a1e157810624ef",
+      "skillPath": "plugins/soroush-design-system/skills/soroush-design-system/SKILL.md",
+      "computedHash": "6eb6c2dff5fd51661cb3bc63c58e8924b02385d441010dc5612c17e3cafaa332"
+    },
+    "wcag": {
+      "source": "soroush-tech/design-system",
+      "sourceType": "github",
+      "commit": "7e0ca3442128159a4acf1b0907a1e157810624ef",
+      "skillPath": "plugins/soroush-design-system/skills/wcag/SKILL.md",
+      "computedHash": "096e653e3b33db452724f7aa2bf66384c54aec2c19de1d6b246478944fe88202"
+    }
+  }
+}
