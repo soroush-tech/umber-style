@@ -42,7 +42,7 @@ flowchart TD
   keep --> direct2
 ```
 
-The default sheet is the style elements of the document (`createDomSheet`, given `hasRuleText` and `nonce`
+The default sheet is the style elements of the document (`createDomSheet`, given `speedy` and `nonce`
 of the options, so that an element it makes carries the nonce of a content security policy), or a memory
 sheet when there is no `document`. `current` is a variable, so after `flush` the instance reads a new cache: the public
 `cache` member is a proxy that reads `current` (or the given cache itself, which never changes).

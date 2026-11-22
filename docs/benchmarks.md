@@ -26,7 +26,7 @@ Each local file sits next to what it measures, in `packages/<package>/bench/`, a
 | `core`         | `page-startup.bench.ts`         | In jsdom: `scanStyleText` of the CSS a server sent for 400 classes, and `createCache` over a page whose head holds it (the read at start-up)                                |
 | `core`         | `pruning-scan.bench.ts`         | `scanVariables` of one rule and of a large rule set                                                                                                                         |
 | `core`         | `pruning-mark-used.bench.ts`    | `markUsed` of a newly used variable with five theme classes, of one that is used already, and the fresh cache the first needs                                               |
-| `core`         | `sheets-dom.bench.ts`           | In jsdom: a style element from `createDomSheet` and the rules of N classes written into it, as text nodes (`hasRuleText` on) or with `insertRule` (off)                     |
+| `core`         | `sheets-dom.bench.ts`           | In jsdom: a sheet from `createDomSheet` and the rules of N classes written into it, as text, an element each (`speedy: false`), or with `insertRule` (`speedy: true`)       |
 | `core`         | `sheets-object.bench.ts`        | An object sheet on first and later access, and an entry used as a class                                                                                                     |
 | `core`         | `sheets-function.bench.ts`      | A function sheet resolved for a new theme view and for the same one                                                                                                         |
 | `core`         | `tokens-references.bench.ts`    | `createTokens`, a theme view and `declare` of a small theme (20 tokens) and a large one (281)                                                                               |
@@ -63,7 +63,7 @@ pnpm bench --rounds 5 --md   # options go to soroush-bench as they are, for ever
 pnpm bench:gate              # build, then the gate against the last release (see "The gate")
 ```
 
-`pnpm bench` runs `pnpm build` first, because the files load the built `dist`; then `bench/bin/local.mjs` runs each matching file with soroush-bench, one after the other (two at once would measure each other), and exits with 1 when a file failed. The first run builds the sandbox image. `sheets-dom.bench.ts` alone takes about twelve minutes: writing 800 classes as text nodes takes about 50 seconds an operation in the sandbox, and a case takes twelve samples at least. A filter (`pnpm bench react`) leaves it out.
+`pnpm bench` runs `pnpm build` first, because the files load the built `dist`; then `bench/bin/local.mjs` runs each matching file with soroush-bench, one after the other (two at once would measure each other), and exits with 1 when a file failed. The first run builds the sandbox image.
 
 To run one file by hand, build first and run soroush-bench from the root of the repository, which it mounts into the sandbox:
 
@@ -152,7 +152,15 @@ With `--rounds N` the whole file runs N times in the sandbox and one table of th
 
 ### Writing rules as text
 
-`sheets-dom.bench.ts` is there to show what a change to the text sheet does. With `hasRuleText` on, each rule is a text node of the style element, and jsdom parses the whole text of the element again for every node, so the cost grows with the square of the number of classes; `insertRule` grows with the number. It runs 200 and 800 classes as text and 200, 800 and 3200 with `insertRule`: in the sandbox 200 classes as text took 3.1 seconds an operation and 800 took 49 seconds (sixteen times as long for four times the classes), so one operation of 3200 would take about thirteen minutes, and a case needs twelve samples at least. With `insertRule` they took 25, 89 and 291 milliseconds. When text mode no longer parses the element again, 3200 goes into `TEXT_SIZES` at the top of the file.
+`sheets-dom.bench.ts` is there to show what a change to the text sheet does. It runs 200 and 800 classes as text and 200, 800 and 3200 with `insertRule`. Before 0.3.0 each rule was a text node of one style element, and jsdom parsed the whole text of the element again for every node, so the cost grew with the square of the number of classes. Now each rule is the text of an element of its own, which is parsed once, and both ways grow with the number. In the sandbox, one operation:
+
+| Classes | Text, one element (0.2.0) | Text, an element for each rule | `insertRule` |
+| ------: | ------------------------: | -----------------------------: | -----------: |
+|     200 |              3.0 to 4.0 s |                         104 ms |        35 ms |
+|     800 |                      49 s |                         306 ms |       146 ms |
+|    3200 |                   not run |                        not run |       456 ms |
+
+The first column is the figure recorded before the change (3200 was not run: one operation would have taken about thirteen minutes). By text, 800 classes take 2.9 times as long as 200, for four times the classes. 3200 by text is not run because it runs the sandbox out of memory: jsdom keeps every style element that was ever in its document after it is removed (a few kilobytes each, measured with jsdom alone, without the engine), and one operation of 3200 classes makes 6401 of them, each sample adding to the last.
 
 ### Not measured
 
@@ -242,7 +250,7 @@ Not in the gate, on purpose:
 
 - **Anything that needs a DOM or a framework**: the jsdom files and the renders. jsdom's own cost is most of their figure, and a binding would need React or Vue loaded for two builds side by side.
 - **The nanosecond operations** (`core/helpers-*`, the later access of a sheet), which settle at another speed in each process and cannot be told from a change.
-- **`classes-memory`, `page-startup` and `sheets-dom`.** Over five rounds on a laptop, `classes-memory` moved from 5.8 to 21 milliseconds for the same 1000 small styles, too far to gate. `createCache` reading a page in `page-startup` was steady (991 to 1047 microseconds), but it needs jsdom, which a gate file would load from a package's `node_modules` in the sandbox of the action, and that was not tried. `sheets-dom` is meant to change.
+- **`classes-memory`, `page-startup` and `sheets-dom`.** Over five rounds on a laptop, `classes-memory` moved from 5.8 to 21 milliseconds for the same 1000 small styles, too far to gate. `createCache` reading a page in `page-startup` was steady (991 to 1047 microseconds), but it needs jsdom, which a gate file would load from a package's `node_modules` in the sandbox of the action, and that was not tried. `sheets-dom` measures jsdom's style elements more than the engine.
 
 ### How it was checked
 
@@ -303,7 +311,7 @@ These benchmarks measure parts. The numbers of a whole page (first HTML, hydrati
 - The React Native binding is measured against a stand-in for the platform, so what the platform does with a style is not in it.
 - `scanHtml`, `scanVariables` and `scanStyleText` are measured from the source compiled by tsx, not from the build; the difference between the two was not measured.
 - The figure of a new variable in `pruning-mark-used.bench.ts` includes 1/127 of a fresh cache with five theme classes, which is most of it; the cost of the marking alone is the difference of two figures, each with its own noise. The same holds for the setup cases of the `dom-*` files.
-- `sheets-dom.bench.ts` has no case of 3200 classes written as text: in jsdom one operation would take minutes.
+- `sheets-dom.bench.ts` has no case of 3200 classes written as text: jsdom keeps every style element it removed, and 6401 elements an operation run the sandbox out of memory. How text mode grows in a browser is checked by `sheetText.browser.test.ts` of the core (1600 rules in Chromium), outside the benchmarks.
 - The gate on identical code differed by up to 8.3% on a laptop; a hosted runner was not measured, and the first runs in continuous integration are the real test of the ratio. The action of the job vendors soroush-bench 2.1.0, the workspace (and so `pnpm bench:gate`) has 2.2.3; their gate rule is the same.
 - The gate builds the release from its git tag: a release whose lockfile can no longer be installed stops the gate.
 - The `bench-report` job has not run in GitHub Actions; its script and its files were run on a laptop for past releases. The report compares versions measured in one job on one runner.

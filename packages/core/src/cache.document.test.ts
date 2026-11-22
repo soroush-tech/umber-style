@@ -36,9 +36,15 @@ describe('createDomSheet in another document', () => {
     expect(document.querySelector('style[data-style="u"]')).toBeNull()
     sheet.insert('.u-a{color:red;}')
     expect(frame.querySelector('style')?.sheet?.cssRules[0].cssText).toBe('.u-a { color: red; }')
-    // A second sheet of the key finds the element of that document.
-    createDomSheet('u', frame.body)
-    expect(frame.querySelectorAll('style[data-style="u"]')).toHaveLength(1)
+    // A second sheet of the key looks in that document: one by insertRule finds the element there that
+    // is not written by text; one by text uses an empty element there that no sheet uses.
+    createDomSheet('u', frame.body, { speedy: true })
+    const marker = frame.createElement('style')
+    marker.dataset.style = 'u'
+    frame.body.appendChild(marker)
+    createDomSheet('u', frame.body, { speedy: false }).insert('.u-b{color:blue;}')
+    expect(marker.textContent).toBe('.u-b{color:blue;}')
+    expect(document.querySelector('style[data-style="u"]')).toBeNull()
   })
 
   it('has the global document by default', () => {
@@ -83,8 +89,8 @@ describe('a cache whose sheet is in another document', () => {
     const frame = createFrameDocument()
     const cache = createCache({ prefix: 'u', sheet: createDomSheet('u', frame.head) })
     const name = cache.css({ color: 'red' })
-    const text = [...(frame.querySelector('style')?.sheet?.cssRules ?? [])].map(
-      (rule) => rule.cssText
+    const text = [...frame.querySelectorAll('style')].flatMap((element) =>
+      [...(element.sheet as CSSStyleSheet).cssRules].map((rule) => rule.cssText)
     )
     expect(text.join('')).toContain(`.${name}`)
     expect(document.querySelector('style')).toBeNull()

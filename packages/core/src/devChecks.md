@@ -5,7 +5,8 @@
 The development-time warning machinery. `isDevelopment()` and `isProduction()` read
 `process.env.NODE_ENV`, `createWarner(prefix)` makes a function that warns once for each key, and
 `createDevChecker(prefix, delay, page, readLabel)` makes the function that schedules a check of a page after
-the rules have stopped arriving.
+the rules have stopped arriving. `warnRenamedOption(prefix, options)` warns, in development, about an
+options object that still has `hasRuleText`, the name of `speedy` before 0.3.0.
 
 ## Why it exists
 
@@ -40,6 +41,18 @@ flowchart TD
 
 The timer is not restarted by later calls: `timer ??=` means the first call of a burst sets the delay
 (250 ms by default), and the run takes every rule written until then.
+
+`warnRenamedOption` warns once for each options object (a `WeakSet` of the objects warned about), so an
+object that one function hands to another as it is gets one warning. Its message says what to write for the
+value given (`hasRuleText: false` is `speedy: true`) and that the value is not read. Nothing is warned about
+outside development, nor for `hasRuleText: undefined`.
+
+```mermaid
+flowchart TD
+  renamed["warnRenamedOption(prefix, options)"] --> given{"hasRuleText given, object not warned, development?"}
+  given -->|no| quiet["nothing"]
+  given -->|yes| once["add the object to the set; console.warn with what to write instead"]
+```
 
 ## What it guarantees
 

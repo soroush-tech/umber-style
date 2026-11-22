@@ -34,8 +34,13 @@ export interface EngineOptions extends TokenOptions {
    * follow this option, else that cache's.
    */
   hasDevChecks?: boolean
-  /** Whether the style element of the cache holds its rules as text, readable through `textContent`, rather than written with `insertRule` (see `DomSheetOptions`). Default: on when `process.env.NODE_ENV` is not `production`; used when the engine makes its cache. */
-  hasRuleText?: boolean
+  /**
+   * Whether the cache writes its rules with `insertRule` into one style element, rather than each as the
+   * text of a style element of its own, readable through `textContent` (see `DomSheetOptions`). Default:
+   * true when `process.env.NODE_ENV` is `production`, false otherwise; used when the engine makes its
+   * cache. The one boolean option without `is` or `has`: it is the name that apps already pass.
+   */
+  speedy?: boolean
   /**
    * The nonce of a content security policy that allows style elements by nonce, for the style elements
    * made from the cache (`CacheOptions.nonce`): the browser's sheet, the tags of a server render and the

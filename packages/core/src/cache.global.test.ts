@@ -144,7 +144,7 @@ describe('global rules in a browser sheet', () => {
     [...(element.sheet as CSSStyleSheet).cssRules].map((rule) => rule.cssText.replace(/\s+/g, ''))
 
   it('are deleted from the style element where they are at the time, written by insertRule', () => {
-    const sheet = createDomSheet('u', undefined, { hasRuleText: false })
+    const sheet = createDomSheet('u', undefined, { speedy: true })
     const { cache, insert } = setup({ hasLayers: false, sheet })
     const element = document.querySelector('style[data-style="u"]') as HTMLStyleElement
     const releaseReset = insert(reset)
@@ -166,20 +166,24 @@ describe('global rules in a browser sheet', () => {
     expect(cache.extract().css).toMatch(/^\.u-\w+\{color:blue;\}$/)
   })
 
-  it('leave the text of the style element when released, written by text', () => {
-    const sheet = createDomSheet('u', undefined, { hasRuleText: true })
+  it('leave the page with their style elements when released, written by text', () => {
+    const sheet = createDomSheet('u', undefined, { speedy: false })
     const { cache, insert } = setup({ hasLayers: false, sheet })
-    const element = document.querySelector('style[data-style="u"]') as HTMLStyleElement
+    const readElements = () => [
+      ...document.querySelectorAll<HTMLStyleElement>('style[data-style="u"]'),
+    ]
     const releaseReset = insert(reset)
     const releaseApp = insert(app)
     const name = cache.css({ color: 'blue' })
     releaseReset()
-    expect(element.textContent).toBe(
-      `body{color:red;}#root{isolation:isolate;}.${name}{color:blue;}`
-    )
+    expect(readElements().map((element) => element.textContent)).toEqual([
+      'body{color:red;}',
+      '#root{isolation:isolate;}',
+      `.${name}{color:blue;}`,
+    ])
     releaseApp()
-    expect(element.textContent).toBe(`.${name}{color:blue;}`)
-    expect(texts(element)).toEqual([`.${name}{color:blue;}`])
+    expect(readElements().map((element) => element.textContent)).toEqual([`.${name}{color:blue;}`])
+    expect(readElements().flatMap(texts)).toEqual([`.${name}{color:blue;}`])
   })
 })
 

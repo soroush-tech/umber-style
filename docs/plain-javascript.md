@@ -31,7 +31,7 @@ const night = engine.themeClass(dark, 'dark')
 - `engine.css(...styles)` merges the styles into one class and inserts its rules once. It returns the class name: `button` is `umber-sarboa`.
 - `engine.themeClass(theme, colorScheme?)` makes the class that declares a theme's variables and returns the class string. `light` is `umber-theme-jg3s2a umber-boundary umber-scheme-light` and `night` is `umber-theme-l0twti umber-boundary umber-scheme-dark`. Put one on `document.documentElement`, or on any element, to give everything below it the theme.
 
-Run in a browser, the engine writes into a `<style data-style="umber">` element it creates in the head: as text nodes outside production, with `insertRule` in production (`hasRuleText`, see [Options reference](options.md)). Run where there is no `document`, it keeps the rules in memory.
+Run in a browser, the engine writes into `<style data-style="umber">` elements it creates in the head: outside production each rule as the text of an element of its own, in production with `insertRule` into one element (`speedy`, see [Options reference](options.md#speedy)). Run where there is no `document`, it keeps the rules in memory.
 
 ## Sheets
 
@@ -81,7 +81,7 @@ const tag = createStyleTag(engine.cache)
 
 `createCache(options)` makes the cache an engine uses. Make one when you want to choose where the rules go, or to share it. The sheet is where rules are inserted: `createMemorySheet()` keeps them in an array, `createDomSheet(key, container?)` writes to the `<style data-style="key">` element, and any object with `insert(rule)` and `rules` is a sheet.
 
-`createDomSheet(key, container)` looks up and creates its style element in the document of `container` (`document.head` by default), and its `document` member is that document. A cache made over it serves that document: it reads the style elements a server left there and those that arrive later as children of its `<head>` or `<body>`, compares the stamp of the options there, and in development checks that page. So a cache for an iframe is `createCache({ prefix: 'frame', sheet: createDomSheet('frame', iframe.contentDocument.head) })` (`cache.document.test.ts`). A sheet with no `document` (one in memory) leaves the cache with the global `document`, where there is one.
+`createDomSheet(key, container)` looks up and creates its style elements in the document of `container` (`document.head` by default), and its `document` member is that document. A cache made over it serves that document: it reads the style elements a server left there and those that arrive later as children of its `<head>` or `<body>`, compares the stamp of the options there, and in development checks that page. So a cache for an iframe is `createCache({ prefix: 'frame', sheet: createDomSheet('frame', iframe.contentDocument.head) })` (`cache.document.test.ts`). A sheet with no `document` (one in memory) leaves the cache with the global `document`, where there is one.
 
 ```ts
 import { createCache, createEngine, createMemorySheet } from '@umber-style/core'

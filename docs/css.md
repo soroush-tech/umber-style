@@ -250,14 +250,14 @@ const {
 
 The options are those of the core's `createCache` (see [Options reference](options.md)), with `key` for `prefix`:
 
-| Option        | What it does                                                                                                                                         |
-| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `key`         | The first part of every class name, and the key of the style element, `data-style="<key>"`. Default `css`                                            |
-| `hasLayers`   | Whether rules go into cascade layers. Default `false` here                                                                                           |
-| `sheet`       | Where rules go. Default: the style element of the key when there is a `document`, otherwise an in-memory sheet                                       |
-| `hasRuleText` | Whether that style element holds the rules as text nodes (`textContent` shows them) or gets them with `insertRule`. Default: text outside production |
-| `cache`       | A cache to share, below                                                                                                                              |
-| the others    | As `createCache` takes them: `suffix`, `hasLabels`, `hasColorFallbacks`, `hasValueRepair`, `hasDevChecks` and the rest                               |
+| Option      | What it does                                                                                                                                                                                                    |
+| ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `key`       | The first part of every class name, and the key of the style element, `data-style="<key>"`. Default `css`                                                                                                       |
+| `hasLayers` | Whether rules go into cascade layers. Default `false` here                                                                                                                                                      |
+| `sheet`     | Where rules go. Default: the style element of the key when there is a `document`, otherwise an in-memory sheet                                                                                                  |
+| `speedy`    | Whether the rules go into one element with `insertRule` (`true`), or each rule is the text of a style element of its own, which `textContent` shows (`false`). Default: `true` in production, `false` otherwise |
+| `cache`     | A cache to share, below                                                                                                                                                                                         |
+| the others  | As `createCache` takes them: `suffix`, `hasLabels`, `hasColorFallbacks`, `hasValueRepair`, `hasDevChecks` and the rest                                                                                          |
 
 ```ts
 const layered = createInstance({ key: 'l', sheet: createMemorySheet(), hasLayers: true })

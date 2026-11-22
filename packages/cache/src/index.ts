@@ -14,12 +14,6 @@ export type { SerializedRule, UmberCache, UmberSheet } from '@umber-style/core'
 export interface UmberCacheOptions extends Omit<CacheOptions, 'prefix' | 'onInsert'> {
   /** The first part of every class name and variable, and the key of the style elements: the `prefix` of the engine's cache. Lowercase letters, digits and hyphens, starting with a letter. */
   key: string
-  /**
-   * Kept for compatibility with what apps pass from the styling library they move from: `true` is
-   * `hasRuleText: false` (rules written with `insertRule`), `false` is `hasRuleText: true` (rules as text).
-   * `hasRuleText` wins when both are given.
-   */
-  speedy?: boolean
 }
 
 /** `registered` that is also read by class name. */
@@ -47,12 +41,10 @@ export default function createCache(options: UmberCacheOptions): UmberCache {
       "createCache(): `onInsert` is the cache's own: it calls `insert` for every group of rules it writes. Replace `cache.insert` to see each rule."
     )
   }
-  const { key, speedy, ...rest } = options
-  const hasRuleText = rest.hasRuleText ?? (speedy === undefined ? undefined : !speedy)
+  const { key, ...rest } = options
   // `cache` is made below, before the engine writes a rule.
   const engineCache = createEngineCache({
     ...rest,
-    hasRuleText,
     prefix: key,
     onInsert: (name, styles) => cache.insert('', { name, styles }, cache.sheet, true),
   })

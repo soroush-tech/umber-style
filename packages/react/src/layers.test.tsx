@@ -168,8 +168,9 @@ describe('the layers in the browser sheet', () => {
     const style = createStyle(baseTheme, { prefix: 'd' })
     const Button = style.styled('button')({ color: 'red' })
     render(<Button style={{ color: 'blue' }}>dom</Button>)
-    const element = document.querySelector<HTMLStyleElement>('style[data-style="d"]')
-    const rules = [...(element?.sheet?.cssRules ?? [])]
+    const rules = [...document.querySelectorAll<HTMLStyleElement>('style[data-style="d"]')].flatMap(
+      (element) => [...(element.sheet as CSSStyleSheet).cssRules]
+    )
     expect(rules.map((rule) => rule.constructor.name)).toEqual([
       'CSSLayerStatementRule',
       'CSSLayerBlockRule',

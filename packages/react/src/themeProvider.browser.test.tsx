@@ -17,9 +17,9 @@ afterEach(() => {
 })
 
 /** A real React render into the real document, with its own engine and style element. */
-function setup() {
+function setup<T extends typeof light>(base: T = light as T) {
   const prefix = `tp${++count}`
-  const style = createStyle(light, { prefix })
+  const style = createStyle(base, { prefix })
   const container = document.createElement('div')
   document.body.appendChild(container)
   const root = createRoot(container)
@@ -140,5 +140,77 @@ describe('a nested provider in a real browser', () => {
     expect(getComputedStyle(portal).color).toBe(GREEN)
     // The surface of the provider between them in the tree, though the portal is not inside its wrapper.
     expect(read(portal, 'surface')).toBe('#123456')
+  })
+})
+
+describe('a nested provider under a theme class on <html>', () => {
+  const day = { palette: { primary: '#ff0000', text: '#111111', surface: '#ffffff' } }
+  const night = { palette: { primary: '#00ff00', text: '#eeeeee', surface: '#000000' } }
+
+  /** An engine with `isRoot` over `day`, whose class is on <html>, with every token in use. */
+  function setupRoot() {
+    const style = setup(day)
+    const { ThemeProvider, themeClass, engine, render, prefix } = style
+    engine.css({
+      color: engine.refs.palette.text,
+      background: engine.refs.palette.surface,
+      borderColor: engine.refs.palette.primary,
+    })
+    const nightClass = themeClass(night)
+    document.documentElement.className = themeClass(day)
+    const mount = (node: ReactNode) =>
+      render(
+        <ThemeProvider isRoot theme={day}>
+          {node}
+        </ThemeProvider>
+      )
+    /** The primary, text and surface that `element` sees. */
+    const readPalette = (element: Element) =>
+      ['primary', 'text', 'surface'].map((name) =>
+        getComputedStyle(element).getPropertyValue(`--${prefix}-palette-${name}`)
+      )
+    const switchToNight = () => {
+      document.documentElement.className = nightClass
+    }
+    return { ...style, mount, readPalette, switchToNight }
+  }
+
+  it('follows the class on <html> for the tokens it does not change', () => {
+    const { ThemeProvider, mount, readPalette, switchToNight } = setupRoot()
+    mount(
+      <ThemeProvider theme={{ palette: { primary: '#0000ff' } }}>
+        <span>inner</span>
+      </ThemeProvider>
+    )
+    const inner = document.querySelector('span') as HTMLElement
+    expect(readPalette(inner)).toEqual(['#0000ff', '#111111', '#ffffff'])
+    switchToNight()
+    expect(readPalette(inner)).toEqual(['#0000ff', '#eeeeee', '#000000'])
+  })
+
+  it('three deep, takes what the nested providers above it give and the rest from <html>, in a portal too', () => {
+    const { ThemeProvider, mount, readPalette, switchToNight } = setupRoot()
+    const target = document.createElement('div')
+    document.body.appendChild(target)
+    const third = (label: string) => (
+      <ThemeProvider theme={{ palette: { primary: '#0000ff' } }}>
+        <span>{label}</span>
+      </ThemeProvider>
+    )
+    mount(
+      <ThemeProvider theme={{ palette: { surface: '#123456' } }}>
+        {third('tree')}
+        {createPortal(third('portal'), target)}
+      </ThemeProvider>
+    )
+    const [tree, portal] = document.querySelectorAll('span')
+    expect(target.contains(portal)).toBe(true)
+    for (const element of [tree, portal]) {
+      expect(readPalette(element)).toEqual(['#0000ff', '#111111', '#123456'])
+    }
+    switchToNight()
+    for (const element of [tree, portal]) {
+      expect(readPalette(element)).toEqual(['#0000ff', '#eeeeee', '#123456'])
+    }
   })
 })

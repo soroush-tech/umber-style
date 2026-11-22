@@ -6,7 +6,7 @@ After this page you can say what the engine guarantees about the `style` attribu
 
 On the web the engine never renders a `style` attribute. Not on a provider's wrapper, and not on a styled component.
 
-- The wrapper of a nested `ThemeProvider` has classes only: the theme class, `<prefix>-boundary`, the scheme marker for `light` and `dark`, the theme class of its merged theme, `<prefix>-scope` and your `className`. The outermost provider renders no element: its theme is a rule on `:root`. The `<prefix>-scope` class holds `display: contents`. The theme class itself has no `display`, because the same class goes on `<html>`.
+- The wrapper of a nested `ThemeProvider` has classes only: the theme class, `<prefix>-boundary`, the scheme marker for `light` and `dark`, below another nested provider the theme class of the nested themes merged, `<prefix>-scope` and your `className`. The outermost provider renders no element: its theme is a rule on `:root`. The `<prefix>-scope` class holds `display: contents`. The theme class itself has no `display`, because the same class goes on `<html>`.
 - Everything given in the `style` prop of a styled component, sheet entries and plain objects, in order, is merged into one class of the element: into the override class, after the component's own styles and before a `className` you pass. A string is an error, because it cannot be merged.
 - `apply()` returns the class (`{ className }` in React, `{ class }` in Vue) and nothing else.
 
@@ -69,7 +69,7 @@ An object you give to the `style` of a plain element yourself is React's own, an
 
 With no style attributes, a policy with `style-src` that forbids inline style attributes is satisfied by what the engine renders. The engine still inserts CSS in `<style>` elements:
 
-- the element that the cache makes in the browser, with `data-style="<prefix>"`, to which rules are added as text nodes outside production and with `insertRule` in production;
+- the elements that the cache makes in the browser, with `data-style="<prefix>"`: outside production one for each rule, which holds it as text, and in production one, into which rules are added with `insertRule`;
 - the element that `createStyleTag` writes for a static page or a classic server render, which has its CSS as text;
 - the `<style href precedence>` elements of the server components build, which have their CSS as text.
 

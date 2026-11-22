@@ -46,7 +46,7 @@ describe('the examples of docs/vue.md', () => {
         ),
     })
     expect(await renderToString(nested)).toBe(
-      '<!--[--><section class="umber-theme-1an5zox umber-boundary umber-theme-1be996m umber-scope mine"></section><!--]-->'
+      '<!--[--><section class="umber-theme-1an5zox umber-boundary umber-scope mine"></section><!--]-->'
     )
   })
 })

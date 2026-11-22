@@ -1,4 +1,4 @@
-import { createWarner, isDevelopment } from './devChecks'
+import { createWarner, isDevelopment, warnRenamedOption } from './devChecks'
 import { hashString } from './hash'
 import { createLazyRecord } from './lazyRecord'
 import { createCache, type Cache, type ClassValue, type GlobalRules, type HeldClass } from './cache'
@@ -295,7 +295,7 @@ const CACHE_OPTIONS = [
   'hasLayers',
   'hasPruning',
   'hasScope',
-  'hasRuleText',
+  'speedy',
   'nonce',
 ] as const
 
@@ -354,7 +354,7 @@ function selectCache(options: EngineOptions, prefix: string): Cache {
     hasScope: options.hasScope,
     hasBaseClass: options.hasBaseClass,
     hasDevChecks: options.hasDevChecks,
-    hasRuleText: options.hasRuleText,
+    speedy: options.speedy,
     nonce: options.nonce,
     tokenSignature: createTokenSignature([rawKeys, lengthKeys, modes, registered, alwaysDeclare]),
   })
@@ -411,6 +411,7 @@ function createFamilyEngine<T extends object>(
     )
   }
   const prefix = given?.prefix ?? optionPrefix ?? 'css'
+  warnRenamedOption(prefix, options)
   const cache = selectCache(options, prefix)
   const { isChecked, warn, guardView, reportGlobal } = createEngineChecks(options, cache, () =>
     readTokens()

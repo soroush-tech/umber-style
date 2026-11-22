@@ -51,14 +51,14 @@ describe('the options of the engine in the client build', () => {
 
 describe('registered properties and a classic server render', () => {
   it.each([true, false])(
-    'are in the style element, and the client inserts none of them again, hasRuleText %s',
-    (hasRuleText) => {
+    'are in the style element, and the client inserts none of them again, speedy %s',
+    (speedy) => {
       const make = (cache?: ReturnType<typeof createCache>) =>
         bindEngine(
           createEngine(theme, {
             prefix: 'h',
             registered: { 'palette.primary': true },
-            hasRuleText,
+            speedy,
             ...(cache ? { cache } : {}),
           })
         )

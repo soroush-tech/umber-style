@@ -36,7 +36,7 @@ describe('two copies of the core', () => {
 
   it('write a style element by text as two caches of one copy do, and do not take the rules of the other for rules a server sent', async () => {
     const write = (copies: Awaited<ReturnType<typeof loadCopy>>[], prefix: string) => {
-      const options = { prefix, hasDevChecks: false, hasRuleText: true }
+      const options = { prefix, hasDevChecks: false, speedy: false }
       const one = copies[0].createCache(options)
       one.css({ color: 'red' })
       const release = one.insertGlobal(one.compileGlobal({ body: { margin: 0 } }))
@@ -59,13 +59,21 @@ describe('two copies of the core', () => {
   it('keep a cache that writes by insertRule out of the element that a cache of the other writes by text', async () => {
     const first = await loadCopy()
     const second = await loadCopy()
-    const byText = first.createCache({ prefix: 'mixed', hasDevChecks: false, hasRuleText: true })
+    const byText = first.createCache({ prefix: 'mixed', hasDevChecks: false, speedy: false })
     byText.css({ color: 'red' })
-    const byRules = second.createCache({ prefix: 'mixed', hasDevChecks: false, hasRuleText: false })
+    const byRules = second.createCache({ prefix: 'mixed', hasDevChecks: false, speedy: true })
     const margin = byRules.css({ margin: 0 })
     byText.css({ padding: 1 })
     const elements = [...document.querySelectorAll<HTMLStyleElement>('style[data-style="mixed"]')]
-    expect(elements).toHaveLength(2)
+    // By text the layer order and two classes, an element each and together; by insertRule the layer
+    // order and a class, in one element after them.
+    expect(elements.map((element) => element.sheet?.cssRules.length)).toEqual([1, 1, 1, 2])
+    expect(elements.map((element) => element.textContent === '')).toEqual([
+      false,
+      false,
+      false,
+      true,
+    ])
     const rules = elements.flatMap((element) =>
       [...(element.sheet?.cssRules ?? [])].map((rule) => rule.cssText)
     )

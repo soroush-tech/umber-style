@@ -142,7 +142,9 @@ describe('a registered token in a theme', () => {
     // jsdom computes a registered <color> variable: the value comes back as rgb().
     expect(read(document.querySelector('p'))).toBe('rgb(255, 0, 0)')
     expect(read(document.getElementById('plain'))).toBe('rgb(0, 0, 255)')
-    const texts = Array.from(document.styleSheets[0].cssRules).map((rule) => rule.cssText)
+    const texts = Array.from(document.styleSheets).flatMap((sheet) =>
+      Array.from(sheet.cssRules).map((rule) => rule.cssText)
+    )
     expect(texts.filter((text) => text.startsWith('@property --e-palette-primary'))).toHaveLength(1)
   })
 })

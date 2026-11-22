@@ -11,11 +11,11 @@ const findElement = (key: string) => document.head.querySelector(`style[data-sty
 
 describe('the nonce of a style element the engine makes', () => {
   it('is set on the element that createDomSheet makes, in either way of writing', () => {
-    const text = createDomSheet('t', document.head, { hasRuleText: true, nonce: 'n0nce' })
+    const text = createDomSheet('t', document.head, { speedy: false, nonce: 'n0nce' })
     text.insert('.a{color:red;}')
     expect(findElement('t')?.getAttribute('nonce')).toBe('n0nce')
     expect(text.rules).toEqual(['.a{color:red;}'])
-    const rules = createDomSheet('r', document.head, { hasRuleText: false, nonce: 'n0nce' })
+    const rules = createDomSheet('r', document.head, { speedy: true, nonce: 'n0nce' })
     rules.insert('.a{color:red;}')
     expect(findElement('r')?.getAttribute('nonce')).toBe('n0nce')
     expect(rules.rules).toEqual(['.a{color:red;}'])

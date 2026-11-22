@@ -43,6 +43,8 @@ export interface ThemeKeys<T> {
   view: InjectionKey<ComputedRef<T>>
   /** The wrapper of the nearest nested provider, or null under the outermost one. */
   scope: InjectionKey<ComputedRef<ThemeScopeValue | null>>
+  /** The themes of the nested providers down to the nearest one, merged; undefined where none is above. */
+  nested: InjectionKey<ComputedRef<T | undefined>>
   /** The engine of the nearest provider. */
   engine: InjectionKey<Engine<T>>
 }
@@ -53,6 +55,7 @@ export function createThemeKeys<T>(): ThemeKeys<T> {
     theme: Symbol('theme'),
     view: Symbol('view'),
     scope: Symbol('scope'),
+    nested: Symbol('nested'),
     engine: Symbol('engine'),
   }
 }
@@ -65,8 +68,9 @@ export function createThemeKeys<T>(): ThemeKeys<T> {
  *   `setup` and again when it changes, which renders no styled component. It gives the engine its base
  *   theme when it has none.
  * - A nested provider renders its wrapper: the theme class of the theme it was given (with the boundary
- *   and scheme markers), the theme class of its merged theme (every variable, for where it is not inside
- *   the wrapper above it), and the scope class, which has `display: contents`.
+ *   and scheme markers), the theme class of the themes of the nested providers above it and its own,
+ *   merged (for where it is not inside their wrappers; the outermost theme is left out, as it is on
+ *   `:root` or on the class of `<html>`), and the scope class, which has `display: contents`.
  * - With `isRoot` it renders no element and makes no rule: the app puts `themeClass(theme)` on an
  *   ancestor, usually `<html>`.
  *
@@ -93,7 +97,9 @@ export function createThemeProvider<T extends object>(baseEngine: Engine<T>, key
       const engine = cache === undefined ? baseEngine : baseEngine.withCache(cache)
       const outer = inject(keys.theme, null)
       // The scope of a provider of another engine (another cache) is not this one's: it starts its own.
-      const scope = inject(keys.engine, null) === engine ? inject(keys.scope, null) : null
+      const isSameEngine = inject(keys.engine, null) === engine
+      const scope = isSameEngine ? inject(keys.scope, null) : null
+      const above = isSameEngine ? inject(keys.nested, null) : null
       const isNested = scope !== null && !props.isRoot
       const readOuter = () => outer?.value ?? engine.givenTheme
       const given = computed(() =>
@@ -103,14 +109,19 @@ export function createThemeProvider<T extends object>(baseEngine: Engine<T>, key
       // not a given base theme: what has no provider above never reads it.
       engine.adoptTheme(given.value as T)
       const merged = computed(() => mergeTheme(readOuter(), given.value))
+      // The themes of the nested providers down to this one, merged; the outermost theme is on `:root`.
+      const nested = computed(() =>
+        isNested ? mergeTheme(above?.value, given.value) : above?.value
+      )
       const classes = computed(() => {
         const own = engine.themeClass(given.value, props.colorScheme)
-        const full = engine.themeId(merged.value as DeepPartial<T>, props.colorScheme)
+        const full = engine.themeId(nested.value as DeepPartial<T>, props.colorScheme)
         const names = [own, own.startsWith(`${full} `) ? '' : full, engine.scopeClass()]
         return names.filter(Boolean).join(' ')
       })
       provide(keys.engine, engine)
       provide(keys.theme, merged)
+      provide(keys.nested, nested)
       provide(
         keys.view,
         computed(() => engine.createThemeView(merged.value))

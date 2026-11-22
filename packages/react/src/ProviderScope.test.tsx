@@ -309,7 +309,7 @@ describe('the browser part of a provider of the server build, with the client bu
     expect(liveRoots()).toEqual([])
   })
 
-  it('makes a provider of the client build below it nested, with the class of its theme merged over the server provider', () => {
+  it('makes a provider of the client build below it nested, with the class of its own theme: the outermost theme is on :root', () => {
     const { request, client, engine } = setup()
     const { ThemeProvider } = request()
     let below: string | undefined
@@ -325,9 +325,9 @@ describe('the browser part of a provider of the server build, with the client bu
       </ThemeProvider>
     )
     const [wrapper] = wrappers(container)
-    // The theme of the server provider above is in the client context: the merged theme has a class.
-    const full = engine.themeId(mergeTheme(dark, brand))
-    expect(wrapper.className).toBe(`${engine.themeClass(brand)} ${full} ${p}-scope`)
+    // The server provider above is the outermost one: the merged class leaves its theme out, and is the
+    // class of the client provider's own theme.
+    expect(wrapper.className).toBe(`${engine.themeClass(brand)} ${p}-scope`)
     expect(below).toBe(wrapper.className)
     expect(liveRoots()).toHaveLength(1)
   })
@@ -369,9 +369,8 @@ describe('the browser part of a provider of the server build, with the client bu
       brandClass
     )
     expect(target.querySelector('[data-testid="bare"]')?.parentElement).toBe(target)
-    const full = engine.themeId(
-      mergeTheme<typeof light>(mergeTheme<typeof light>(light, brand), accent)
-    )
+    // The theme of the nested server provider above, and its own, merged; not the outermost one.
+    const full = engine.themeId(mergeTheme<typeof light>(brand as typeof light, accent))
     expect(target.querySelector('[data-testid="provided"]')?.parentElement?.className).toBe(
       `${engine.themeClass(accent)} ${full} ${p}-scope`
     )
@@ -399,7 +398,7 @@ describe('the browser part of a provider of the server build, with the client bu
     expect(wrappers(container)).toHaveLength(1)
   })
 
-  it('under a provider with isRoot of the server build, a nested client provider keeps the class of its merged theme', () => {
+  it('under a provider with isRoot of the server build, a nested client provider has the class of its own theme', () => {
     const { request, client, engine } = setup()
     const { ThemeProvider } = request()
     const { container } = mount(
@@ -412,8 +411,27 @@ describe('the browser part of a provider of the server build, with the client bu
       </ThemeProvider>
     )
     const [wrapper] = wrappers(container)
-    const full = engine.themeId({ ...light, palette: { ...light.palette, ...brand.palette } })
-    expect(wrapper.className).toBe(`${engine.themeClass(brand)} ${full} ${p}-scope`)
+    // The root theme is on the class of an ancestor, which reaches every element: it is left out.
+    expect(wrapper.className).toBe(`${engine.themeClass(brand)} ${p}-scope`)
+  })
+
+  it('under a nested provider of the server build and one with isRoot, a client provider has the class of both nested themes', () => {
+    const { request, client, engine } = setup()
+    const { ThemeProvider } = request()
+    const { container } = mount(
+      <ThemeProvider theme={light}>
+        <ThemeProvider theme={brand}>
+          <ThemeProvider theme={light} isRoot>
+            <client.ThemeProvider theme={accent}>
+              <b />
+            </client.ThemeProvider>
+          </ThemeProvider>
+        </ThemeProvider>
+      </ThemeProvider>
+    )
+    const inner = wrappers(container).at(-1) as HTMLElement
+    const full = engine.themeId(mergeTheme<typeof light>(brand as typeof light, accent))
+    expect(inner.className).toBe(`${engine.themeClass(accent)} ${full} ${p}-scope`)
   })
 
   it('under a CacheProvider, still renders its style elements, once each, and stays nested', () => {

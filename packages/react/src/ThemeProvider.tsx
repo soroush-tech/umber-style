@@ -50,9 +50,10 @@ export interface ThemeProviderParts<T> {
  *   the shape of its tokens when it has none (`adoptTheme`), which is not a base theme that a tree with no
  *   provider reads.
  * - A nested provider renders its wrapper: the theme class of the theme it was given (with the boundary
- *   and scheme markers that conditions use), the theme class of its merged theme (every variable, so that
- *   it is right where its element is not inside the wrapper of the provider above, in a portal), and the
- *   scope class, which has `display: contents`.
+ *   and scheme markers that conditions use), the theme class of the themes of the nested providers above
+ *   it and its own, merged (so that it is right where its element is not inside their wrappers, in a
+ *   portal; the outermost theme is left out, as it is on `:root` or on the class of `<html>`, which reach
+ *   every element), and the scope class, which has `display: contents`.
  * - With `isRoot` it renders no element and makes no rule: the app puts `themeClass(theme)` on an ancestor
  *   of its own, usually `<html>`.
  *
@@ -99,16 +100,21 @@ export function createThemeProvider<T extends object>({
     // a given base theme: what has no provider above never reads it.
     engine.adoptTheme(given as T)
     const merged = useMemo(() => mergeTheme(outer, given), [outer, given])
+    // The themes of the nested providers down to this one, merged; the outermost theme is on `:root`.
+    const nested = useMemo(
+      () => (isNested ? mergeTheme(above.nested as T | undefined, given) : above?.nested),
+      [isNested, above, given]
+    )
     const wrapper = useMemo((): ThemeScopeValue | undefined => {
       if (!isNested) return undefined
       const own = engine.themeClass(given, colorScheme)
-      const full = engine.themeId(merged as DeepPartial<T>, colorScheme)
+      const full = engine.themeId(nested as DeepPartial<T>, colorScheme)
       const names = [own, own.startsWith(`${full} `) ? '' : full, engine.scopeClass(), className]
       return { as, className: names.filter(Boolean).join(' ') }
-    }, [engine, isNested, given, merged, colorScheme, className, as])
+    }, [engine, isNested, given, nested, colorScheme, className, as])
     const below = useMemo(
-      () => addMark(marks, key, { scope: wrapper ?? above?.scope ?? null }),
-      [marks, key, wrapper, above]
+      () => addMark(marks, key, { scope: wrapper ?? above?.scope ?? null, nested }),
+      [marks, key, wrapper, above, nested]
     )
     useInsertionEffect(() => {
       if (isOutermost) engine.declareRoot(merged, colorScheme)

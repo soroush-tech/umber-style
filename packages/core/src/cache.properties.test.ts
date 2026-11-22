@@ -138,8 +138,8 @@ describe('getFullRules with registered properties', () => {
 
 describe('registered properties and a server render', () => {
   it.each([true, false])(
-    'are not written again by a cache that hydrates the style element, hasRuleText %s',
-    (hasRuleText) => {
+    'are not written again by a cache that hydrates the style element, speedy %s',
+    (speedy) => {
       for (const hasPruning of [true, false]) {
         document.head.innerHTML = ''
         const server = createCache({ prefix: 'u', sheet: createMemorySheet(), hasPruning })
@@ -149,7 +149,7 @@ describe('registered properties and a server render', () => {
         const element = document.querySelector('style[data-style="u"]') as HTMLStyleElement
         const before = element.sheet?.cssRules.length
 
-        const sheet = createDomSheet('u', undefined, { hasRuleText })
+        const sheet = createDomSheet('u', undefined, { speedy })
         const client = createCache({ prefix: 'u', sheet, hasPruning })
         client.registerProperties(rules)
         client.css({ color: 'var(--u-a)', margin: 'var(--u-b)' })
@@ -162,15 +162,15 @@ describe('registered properties and a server render', () => {
   )
 
   it.each([true, false])(
-    'are written by a cache that hydrates a render that did not use the variable, hasRuleText %s',
-    (hasRuleText) => {
+    'are written by a cache that hydrates a render that did not use the variable, speedy %s',
+    (speedy) => {
       const server = createCache({ prefix: 'u', sheet: createMemorySheet() })
       server.registerProperties(rules)
       server.css({ color: 'var(--u-a)' })
       document.head.innerHTML = createStyleTag(server)
       const client = createCache({
         prefix: 'u',
-        sheet: createDomSheet('u', undefined, { hasRuleText }),
+        sheet: createDomSheet('u', undefined, { speedy }),
       })
       client.registerProperties(rules)
       const before = readPageRules('u').length
@@ -183,8 +183,8 @@ describe('registered properties and a server render', () => {
 })
 
 describe('what a DOM sheet does with an @property rule', () => {
-  it.each([true, false])('takes it as a property rule, hasRuleText %s', (hasRuleText) => {
-    const sheet = createDomSheet('p', undefined, { hasRuleText })
+  it.each([true, false])('takes it as a property rule, speedy %s', (speedy) => {
+    const sheet = createDomSheet('p', undefined, { speedy })
     sheet.insert(colorRule)
     const element = document.querySelector('style[data-style="p"]') as HTMLStyleElement
     expect(element.sheet?.cssRules).toHaveLength(1)
@@ -193,13 +193,13 @@ describe('what a DOM sheet does with an @property rule', () => {
   })
 
   it('skips one that the browser rejects, written by insertRule', () => {
-    const sheet = createDomSheet('p', undefined, { hasRuleText: false })
+    const sheet = createDomSheet('p', undefined, { speedy: true })
     sheet.insert('@property')
     expect(sheet.rules).toEqual([])
   })
 
   it('keeps one that the browser rejects in its text, which the browser does not take, written by text', () => {
-    const sheet = createDomSheet('p', undefined, { hasRuleText: true })
+    const sheet = createDomSheet('p', undefined, { speedy: false })
     sheet.insert(colorRule)
     sheet.insert('@property')
     const element = document.querySelector('style[data-style="p"]') as HTMLStyleElement

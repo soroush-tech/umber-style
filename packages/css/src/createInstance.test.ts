@@ -369,17 +369,22 @@ describe('options', () => {
     ])
   })
 
-  it('writes the rules as text of the element outside production, and with insertRule when asked', () => {
+  it('writes each rule as the text of an element outside production, and with insertRule when asked', () => {
     const text = createInstance({ key: 'text' })
     const name = text.css({ color: 'red' })
     text.injectGlobal({ body: { margin: 0 } })
-    const readText = (key: string) =>
-      document.querySelector(`style[data-style="${key}"]`)?.textContent
-    expect(readText('text')).toBe(`.${name}{color:red;}body{margin:0;}`)
+    const readTexts = (key: string) =>
+      [...document.querySelectorAll(`style[data-style="${key}"]`)].map(
+        (element) => element.textContent
+      )
+    expect(readTexts('text')).toEqual([`.${name}{color:red;}`, 'body{margin:0;}'])
+    // Flushed, the element of the first rule stays, empty, where the rules were.
     text.flush()
-    expect(readText('text')).toBe('')
-    createInstance({ key: 'fast', hasRuleText: false }).css({ color: 'red' })
-    expect(readText('fast')).toBe('')
+    expect(readTexts('text')).toEqual([''])
+    text.css({ color: 'red' })
+    expect(readTexts('text')).toEqual([`.${name}{color:red;}`])
+    createInstance({ key: 'fast', speedy: true }).css({ color: 'red' })
+    expect(readTexts('fast')).toEqual([''])
   })
 
   it('makes its style element with the nonce it is given, and writes the nonce into its tag', () => {

@@ -131,14 +131,14 @@ function isTemplate(value: unknown): value is TemplateStringsArray {
   return Array.isArray(value) && Object.hasOwn(value, 'raw')
 }
 
-/** The sheet of a cache made here: the style elements of the document, written as `hasRuleText` says and carrying `nonce`, or one in memory where there is no document. */
+/** The sheet of a cache made here: the style elements of the document, written as `speedy` says and carrying `nonce`, or one in memory where there is no document. */
 function createDefaultSheet(
   prefix: string,
-  { hasRuleText, nonce }: Pick<CacheOptions, 'hasRuleText' | 'nonce'>
+  { speedy, nonce }: Pick<CacheOptions, 'speedy' | 'nonce'>
 ): Sheet {
   return typeof document === 'undefined'
     ? createMemorySheet()
-    : createDomSheet(prefix, undefined, { hasRuleText, nonce })
+    : createDomSheet(prefix, undefined, { speedy, nonce })
 }
 
 /** The items of `args`, lists flattened, without `false`, `null`, `undefined`, `''` and `true`. */

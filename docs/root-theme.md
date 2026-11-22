@@ -38,7 +38,7 @@ const App = () => (
 )
 ```
 
-Use it when the page switches its theme by a class on `<html>` (a script that applies a stored choice before the first paint, below), or when conditions must see the theme of the root: the class carries the boundary and scheme markers. `isRoot` is a prop of the provider in every binding. React Native accepts it and ignores it, because React Native has no classes. Providers below it are nested providers, as below any other.
+Use it when the page switches its theme by a class on `<html>` (a script that applies a stored choice before the first paint, below), or when conditions must see the theme of the root: the class carries the boundary and scheme markers. `isRoot` is a prop of the provider in every binding. React Native accepts it and ignores it, because React Native has no classes. Providers below it are nested providers, as below any other. A nested provider declares only what it and the nested providers above it change: for every other token it follows the class on `<html>`, so switching that class reaches inside it too, a provider in portal content included (`themeProvider.browser.test.tsx`).
 
 A root provider makes no theme class, so its `colorScheme` makes no rule and changes nothing in the markup: the class that matters is the one you got from `themeClass(theme, colorScheme)` and put on `<html>`. Call `themeClass` for the root theme, at start-up, as for every theme you switch to. An app that never calls it has no rule for its root theme at all, and a root provider does not make one for it.
 

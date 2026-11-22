@@ -137,7 +137,7 @@ A `span` styled with the same style in both bindings gets the same class name (t
 | `prefix`                                                        | the cache | Classes and variables use the cache's prefix                                                                                                                                |
 | `suffix`, `hasLabels`                                           | the cache | How the cache names its classes                                                                                                                                             |
 | `hasLayers`, `hasPruning`, `hasScope`                           | the cache | How and where the cache stores its rules and themes                                                                                                                         |
-| `hasRuleText`, `sheet`, `onInsert`                              | the cache | Where the rules go                                                                                                                                                          |
+| `speedy`, `sheet`, `onInsert`                                   | the cache | Where the rules go                                                                                                                                                          |
 
 See [The cache and server packages](cache-and-server.md#cacheprovider-a-cache-for-a-subtree) for the details.
 

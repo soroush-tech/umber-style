@@ -186,6 +186,21 @@ describe('the options of the cache given to an engine with a cache', () => {
     ])
     warn.mockRestore()
   })
+
+  it('include speedy, and an engine warns once in development about hasRuleText, with a cache or without', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    vi.stubEnv('NODE_ENV', 'development')
+    const { cache } = createSheetCache('ws')
+    createEngine(theme, { cache, hasDevChecks: true, speedy: true })
+    // @ts-expect-error hasRuleText is no option of an engine: it was renamed to speedy.
+    createEngine(theme, { prefix: 'wr', hasDevChecks: false, hasRuleText: true })
+    vi.unstubAllEnvs()
+    expect(warn.mock.calls.map(([message]) => message)).toEqual([
+      '[ws] The engine was given a cache and the options speedy, which the cache decides: they are ignored. Give them to createCache, or leave out the cache.',
+      '[wr] The option hasRuleText was renamed to speedy, with the opposite meaning: hasRuleText: true is not read, and the default applies. Write speedy: false instead.',
+    ])
+    warn.mockRestore()
+  })
 })
 
 describe('the paths of the token options', () => {

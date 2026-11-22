@@ -234,7 +234,7 @@ describe('the removal of a held class', () => {
   })
 
   it('deletes the rules from a style element of the browser, written by insertRule', () => {
-    const { cache } = setup({ sheet: createDomSheet('u', undefined, { hasRuleText: false }) })
+    const { cache } = setup({ sheet: createDomSheet('u', undefined, { speedy: true }) })
     const element = document.querySelector('style[data-style="u"]') as HTMLStyleElement
     const kept = cache.css({ color: 'blue' })
     const { hold } = cache.cssHeld({}, { width: 7 })
@@ -246,15 +246,16 @@ describe('the removal of a held class', () => {
     ).toEqual(['main{order:1;}', `.${kept}{color:blue;}`])
   })
 
-  it('deletes the rules from the text of the style element, written by text', () => {
-    const { cache } = setup({ sheet: createDomSheet('u', undefined, { hasRuleText: true }) })
-    const element = document.querySelector('style[data-style="u"]') as HTMLStyleElement
+  it('removes the style elements of its rules from the page, written by text', () => {
+    const { cache } = setup({ sheet: createDomSheet('u', undefined, { speedy: false }) })
+    const readTexts = () =>
+      [...document.querySelectorAll('style[data-style="u"]')].map((element) => element.textContent)
     const kept = cache.css({ color: 'blue' })
     const { hold } = cache.cssHeld({}, { width: 7 })
-    expect(element.textContent).toMatch(/\{width:7px;\}/)
+    expect(readTexts()).toEqual([`.${kept}{color:blue;}`, expect.stringMatching(/\{width:7px;\}/)])
     ;(hold as () => () => void)()()
     wait()
-    expect(element.textContent).toBe(`.${kept}{color:blue;}`)
+    expect(readTexts()).toEqual([`.${kept}{color:blue;}`])
   })
 })
 

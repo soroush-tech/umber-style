@@ -57,10 +57,35 @@ stateDiagram-v2
   Written --> Permanent: cssWith or an entry makes it later
 ```
 
+A DOM sheet writes in one of two ways (`createDomSheet`). By `insertRule`, every rule goes into one
+element. By text, every rule is the text of an element of its own, so that the document parses that rule
+once and never the rules before it again (one element of N text nodes was parsed again for each node,
+which grew with the square of N):
+
+```mermaid
+flowchart TD
+  create["createDomSheet(key, container, speedy)"] --> renamed["warnRenamedOption: hasRuleText in development"]
+  renamed --> mode{"speedy?"}
+  mode -->|yes| ruleEl["element of key not written by text, else a new one in container"]
+  ruleEl --> insertRule["insert: insertRule into it; remove: deleteRule of the object kept"]
+  mode -->|no| firstEl["first element: an empty one of key that no sheet uses, else a new one in container"]
+  firstEl --> anchor["anchor = first element"]
+  anchor --> ins{"insert: anchor set?"}
+  ins -->|yes| intoAnchor["text node into the anchor, anchor cleared"]
+  ins -->|no| newEl["new element with data-style and nonce, its text, then after the element of the last rule"]
+  intoAnchor --> list["elements[i] holds rules[i]"]
+  newEl --> list
+  list --> rem{"remove(i): other rules left?"}
+  rem -->|yes| drop["element of rule i removed"]
+  rem -->|no| keep["element emptied and kept as the anchor: the next rule goes where the rules were"]
+```
+
 The rest of the closure, in the order of the file:
 
 - Page reading. When a document exists, the cache scans the style elements of its prefix once, and any
-  that arrive later (a `MutationObserver` on `head` and `body`), with `scanStyleText`. What it finds
+  that arrive later (a `MutationObserver` on `head` and `body`), with `scanStyleText`. An element written
+  by text (`elementModes`) is skipped at once: it holds a rule of a sheet of the engine, never one a server
+  sent, and one arrives for every rule such a sheet writes. What it finds
   (classes, layer order, `@property` and `@keyframes` rules, theme classes with their variables, global
   rules, root rules) is marked as inserted, so nothing from a server render is written again. Root rules are the exception:
   they are not kept. Those found before the cache declares its root theme wait in `pageRoots`, which every
@@ -83,8 +108,8 @@ The rest of the closure, in the order of the file:
   none on a server): what `declareLiveValue` of `liveValue.ts` writes the rule of a value into.
 - The nonce. `CacheOptions.nonce` is held as `cache.nonce` (a view of `withStyleOptions` has it too) and
   given to the DOM sheet the cache makes for itself; `createDomSheet` sets it as the `nonce` attribute of
-  an element it creates, before the element is in the document, in either way of writing. An element that
-  the document had (a server's, or an empty one) is used as it is. The nonce is in no rule, class name or
+  every element it creates, before the element is in the document, in either way of writing (by text, the
+  element of each rule). An element that the document had (a server's, or an empty one) is used as it is. The nonce is in no rule, class name or
   fingerprint: it is for the elements, and the tags of `extractStyles.ts`, `@umber-style/server` and the
   bindings read it from the cache.
 
@@ -119,9 +144,24 @@ The rest of the closure, in the order of the file:
   never reads. Without pruning every variable is declared.
 - The class name is made from rules compiled without vendor prefixes (`naming`), so the name is the same
   with or without them.
-- Two ways of writing to the DOM, text nodes and `insertRule`, never share one element: changing the text of
+- Two ways of writing to the DOM, text and `insertRule`, never share one element: changing the text of
   an element parses it again and drops inserted rules (the comment at `elementModes`). Text is the default
   outside production because it keeps `textContent` readable.
+- Written by text, one element for each rule, not one text node for each rule of one element: a change of
+  the text of an element parses all of it again. A later element is put right after the element of the
+  sheet's last rule, so the rules of a sheet stay together and in the order of `rules`. Two sheets of one
+  key never share an element (each element holds one rule of one sheet): a text sheet takes only an empty
+  element that no sheet marked, and a second sheet of the key starts in the container.
+- When the last rule of a text sheet is removed, its element stays, empty, as the anchor of the next rule,
+  rather than a reference to its neighbours, which other code may move or remove. The anchor is marked
+  `text`, so no other sheet takes it.
+- `speedy` (true: `insertRule`) is the name of the option, the one boolean without `is` or `has`, because
+  it is what apps already pass. It is not in the fingerprint: the two ways of writing give the same rules,
+  so a server and a browser of different modes hydrate as before. `createCache` and `createDomSheet` call
+  `warnRenamedOption` for `hasRuleText`, its name before 0.3.0, which is not read.
+- `elementModes` and `writtenText` keep their shared keys (`@1`): a copy of the core of an earlier release
+  reads them, and skips the text nodes of `writtenText` when it scans an element written by text. This
+  copy never scans such an element, so it only adds to `writtenText`.
 - A held class is removed after one macrotask, so a class let go and held again in the same task stays.
 - The sheet decides removal: without `remove` every class is permanent and global rules stay.
 - Keyframes live outside every layer (an at-rule that is not a layer's to hold).
@@ -132,6 +172,10 @@ The rest of the closure, in the order of the file:
 - A nonce is set only on a style element the sheet creates. Written with `insertRule`, the sheet uses the
   element of a server when there is one, which carries the server's nonce or none; the cache does not check.
   `options.nonce` is not read when a `sheet` is given.
+- A text sheet puts a new element after the element of its last rule. If other code removed that element
+  from the document, the new one is not put in the document, and its rule is not on the page.
+- A copy of the core of an earlier release that writes by text takes any element marked `text`, so it can
+  put its rules into an element of a sheet of this copy, which removes them with its own rule.
 - Page global rules whose rule objects cannot all be matched to the page are left in place when released
   (`removeGlobal`, `removeHeld` return without deleting).
 - The root theme of a page is the one in the sheet; one cache that renders pages with different root

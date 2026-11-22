@@ -1,4 +1,4 @@
-import { createCache, createDomSheet, createMemorySheet } from './cache'
+import { createCache, createDomSheet, createMemorySheet, type CacheOptions } from './cache'
 import { keyframes } from './keyframes'
 
 afterEach(() => {
@@ -118,45 +118,57 @@ describe('createCache', () => {
   })
 })
 
+/** The rules of the style elements `data-style="<key>"`, as the document parsed them, in document order. */
+function readRuleTexts(key: string): string[] {
+  return [...document.querySelectorAll<HTMLStyleElement>(`style[data-style="${key}"]`)].flatMap(
+    (element) => [...(element.sheet as CSSStyleSheet).cssRules].map((rule) => rule.cssText)
+  )
+}
+
+/** The text of the style elements `data-style="<key>"`, joined in document order. */
+function readStyleText(key: string): string {
+  return [...document.querySelectorAll(`style[data-style="${key}"]`)]
+    .map((element) => element.textContent)
+    .join('')
+}
+
 const RULE_MODES = [
-  { mode: 'text', hasRuleText: true },
-  { mode: 'insertRule', hasRuleText: false },
+  { mode: 'text', speedy: false },
+  { mode: 'insertRule', speedy: true },
 ] as const
 
-describe.each(RULE_MODES)('createDomSheet, written by $mode', ({ hasRuleText }) => {
+describe.each(RULE_MODES)('createDomSheet, written by $mode', ({ speedy }) => {
   it('creates a style element in the container and inserts rules', () => {
     const container = document.createElement('div')
     document.body.appendChild(container)
-    const sheet = createDomSheet('k', container, { hasRuleText })
+    const sheet = createDomSheet('k', container, { speedy })
     sheet.insert('.a{color:red;}')
     expect(container.querySelector('style[data-style="k"]')).not.toBeNull()
     expect(sheet.rules).toEqual(['.a{color:red;}'])
     container.remove()
   })
 
-  it('reuses an existing element of its own way of writing', () => {
-    const first = createDomSheet('k', undefined, { hasRuleText })
-    const second = createDomSheet('k', undefined, { hasRuleText })
+  it('keeps the rules of two sheets of its way of writing apart from those of the page', () => {
+    const first = createDomSheet('k', undefined, { speedy })
+    const second = createDomSheet('k', undefined, { speedy })
     first.insert('.a{color:red;}')
     second.insert('.b{color:blue;}')
-    expect(document.querySelectorAll('style[data-style="k"]')).toHaveLength(1)
-    const element = document.querySelector<HTMLStyleElement>('style[data-style="k"]')
-    expect(element?.sheet?.cssRules).toHaveLength(2)
+    // By insertRule they share one element; by text each rule has an element of its own.
+    expect(document.querySelectorAll('style[data-style="k"]')).toHaveLength(speedy ? 1 : 2)
+    expect(readRuleTexts('k')).toEqual(['.a { color: red; }', '.b { color: blue; }'])
   })
 
-  it('removes a rule from the element, the others staying in order', () => {
-    const sheet = createDomSheet('k', undefined, { hasRuleText })
+  it('removes a rule from the page, the others staying in order', () => {
+    const sheet = createDomSheet('k', undefined, { speedy })
     for (const rule of ['.a{color:red;}', '.b{color:blue;}', '.c{color:green;}']) sheet.insert(rule)
     sheet.remove?.(1)
     expect(sheet.rules).toEqual(['.a{color:red;}', '.c{color:green;}'])
-    const element = document.querySelector<HTMLStyleElement>('style[data-style="k"]')
-    const texts = [...(element?.sheet?.cssRules ?? [])].map((rule) => rule.cssText)
-    expect(texts).toEqual(['.a { color: red; }', '.c { color: green; }'])
+    expect(readRuleTexts('k')).toEqual(['.a { color: red; }', '.c { color: green; }'])
   })
 
   it('keeps the rules of the other way of writing in an element of their own', () => {
-    const own = createDomSheet('k', undefined, { hasRuleText })
-    const other = createDomSheet('k', undefined, { hasRuleText: !hasRuleText })
+    const own = createDomSheet('k', undefined, { speedy })
+    const other = createDomSheet('k', undefined, { speedy: !speedy })
     own.insert('.a{color:red;}')
     other.insert('.b{color:blue;}')
     const elements = document.querySelectorAll<HTMLStyleElement>('style[data-style="k"]')
@@ -165,14 +177,12 @@ describe.each(RULE_MODES)('createDomSheet, written by $mode', ({ hasRuleText }) 
 })
 
 describe('createDomSheet, only when written by text', () => {
-  const readElement = () => document.querySelector<HTMLStyleElement>('style[data-style="k"]')
-
-  it('holds the live rules as the text of its element: inserted and removed, and has no replace', () => {
-    const sheet = createDomSheet('k', undefined, { hasRuleText: true })
+  it('holds the live rules as the text of its elements: inserted and removed, and has no replace', () => {
+    const sheet = createDomSheet('k', undefined, { speedy: false })
     sheet.insert('@layer k-theme,k-components;')
     sheet.insert('@layer k-theme{.t{--k-a:1px;}}')
     sheet.insert('@layer k-components{.a{color:red;}}')
-    expect(readElement()?.textContent).toBe(sheet.rules.join(''))
+    expect(readStyleText('k')).toBe(sheet.rules.join(''))
     sheet.remove?.(1)
     sheet.insert('@layer k-theme{.t{--k-a:1px;--k-b:2px;}}')
     expect(sheet.replace).toBeUndefined()
@@ -181,14 +191,15 @@ describe('createDomSheet, only when written by text', () => {
       '@layer k-components{.a{color:red;}}',
       '@layer k-theme{.t{--k-a:1px;--k-b:2px;}}',
     ])
-    expect(readElement()?.textContent).toBe(sheet.rules.join(''))
+    expect(readStyleText('k')).toBe(sheet.rules.join(''))
+    expect(document.querySelectorAll('style[data-style="k"]')).toHaveLength(3)
   })
 
   it('keeps a rule as it is given: the browser parses the text, and drops what it rejects there', () => {
-    const sheet = createDomSheet('k', undefined, { hasRuleText: true })
+    const sheet = createDomSheet('k', undefined, { speedy: false })
     sheet.insert('not a rule')
     expect(sheet.rules).toEqual(['not a rule'])
-    expect(readElement()?.textContent).toBe('not a rule')
+    expect(readStyleText('k')).toBe('not a rule')
   })
 
   it('writes in an element of its own next to one that a server filled, which it leaves as it is', () => {
@@ -196,7 +207,7 @@ describe('createDomSheet, only when written by text', () => {
     sent.dataset.style = 'k'
     sent.textContent = '.s{color:red;}'
     document.head.appendChild(sent)
-    const sheet = createDomSheet('k', undefined, { hasRuleText: true })
+    const sheet = createDomSheet('k', undefined, { speedy: false })
     sheet.insert('.a{color:blue;}')
     const elements = [...document.querySelectorAll('style[data-style="k"]')]
     expect(elements.map((element) => element.textContent)).toEqual([
@@ -219,7 +230,7 @@ describe('createDomSheet, only when written by text', () => {
 
 describe('createDomSheet, only when written by insertRule', () => {
   it('skips a rule the sheet rejects', () => {
-    const sheet = createDomSheet('k', undefined, { hasRuleText: false })
+    const sheet = createDomSheet('k', undefined, { speedy: true })
     vi.spyOn(CSSStyleSheet.prototype, 'insertRule').mockImplementation(() => {
       throw new SyntaxError('bad rule')
     })
@@ -229,14 +240,17 @@ describe('createDomSheet, only when written by insertRule', () => {
 })
 
 describe('createCache over a sheet written by text', () => {
-  it('passes hasRuleText to the sheet it makes, and does not read its own text as sent by a server', () => {
-    const first = createCache({ hasLayers: false, hasRuleText: true })
+  it('passes speedy to the sheet it makes, and does not read its own text as sent by a server', () => {
+    const first = createCache({ hasLayers: false, speedy: false })
     const name = first.css({ color: 'red' })
-    const second = createCache({ hasLayers: false, hasRuleText: true })
+    const second = createCache({ hasLayers: false, speedy: false })
     expect(second.css({ color: 'red' })).toBe(name)
-    const element = document.querySelector('style[data-style="css"]')
-    expect(element?.textContent).toBe(`.${name}{color:red;}.${name}{color:red;}`)
-    createCache({ prefix: 'fast', hasRuleText: false }).css({ color: 'red' })
+    const elements = [...document.querySelectorAll('style[data-style="css"]')]
+    expect(elements.map((element) => element.textContent)).toEqual([
+      `.${name}{color:red;}`,
+      `.${name}{color:red;}`,
+    ])
+    createCache({ prefix: 'fast', speedy: true }).css({ color: 'red' })
     expect(document.querySelector('style[data-style="fast"]')?.textContent).toBe('')
   })
 })
@@ -333,7 +347,7 @@ describe('a rule that the browser rejects', () => {
 
   it('is skipped by a sheet written by insertRule, which tells onReject with the message', () => {
     const onReject = vi.fn()
-    const sheet = createDomSheet('rj', document.head, { hasRuleText: false, onReject })
+    const sheet = createDomSheet('rj', document.head, { speedy: true, onReject })
     sheet.insert('.a{color:red;}')
     sheet.insert('}{')
     expect(sheet.rules).toEqual(['.a{color:red;}'])
@@ -342,7 +356,7 @@ describe('a rule that the browser rejects', () => {
 
   it('is warned about once by a cache with the development checks, with its selector', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
-    const cache = createCache({ prefix: 'rj', hasRuleText: false, hasDevChecks: true })
+    const cache = createCache({ prefix: 'rj', speedy: true, hasDevChecks: true })
     cache.insertOnce('bad', ['@layer rj-components{.a{color:red;}}}{'])
     cache.insertOnce('other', ['}{'])
     const messages = warn.mock.calls.map(([message]) => String(message))
@@ -355,5 +369,48 @@ describe('a rule that the browser rejects', () => {
       ),
     ])
     warn.mockRestore()
+  })
+})
+
+describe('the option hasRuleText, renamed to speedy', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs()
+  })
+
+  /** The warnings of `run`, in development or in `env`. */
+  function readWarnings(run: () => void, env = 'development'): string[] {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    vi.stubEnv('NODE_ENV', env)
+    run()
+    vi.unstubAllEnvs()
+    return warn.mock.calls.map(([message]) => String(message))
+  }
+
+  it('is warned about once for each options object in development, with what to write instead, and is not read', () => {
+    // An object of plain JavaScript, or one typed elsewhere: as a literal it is a type error (below).
+    const asText = { prefix: 'rn', hasDevChecks: false, hasRuleText: true } as CacheOptions
+    const warnings = readWarnings(() => {
+      createCache(asText).css({ color: 'red' })
+      // The same object again is not warned about again.
+      createCache(asText)
+      // @ts-expect-error hasRuleText is no option of a DOM sheet: it was renamed to speedy.
+      createDomSheet('rd', document.head, { hasRuleText: false }).insert('.a{color:red;}')
+    })
+    expect(warnings).toEqual([
+      '[rn] The option hasRuleText was renamed to speedy, with the opposite meaning: hasRuleText: true is not read, and the default applies. Write speedy: false instead.',
+      '[rd] The option hasRuleText was renamed to speedy, with the opposite meaning: hasRuleText: false is not read, and the default applies. Write speedy: true instead.',
+    ])
+    // Not read: the default of development is text, so the rule is in the text of the element.
+    expect(document.querySelector('style[data-style="rd"]')?.textContent).toBe('.a{color:red;}')
+  })
+
+  it('is not warned about in production, nor when it is undefined', () => {
+    // @ts-expect-error hasRuleText is no option.
+    const run = () => createCache({ prefix: 'rp', hasDevChecks: false, hasRuleText: true })
+    expect(readWarnings(run, 'production')).toEqual([])
+    const runUndefined = () =>
+      // @ts-expect-error hasRuleText is no option.
+      createDomSheet('ru', document.head, { hasRuleText: undefined })
+    expect(readWarnings(runUndefined)).toEqual([])
   })
 })

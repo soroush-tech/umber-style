@@ -257,8 +257,8 @@ describe('a page extracted on the server and hydrated', () => {
   })
 
   it.each([true, false])(
-    'writes after the rules of the server in the browser, and not twice, hasRuleText %s',
-    (hasRuleText) => {
+    'writes after the rules of the server in the browser, and not twice, speedy %s',
+    (speedy) => {
       const { server, darkName } = serverPage()
       document.head.innerHTML = createStyleTag(server)
       const readRules = () =>
@@ -266,7 +266,7 @@ describe('a page extracted on the server and hydrated', () => {
           (element) => [...(element.sheet?.cssRules ?? [])].map((rule) => rule.cssText)
         )
       const before = readRules().length
-      const sheet = createDomSheet('u', undefined, { hasRuleText })
+      const sheet = createDomSheet('u', undefined, { speedy })
       const client = createCache({ hasLayers: false, prefix: 'u', sheet })
       createThemeClass(client, dark)
       client.css({ color: 'var(--u-a)' })

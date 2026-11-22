@@ -2,7 +2,7 @@ import { render } from '@testing-library/react'
 import { createStyle } from './createStyle'
 
 describe('the nonce of the client build in the browser', () => {
-  it('is on the style element of the engine, which holds the rules of what renders', () => {
+  it('is on every style element of the engine, which hold the rules of what renders', () => {
     const { styled } = createStyle(
       { palette: { primary: '#0000ff' } },
       {
@@ -12,9 +12,12 @@ describe('the nonce of the client build in the browser', () => {
     )
     const Box = styled('div', { name: 'Box' })(({ theme }) => ({ color: theme.palette.primary }))
     const { container } = render(<Box />)
-    const element = document.head.querySelector('style[data-style="nb"]')
-    expect(element?.getAttribute('nonce')).toBe('n0nce')
+    const elements = [...document.head.querySelectorAll('style[data-style="nb"]')]
+    expect(elements.length).toBeGreaterThan(1)
+    expect(elements.every((element) => element.getAttribute('nonce') === 'n0nce')).toBe(true)
     const className = (container.firstElementChild as HTMLElement).className
-    expect(element?.textContent).toContain(`.${className}{color:var(--nb-palette-primary);}`)
+    expect(elements.map((element) => element.textContent).join('')).toContain(
+      `.${className}{color:var(--nb-palette-primary);}`
+    )
   })
 })

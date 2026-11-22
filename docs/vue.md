@@ -81,7 +81,7 @@ Entries in `style` work as in React: sheet entries and objects, in arrays, falsy
 
 A sheet entry given to the `style` of a plain element renders nothing in Vue on the client: Vue skips a `null` style value. Vue's server renderer writes `style=""` for any `style` prop, whatever it holds (an empty object or `null` as well), so a plain element given a `style` gets an empty attribute on the server; nothing declared is in it. For a plain element use `apply`.
 
-A nested provider (under an outermost one with the theme above) given `{ palette: { primary: '#c2410c' } }`, a `class` of `mine` and `as: 'section'` renders `<section class="umber-theme-1an5zox umber-boundary umber-theme-1be996m umber-scope mine">`: the class of the theme it was given, the boundary, the class of its merged theme, the scope, and yours (`packages/vue/src/providers.docs.test.ts`).
+A nested provider (under an outermost one with the theme above) given `{ palette: { primary: '#c2410c' } }`, a `class` of `mine` and `as: 'section'` renders `<section class="umber-theme-1an5zox umber-boundary umber-scope mine">`: the class of the theme it was given, the boundary, the scope, and yours (below another nested provider, the class of the nested themes merged comes after the boundary: see [Themes](themes.md#the-provider)) (`packages/vue/src/providers.docs.test.ts`).
 
 There is no theme context to export in Vue: the providers use `provide` and `inject`, and `useTheme` reads them.
 
