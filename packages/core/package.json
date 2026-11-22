@@ -1,6 +1,6 @@
 {
   "name": "@umber-style/core",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "The UmberStyle engine: theme tokens as CSS variables, a class cache and theme classes. It knows no framework.",
   "keywords": [
     "styling",

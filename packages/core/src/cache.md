@@ -62,7 +62,10 @@ The rest of the closure, in the order of the file:
 - Page reading. When a document exists, the cache scans the style elements of its prefix once, and any
   that arrive later (a `MutationObserver` on `head` and `body`), with `scanStyleText`. What it finds
   (classes, layer order, `@property` and `@keyframes` rules, theme classes with their variables, global
-  rules, root rules) is marked as inserted, so nothing from a server render is written again. Before it
+  rules, root rules) is marked as inserted, so nothing from a server render is written again. Root rules are the exception:
+  they are not kept. Those found before the cache declares its root theme wait in `pageRoots` and are
+  deleted at the declaration; those of an element that arrives after it are deleted as it is scanned,
+  because they would come later in the document than the rule of the cache and win with old values. Before it
   does, `createCache` compares the options stamp of the server with its own and throws on a difference.
 - Themes. `insertTheme` registers a theme class. With pruning a class declares only used variables, and
   `markUsed` adds more as rules refer to them, following values that refer to other variables. `insertRoot`

@@ -21,6 +21,8 @@ const RGB = {
   text: 'rgb(31, 26, 23)',
   primary: 'rgb(138, 75, 42)',
   accent: 'rgb(179, 38, 30)',
+  darkBackground: 'rgb(16, 17, 20)',
+  darkAccent: 'rgb(255, 138, 128)',
 } as const
 
 /** What a scenario needs besides the page. */
@@ -296,7 +298,6 @@ export const REGISTRY_SCENARIOS: readonly RegistryScenario[] = [
   {
     title:
       '(c) the root rules of a chunk that streams in after the hydration are replaced too: one live root rule',
-    knownKey: 'registry-late-root',
     async run(page, tools) {
       await page.goto(`http://localhost:${tools.fixture.port}/registry/stream`, {
         waitUntil: 'commit',
@@ -323,6 +324,10 @@ export const REGISTRY_SCENARIOS: readonly RegistryScenario[] = [
         return found
       }, STYLE_SELECTOR)
       expect(roots, 'the style elements that hold a live root rule').toHaveLength(1)
+      // With one live rule a root theme given later takes effect: the page turns dark.
+      await page.getByTestId('registry-theme-switch').click()
+      await expect(page.locator('body')).toHaveCSS('background-color', RGB.darkBackground)
+      await expect(page.getByTestId('registry-late')).toHaveCSS('border-top-color', RGB.darkAccent)
     },
   },
   {

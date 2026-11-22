@@ -1,6 +1,6 @@
 {
   "name": "@umber-style/vue",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "UmberStyle for Vue: the same names as the React binding, with a reactive useTheme.",
   "keywords": [
     "styling",

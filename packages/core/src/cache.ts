@@ -1584,7 +1584,11 @@ export function createCache(options: CacheOptions = {}): Cache {
         known.push(objects?.[index])
         pageGlobals.set(text, known)
       }
-      for (const index of found.roots) pageRoots.push(objects?.[index])
+      // A root rule that arrives after the cache declared its root theme would come after the rule of the
+      // cache and win with its old values: it is removed now. Before that, it waits for the declaration.
+      const rootRules = found.roots.map((index) => objects?.[index])
+      if (root === undefined) pageRoots.push(...rootRules)
+      else for (const rule of rootRules) if (rule) deleteCssRule(rule)
     }
     for (const element of page.querySelectorAll(selector)) scan(element)
     // Rules reach the page without a call to the engine: streamed content, a route that a framework
