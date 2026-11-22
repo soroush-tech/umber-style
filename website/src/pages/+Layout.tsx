@@ -17,7 +17,7 @@ export default function Layout({ children }: { readonly children: ReactNode }) {
       <Header>
         <SchemeSwitch scheme={scheme} onSchemeChange={setScheme} />
       </Header>
-      <View as="main" px={3} py={4}>
+      <View as="main" px={3} py={4} padding={0}>
         {children}
       </View>
     </Providers>

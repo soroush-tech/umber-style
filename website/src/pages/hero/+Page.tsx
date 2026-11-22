@@ -9,16 +9,6 @@ export default function Page() {
   return (
     <main>
       <Flex alignItems="center" data-name="root" flexDirection="column" fontFamily="'Space Grotesk Variable', 'Space Grotesk', sans-serif" gap={0} p={0} style={{"backgroundColor":"rgba(247, 241, 225, 1)","color":"#2F1702"}} width="100%">
-        <Flex alignItems="center" data-name="bar" flexDirection="row" gap={0} justifyContent="space-between" maxWidth="1760px" p={0} px={3} py={2} width="100%">
-          <Typography data-name="brand" fontFamily="'Space Grotesk Variable', 'Space Grotesk', sans-serif" letterSpacing="-0.03em" m={0} style={{"fontSize":"22px","fontWeight":700}} variant="h5">UmberStyle</Typography>
-          <Flex alignItems="center" data-name="nav" flexDirection="row" gap={4} p={0}>
-            <Link color="inherit" data-name="n1" fontFamily="'Space Grotesk Variable', 'Space Grotesk', sans-serif" href="#" style={{"fontSize":"15px"}} underline="none">Docs</Link>
-            <Link color="inherit" data-name="n2" fontFamily="'Space Grotesk Variable', 'Space Grotesk', sans-serif" href="#" style={{"fontSize":"15px"}} underline="none">Packages</Link>
-            <Link color="inherit" data-name="n3" fontFamily="'Space Grotesk Variable', 'Space Grotesk', sans-serif" href="#" style={{"fontSize":"15px"}} underline="none">Benchmarks</Link>
-            <Link color="inherit" data-name="n4" fontFamily="'Space Grotesk Variable', 'Space Grotesk', sans-serif" href="#" style={{"fontSize":"15px"}} underline="none">GitHub</Link>
-            <Button color="primary" data-name="navCta" fontFamily="'Space Grotesk Variable', 'Space Grotesk', sans-serif" fontSize={1} px={3} size="sm" style={{"backgroundColor":"rgba(47, 23, 2, 1)","borderColor":"#2F1702","borderRadius":"999px","color":"#F7F1E1","letterSpacing":"0px"}} textTransform="none" variant="contained">Get started</Button>
-          </Flex>
-        </Flex>
         <Flex data-name="rule1" flexShrink="0" gap={0} height="1px" p={0} style={{"backgroundImage":"repeating-linear-gradient(to right, color-mix(in srgb, currentColor 32%, transparent) 0 16px, transparent 16px 32px)"}} width="100%" />
         <Flex alignItems="center" borderLeftStyle="solid" borderLeftWidth="0" data-name="hero" flexDirection="row" gap={0} maxWidth="1920px" p={0} style={{"borderLeftColor":"#2F170224"}} width="100%">
           <Grid data-name="sideL" display="grid" flexShrink="0" gap={0} gridTemplateColumns="repeat(2, 1fr)" gridTemplateRows="repeat(4, 1fr)" p={0} position="relative" width="200px" style={{"borderLeftWidth":"0","display":"flex","flexShrink":"0","height":"700px","position":"relative","width":"300px"}}>
