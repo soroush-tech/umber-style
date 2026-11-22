@@ -2,7 +2,7 @@
 // this file; the run checks that the values behind the types work.
 import { render, screen } from '@testing-library/react'
 import { createCache, createMemorySheet } from '@umber-style/core'
-import type { ComponentProps } from 'react'
+import type { ComponentProps, ElementType } from 'react'
 import { expectTypeOf } from 'vitest'
 import { createStyle } from './createStyle'
 import type {
@@ -90,6 +90,30 @@ describe('the type names that apps import', () => {
     const Plain = styled('a', plain)({ color: 'red' })
     const kept = <Plain title="kept" />
     expect(kept.props.title).toBe('kept')
+  })
+
+  it('types `as` by the own `as` of a component that is not made by styled, and as any element type else', () => {
+    const { styled } = setup()
+    const Typography = ({
+      as: Tag = 'span',
+      className,
+    }: {
+      as?: 'span' | 'a'
+      className?: string
+    }) => <Tag className={className} data-testid="typography" />
+    const Link = styled(Typography)({ color: 'red' })
+    const Wide = styled(Link)({ width: '100%' })
+    const Button = styled('button')({ color: 'red' })
+    const Fancy = styled(Button)({ margin: 4 })
+    expectTypeOf<PropsOf<typeof Link>['as']>().toEqualTypeOf<'span' | 'a' | undefined>()
+    expectTypeOf<PropsOf<typeof Wide>['as']>().toEqualTypeOf<'span' | 'a' | undefined>()
+    expectTypeOf<PropsOf<typeof Button>['as']>().toEqualTypeOf<ElementType | undefined>()
+    expectTypeOf<PropsOf<typeof Fancy>['as']>().toEqualTypeOf<ElementType | undefined>()
+    // @ts-expect-error the component takes `as` itself, and only the tags it names
+    const wrong = <Link as="div" />
+    expect(wrong.type).toBe(Link)
+    render(<Wide as="a" />)
+    expect(screen.getByTestId('typography').tagName).toBe('A')
   })
 
   it('types a css() result that is passed around, and a list of styles', () => {

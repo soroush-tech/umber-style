@@ -1,4 +1,5 @@
 import { createCache, createEngine, createMemorySheet } from '@umber-style/core'
+import type { ReactNode } from 'react'
 import { bindEngine } from './createStyle.server'
 import { findAll, resolveTree } from './vitest.resolveTree'
 import type { CacheFunction } from './serverContext'
@@ -46,5 +47,60 @@ describe('styled in the server components build', () => {
     const [bar] = findAll(tree, 'div')
     const override = (bar.props.className as string).split(' ')[1]
     expect(sheet.rules.filter((rule) => rule.includes(override))).toHaveLength(1)
+  })
+
+  it('labels the base and the props class of a wrapper of a styled component with the label of the wrapper', async () => {
+    const { styled } = setup()
+    const byVariant = ({ variant }: { variant?: string }) => ({ fontWeight: variant ? 700 : 400 })
+    const Typography = styled('span', { label: 'Typography' })({ margin: 0 }, byVariant)
+    const Wrapper = styled(Typography, { label: 'W' })({ padding: 1 })
+    const tree = await resolveTree(
+      <>
+        <Typography variant="a" />
+        <Wrapper variant="a" />
+      </>
+    )
+    const [typography, wrapper] = findAll(tree, 'span').map((span) =>
+      (span.props.className as string).split(' ')
+    )
+    expect(typography[0]).toMatch(/^s-Typography-\w+$/)
+    expect(wrapper).toEqual([
+      typography[0].replace('Typography', 'W'),
+      expect.stringMatching(/^s-W-\w+$/),
+    ])
+  })
+
+  it('gives `as` to a component that is not made by styled, and replaces a string tag with it', async () => {
+    const { styled } = setup()
+    const Typography = ({
+      as: Tag = 'span',
+      color: _color,
+      variant,
+      className,
+      ...rest
+    }: {
+      as?: 'span' | 'a'
+      color?: string
+      variant?: string
+      className?: string
+      href?: string
+      children?: ReactNode
+    }) => <Tag className={`typography-${variant} ${className}`} {...rest} />
+    const Link = styled(Typography, {
+      shouldForwardProp: (prop) => prop !== 'underline',
+    })<{ underline?: string }>(({ underline }) => ({ textDecoration: underline }))
+    const Button = styled('button')<{ tone?: string }>({ color: 'red' })
+    const tree = await resolveTree(
+      <>
+        <Link as="a" color="primary" variant="inherit" underline="always" href="#top" />
+        <Button as="a" tone="x" {...{ href: '#b' }} />
+      </>
+    )
+    const [link, button] = findAll(tree, 'a')
+    expect(link.props).toEqual({
+      href: '#top',
+      className: expect.stringMatching(/^typography-inherit s-\w+$/),
+    })
+    expect(button.props).toEqual({ href: '#b', className: expect.stringMatching(/^s-\w+$/) })
   })
 })

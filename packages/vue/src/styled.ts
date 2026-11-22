@@ -40,14 +40,15 @@ function createHoldRef(hold: () => () => void) {
   }
 }
 
-/** The attributes that the element is given: all but those of `styled` (`as`, `theme`, `class`, `style`), and of those only what `filter` lets through when there is one. */
+/** The attributes that the element is given: all but those of `styled` (`as` where it replaces a string tag, `theme`, `class`, `style`), and of those only what `filter` lets through when there is one. */
 function forwardAttributes(
   attrs: Readonly<Record<string, unknown>>,
-  filter: StyledOptions['shouldForwardProp']
+  filter: StyledOptions['shouldForwardProp'],
+  isTag: boolean
 ): Record<string, unknown> {
   const forwarded: Record<string, unknown> = {}
   for (const [key, value] of Object.entries(attrs)) {
-    const isOwn = key === 'as' || key === 'theme' || key === 'class' || key === 'style'
+    const isOwn = (isTag && key === 'as') || key === 'theme' || key === 'class' || key === 'style'
     if (!isOwn && (!filter || filter(key))) forwarded[key] = value
   }
   return forwarded
@@ -68,6 +69,8 @@ export function createStyled<T>(engine: Engine<T>, useThemeView: (cache?: Cache)
       const styles = readStyleArguments(args)
       const inner = isStyledComponent(tag) ? tag : undefined
       const baseTag = inner?._tag ?? tag
+      // `as` replaces a string tag; any other component is always rendered, and is given `as`.
+      const isTag = typeof baseTag === 'string'
       const shouldForward = options.shouldForwardProp ?? inner?._shouldForwardProp
       const target = [inner?._target, options.target].filter(Boolean).join(' ') || undefined
       const styler = engine.createStyler(options, styles, inner?._styles)
@@ -107,10 +110,12 @@ export function createStyled<T>(engine: Engine<T>, useThemeView: (cache?: Cache)
               : undefined
           let className = held ? held.className : own.getClassName(attrs, extra, theme)
           if (target) className = className ? `${className} ${target}` : target
-          const element = (attrs.as as string | Component | undefined) ?? baseTag
+          const element = isTag
+            ? ((attrs.as as string | Component | undefined) ?? baseTag)
+            : baseTag
           const filter = typeof element === 'string' ? shouldForward : undefined
 
-          const forwarded = forwardAttributes(attrs, filter)
+          const forwarded = forwardAttributes(attrs, filter, isTag)
           forwarded.class = className || undefined
           if (held?.hold) forwarded.ref = createHoldRef(held.hold)
           return h(element, forwarded, slots)

@@ -96,6 +96,45 @@ describe('styled', () => {
     expect(root.querySelector('button')).toBeNull()
   })
 
+  it('gives `as` to a component that is not made by styled, which is always rendered', () => {
+    const { styled } = setup()
+    const Typography = defineComponent({
+      props: { as: { type: String, default: 'span' }, variant: String },
+      setup:
+        (props, { slots }) =>
+        () =>
+          h(props.as, { class: `typography-${props.variant}` }, slots),
+    })
+    const Link = styled(Typography)({ color: 'red' })
+    const Wide = styled(Link, { label: 'Wide' })({ width: '100%' })
+    const root = mount(() => [
+      h(Link, { as: 'a', variant: 'body', href: '#top' }, () => 'top'),
+      h(Wide, { as: 'a', variant: 'body' }),
+    ])
+    const [link, wide] = [...root.children]
+    expect(link.tagName).toBe('A')
+    expect(link.getAttributeNames().sort()).toEqual(['class', 'href'])
+    expect(link.className).toMatch(/^typography-body v-[a-z0-9]+$/)
+    expect(link.textContent).toBe('top')
+    expect(wide.tagName).toBe('A')
+    expect(wide.className).toMatch(/^typography-body v-Wide-[a-z0-9]+$/)
+  })
+
+  it('labels the base and the props class of a wrapper of a styled component with the label of the wrapper', () => {
+    const { styled } = setup()
+    const Typography = styled('span', { label: 'Typography' })({ margin: 0 }, ({ variant }) => ({
+      fontWeight: variant ? 700 : 400,
+    }))
+    const Wrapper = styled(Typography, { label: 'W' })({ padding: 1 })
+    const root = mount(() => [h(Typography, { variant: 'a' }), h(Wrapper, { variant: 'a' })])
+    const [typography, wrapper] = [...root.children].map((element) => element.className.split(' '))
+    expect(typography[0]).toMatch(/^v-Typography-[a-z0-9]+$/)
+    expect(wrapper).toEqual([
+      typography[0].replace('Typography', 'W'),
+      expect.stringMatching(/^v-W-[a-z0-9]+$/),
+    ])
+  })
+
   it('uses shouldForwardProp for a tag only', () => {
     const { styled } = setup()
     const Box = styled('div', { shouldForwardProp: (prop) => prop === 'id' })({ color: 'red' })

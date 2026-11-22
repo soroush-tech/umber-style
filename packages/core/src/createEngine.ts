@@ -490,19 +490,48 @@ function createFamilyEngine<T extends object>(
       theme: unknown
     ): StyleResult[] => source.map((style) => resolveStyle(style, props, theme))
 
-    /** The base class (written first) and the styles that make the props class, which is made for each render. */
+    /**
+     * The base class (written first), the classes in front of the props class (the base, after the class
+     * of a wrapped component that has no function, where the base stands in for it), and the styles that
+     * make the props class, which is made for each render.
+     */
     interface Plan {
       baseClass: string
+      leading: string
       propsStyles: readonly StyleInput[]
     }
 
     // Without `hasBaseClass`, or without any function, the split does not depend on the theme: the whole
     // list is the base when it has no function, and the props part when it has one.
     let fixed: Plan | undefined
-    const getFixed = (): Plan =>
-      (fixed ??= hasFunction
-        ? { baseClass: '', propsStyles: list }
-        : { baseClass: cache.css(...(list as WebStyleObject[])), propsStyles: [] })
+    const getFixed = (): Plan => {
+      if (fixed) return fixed
+      const baseClass = hasFunction ? '' : cache.css(...(list as WebStyleObject[]))
+      fixed = { baseClass, leading: baseClass, propsStyles: hasFunction ? list : [] }
+      return fixed
+    }
+
+    // A wrapped component with no function has one class, which is its selector (`${Inner}`).
+    const isInheritedStatic = !inherited.some(isStyleFunction)
+    /**
+     * The base class and what goes in front of the props class, for the base `base`. A base made of the
+     * wrapped component's styles alone would carry the wrapped component's label: it takes the label of
+     * this component. When the wrapped component has no function, the base is its class, which the
+     * element carried before; it stays in front, so that the wrapped component as a selector still
+     * matches the element.
+     */
+    const createBase = (base: StyleResult[]): Pick<Plan, 'baseClass' | 'leading'> => {
+      if (!base.some(Boolean)) return { baseClass: '', leading: '' }
+      const styles = base as WebStyleObject[]
+      if (!label || base.length > inherited.length) {
+        const baseClass = cache.css(...styles)
+        return { baseClass, leading: baseClass }
+      }
+      const baseClass = cache.css(...styles, { label })
+      if (!isInheritedStatic) return { baseClass, leading: baseClass }
+      const before = cache.css(...styles)
+      return { baseClass, leading: before === baseClass ? baseClass : `${before} ${baseClass}` }
+    }
 
     // With functions, where the props part starts depends on the theme view, because a function that
     // reads only the theme is part of the base, and what it reads from the theme may differ per view.
@@ -515,7 +544,7 @@ function createFamilyEngine<T extends object>(
       const hasProps = propsFrom < list.length
       const lead = label ? [{ label }] : []
       return {
-        baseClass: base.some(Boolean) ? cache.css(...(base as WebStyleObject[])) : '',
+        ...createBase(base),
         propsStyles: hasProps ? [...lead, ...list.slice(propsFrom)] : [],
       }
     }
@@ -532,11 +561,11 @@ function createFamilyEngine<T extends object>(
 
     /** The classes of the styles: the base, then the props class that is made after it. */
     const getOwn = (plan: Plan, props: Record<string, unknown>, theme: unknown) => {
-      const { baseClass, propsStyles } = plan
-      if (propsStyles.length === 0) return baseClass
+      const { baseClass, leading, propsStyles } = plan
+      if (propsStyles.length === 0) return leading
       const resolved = resolveAll(propsStyles, props, theme)
       const second = cache.cssWith({ after: baseClass }, ...resolved)
-      return [baseClass, second].filter(Boolean).join(' ')
+      return [leading, second].filter(Boolean).join(' ')
     }
 
     /** Without layers there is no override class and no order between classes to rely on: what comes in is merged with all of the styles, into the one class. */

@@ -1,4 +1,5 @@
 import { render } from '@testing-library/react'
+import type { ReactNode } from 'react'
 import { createCache, createMemorySheet } from '@umber-style/core'
 import { createStyle } from './createStyle'
 import { createDefaultStyle } from './defaultStyle'
@@ -194,5 +195,147 @@ describe('the label option, and a function style that returns a list', () => {
     const { container } = render(<Toggle isOn />)
     const className = only(container).className
     expect(className).toBe(cache.css({ color: 'red', margin: 1 }, { color: 'blue' }, card))
+  })
+})
+
+describe('the label of a styled component that wraps a styled component', () => {
+  const byVariant = ({ variant }: { variant?: string }) => ({ fontWeight: variant ? 700 : 400 })
+
+  it('is the label of the wrapper on its base and its props class, and the inner label without one', () => {
+    const { styled } = setup()
+    const Typography = styled('span', { label: 'Typography' })({ margin: 0 }, byVariant)
+    const Wrapper = styled(Typography, { label: 'W' })({ padding: 1 })
+    const Named = styled(Typography, { name: 'Popover' })({ padding: 1 })
+    const Plain = styled(Typography)({ padding: 1 })
+    const { container } = render(
+      <>
+        <Typography variant="a" />
+        <Wrapper variant="a" />
+        <Named variant="a" />
+        <Plain variant="a" />
+      </>
+    )
+    const [typography, wrapper, named, plain] = [...container.children].map((element) =>
+      element.className.split(' ')
+    )
+    expect(typography).toEqual([
+      expect.stringMatching(/^o-Typography-\w+$/),
+      expect.stringMatching(/^o-Typography-\w+$/),
+    ])
+    expect(wrapper).toEqual([
+      typography[0].replace('Typography', 'W'),
+      expect.stringMatching(/^o-W-\w+$/),
+    ])
+    expect(named.map((name) => name.replace(/-\w+$/, ''))).toEqual([
+      'o-popover-root',
+      'o-popover-root',
+    ])
+    expect(plain).toEqual([typography[0], expect.stringMatching(/^o-\w+$/)])
+  })
+
+  it('keeps the class of a wrapped component without functions in front, so that it is still a selector of the element', () => {
+    const sheet = createMemorySheet()
+    const { styled } = createStyle(theme, { cache: createCache({ prefix: 'o', sheet }) })
+    const Paper = styled('div', { label: 'Paper' })({ margin: 0 })
+    const Popover = styled(Paper, { label: 'Popover' })(byVariant)
+    const Page = styled.main`
+      ${Paper} {
+        color: red;
+      }
+    `
+    const { container } = render(
+      <Page>
+        <Paper />
+        <Popover variant="a" />
+      </Page>
+    )
+    const [paper, popover] = [...(container.firstElementChild as Element).children]
+    const [selector, base, props] = popover.className.split(' ')
+    expect(selector).toBe(paper.className)
+    expect(`.${selector}`).toBe(String(Paper))
+    expect(base).toBe(paper.className.replace('Paper', 'Popover'))
+    expect(props).toMatch(/^o-Popover-\w+$/)
+    expect(popover.matches(`main ${Paper}`)).toBe(true)
+    expect(sheet.rules.join('')).toContain(`${Paper}{color:red;}`)
+  })
+})
+
+describe('`as` on a styled component', () => {
+  interface TypographyProps {
+    as?: 'span' | 'a' | 'p'
+    color?: string
+    variant?: string
+    className?: string
+    href?: string
+    children?: ReactNode
+  }
+  const join = (...names: (string | false | undefined)[]) => names.filter(Boolean).join(' ')
+  /** A component that is not made by `styled`: it takes `as` itself, and renders that tag with its own class. */
+  const Typography = ({
+    as: Tag = 'span',
+    color,
+    variant,
+    className,
+    ...rest
+  }: TypographyProps) => (
+    <Tag
+      className={join(
+        'typography',
+        `typography-${variant}`,
+        color && `typography-${color}`,
+        className
+      )}
+      {...rest}
+    />
+  )
+
+  it('is given to a component that is not made by styled, which is always rendered', () => {
+    const { styled } = setup()
+    const Link = styled(Typography, {
+      shouldForwardProp: (prop) => prop !== 'underline',
+    })<{ underline?: string }>(({ underline }) => ({ textDecoration: underline }))
+    const { container } = render(
+      <Link as="a" color="primary" variant="inherit" underline="always" href="#top">
+        top
+      </Link>
+    )
+    const link = only(container)
+    expect(link.tagName).toBe('A')
+    expect(link.getAttributeNames().sort()).toEqual(['class', 'href'])
+    expect(link.className).toMatch(/^typography typography-inherit typography-primary o-\w+$/)
+    expect(link.textContent).toBe('top')
+  })
+
+  it('is not given when shouldForwardProp keeps it, and a wrapper of the styled component gives it too', () => {
+    const { styled } = setup()
+    const Kept = styled(Typography, { shouldForwardProp: (prop) => prop !== 'as' })({ margin: 0 })
+    const Link = styled(Typography)({ margin: 0 })
+    const Wide = styled(Link, { label: 'Wide' })({ width: '100%' })
+    const { container } = render(
+      <>
+        <Kept as="a" variant="body" />
+        <Wide as="a" variant="body" />
+      </>
+    )
+    const [kept, wide] = [...container.children]
+    expect(kept.tagName).toBe('SPAN')
+    expect(wide.tagName).toBe('A')
+    expect(wide.className).toMatch(/^typography typography-body o-Wide-\w+$/)
+  })
+
+  it('replaces a string tag, also of a wrapped styled component, with the filter of the tag that is rendered', () => {
+    const { styled } = setup()
+    const Button = styled('button')<{ tone?: string }>({ color: 'red' })
+    const Fancy = styled(Button)({ margin: 4 })
+    const { container } = render(
+      <>
+        <Button as="a" tone="x" {...{ href: '#a' }} />
+        <Fancy as="a" tone="x" {...{ href: '#b' }} />
+      </>
+    )
+    for (const element of container.children) {
+      expect(element.tagName).toBe('A')
+      expect(element.getAttributeNames().sort()).toEqual(['class', 'href'])
+    }
   })
 })

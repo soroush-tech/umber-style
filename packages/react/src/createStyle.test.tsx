@@ -147,14 +147,14 @@ describe('styled', () => {
     ])
   })
 
-  it('forwards every prop but `as` and `theme` to a component', () => {
+  it('forwards every prop but `theme` to a component, `as` included', () => {
     const { styled } = setup()
     const Probe = (props: Record<string, unknown>) => (
       <i data-keys={Object.keys(props).sort().join()} />
     )
     const Box = styled(Probe)({ color: 'red' })
     const { container } = render(<Box $size="big" theme={{}} as={Probe} id="a" />)
-    expect(container.firstElementChild?.getAttribute('data-keys')).toBe('$size,className,id')
+    expect(container.firstElementChild?.getAttribute('data-keys')).toBe('$size,as,className,id')
   })
 
   it('passes the ref and the children on', () => {

@@ -78,7 +78,7 @@ export type StyleOptions<T = never> = BindingOptions<T>
 
 /** The options of `styled(tag, options)`: the label of the class, what reaches the element, a class name of your own. */
 export interface StyledOptions extends StylerOptions {
-  /** Whether an attribute is forwarded to a string tag. Default: every attribute but `as`, `theme`, `class` and `style`, which the component handles itself. */
+  /** Whether an attribute is forwarded to a string tag. Default: every attribute but `as`, `theme`, `class` and `style`, which the component handles itself; a component that is not made by `styled` is always rendered, and is given `as`. */
   shouldForwardProp?: (prop: string) => boolean
   /**
    * A class name of your own that the element always has, after the engine's classes: a stable name

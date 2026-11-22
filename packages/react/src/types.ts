@@ -115,10 +115,12 @@ export interface DefaultStyleOptions extends BindingOptions<Theme>, ServerStyleO
  */
 export interface StyledOptions<_Props = unknown> extends StylerOptions {
   /**
-   * Whether a prop is forwarded to a string tag. It replaces the default, which forwards the attributes
-   * of HTML and SVG (by their React names), `data-*`, `aria-*`, event handlers and React's own props, and
-   * every prop to a custom element (a tag with a hyphen). `as`, `theme`, `className` and `style` are the
-   * component's own and are never forwarded. A component tag receives every prop but those four.
+   * Whether a prop is forwarded to the element or component that is rendered. It replaces the default,
+   * which forwards to a string tag the attributes of HTML and SVG (by their React names), `data-*`,
+   * `aria-*`, event handlers and React's own props, and every prop to a custom element (a tag with a
+   * hyphen) and to a component. `theme`, `className` and `style` are the component's own and are never
+   * forwarded, and so is `as` where it replaces a string tag; a component that is not made by `styled`
+   * is always rendered, and is given `as` as a prop.
    */
   shouldForwardProp?: (prop: string) => boolean
   /**
@@ -137,7 +139,7 @@ export interface FilteringStyledOptions<
   Props = Record<string, unknown>,
   Forwarded extends keyof Props & string = keyof Props & string,
 > extends StyledOptions<Props> {
-  /** A type guard of the props that are forwarded to a string tag: the component takes only the props of the tag that it names. */
+  /** A type guard of the props that are forwarded: the component takes only the props of the tag that it names. */
   shouldForwardProp?: (prop: string) => prop is Forwarded
 }
 
@@ -174,6 +176,16 @@ export type StyleProp =
   | readonly StyleProp[]
 
 /**
+ * The `as` of a styled component whose tag takes the props `Base`: the type of the tag's own `as` when it
+ * has one (a component that is not made by `styled` is given `as` as a prop), else any element type.
+ */
+type AsProp<Base> = Base extends { as?: infer As }
+  ? unknown extends As
+    ? ElementType
+    : As
+  : ElementType
+
+/**
  * A component made by `styled`: it takes the props of the tag (`Base`: all of them, unless a
  * `shouldForwardProp` type guard named some), its own props `P`, `as` and `style`. As text it is a
  * selector: `.` and a class that every element of it has (its `target`, else its class when none of its
@@ -184,7 +196,7 @@ export type StyledComponent<
   P extends object,
   Base extends object = ComponentProps<C>,
 > = FunctionComponent<
-  Omit<Base, keyof P | 'as' | 'style'> & P & { as?: ElementType; style?: StyleProp }
+  Omit<Base, keyof P | 'as' | 'style'> & P & { as?: AsProp<Base>; style?: StyleProp }
 > &
   StyledStatics
 

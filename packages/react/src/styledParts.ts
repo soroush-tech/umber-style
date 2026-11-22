@@ -15,10 +15,10 @@ function isStyledComponent(tag: ElementType): tag is ElementType & StyledStatics
   return typeof tag === 'function' && '_styles' in tag
 }
 
-/** The filter of the props of `element`: the one given, else for a string tag the attributes of HTML and SVG (a custom element, with a hyphen in its name, receives every prop); none for a component. */
+/** The filter of the props of `element`: the one given, whatever the element is; else for a string tag the attributes of HTML and SVG (a custom element, with a hyphen in its name, receives every prop), and none for a component. */
 function readFilter(element: ElementType, given: ((prop: string) => boolean) | undefined) {
-  if (typeof element !== 'string') return undefined
-  return given ?? (element.includes('-') ? undefined : isDomProp)
+  if (given || typeof element !== 'string') return given
+  return element.includes('-') ? undefined : isDomProp
 }
 
 /** What both builds of `styled` share: the styler, and the element and props that a component renders. */
@@ -30,6 +30,8 @@ export function prepareStyled<T>(
 ) {
   const inner = isStyledComponent(tag) ? tag : undefined
   const baseTag = inner?._tag ?? tag
+  // `as` replaces a string tag. Any other component is always rendered, and `as` is one of its props.
+  const isTag = typeof baseTag === 'string'
   const shouldForward = options.shouldForwardProp ?? inner?._shouldForwardProp
   const target = [inner?._target, options.target].filter(Boolean).join(' ') || undefined
   const styler = engine.createStyler(options, styles, inner?._styles)
@@ -60,12 +62,13 @@ export function prepareStyled<T>(
     const held = canHold && props.style ? own.getHeldClass(props, extra, theme) : undefined
     let className = held ? held.className : own.getClassName(props, extra, theme)
     if (target) className = className ? `${className} ${target}` : target
-    const element = (props.as as ElementType | undefined) ?? baseTag
+    const element = isTag ? ((props.as as ElementType | undefined) ?? baseTag) : baseTag
     const filter = readFilter(element, shouldForward)
 
     const forwarded: Record<string, unknown> = {}
     for (const [key, value] of Object.entries(props)) {
-      const isOwn = key === 'as' || key === 'theme' || key === 'className' || key === 'style'
+      const isOwn =
+        (isTag && key === 'as') || key === 'theme' || key === 'className' || key === 'style'
       if (!isOwn && (!filter || filter(key))) forwarded[key] = value
     }
     forwarded.className = className || undefined
