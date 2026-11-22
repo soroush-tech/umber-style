@@ -20,7 +20,10 @@ pnpm test:browser         # tier 2, in core and react
 pnpm test:e2e             # tier 3, every fixture; builds each one first
 E2E_FIXTURE=next-app pnpm test:e2e     # one fixture (a comma-separated list works)
 pnpm test:e2e:dev         # tier 3 against development servers; see "Tier 3 in development"
+pnpm typecheck            # the type tests of every package, and the budget of the type cost
 ```
+
+`pnpm typecheck` is not a tier of tests run by a test runner, but it holds the type tests: files that assert what compiles (`expectTypeOf`, `@ts-expect-error`), compiled by each package's `tsconfig*.json`. The typecheck of `@umber-style/react` also runs `scripts/check-type-cost.mjs`, which fails when the types cost the checker more instantiations than a budget on the shapes of a design system (see [How the cost of the types is kept](typed-styles.md#how-the-cost-of-the-types-is-kept)).
 
 Tiers 2 and 3 need Chromium, which Playwright installs once: `pnpm --filter @umber-style/core exec playwright install chromium`. The version of `playwright` in the packages and of `@playwright/test` in `e2e` is the same exact version, so one download serves both. Tier 2 has its own `vitest.browser.config.ts`: `pnpm test` and `pnpm test:coverage` never open a browser. In CI the `browser` job runs tier 2 for `core` and `react`, and the `e2e` job runs one matrix row for each folder of `fixtures/`; a new fixture appears in the matrix with no change to the workflow.
 

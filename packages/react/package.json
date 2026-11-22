@@ -1,6 +1,6 @@
 {
   "name": "@umber-style/react",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "UmberStyle for React: styled, ThemeProvider, useTheme, StyleSheet, useStyle and apply, with a server build for server components.",
   "keywords": [
     "styling",
@@ -65,7 +65,7 @@
   "scripts": {
     "build": "tsdown",
     "lint": "oxlint --deny-warnings",
-    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.augmentation.json && tsc --noEmit -p tsconfig.server.json && tsc --noEmit -p tsconfig.strict.json",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.augmentation.json && tsc --noEmit -p tsconfig.server.json && tsc --noEmit -p tsconfig.strict.json && node ../../scripts/check-type-cost.mjs",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:browser": "vitest run --config vitest.browser.config.ts",

@@ -179,7 +179,7 @@ Not in the gate, on purpose:
 
 ### The baseline tag
 
-The release `previous` installs is named in one place, `bench/gate/baseline.ts`: `BASELINE_TAG`, now `alpha`, because `latest` of each package is an empty placeholder until the first stable release. After that release, change that one line to `'latest'`. Every gate file reads its install spec from there.
+The release `previous` installs is named in one place, `bench/gate/baseline.ts`: `BASELINE_TAG`, now `'latest'`: the stable release of each package on npm (0.1.0 was the first). Every gate file reads its install spec from there.
 
 If the baseline cannot be installed (the tag does not exist, or npm cannot be reached), the sandbox run fails before it measures anything, the file counts as failed, and so the job and `ci-ok` fail. There is no way to pass without a comparison.
 
