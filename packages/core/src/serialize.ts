@@ -138,7 +138,8 @@ const UNIT_TEXT = /^[a-z%]*$/i
 
 /** Whether the character at `index` of `text` is a digit. */
 function isDigitAt(text: string, index: number): boolean {
-  const code = text.charCodeAt(index)
+  // Past the end there is no code point, and no digit.
+  const code = text.codePointAt(index) ?? 0
   return code >= 48 && code <= 57
 }
 
@@ -162,7 +163,7 @@ function skipExponent(text: string, index: number): number {
  * length, a time or a plain number.
  */
 function readNumberUnit(text: string): string | undefined {
-  const start = text[0] === '+' || text[0] === '-' ? 1 : 0
+  const start = text.startsWith('+') || text.startsWith('-') ? 1 : 0
   const whole = skipDigits(text, start)
   const fraction = text[whole] === '.' ? skipDigits(text, whole + 1) : whole
   // A number has a digit, before the point or after it: `.` alone and no digits at all are not one.
