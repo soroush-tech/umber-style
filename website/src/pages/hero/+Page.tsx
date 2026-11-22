@@ -8,20 +8,20 @@ import { Typography } from '@soroush.tech/design-system/Typography'
 export default function Page() {
   return (
     <main>
-      <Flex alignItems="center" data-name="root" flexDirection="column" fontFamily="'Space Grotesk Variable', 'Space Grotesk', sans-serif" gap={0} p={0} style={{"backgroundColor":"rgba(247, 241, 225, 1)","color":"#2F1702"}} width="100%">
+      <Flex alignItems="center" data-name="root" flexDirection="column" fontFamily="'Space Grotesk Variable', 'Space Grotesk', sans-serif" gap={0} p={0} style={{"backgroundColor":"rgba(247, 241, 225, 1)","color":"#2F1702"}} width="100%" maxWidth="100%" overflowX="clip">
         <Flex data-name="rule1" flexShrink="0" gap={0} height="1px" p={0} style={{"backgroundImage":"repeating-linear-gradient(to right, color-mix(in srgb, currentColor 32%, transparent) 0 16px, transparent 16px 32px)"}} width="100%" />
-        <Flex alignItems="center" borderLeftStyle="solid" borderLeftWidth="0" data-name="hero" flexDirection="row" gap={0} maxWidth="1920px" p={0} style={{"borderLeftColor":"#2F170224"}} width="100%">
-          <Grid data-name="sideL" display="grid" flexShrink="0" gap={0} gridTemplateColumns="repeat(2, 1fr)" gridTemplateRows="repeat(4, 1fr)" p={0} position="relative" width="200px" style={{"borderLeftWidth":"0","display":"flex","flexShrink":"0","height":"700px","position":"relative","width":"300px"}}>
-            <Image alt="Squares left" height="700px" left="0" position="absolute" src="/95cea2cf050b318e56bf71b695b1759937372efcbcd4d5d4f1b993175c571204.svg" top="0" width="300px" />
+        <Flex alignItems="center" borderLeftStyle="solid" borderLeftWidth="0" data-name="hero" flexDirection="row" gap={0} maxWidth="100%" p={0} style={{"borderLeftColor":"#2F170224"}} width="100%" justifyContent="center">
+          <Grid data-name="sideL" display="grid" flexShrink="0" gap={0} gridTemplateColumns="repeat(2, 1fr)" gridTemplateRows="repeat(4, 1fr)" p={0} position="relative" width="auto" style={{"borderLeftWidth":"0","display":"flex","flexShrink":"0","height":"700px","position":"relative","width":"300px"}} flex="0 1 300px" minWidth="0" overflow="hidden">
+            <Image alt="Squares left" height="700px" left="auto" position="absolute" src="/95cea2cf050b318e56bf71b695b1759937372efcbcd4d5d4f1b993175c571204.svg" top="0" width="300px" maxWidth="none" right="0" />
           </Grid>
-          <Flex alignItems="center" data-name="mid" flex="1 1 0" flexDirection="row" gap={8} minWidth="0" px={6} py={6} style={{"paddingBottom":"104px","paddingTop":"96px"}}>
-            <Flex alignItems="flex-start" data-name="copy" flex="5 1 0" flexDirection="column" gap={3} minWidth="0" p={0}>
+          <Flex alignItems="center" data-name="mid" flex="1 1 0" flexDirection="row" gap={6} minWidth="0" px={6} py={6} style={{"paddingBottom":"104px","paddingTop":"96px"}} paddingLeft={5} paddingRight={5}>
+            <Flex alignItems="flex-start" data-name="copy" flex="6 1 0" flexDirection="column" gap={3} minWidth="0" p={0}>
               <Flex alignItems="center" borderColor="#2F170224" borderStyle="solid" borderWidth="1px" data-name="badge" flexDirection="row" gap={1} p={0} px={1.5} py={0.5} style={{"backgroundColor":"rgba(255, 251, 240, 1)","borderRadius":"999px"}}>
                 <Flex data-name="badgeDot" gap={0} height="8px" p={0} style={{"backgroundColor":"rgba(18, 161, 80, 1)","borderRadius":"999px"}} width="8px" />
                 <Typography data-name="badgeText" fontFamily="'JetBrains Mono Variable', 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace" m={0} variant="caption">Runtime CSS engine / v0.1 alpha</Typography>
               </Flex>
-              <Typography data-name="h1a" fontFamily="'Space Grotesk Variable', 'Space Grotesk', sans-serif" letterSpacing="-0.05em" lineHeight="0.98" m={0} style={{"fontSize":"84px","fontWeight":700}} variant="h1">Write styled once.</Typography>
-              <Typography data-name="h1b" fontFamily="'Space Grotesk Variable', 'Space Grotesk', sans-serif" letterSpacing="-0.05em" lineHeight="0.98" mb={0} mx={0} style={{"color":"#2F5BEA","fontSize":"84px","fontWeight":700,"marginTop":"-18px"}} variant="h1">Ship it everywhere.</Typography>
+              <Typography data-name="h1a" fontFamily="'Space Grotesk Variable', 'Space Grotesk', sans-serif" letterSpacing="-0.05em" lineHeight="0.98" m={0} style={{ fontSize: '84px', fontWeight: 700, overflowWrap: 'normal' }} variant="h1" fontSize="clamp(44px, 4.2vw, 84px)">Write styled once.</Typography>
+              <Typography data-name="h1b" fontFamily="'Space Grotesk Variable', 'Space Grotesk', sans-serif" letterSpacing="-0.05em" lineHeight="0.98" mb={0} mx={0} style={{ color: '#2F5BEA', fontSize: '84px', fontWeight: 700, marginTop: '-18px', overflowWrap: 'normal' }} variant="h1" fontSize="clamp(44px, 4.2vw, 84px)">Ship it everywhere.</Typography>
               <Typography data-name="lead" fontFamily="'Space Grotesk Variable', 'Space Grotesk', sans-serif" lineHeight="1.55" m={0} maxWidth="560px" style={{"color":"#6B5A45","fontSize":"19px"}} variant="body1">The API you already know, over an engine that turns tokens into CSS variables. One class for every theme, one component file for React, Vue and React Native.</Typography>
               <Flex data-name="actions" flexDirection="row" gap={1.5} p={0}>
                 <Button borderRadius="md" color="primary" data-name="b1" fontFamily="'Space Grotesk Variable', 'Space Grotesk', sans-serif" fontSize={2} size="lg" style={{"backgroundColor":"rgba(47, 23, 2, 1)","borderColor":"#2F1702","boxShadow":"0 6px 0 color-mix(in srgb, currentColor 18%, transparent)","color":"#F7F1E1","letterSpacing":"0px"}} textTransform="none" variant="contained">Start building</Button>
@@ -55,8 +55,8 @@ export default function Page() {
               </Flex>
             </Flex>
           </Flex>
-          <Grid borderLeftStyle="solid" borderLeftWidth="1px" data-name="sideR" display="grid" flexShrink="0" gap={0} gridTemplateColumns="repeat(2, 1fr)" gridTemplateRows="repeat(4, 1fr)" p={0} position="relative" style={{"borderLeftColor":"#2F170224","borderLeftWidth":"0","display":"flex","flexShrink":"0","height":"700px","position":"relative","width":"300px"}} width="200px">
-            <Image alt="Squares right" height="700px" left="0" position="absolute" src="/4ca36d1ffc799711e0d6cc2ae44fe9a5918fc6ecd44e38ba7803445c90caffae.svg" top="0" width="300px" />
+          <Grid borderLeftStyle="solid" borderLeftWidth="1px" data-name="sideR" display="grid" flexShrink="0" gap={0} gridTemplateColumns="repeat(2, 1fr)" gridTemplateRows="repeat(4, 1fr)" p={0} position="relative" style={{"borderLeftColor":"#2F170224","borderLeftWidth":"0","display":"flex","flexShrink":"0","height":"700px","position":"relative","width":"300px"}} width="auto" flex="0 1 300px" minWidth="0" overflow="hidden">
+            <Image alt="Squares right" height="700px" left="0" position="absolute" src="/4ca36d1ffc799711e0d6cc2ae44fe9a5918fc6ecd44e38ba7803445c90caffae.svg" top="0" width="300px" maxWidth="none" right="auto" />
           </Grid>
         </Flex>
         <Flex data-name="rule2" flexShrink="0" gap={0} height="1px" p={0} style={{"backgroundImage":"repeating-linear-gradient(to right, color-mix(in srgb, currentColor 32%, transparent) 0 16px, transparent 16px 32px)"}} width="100%" />
