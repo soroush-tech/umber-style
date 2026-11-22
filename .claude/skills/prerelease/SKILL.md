@@ -95,8 +95,13 @@ stops the same way when the dependency's version is not on npm.
 3. Consumers move from the tag to `^X.Y.Z`. The next change needs a new target.
 4. `pnpm deprecate-alpha`: deprecates every alpha whose release is now on npm, in every package,
    pointing each at `^X.Y.Z`. It asks for npm's one-time code; `--dry-run` only lists.
-5. After the first stable release, `BASELINE_TAG` in `bench/gate/baseline.ts` changes from
-   `'alpha'` to `'latest'`, so the benchmark gate compares against the release.
+5. Nothing to change for the benchmark gate: it builds the newest stable tag of the core
+   (`bench/gate/baseline.ts`), which the release just made.
+
+After every dispatch, the `bench-report` job of the same run compares what was published with the
+last stable (and an alpha or an rc with the previous one of its channel): its table is in the run's
+summary and, for an rc or a stable, below the notes of the GitHub Release (`docs/benchmarks.md`). It
+never fails the release.
 
 ## Once per repository
 

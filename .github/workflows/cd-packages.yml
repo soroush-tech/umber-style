@@ -56,6 +56,9 @@ jobs:
     runs-on: ubuntu-latest
     environment: cd-packages
     timeout-minutes: 20
+    outputs:
+      # The `<name>@<version>` of each package this run published, for the benchmark report.
+      published: ${{ steps.published.outputs.published }}
     permissions:
       id-token: write # OIDC token for npm Trusted Publishing (no NPM_TOKEN)
       contents: write # create the GitHub Release and its tag
@@ -228,6 +231,7 @@ jobs:
                 echo "::error::$name latest is now $latest - move it back with npm dist-tag"; exit 1 ;;
               *) ;; # a release, or the 0.0.0 placeholder, on `latest`: as it should be
               esac
+              echo "$name@$version" >> "$RUNNER_TEMP/published"
               echo "### Published \`$name@$version\` (\`$tag\`)" >> "$GITHUB_STEP_SUMMARY"
               echo "https://www.npmjs.com/package/$name/v/$version" >> "$GITHUB_STEP_SUMMARY"
               echo "::notice title=Published::$name@$version"
@@ -237,6 +241,16 @@ jobs:
             echo "::error::Publish failed for:$failed"
             exit 1
           fi
+
+      # What was published, for the benchmark report: also after a publish that failed part-way, so that
+      # the packages that did reach npm get their report.
+      - name: Record what was published
+        id: published
+        if: ${{ !cancelled() }}
+        run: |
+          published=""
+          [ -f "$RUNNER_TEMP/published" ] && published=$(tr '\n' ' ' < "$RUNNER_TEMP/published")
+          echo "published=$published" >> "$GITHUB_OUTPUT"
 
       # Create each package's GitHub Release if it doesn't already exist - gated on the release's
       # existence, not on whether npm was newly published in this run, so a rerun can repair a
@@ -293,3 +307,52 @@ jobs:
             echo "### Released \`$tag\`" >> "$GITHUB_STEP_SUMMARY"
           done
           [ -z "$missing" ] || exit 1
+
+  # The benchmark report of docs/benchmarks.md: after a publish, the report scenarios (bench/report/) of
+  # each published package that has them run in the soroush-bench sandbox with every version installed
+  # from npm: the version just published, the last stable, and for an alpha or an rc the previous release
+  # of its channel for the same version (planReport, bench/src/releases.ts). The table goes to the job summary and, for an rc or a stable
+  # release, below the notes of its GitHub Release. It is a report, not a gate: continue-on-error keeps a
+  # failure here from failing the release, and the summary says when the report could not run.
+  bench-report:
+    needs: publish
+    if: ${{ !cancelled() && needs.publish.outputs.published != '' }}
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: write # add the table to the GitHub Release
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Read Node.js version from .nvmrc
+        id: node-version
+        run: echo "version=$(cat .nvmrc)" >> "$GITHUB_OUTPUT"
+
+      # soroush-bench, the report files and their shared inputs come from the workspace install.
+      - name: Setup pnpm, Node and dependencies
+        uses: ./.github/actions/setup
+        with:
+          node_version: ${{ steps.node-version.outputs.version }}
+          manager: pnpm
+          command: install --frozen-lockfile --ignore-scripts
+
+      # The script waits, a bounded number of tries, until the registry lists each published version,
+      # then runs the report. An alpha has no GitHub Release, so its table is in the summary only.
+      # PUBLISHED is a list of name@version words, split on purpose.
+      - name: Run the benchmark report
+        env:
+          CHANNEL: ${{ inputs.channel }}
+          PUBLISHED: ${{ needs.publish.outputs.published }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          release=""
+          [ "$CHANNEL" != "alpha" ] && release="--release"
+          node scripts/bench-report.mjs $PUBLISHED $release --summary "$GITHUB_STEP_SUMMARY"
+
+      - name: Say that the report did not run to the end
+        if: ${{ failure() }}
+        run: echo "The benchmark report did not run to the end (see the log of this job). The release is not affected." >> "$GITHUB_STEP_SUMMARY"

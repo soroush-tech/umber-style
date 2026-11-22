@@ -1,16 +1,7 @@
-// One operation: `createTokens(theme)` of the large theme (about 280 tokens) and `declare(theme)`, the
-// variable declarations of it. Same work as core/tokens.bench.ts.
+// One operation: see `themeTokens` in scenarios.ts (the tokens and declarations of the large theme). `current` is this tree's build,
+// `previous` the build of the last release (support.ts).
 import type { BenchConfig } from '@soroush.tech/bench'
-import * as local from '../../packages/core/dist/index.cjs'
-import { createLargeTheme } from '../src/themes'
-import { previousCore } from './baseline'
-import { createSides } from './support'
+import { themeTokens } from './scenarios'
+import { createGate } from './support'
 
-export default {
-  name: 'core: a theme and its variables',
-  packages: { previous: previousCore },
-  cases: createSides(local, (core) => {
-    const theme = createLargeTheme()
-    return () => core.createTokens(theme, { prefix: 'b' }).declare(theme)
-  }),
-} satisfies BenchConfig
+export default createGate(themeTokens) satisfies BenchConfig

@@ -137,5 +137,5 @@ export function createFixtures(react: typeof React, core: typeof Core) {
     return provide(style, h(Tree, { components, shift }))
   }
 
-  return { createBenchOptions, createFortyEight, provide, createTreeApp }
+  return { createBenchOptions, createFortyEight, provide, createTreeApp, Tree }
 }
