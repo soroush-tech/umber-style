@@ -41,8 +41,12 @@ function createServerTag(): string {
 
 /** An observer that watches nothing and reports nothing. */
 class StandInObserver {
-  observe(): void {}
-  disconnect(): void {}
+  observe(): void {
+    // Nothing is watched.
+  }
+  disconnect(): void {
+    // There is nothing to stop.
+  }
   takeRecords(): MutationRecord[] {
     return []
   }

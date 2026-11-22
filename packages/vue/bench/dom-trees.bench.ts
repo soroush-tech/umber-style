@@ -41,10 +41,13 @@ function mountApp(render: () => Vue.VNode | null) {
 const provide = (setup: Setup, value: object, shift: number) =>
   h(setup.style.ThemeProvider, { theme: value }, () => createTree(setup, shift))
 
+/** Reads `tick`, so that the render that calls it runs again when the value changes. */
+const readTick = (tick: { readonly value: number }): number => tick.value
+
 const same = createSetup()
 const sameTick = shallowRef(0)
 mountApp(() => {
-  void sameTick.value
+  readTick(sameTick)
   return provide(same, theme, 0)
 })
 

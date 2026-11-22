@@ -36,9 +36,11 @@ export function warnRenamedOption(prefix: string, options: object): void {
   const { hasRuleText } = options as { hasRuleText?: unknown }
   if (hasRuleText === undefined || renamedWarned.has(options) || !isDevelopment()) return
   renamedWarned.add(options)
+  // The option was a boolean: what was given is read as one, and so is what to write instead.
+  const given = hasRuleText ? 'true' : 'false'
   const instead = hasRuleText ? 'speedy: false' : 'speedy: true'
   console.warn(
-    `[${prefix}] The option hasRuleText was renamed to speedy, with the opposite meaning: hasRuleText: ${String(hasRuleText)} is not read, and the default applies. Write ${instead} instead.`
+    `[${prefix}] The option hasRuleText was renamed to speedy, with the opposite meaning: hasRuleText: ${given} is not read, and the default applies. Write ${instead} instead.`
   )
 }
 
