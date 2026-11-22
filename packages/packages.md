@@ -36,6 +36,7 @@ packages/
     src/
       index.ts            <- single entry: the public API + its exported types
       index.test.ts       <- co-located unit tests (100% coverage - required)
+      index.md            <- the sidecar of index.ts: the model of the file (see "Sidecars")
     package.json
     tsconfig.json         <- bundler resolution, noEmit; NOT in the root solution
     .oxlintrc.json        <- extends @umber-style/eslint-config's base (or React layer) + env
@@ -46,7 +47,9 @@ packages/
 ```
 
 Keep the **public API in `index.ts`**; extract internal helpers into sibling modules with co-located
-`*.test.ts` once the entry file grows unwieldy - don't pre-split a small, well-factored file.
+`*.test.ts` once the entry file grows unwieldy - don't pre-split a small, well-factored file. Each
+source file, the entry and every sibling module, has its sidecar next to it (`cache.ts`, `cache.test.ts`,
+`cache.md`).
 
 ---
 
@@ -185,6 +188,32 @@ at the repository root, and is written for all platforms together.
   test. A page ends with a "Limits" section for what is not checked or not observed.
 - The package `README.md` stays a stub: what the package is, an install line, one import example, and a
   link to `docs/`. Do not document features in it.
+
+### Sidecars
+
+The one kind of writing that does live in a package is the sidecar: every source file has a sibling
+`.md` of the same name, written in the same change as the code (`AGENTS.md`, guidelines 7 and 8).
+`docs/` is for the people who use the packages; a sidecar is for whoever changes the file.
+
+- **One for each source file:** `src/cache.ts` has `src/cache.md`; `src/styledParts.ts` has
+  `src/styledParts.md`. The same holds for a `.tsx` file, and for a script in `scripts/`.
+- **What it holds:** what the file is for, the shape of the data it works on, the invariants it keeps,
+  what was decided and what was rejected. Not the signatures: the comments in the code say what each
+  function does, and a sidecar that repeats them drifts from them.
+- **A document and a graph:** it opens with what the file does and why it exists, and it holds a graph
+  of the logic as a `mermaid` block: the path of the data through the file, the decisions and what each
+  one leads to.
+- **It changes with the code:** a commit that changes behaviour and leaves the sidecar describing the old
+  behaviour is incomplete. A sidecar that is wrong and cannot be rewritten now is deleted, not left.
+- **A change to what a sidecar describes stops and asks:** the behaviour as it is, what it would become
+  and why, before it is written, and again after, for the owner to see it work.
+- **No sidecar for:** tests and specs (`*.test.ts(x)`, `*.spec.ts(x)`, `*.bench.ts`), generated output
+  (`dist/`, `coverage/`, `*.d.ts`), and config (`tsdown.config.ts`, `vitest.config.ts`, set-up files,
+  stubs).
+- **It is not published:** a package's `files` is `dist` alone, so a sidecar in `src/` never reaches a
+  tarball. Do not add `src` to `files`.
+- **It follows the rules of the repository:** no library names, ASCII punctuation, and any code in it is
+  copied from the file or from a passing test.
 
 ---
 

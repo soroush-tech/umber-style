@@ -29,7 +29,7 @@ const REACT_NAMES =
 // `onClick`, and also a digit, `-`, `:` or `@` (`on-click`, `on1`), which the predicate apps use today
 // accepts too. The class names what it leaves out, `[` (code 91) to the last code unit, so that it
 // names no control character.
-const PREFIXED = /^(?:[Dd][Aa][Tt][Aa]-|[Aa][Rr][Ii][Aa]-|x-|on[^\x5b-￿])/
+const PREFIXED = /^(?:[Dd][Aa][Tt][Aa]-|[Aa][Rr][Ii][Aa]-|x-|on[^\x5b-\uffff])/
 
 /**
  * Whether `prop` is a prop that React writes to an HTML or SVG element, under the name React gives it:

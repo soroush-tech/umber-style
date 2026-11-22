@@ -62,6 +62,45 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 **After any implementation, run `pnpm test:coverage` and verify 100% on all touched files.**
 
+### 7. Document the model beside the code
+
+**Every source file has a sibling `.md` of the same name, written in the same change as the
+code.**
+
+`cache.ts` -> `cache.md`. `styledParts.ts` -> `styledParts.md`.
+
+- **Explain the model, not the signatures.** What the file is for, the shape of the data it works
+  on, the invariants it keeps, what was decided and what was rejected. The doc comments already
+  say what each function does; repeating them is how the two drift apart. The comments in the
+  code stay governed by the `code-style` skill - the sidecar is the layer above them, for the
+  reader who does not yet know the model. The pages in `docs/` are for the people who use the
+  packages; the sidecar is for whoever changes the file.
+- **A document and a graph.** It opens with what the file does and why it exists, and it holds a
+  graph of the logic (a `mermaid` block: the path of the data through the file, the decisions
+  and what each one leads to).
+- **A commit that changes behaviour and leaves the sidecar describing the old behaviour is
+  incomplete**, the same way one that breaks a test is.
+- **A wrong sidecar is worse than none.** If the logic has moved on and there is no time to
+  rewrite it, delete the sidecar rather than leave it lying.
+- **Exempt:** tests and specs (`*.test.ts(x)`, `*.spec.ts(x)`, `*.bench.ts`, everything under
+  `e2e/`), generated output (`dist/`, `coverage/`, `*.d.ts`), and config (`tsdown.config.ts`,
+  `vitest.config.ts`, `playwright.config.ts`, set-up files, stubs).
+
+### 8. Changing documented behaviour stops and asks
+
+**When a change would alter the logic or behaviour a sidecar describes, say so and wait for user
+confirmation - before writing it, and again after.**
+
+Not the wording: the substance. What the code decides, what it guarantees, what a call does.
+
+- Say what the behaviour is now, what it would become, and why.
+- Wait for an answer before writing it.
+- Once written, wait for verification. Tests passing is not the same as having seen it work.
+
+This is narrower than guideline 2 and bites at a different moment. Guideline 2 covers the plan
+agreed up front; this covers behaviour change discovered during the work, where the shape of
+the fix turns out to move something that was being relied on.
+
 ## Critical conventions
 
 - **Framework-free core:** `@umber-style/core` knows no framework: no React, no Vue, no DOM globals at
