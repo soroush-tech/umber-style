@@ -67,7 +67,12 @@ source file, the entry and every sibling module, has its sidecar next to it (`ca
   `moduleResolution: bundler` via `workspace:^`. **No `paths` alias, no build step** for internal use.
 - A package whose API is one function may export it as the default export of its entry or of a
   subpath (`@umber-style/cache`, `@umber-style/server/create-instance`,
-  `@umber-style/css/create-instance`, `@umber-style/is-prop-valid/react`, `/vue` and `/react-native`). A package with no root entry exports only its subpaths
+  `@umber-style/css/create-instance`, `@umber-style/is-prop-valid/react`, `/vue` and `/react-native`, and
+  `@umber-style/styled`). An entry with a default export also exports that value by name, the same
+  function (`createCache`, `createInstance`, `isPropValid`, `styled`): a library that is an ES module
+  package and ships a CommonJS build reaches our CommonJS file through Node's interop, where the default
+  is the whole `module.exports`, so it imports by name. `scripts/smoke-packed.mjs` lists these entries in
+  `NAMED_DEFAULTS`. A package with no root entry exports only its subpaths
   (`server` has `./create-instance` and no `.`; `is-prop-valid` has `./react`, `./vue` and
   `./react-native`, and no `main`, `module` or `types` either, so that its bare name does not resolve).
 - A binding that has a server build adds the `react-server` condition ahead of `default`. The umbrella

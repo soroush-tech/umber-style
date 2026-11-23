@@ -99,3 +99,7 @@ export default function createInstance(cache: Cache): ServerInstance {
     },
   }
 }
+
+// Also by name: a CommonJS build of a library that imports this entry by default gets the whole
+// `module.exports` from its interop, not the function; one that imports it by name gets the function.
+export { createInstance }

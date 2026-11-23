@@ -5,7 +5,8 @@
 `createCache({ key, ...options })` makes the engine's cache (`createCache` of `@umber-style/core`) with `key`
 as its prefix, and adds the members that server-rendering set-ups read: `key`, `compat`, `inserted`,
 `registered` (also readable by class name), `sheet` (the style elements of the key) and `insert`. It
-re-exports the types `SerializedRule`, `UmberCache` and `UmberSheet` of the core.
+re-exports the types `SerializedRule`, `UmberCache` and `UmberSheet` of the core. `createCache` is the
+default export of `@umber-style/cache` and a named one.
 
 ## Why it exists
 
@@ -62,6 +63,8 @@ bound to it, so `get`, `has` and `size` still work.
 - No browser global is read at module top level: `document` is read inside the call, guarded by
   `typeof document`. Without a document `sheet.tags` is `[]`.
 - Two caches with different keys keep their rules apart (test "keeps the rules of two caches apart").
+- The named export `createCache` is the default export, with the same type (the test "is the named
+  export too, with the same type").
 
 ## Decisions
 
@@ -72,6 +75,13 @@ bound to it, so `get`, `has` and `size` still work.
   cache's own element is made at its first rule (`createDomSheet` of the core), so a cache that has written
   nothing lists only the elements a server sent, and a cache that writes nothing never adds one.
 - `compat` starts `false`; a set-up can set it to `true` to have `inserted` hold CSS text.
+- The function is the default export and also a named one, the same function. A library that is an ES
+  module package and ships a CommonJS build has its bundler compile `import createCache from '@umber-style/cache'` as Node's
+  interop does, where the default is the whole `module.exports` (`{ __esModule: true, default, createCache }`),
+  not the function, so it throws `is not a function`; `import { createCache } from '@umber-style/cache'` gets the function.
+  The shape of the CommonJS file (`cjsDefault: false` in `tsdown.config.ts`) was left as it is: making the
+  function `module.exports` would change what every existing `require` of the entry gets.
+  `scripts/smoke-packed.mjs` runs that interop on the packed tarball.
 
 ## Limits
 

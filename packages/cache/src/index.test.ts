@@ -6,7 +6,11 @@ import {
   type UmberCache as CoreUmberCache,
 } from '@umber-style/core'
 import { expectTypeOf } from 'vitest'
-import createCache, { type SerializedRule, type UmberCache } from './index'
+import createCache, {
+  createCache as namedCreateCache,
+  type SerializedRule,
+  type UmberCache,
+} from './index'
 
 afterEach(() => {
   document.head.innerHTML = ''
@@ -46,6 +50,11 @@ describe('createCache', () => {
   it('makes the UmberCache that the core declares and this package re-exports', () => {
     expectTypeOf<UmberCache>().toEqualTypeOf<CoreUmberCache>()
     expectTypeOf(createCache).returns.toEqualTypeOf<CoreUmberCache>()
+  })
+
+  it('is the named export too, with the same type', () => {
+    expect(namedCreateCache).toBe(createCache)
+    expectTypeOf(namedCreateCache).toEqualTypeOf(createCache)
   })
 
   it('is the engine cache keyed by `key`, and throws for a key the engine refuses', () => {

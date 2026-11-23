@@ -229,7 +229,7 @@ css({ margin: 2 }) // name again, and sheet.rules is ['.css-...{margin:2px;}']
 
 ## A separate instance
 
-`@umber-style/css/create-instance` makes an instance with its own cache, and returns the same ten functions bound to it:
+`@umber-style/css/create-instance` makes an instance with its own cache, and returns the same ten functions bound to it. `createInstance` is its default export and also a named one, the same function (`import { createInstance } from '@umber-style/css/create-instance'`), which a library that ships a CommonJS build imports: see [A library that ships a CommonJS build](react.md#a-library-that-ships-a-commonjs-build).
 
 ```ts
 import createInstance from '@umber-style/css/create-instance'
@@ -298,13 +298,13 @@ const { css } = createInstance(cache).extractCritical(html)
 
 ## Everything `@umber-style/css` exports
 
-| Export                                              | What it is                                                                          |
-| --------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| `css`, `cx`, `keyframes`, `injectGlobal`            | Class names, merged class names, animation names, global rules: above               |
-| `cache`, `sheet`                                    | The cache of the default instance (key `css`, no layers) and the sheet it writes to |
-| `flush`, `hydrate`                                  | Empty the cache; mark rules as present                                              |
-| `getRegisteredStyles`, `merge`                      | Read and merge the classes of a class string                                        |
-| `@umber-style/css/create-instance` (default export) | `createInstance(options)`, a separate instance                                      |
+| Export                                                                   | What it is                                                                          |
+| ------------------------------------------------------------------------ | ----------------------------------------------------------------------------------- |
+| `css`, `cx`, `keyframes`, `injectGlobal`                                 | Class names, merged class names, animation names, global rules: above               |
+| `cache`, `sheet`                                                         | The cache of the default instance (key `css`, no layers) and the sheet it writes to |
+| `flush`, `hydrate`                                                       | Empty the cache; mark rules as present                                              |
+| `getRegisteredStyles`, `merge`                                           | Read and merge the classes of a class string                                        |
+| `@umber-style/css/create-instance` (default export and `createInstance`) | `createInstance(options)`, a separate instance                                      |
 
 Types: `CssFunction`, `CssInput`, `ClassNamesInput`, `KeyframesFunction`, `InjectGlobalFunction`, `InjectGlobalInput`, `CssInstance`, `InstanceOptions` and `SharedCache`, and the core's `CSSObject`, `Interpolation`, `Keyframes`, `SerializedStyles`, `Theme` and `UmberCache`, and `StyleTypeOptions`, the strict switch, re-exported so that a file needs one import (see [Typed styles](typed-styles.md)). `css` here returns a class name, a string, not the `SerializedStyles` that `css()` of a binding returns.
 

@@ -57,7 +57,10 @@ Every module exports by name. A default export exists only where a package's API
 as the default export of its entry or of a subpath (`@umber-style/cache`,
 `@umber-style/css/create-instance`, `@umber-style/server/create-instance`, the three subpaths of
 `@umber-style/is-prop-valid`), and in
-`@umber-style/styled`, whose purpose is `styled` as a default export (`packages/packages.md`). A
+`@umber-style/styled`, whose purpose is `styled` as a default export (`packages/packages.md`). Each
+of them also exports the same value by name (`export { createCache }` after the function), because a
+library's CommonJS build reaches it through Node's interop, where the default is the whole
+`module.exports`; add a new one to `NAMED_DEFAULTS` of `scripts/smoke-packed.mjs`. A
 file in `fixtures/` whose default export a framework requires (a page, a layout, the config of
 Next.js, Vike or Vite) is exempt.
 

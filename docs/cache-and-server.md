@@ -9,7 +9,7 @@ The bindings render on a server without these two packages: see [Server renderin
 | `@umber-style/cache`                  | `createCache({ key })`: the engine's cache, keyed by `key`, with the members a set-up reads and wraps               |
 | `@umber-style/server/create-instance` | `createInstance(cache)`: the CSS that one page needs, as chunks, as `<style data-umber>` tags, or put into the HTML |
 
-Both are default exports, and both depend on `@umber-style/core` only.
+Both are default exports, and named ones too, the same function (`import { createCache } from '@umber-style/cache'`, `import { createInstance } from '@umber-style/server/create-instance'`): a library that ships a CommonJS build imports them by name, see [A library that ships a CommonJS build](react.md#a-library-that-ships-a-commonjs-build). Both depend on `@umber-style/core` only.
 
 ## `createCache`
 

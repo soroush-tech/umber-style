@@ -5,7 +5,9 @@
 Packs each publishable package with `pnpm pack`, inspects every tarball, installs all of them together
 into a temporary folder outside the workspace with npm, and checks from there that the packages work as
 npm hands them out. It checks the contents of the tarballs, that every entry loads with `import` and with
-`require` and gives the same names, a server render of a styled component, the export conditions, and that
+`require` and gives the same names, that an entry with a default export has the same function by name and
+that a CommonJS file that loads it as a bundler's Node interop does gets the function by that name, a
+server render of a styled component, the export conditions, and that
 TypeScript resolves the declarations. It prints `ok` or `FAIL` for each check, exits 1 if any failed, and
 removes the folder unless `--keep` is given.
 
@@ -30,7 +32,8 @@ flowchart TD
   one -->|yes| f1["FAIL"]
   one -->|no| s3["3: node check.mjs and check.cjs"]
   s3 --> keys["both write the exported names: compare them"]
-  keys --> s4["4: conditions.mjs and conditions.cjs under none, react-server, react-native"]
+  keys --> s3b["3b: node interop.cjs for each entry of NAMED_DEFAULTS"]
+  s3b --> s4["4: conditions.mjs and conditions.cjs under none, react-server, react-native"]
   s4 --> s5["5: tsc on four tsconfigs"]
   s5 --> end1{"any FAIL?"}
   end1 -->|yes| exit1["exit 1"]
@@ -41,12 +44,19 @@ Step 1 checks each tarball: not private; `exports`, `main`, `module` and `types`
 and exist (a package with no `.` entry, `is-prop-valid`, has no main, module or types to check); no
 `/src/` in the manifest; `LICENSE` and `README.md` present; no `workspace:` left; each sibling published
 as `^<its version>`; nothing but `dist`, `LICENSE`, `README.md`, `package.json`. Step 3 loads every key of
-`ENTRIES` and also checks that the bindings and the umbrella hand out the very functions of one core,
+`ENTRIES` and also checks that each entry of `NAMED_DEFAULTS` exports its default by name, the same
+function, that the bindings and the umbrella hand out the very functions of one core,
 that each prop filter answers for its platform, that `@umber-style/is-prop-valid` has no root entry, that
 `css` writes its rule into its cache, that a styled React component renders to a class with its CSS and no
-`style=`, and that `@umber-style/server` puts `<style data-umber>` elements first. Step 4 runs the
+`style=`, and that `@umber-style/server` puts `<style data-umber>` elements first. Step 3b runs
+`interop.cjs` once for each entry of `NAMED_DEFAULTS`: it loads the entry as the helper of a bundler does
+for an ES module package's CommonJS build (`__toESM(require(id), 1)`: the default is the whole
+`module.exports`, the other exports read through by name), asserts that the default it gets is not a
+function, calls the function by its name (renders a styled `div`, makes a cache, puts a page's tags in
+front of it, makes a class, answers for a prop of the platform) and checks the answer. Step 4 runs the
 condition scripts with `--conditions=react-server` and `--conditions=react-native`. Step 5 compiles
-`entries.ts`, `entries.mts` and `entries.cts` (bundler, node16), `server.ts` (custom condition
+`entries.ts`, `entries.mts` and `entries.cts` (bundler, node16), `library.cts` (node16: a CommonJS file
+that imports the default exports by name), `server.ts` (custom condition
 `react-server`) and `strict.ts` (the strict switch of `StyleTypeOptions`) with `skipLibCheck` off.
 
 ## The data
@@ -55,6 +65,9 @@ condition scripts with `--conditions=react-server` and `--conditions=react-nativ
   react-native, vue, umber-style).
 - `ENTRIES`: specifier -> the names that entry must export (`'@umber-style/core': ['createEngine',
   'createCache', 'extractPageStyles', 'at']`, `'@umber-style/css/create-instance': []`).
+- `NAMED_DEFAULTS`: specifier -> the name its default export also has (`'@umber-style/cache':
+  'createCache'`): `styled`, `cache`, the two `create-instance` subpaths and the three subpaths of
+  `is-prop-valid`.
 - The stand-in `react-native`: a small package of five values (`Appearance`, `StyleSheet`, `Dimensions`,
   `AccessibilityInfo`, and a `Pressable` that renders nothing, which the binding compares a component
   with) and their types. A value the binding imports that the stand-in lacks fails the ESM checks
@@ -67,6 +80,11 @@ condition scripts with `--conditions=react-server` and `--conditions=react-nativ
 - It tests what npm would hand out: the packed tarball, installed in a folder with no link to the
   workspace.
 - The ESM and the CJS builds export the same names and render the same HTML.
+- A library whose CommonJS build reaches an entry through the Node interop gets the function by name.
+  The interop gives the whole `module.exports` as the default, an object, for as long as the CommonJS
+  files keep `{ __esModule: true, default }` (`cjsDefault: false`); step 3b fails if a default becomes a
+  function that way, because that is a change of what every existing `require` gets, to be made on
+  purpose and said in the release notes.
 - Output of a command is shown only when it fails.
 - On Windows `npm`, `npx` and `pnpm` are started through a shell; the arguments are quoted with
   `JSON.stringify`.
@@ -81,6 +99,10 @@ condition scripts with `--conditions=react-server` and `--conditions=react-nativ
   sibling under a package when that sibling is released alone.
 - Versions of `react`, `react-dom`, `vue`, `typescript` and the types are read from the devDependencies of
   the workspace packages, so the consumer uses the same ones.
+
+- The interop of step 3b is written out in the script rather than produced by a bundler, so the
+  consumer installs no bundler; it is the Node mode of the helper, the one a `"type": "module"` package
+  gets.
 
 ## Limits
 

@@ -6,6 +6,9 @@
 // inspects each tarball, installs them all together into a temporary folder outside the workspace
 // with npm, and then checks, from there:
 //   - every entry and subpath loads with `import` and with `require`, and both give the same names;
+//   - an entry with a default export has the same function by name, and a CommonJS file that loads
+//     it as a bundler's Node interop does (the default is the whole `module.exports`) gets the
+//     function by that name;
 //   - the `react-server` condition gives the server build (`useTheme` and `readTheme`, no
 //     `ThemeContext`), the `react-native` condition gives the React Native binding for
 //     `umber-style/react`;
@@ -49,8 +52,8 @@ const PACKAGES = [
 // The names every entry of the package must export, and that the ESM and CJS builds must agree on.
 const ENTRIES = {
   '@umber-style/core': ['createEngine', 'createCache', 'extractPageStyles', 'at'],
-  '@umber-style/cache': ['default'],
-  '@umber-style/server/create-instance': ['default'],
+  '@umber-style/cache': ['default', 'createCache'],
+  '@umber-style/server/create-instance': ['default', 'createInstance'],
   '@umber-style/css': [
     'css',
     'cx',
@@ -63,7 +66,7 @@ const ENTRIES = {
     'getRegisteredStyles',
     'merge',
   ],
-  '@umber-style/css/create-instance': [],
+  '@umber-style/css/create-instance': ['default', 'createInstance'],
   '@umber-style/is-prop-valid/react': ['default', 'isPropValid'],
   '@umber-style/is-prop-valid/vue': ['default', 'isPropValid'],
   '@umber-style/is-prop-valid/react-native': ['default', 'isPropValid'],
@@ -79,7 +82,7 @@ const ENTRIES = {
     'keyframes',
     'css',
   ],
-  '@umber-style/styled': ['default'],
+  '@umber-style/styled': ['default', 'styled'],
   '@umber-style/react-native': [
     'createStyle',
     'state',
@@ -121,6 +124,18 @@ const ENTRIES = {
     'css',
   ],
   'umber-style/vue': ['createStyle', 'styled', 'ThemeProvider', 'useTheme', 'Global', 'css'],
+}
+// Each entry with a default export, and the name it also exports that function by: a CommonJS build
+// of a library imports it by that name, since its interop takes the whole `module.exports` as the
+// default.
+const NAMED_DEFAULTS = {
+  '@umber-style/styled': 'styled',
+  '@umber-style/cache': 'createCache',
+  '@umber-style/server/create-instance': 'createInstance',
+  '@umber-style/css/create-instance': 'createInstance',
+  '@umber-style/is-prop-valid/react': 'isPropValid',
+  '@umber-style/is-prop-valid/vue': 'isPropValid',
+  '@umber-style/is-prop-valid/react-native': 'isPropValid',
 }
 
 const isWindows = process.platform === 'win32'
@@ -356,6 +371,11 @@ const need = async (specifier, names) => {
 const entries = ${JSON.stringify(ENTRIES)}
 const mods = {}
 for (const [specifier, names] of Object.entries(entries)) mods[specifier] = await need(specifier, names)
+// Each default export is also exported by name: the same function.
+for (const [specifier, name] of Object.entries(${JSON.stringify(NAMED_DEFAULTS)})) {
+  const mod = mods[specifier]
+  if (typeof mod.default !== 'function' || mod[name] !== mod.default) throw new Error(specifier + ': ' + name + ' is not the default export')
+}
 // One engine: the bindings and the umbrella hand out the very functions of the one core.
 const same = (a, b, what) => { if (a !== b) throw new Error('two copies: ' + what) }
 same(mods['umber-style'].createEngine, mods['@umber-style/core'].createEngine, 'umber-style and core')
@@ -411,10 +431,16 @@ writeFileSync('keys-${format}.json', JSON.stringify(results, null, 2))
     `const load = async (specifier) => require(specifier)\n;(async () => {${createBody('cjs')}})().catch((error) => { console.error(error); process.exit(1) })\n`
   )
   const esm = run('node', ['check.mjs'], { cwd: consumer })
-  check(esm.isOk, 'ESM: every entry loads, one core, a styled component renders')
+  check(
+    esm.isOk,
+    'ESM: every entry loads, each default also by name, one core, a styled component renders'
+  )
   if (!esm.isOk) console.error(esm.out)
   const cjs = run('node', ['check.cjs'], { cwd: consumer })
-  check(cjs.isOk, 'CJS: every entry loads, one core, a styled component renders')
+  check(
+    cjs.isOk,
+    'CJS: every entry loads, each default also by name, one core, a styled component renders'
+  )
   if (!cjs.isOk) console.error(cjs.out)
   if (esm.isOk && cjs.isOk) {
     const esmKeys = JSON.parse(readFileSync(join(consumer, 'keys-esm.json'), 'utf8'))
@@ -429,6 +455,57 @@ writeFileSync('keys-${format}.json', JSON.stringify(results, null, 2))
       esmKeys.html === cjsKeys.html,
       'the server render is the same from import and from require'
     )
+  }
+
+  // 3b. The CommonJS build of a library that is `"type": "module"` and imports an entry of ours:
+  // its bundler compiles the import as Node's interop does, `__toESM(require(id), 1)`, where the
+  // default is the whole `module.exports`, whatever `__esModule` says. Our CommonJS files export
+  // `{ __esModule: true, default: fn }`, so such a library gets the object as the default, and gets
+  // the function only by name.
+  writeFileSync(
+    join(consumer, 'interop.cjs'),
+    `
+const [, , specifier, name] = process.argv
+// What the helper of a bundler gives in Node mode: the default is \`module.exports\` itself, and
+// every other export is read through by name.
+const toEsm = (exported) => {
+  const target = { default: exported }
+  for (const key of Object.keys(exported)) {
+    if (key !== 'default') Object.defineProperty(target, key, { enumerable: true, get: () => exported[key] })
+  }
+  return target
+}
+const load = (id) => toEsm(require(id))
+const mod = load(specifier)
+if (typeof mod.default === 'function') {
+  throw new Error(specifier + ': through the Node interop the default is a function: its CommonJS file no longer exports { __esModule, default }. That changes what every existing require() of it gets; if it is meant, say so in the release notes and change this check.')
+}
+const value = mod[name]
+if (typeof value !== 'function') throw new Error(specifier + ': no function named ' + name)
+const React = require('react')
+const { renderToStaticMarkup } = require('react-dom/server')
+const calls = {
+  '@umber-style/styled': (styled) => /class="[^"]+"/.test(renderToStaticMarkup(React.createElement(styled.div({ padding: 4 }), null, 'x'))),
+  '@umber-style/cache': (createCache) => createCache({ key: 'interop' }).key === 'interop',
+  '@umber-style/server/create-instance': (createInstance) => {
+    const cache = load('@umber-style/cache').createCache({ key: 'interop' })
+    return createInstance(cache).renderStylesToString('<p></p>').endsWith('<p></p>')
+  },
+  '@umber-style/css/create-instance': (createInstance) => createInstance({ key: 'interop' }).css({ color: 'red' }).startsWith('interop-'),
+  '@umber-style/is-prop-valid/react': (isPropValid) => isPropValid('tabIndex') && !isPropValid('variant'),
+  '@umber-style/is-prop-valid/vue': (isPropValid) => isPropValid('tabindex') && !isPropValid('variant'),
+  '@umber-style/is-prop-valid/react-native': (isPropValid) => isPropValid('testID') && !isPropValid('variant'),
+}
+if (!calls[specifier](value)) throw new Error(specifier + ': ' + name + ' answers wrong')
+`
+  )
+  for (const [specifier, name] of Object.entries(NAMED_DEFAULTS)) {
+    const result = run('node', ['interop.cjs', specifier, name], { cwd: consumer })
+    check(
+      result.isOk,
+      `${specifier}: a CommonJS build that loads it through the Node interop gets the function by name (${name}), not as the default`
+    )
+    if (!result.isOk) console.error(result.out)
   }
 
   // 4. The export conditions.
@@ -599,6 +676,18 @@ const inline: CSSProperties = { marginTop: 4 }
 // @ts-expect-error with the strict switch, the style prop takes no CSSProperties
 export const inlineStyle: ComponentProps<typeof Box>['style'] = inline
 `
+  // A CommonJS file of a library: the entries with a default export, imported by name.
+  const library = `
+import { createCache } from '@umber-style/cache'
+import { createInstance as createCssInstance } from '@umber-style/css/create-instance'
+import { createInstance } from '@umber-style/server/create-instance'
+import { styled } from '@umber-style/styled'
+
+export const cache = createCache({ key: 'lib' })
+export const badge: string = createCssInstance({ cache }).css({ margin: 4 })
+export const Card = styled.div({ padding: 4 })
+export const page: string = createInstance(cache).renderStylesToString('<p></p>')
+`
   const ts = join(consumer, 'ts')
   mkdirSync(ts)
   writeFileSync(join(ts, 'entries.ts'), typed)
@@ -606,6 +695,7 @@ export const inlineStyle: ComponentProps<typeof Box>['style'] = inline
   writeFileSync(join(ts, 'entries.cts'), typed)
   writeFileSync(join(ts, 'server.ts'), server)
   writeFileSync(join(ts, 'strict.ts'), strict)
+  writeFileSync(join(ts, 'library.cts'), library)
   const options = {
     strict: true,
     noEmit: true,
@@ -624,8 +714,8 @@ export const inlineStyle: ComponentProps<typeof Box>['style'] = inline
     [
       'tsconfig.node16.json',
       { ...options, module: 'node16', moduleResolution: 'node16' },
-      ['ts/entries.mts', 'ts/entries.cts'],
-      'moduleResolution node16, from an ES module and from a CommonJS file',
+      ['ts/entries.mts', 'ts/entries.cts', 'ts/library.cts'],
+      'moduleResolution node16, from an ES module and from a CommonJS file, and the default exports by name',
     ],
     [
       'tsconfig.server.json',
