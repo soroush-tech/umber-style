@@ -1,6 +1,6 @@
 # The style memo
 
-After this page you can decide whether to turn on `hasStyleMemo`, turn it on where your app makes its styles, and say what it costs, what could go wrong with it, and what has not been checked.
+After this page you can decide whether to turn on `hasStyleMemo`, turn it on where your app makes its styles, and say what it costs, what could go wrong with it, and what has not been checked. It also shows where UmberStyle stands, with the option off and on, next to two other styling libraries.
 
 ## What it is
 
@@ -94,21 +94,150 @@ Why the second time and not the first: a first version remembered a style the fi
 
 (`cache.memo.test.ts`: "is not used with the development checks, which warn on every call as before" and "is not used with value repair, whose compile reads the values of the tokens".)
 
+## Benchmark: Emotion, styled-components and UmberStyle, with the memo off and on
+
+This section is for a reader who knows Emotion and styled-components and wants to see where UmberStyle stands next to them, with the option off (the default) and on. It is the one place in this repository that names other styling libraries, at the owner's request; no other page names them.
+
+| Measured                                     | Version                                       |
+| -------------------------------------------- | --------------------------------------------- |
+| `@emotion/react`, `@emotion/cache`           | 11.14.0                                       |
+| `@emotion/styled`                            | 11.14.1                                       |
+| `@emotion/css`                               | 11.13.5                                       |
+| `@emotion/server`                            | 11.11.0                                       |
+| `styled-components`                          | 6.6.0, its `latest` on 2026-11-23             |
+| `@umber-style/core`, `react`, `css`, `cache` | 0.4.0, packed from this tree with `pnpm pack` |
+| `react`, `react-dom`                         | 19.3.1, one copy for all four sides           |
+| soroush-bench, and Node in its sandbox       | 2.2.3, Node 24.18.0                           |
+| esbuild, for the bundle                      | 0.25.12                                       |
+
+### How it was run
+
+- Every side was installed from npm inside the Docker sandbox of soroush-bench, pinned to one CPU with 512 MB, five rounds. Each row is one file with all its sides, so the four sides of a row are measured in the same rounds of the same process. Each file checks before it measures that every side runs its production build (`NODE_ENV`, React's production builds, `isDevelopment()` of the core, the short production errors of styled-components, one copy of React), and throws otherwise.
+- A time is the median of the five rounds of the mean time of one operation. "Times faster" is the median of the ratios of the five rounds; where it differs from the ratio of the two times shown by more than 0.15, both are given. "Level" is within 5%.
+- The 14 timed rows ran together. Seven of them had rounds more than half apart; those seven were run again, all four sides together, and the second run is shown. No row mixes two runs.
+- The files of the run are not part of this repository, which installs neither library. They are kept outside it, with the raw figures of every round and of both runs.
+
+### What is the same on every side, and what is not
+
+- **The same work.** The repository's own benchmark inputs (`bench/src/`) on every side: the same style objects, small theme, 48 prop combinations and tree of 500 (100 rows chosen by props, of four cells that read the theme), and a label on every component (`label` for Emotion, `displayName` for styled-components, `name` for UmberStyle). Each side is used as its own documentation says: Emotion's `styled`, `ThemeProvider`, `CacheProvider`, `createCache` and, on a server, `extractCritical` of `@emotion/server`; styled-components' `styled(tag).withConfig(...)`, `ThemeProvider` and, on a server, a `ServerStyleSheet` with `collectStyles` and `getStyleTags()`; UmberStyle's `createStyle(theme, { hasServerStyleElements: false })`, its `ThemeProvider` and `styled`, and `extractPageStyles`.
+- **An override.** Emotion takes a `css` prop, UmberStyle a plain object in `style`. styled-components has no `css` prop without its build-time plugin, so its override is a component made once, `styled(Fixed)`, whose style is the object of a transient prop `$override`, a new object on each element.
+- **No equivalent.** styled-components has no function that returns a class name from a style object outside a component, so the rows of a class with no framework are empty for it. It does not read a page's HTML either: its sheet gives all it collected, so over a sheet that holds more than the page it cannot give the CSS of one page, and that row is empty too.
+- **Warm and cold.** Warm is a cache made warm by a render before the measurement, on every side. styled-components' documentation makes a `ServerStyleSheet` for each request; here its warm rows keep one sheet across renders, so that it starts as warm as the others. Cold is a fresh cache, or a fresh sheet, for every render, the same on every side. Emotion's server cache keeps what it compiled in a memo of the whole process, by the key of the cache, and that is in its cold rows.
+- **The output is not the same.** Emotion gives an element one class, a merged rule for each combination, with vendor prefixes: the tree of 500 is 18.3 KB of markup and 25.1 KB of CSS. styled-components gives two classes, the component's and the generated one, without vendor prefixes: 20.4 KB and 8.8 KB. UmberStyle gives a base class and a props class, in cascade layers, with the theme as variables: 30.3 KB and 7.7 KB. UmberStyle renders a wrapper element for each nested theme provider; the other two render none.
+
+### A class from a style object, no framework
+
+One operation is one `css()` call of each side's own instance, with a style in a new object, over an instance that has made each style before.
+
+| One call                        | Emotion | styled-components | UmberStyle, memo off | UmberStyle, memo on |
+| ------------------------------- | ------: | ----------------: | -------------------: | ------------------: |
+| A condition, two values in turn |  285 ns |     no equivalent |               529 ns |               87 ns |
+| The small style, one of four    |  758 ns |     no equivalent |              1.07 us |              345 ns |
+| The large style, one of four    | 6.46 us |     no equivalent |              9.88 us |             4.14 us |
+
+With the memo on, UmberStyle is 3.33 times faster than Emotion on the condition, 2.22 times on the small style and 1.60 times on the large one. With it off, UmberStyle is slower on all three: 1.82, 1.40 and 1.50 times.
+
+### 48 elements over a warm cache
+
+One operation is one `renderToString` of 48 styled elements, markup only.
+
+| 48 elements              | Emotion | styled-components | UmberStyle, memo off | UmberStyle, memo on |
+| ------------------------ | ------: | ----------------: | -------------------: | ------------------: |
+| Fixed styles only        | 82.6 us |           59.6 us |              20.4 us |             19.7 us |
+| A function of the theme  | 80.3 us |           95.8 us |              20.9 us |             20.1 us |
+| 2 combinations by a prop | 72.5 us |           85.6 us |              68.3 us |             38.9 us |
+| 48 combinations of props |  145 us |            147 us |               113 us |             69.1 us |
+| An override on each      |  156 us |           92.3 us |              91.4 us |             49.6 us |
+
+With the memo on, UmberStyle is the fastest of the four on every row: 1.86 to 4.11 times faster than Emotion and 1.88 to 4.77 times faster than styled-components. With it off, the fixed and themed rows stay where they are (4.04 and 3.94 times faster than Emotion, 2.98 and 4.58 times faster than styled-components), and the rows chosen by props come closer: 2 combinations 1.07 times faster than Emotion and 1.26 times faster than styled-components, 48 combinations 1.29 and 1.30 times, the override 1.81 and 1.09 times.
+
+### A page of 500 elements, and nested themes
+
+One operation is one `renderToString` over a warm cache.
+
+| One render                        | Emotion | styled-components | UmberStyle, memo off | UmberStyle, memo on |
+| --------------------------------- | ------: | ----------------: | -------------------: | ------------------: |
+| The tree of 500, markup only      | 1.63 ms |           1.82 ms |              1.48 ms |             1.11 ms |
+| The tree of 500, with its CSS     | 1.93 ms |           2.06 ms |              1.63 ms |             1.26 ms |
+| Providers three deep, 48 elements | 84.5 us |           97.5 us |              76.3 us |             76.5 us |
+
+With the memo on, the tree is 1.50 times faster than Emotion and 1.70 times faster than styled-components, and 1.54 and 1.66 times with its CSS. With it off, 1.10 and 1.23 times, and 1.17 and 1.23 times. The nested providers read the theme only, so the memo changes nothing there: UmberStyle is 1.09 times faster than Emotion and 1.24 times faster than styled-components with it off, 1.11 and 1.27 times with it on.
+
+### The first render over a fresh cache
+
+One operation is a fresh cache, one `renderToString`, and the CSS of the page as one style tag.
+
+| One render, cold             | Emotion | styled-components | UmberStyle, memo off | UmberStyle, memo on |
+| ---------------------------- | ------: | ----------------: | -------------------: | ------------------: |
+| 48 elements, 48 combinations |  178 us |            411 us |               496 us |              466 us |
+| The tree of 500              | 1.86 ms |           2.80 ms |              2.59 ms |             2.34 ms |
+
+Emotion is the fastest on both. On the 48 elements UmberStyle is the slowest of the three: with the memo on it is 2.65 times slower than Emotion and 1.14 times slower than styled-components, with it off 3.01 and 1.20 times slower. On the tree it is 1.30 times slower than Emotion and 1.19 times faster than styled-components with the memo on, 1.43 times slower and 1.07 times faster with it off. A fresh cache starts with an empty memo, so the memo helps here only for styles that come three times or more in one render.
+
+### The CSS of one page
+
+One operation is the CSS of the tree of 500 read from its HTML, as one style tag, over a warm cache that holds more than the page.
+
+| One page        | Emotion | styled-components | UmberStyle, memo off | UmberStyle, memo on |
+| --------------- | ------: | ----------------: | -------------------: | ------------------: |
+| The tree of 500 | 44.1 us |     no equivalent |               150 us |              144 us |
+
+Emotion is 3.13 times faster than UmberStyle with the memo off and 3.31 times faster with it on: the memo does not take part in reading a page. [Where it is slower, and why](performance.md#where-it-is-slower-and-why) explains the gap.
+
+### The bundle
+
+The same small app (one theme, one styled button that reads it, one provider, `createRoot`), bundled with esbuild (minified, ESM, for a browser, `NODE_ENV` written as `production`), less the same app with no styling library. The memo's code is in the bundle whether the option is on or off.
+
+| What the styling adds | Emotion | styled-components | UmberStyle, memo off | UmberStyle, memo on |
+| --------------------- | ------: | ----------------: | -------------------: | ------------------: |
+| Minified              | 27.2 KB |           27.7 KB |              89.1 KB |             89.1 KB |
+| Gzipped               | 10.7 KB |           11.0 KB |              33.1 KB |             33.1 KB |
+
+UmberStyle adds about three times what either of the others adds, gzipped.
+
+### The score
+
+Of the 14 timed rows above (the bundle is not counted), the side with the shortest time:
+
+| Rows where it is the fastest | Emotion | styled-components | UmberStyle, memo off | UmberStyle, memo on |
+| ---------------------------- | ------: | ----------------: | -------------------: | ------------------: |
+| All four sides               |       3 |                 0 |                    1 |                  10 |
+| Without the memo-on column   |       6 |                 0 |                    8 |                   - |
+
+With the memo on, UmberStyle is the fastest on every call of a class and every warm render; on two of those (fixed styles, nested providers) its two columns are level, and the memo-off column takes one of them. Emotion is the fastest on the two first renders over a fresh cache and on the CSS of one page. styled-components is the fastest on no row; its times are below Emotion's on two (fixed styles, the override) and above UmberStyle's on every row but the first render of 48 elements. With the defaults, UmberStyle loses the three calls of a class as well.
+
+Not measured here: a browser (every figure is Node rendering to a string), a client render, hydration, streaming, development mode, the build-time plugins of either library, the CSS variable themes of styled-components, and a change of theme. Each row is one run on one desktop machine; compare the columns of one table, not figures from two tables or from [Performance](performance.md), which is another run.
+
 ## What it costs
 
-**Memory.** A memo holds at most 10,000 steps (a step is one key with its value) for each set of style options of a cache. When it is full, the next style it remembers empties it first, and it fills again from the calls that follow. Its size at the cap depends on where styles differ. Measured on the host with `--expose-gc`, each style made twice so that it is remembered, the heap of a cache with the memo less the heap of one without:
+The option adds memory usage to each cache that turns it on, code to every bundle, and a little time to the calls it cannot help.
 
-| Styles                                                                       | Held at the cap |
-| ---------------------------------------------------------------------------- | --------------: |
-| They differ early in their keys (`{ left: n, ...small }`)                    |    about 3.5 MB |
-| The large style with a new `zIndex`                                          |      about 4 MB |
-| They differ in one value at the end (`{ ...small, left: n }`, `{ left: n }`) |    under 0.5 MB |
+### Memory usage
 
-After the cap it stays flat: 20,000 and 40,000 styles held what 10,000 held. The memory allocated by one call was within the benchmark tool's noise on every row.
+A memo holds at most 10,000 steps for each set of style options of a cache; a step is one key with its value. When it is full, the next style it remembers empties it first, and it fills again from the calls that follow. How much memory those steps use depends on where the styles differ.
 
-**Code.** The code of the memo is part of the cache, so it is in every bundle of the core, whether the option is on or off. All exports of the core, bundled with esbuild 0.25.12: 79.7 KB minified and 29.3 KB gzipped before it, 81.7 KB and 30.1 KB after, so 0.8 KB gzipped.
+The memory a cache holds for a set of styles, with the option off and with it on:
 
-**Time where it cannot help.** A call it covers pays one walk of the contents of its merged style. When the walk finds nothing, the call takes the full path as before, plus one lookup of the class once it is named. The rows of the table above that say "level" are that cost.
+| Styles the cache was given            | `hasStyleMemo: false` | `hasStyleMemo: true` | Difference |
+| ------------------------------------- | --------------------: | -------------------: | ---------: |
+| Two that repeat, the condition        |                 26 KB |                64 KB |      38 KB |
+| New, differing in their first key     |                6.0 MB |               9.6 MB |     3.6 MB |
+| New large styles, a new `zIndex` each |               53.2 MB |              57.4 MB |     4.2 MB |
+| New, differing in their last key      |                6.0 MB |               6.9 MB |     0.9 MB |
+
+The difference is the memory usage of the memo; the first column is what the cache holds for the same styles without it, a class, its rules and its style for each. The first row is 10,000 calls of `{ fontSize: isMobile ? 12 : 48 }`, the everyday case: the memo holds three steps, and at that size the method cannot tell its data from the engine's compiled code, which is on the heap too. The other rows are about 10,000 new styles, measured with the memo full (9,991 to 10,028 steps): 10,000 of `{ left: n, ...small }`, 10,000 of the large style of the benchmarks with `zIndex: n`, and 9,994 of `{ ...small, left: n }`, where `small` is five declarations. 9,999 styles of `{ left: n }` alone give 4.8 MB and 5.7 MB, a difference of 0.9 MB.
+
+Measured on the host, Node 26.4.0 with `--expose-gc`, on the built `dist` of the core loaded by path: the heap after four forced collections, with the cache alive, less the heap before the cache was made; each style made twice so that the memo remembers it, after 5,000 calls of the same shape on another cache. Each figure is the median of three runs, each in a process of its own; the three runs of a row were within 10 KB of each other on the first row and within 0.1 MB on the others.
+
+After the cap the memo stays flat while the cache grows: at about 20,000 and 40,000 styles, on the three rows of new styles in order, the memo used 3.5 and 3.5 MB, 4.2 and 4.0 MB, and 0.85 and 0.84 MB, while the cache without it held 12 and 24 MB, 107 and 213 MB, and 12 and 24 MB. The memory allocated by one call was within the benchmark tool's noise on every row.
+
+### Code size
+
+The code of the memo is part of the cache, so it is in every bundle of the core, whether the option is on or off. All exports of the core, bundled with esbuild 0.25.12: 79.7 KB minified and 29.3 KB gzipped before it, 81.7 KB and 30.1 KB after, so 0.8 KB gzipped.
+
+### Time where it cannot help
+
+A call it covers pays one walk of the contents of its merged style. When the walk finds nothing, the call takes the full path as before, plus one lookup of the class once it is named. The rows of the tables above that say "level" are that cost.
 
 ## Risks
 
@@ -179,14 +308,15 @@ Not every test failed under some break: see [Known issues](#known-issues).
 | Many components whose class depends on props, rendering again and again over a long-lived server process or in a browser | Yes                         | The same contents come back render after render: 20% to 42% less time for the renders measured                                                       |
 | A process that starts fresh for each request, or a cache made for each request                                           | Little to gain              | A fresh cache starts with an empty memo; a first render hits only on styles that come three times or more in it (1.06 to 1.16 times faster measured) |
 | A suite of tests with the development checks on                                                                          | No                          | There is no memo with the development checks                                                                                                         |
-| A library that wraps the engine                                                                                          | Leave the choice to the app | It costs memory for each cache, and the app knows whether its renders repeat                                                                         |
+| A library that wraps the engine                                                                                          | Leave the choice to the app | It adds memory usage to each cache, and the app knows whether its renders repeat                                                                     |
 
 The option adds 0.8 KB gzipped to the core whether it is on or not, so leaving it off saves no code.
 
 ## Limits
 
-- No browser was measured: the times are of Node in a Docker sandbox, one CPU, rendering to a string, and the memory at the cap was measured on the host. The cost in a browser's memory, and over a long session, is not known.
-- Every figure comes from one desktop machine, in use during the runs.
+- No browser was measured: the times are of Node in a Docker sandbox, one CPU, rendering to a string, and the memory usage was measured on the host. The memory usage in a browser, and over a long session, is not known.
+- Every figure comes from one desktop machine, in use during the runs. Each row of the benchmark against the two other libraries is one run; seven rows were run a second time because the first run's rounds disagreed, and the second run is shown.
+- The benchmark against the two other libraries covers what is listed in its section; one of the two has no counterpart for a class with no framework or for the CSS of a page read from its HTML, so those rows compare UmberStyle with one library only.
 - The option is off by default, and no app outside the repository's tests has run with it on.
 - The memory per call and the memory at the cap were measured for the shapes of style named above; another shape of style holds another amount at the cap, up to what 10,000 steps of it hold.
 - Vue's `createStyle` and `configure` take the option, as an engine option, but no test turns it on through Vue.

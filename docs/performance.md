@@ -97,7 +97,7 @@ With the memo off, 0.4.0 takes the path it took before the memo existed: the cor
 
 ## Against the styling library the design system used before
 
-Every table of this section is from round 2, except the bundle (round 1). The last column compares each UmberStyle column with Used before.
+Every table of this section is from round 2, except the bundle (round 1). The last column compares each UmberStyle column with Used before. [The style memo](style-memo.md) has a section that compares UmberStyle, with the memo off and on, with two other styling libraries by name.
 
 ### A class from a style object, no framework
 
@@ -248,7 +248,7 @@ The bytes one operation allocates, as soroush-bench estimates them from the heap
 | The tree of 500, warm, markup only       |    550.5 KB |         763.9 KB |
 | The CSS of the tree of 500 from its HTML |        43 B |         202.4 KB |
 
-UmberStyle allocates less for a new style and for fixed components, and more for prop-driven and cold renders and for the CSS of a page, which Used before joins from texts it already holds. The same estimate moves a lot from run to run: round 1 gave 296.6 KB and 828.7 KB for the warm tree. With the memo on, the bytes of one call were within the tool's noise on every row; what the memo holds is on [its page](style-memo.md#what-it-costs), up to about 4 MB for each set of style options of a cache.
+UmberStyle allocates less for a new style and for fixed components, and more for prop-driven and cold renders and for the CSS of a page, which Used before joins from texts it already holds. The same estimate moves a lot from run to run: round 1 gave 296.6 KB and 828.7 KB for the warm tree. With the memo on, the bytes of one call were within the tool's noise on every row; the memory usage of the memo is on [its page](style-memo.md#memory-usage), up to about 4 MB for each set of style options of a cache.
 
 ## Limits
 

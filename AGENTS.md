@@ -116,8 +116,9 @@ the fix turns out to move something that was being relied on.
   (`/react`, `/vue`, `/react-native`, no root entry), which the React binding uses as its default.
 - **No library names:** never name another CSS-in-JS library, CSS framework or web framework in code,
   comments, tests, docs or config comments. The platforms (React, React Native, Vue) and
-  `@soroush.tech/styled-system` may be named. A dependency name in a `package.json` is the one
-  exception.
+  `@soroush.tech/styled-system` may be named. A dependency name in a `package.json` is one exception.
+  The other, asked for by the owner, is the "Benchmark" section of `docs/style-memo.md`, which names
+  the two libraries it measures with their versions: keep it, and do not copy those names anywhere else.
 - **No inline styles:** the engine never renders a `style` attribute on the web, and nothing in this
   repository puts one on a plain element (`<div style="...">`, `<div style={{...}}>`). The `style`
   prop of a styled component is the engine's own API: it takes sheet entries and objects and merges
