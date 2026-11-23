@@ -103,11 +103,13 @@ describe('the order of the media blocks', () => {
       isConditional: true,
       hasScheme: true,
       queries: [wide, portrait],
+      states: [],
     })
     expect(collectKeys({ [darkSystem]: { padding: 1 } })).toEqual({
       isConditional: false,
       hasScheme: false,
       queries: [darkSystem],
+      states: [],
     })
   })
 

@@ -69,3 +69,6 @@ conversion), `keys` (a `StyleKeys` for each entry), `isConditional`, `queries`, 
 ## Limits
 
 - Only `remBase` and `lengthKeys` of the options are used; the rest warn in development.
+- A `state()` key in a sheet entry or in `css()` never applies here: an entry belongs to no component, so
+  there is no state to match, and the part is dropped without a warning. `StyleKeys` of an entry carries its
+  states, and nothing reads them. On the web the same entry is a class whose state rules the browser applies.

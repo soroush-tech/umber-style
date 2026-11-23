@@ -1,7 +1,7 @@
 import { isDevelopment } from './devChecks'
 
 /** The version of this copy of the core: what it records, and names in a warning, when it first reads the shared state. */
-export const CORE_VERSION = '0.3.0'
+export const CORE_VERSION = '0.4.0'
 
 // The state that every copy of the packages loaded in one program shares: one Map on `globalThis`, under
 // a key that `Symbol.for` gives every copy alike. The Map itself never changes shape. Each entry is keyed

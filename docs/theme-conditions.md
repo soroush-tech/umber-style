@@ -97,6 +97,19 @@ const Card = styled(View)({
 
 `colorScheme` of `when(theme, colorScheme)` is not used on React Native. The same source, with `when` and `whenScheme` at the top of a shared style, matches the nearest provider on React Native and compiles to the scoped rules on the web: see [Style sheets and the style prop](style-sheets.md).
 
+## State keys
+
+A third kind of condition key names what the element is doing, not the theme around it: `state('hovered')`, `state('pressed')`, `state('focused')` and `state('disabled')` ([Writing styles](writing-styles.md#interaction-states)). It is written with `at` like the keys above, and it nests in them and they in it:
+
+```ts
+const nested = {
+  [when(dark)]: { ...at(state('pressed'), { opacity: 0.5 }) },
+  '@media (min-width: 600px)': { ...at(state('disabled'), { opacity: 0.3 }) },
+}
+```
+
+On the web a state key is not scoped: it is the selector written by hand for its state (`&:active` for `pressed`), so inside `when(dark)` the rule above is the scoped rule of `.card:active`. On React Native it is matched when the component renders, as `when()` is, against the component's state instead of the nearest provider: see [React Native](react-native.md#interaction-states). `packages/core/src/state.test.ts` checks that the nested form gives the same rules and class as the selectors written by hand, and `packages/react-native/src/states.test.tsx` that a state part inside a `when()` part, and a media and a scheme part inside a state part, apply on React Native.
+
 ## Limits
 
 - A conditional style applies to the descendants of the theme element, not to the element that carries the theme class. With the class on `<html>` this is the whole page below it.
@@ -107,3 +120,4 @@ const Card = styled(View)({
 - The "nearest theme" behaviour is checked in a test with jsdom, which evaluates `@scope`, inside a layer too: a card under A, then B, then A gets the conditional style below the first A, not below B, and again below the second A (`packages/core/src/createEngine.conditions.test.ts`). `whenScheme` and the system-preference rule are checked as rule text only. No real browser was used.
 - Typing: with the strict style types, a computed key made by `when()` written directly in a web style object is a type error, because TypeScript types a computed key as `string`: use `at()`, as above. The style inside `at()` is checked like any style. See [Typed styles](typed-styles.md).
 - On React Native the types accept the condition keys and do not check what is inside them.
+- A state key is not a scoped rule on the web: it is a selector, decided by the browser on the element itself. What a state means on React Native, and what was not observed there, is in [React Native](react-native.md#limits).

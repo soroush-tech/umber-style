@@ -53,9 +53,26 @@ type StyleValue = NativeStyleObject | false | null | readonly StyleProp[]
 /** What the `style` prop of a styled component takes, or nothing. */
 export type StyleProp = StyleValue | undefined
 
-/** A component made by `styled`: it takes the props of the tag, its own props `P`, `as` and `style`. */
+/**
+ * The props that tell a styled component a state that its `state()` keys name, for a component that does
+ * not report it itself (a `Pressable` reports `pressed`; hover and focus are kept from the events of a
+ * component whose object styles name them). Where the styles name a state, the binding reads these and
+ * does not forward them, unless `shouldForwardProp` returns true for the name.
+ */
+export interface StateProps {
+  /** Whether it is pressed now. */
+  pressed?: boolean
+  /** Whether a pointer is over it now. */
+  hovered?: boolean
+  /** Whether it has the focus now. */
+  focused?: boolean
+}
+
+/** A component made by `styled`: it takes the props of the tag, its own props `P`, the state props, `as` and `style`. */
 export type StyledComponent<C extends ElementType, P extends object> = FunctionComponent<
-  Omit<ComponentProps<C>, keyof P | 'as' | 'style'> & P & { as?: ElementType; style?: StyleValue }
+  Omit<ComponentProps<C>, keyof P | 'as' | 'style'> &
+    P &
+    StateProps & { as?: ElementType; style?: StyleValue }
 >
 
 /** `styled` of a theme `T`: a tag and options, then the styles of the component. */

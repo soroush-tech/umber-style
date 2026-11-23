@@ -7,7 +7,7 @@ React Native understand, the shapes of `styled`, `StyleSheet`, `css` and `apply`
 `SharedStyleBase<T>` (the styling of one theme shape that the web, React Native and server components
 all have), and the declarations of the default style's functions (`styled`, `StyleSheet`, `useStyle`,
 `useTheme`, `ThemeProvider`, `apply`, `css`, `themeClass`, `when`, `whenScheme`, `keyframes`,
-`globalStyles`, `Global`, `configure`, `alpha`, `at`, and the arithmetic helpers `multiply`, `divide`,
+`globalStyles`, `Global`, `configure`, `alpha`, `at`, `state`, and the arithmetic helpers `multiply`, `divide`,
 `add`, `subtract`, `negate`). Types and declarations only; it is never loaded.
 
 ## Why it exists
@@ -32,6 +32,8 @@ flowchart TD
   styled --> base
   ss --> base
   base --> decl["declared constants of the default style"]
+  stateProps["StateProps of the React Native binding"] --> comp["SharedStyledComponent: tag props, own props, state props, as, style"]
+  comp --> styled
 ```
 
 ## The data
@@ -40,6 +42,9 @@ flowchart TD
   `10px` are not), plus `web` (merged over the rest on the web, dropped on native) and `native` (the
   other way round).
 - `SharedEntry`: a class name on the web, a style object on React Native; pass it on, do not read it.
+- `SharedStyledComponent` takes the state props `pressed`, `hovered` and `focused` (`StateProps` of the React
+  Native binding), so shared code can tell a component its state; React Native reads them, the web does not
+  (its selectors decide). `state(name)` is declared with the core's `StateName` and `StateKey`.
 - `SharedPercent`: `` `${number}%` ``. The arithmetic helpers take numbers or percentages; `divide` by 0
   throws a `RangeError`; a token is a number on React Native and a `var(--x)` reference on the web, so the
   result there is a CSS `calc()`.
@@ -62,4 +67,5 @@ flowchart TD
 ## Limits
 
 - The file declares; the implementations are in the bindings. Whether a declaration matches them is shown
-  by `sharedSource.test.tsx`, `sharedTypes.test.tsx` and `styleTypes.strict.test.tsx`.
+  by `sharedSource.test.tsx`, `sharedStates.test.tsx`, `sharedTypes.test.tsx`, `sharedConditions.test.tsx` and
+  `styleTypes.strict.test.tsx`.

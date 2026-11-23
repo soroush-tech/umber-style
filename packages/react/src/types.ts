@@ -64,6 +64,8 @@ export type {
   SchemeKey,
   SchemeName,
   SheetEntry,
+  StateKey,
+  StateName,
   StyleObject,
   StyleTypeOptions,
   ThemeInput,

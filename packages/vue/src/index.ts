@@ -26,7 +26,7 @@ export const {
   Global,
 } = defaults
 
-export { add, alpha, at, divide, multiply, negate, subtract } from '@umber-style/core'
+export { add, alpha, at, divide, multiply, negate, state, subtract } from '@umber-style/core'
 export { CacheProvider } from './CacheProvider'
 export * from './createStyle'
 export * from './defaultStyle'

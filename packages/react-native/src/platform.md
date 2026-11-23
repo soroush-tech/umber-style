@@ -2,8 +2,8 @@
 
 ## What it does
 
-Re-exports four objects of the `react-native` package under the names `platformAccessibility`,
-`platformAppearance`, `platformDimensions` and `platformStyleSheet`.
+Re-exports five objects of the `react-native` package under the names `platformAccessibility`,
+`platformAppearance`, `platformDimensions`, `platformPressable` and `platformStyleSheet`.
 
 ## Why it exists
 
@@ -21,6 +21,8 @@ flowchart LR
   rn --> b["Appearance"]
   rn --> c["Dimensions"]
   rn --> d["StyleSheet"]
+  rn --> e["Pressable"]
+  e --> pe["platformPressable"]
   a --> pa["platformAccessibility"]
   b --> pb["platformAppearance"]
   c --> pc["platformDimensions"]
@@ -34,5 +36,7 @@ flowchart LR
 
 ## Decisions
 
+- `platformPressable` is read only to compare: `styled.ts` gives a function `style` to a component that is
+  this object (the platform's memoized `Pressable`), and to no other.
 - The `platform` prefix keeps these names apart from the engine's own `StyleSheet`, which spreads
   `platformStyleSheet` and replaces `create`.

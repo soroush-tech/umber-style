@@ -2,7 +2,9 @@ import {
   createThemeKey,
   readCondition,
   readSharedState,
+  readState,
   type SchemeName,
+  type StateName,
   type ThemeKey,
 } from '@umber-style/core'
 import { platformAppearance } from './platform'
@@ -38,8 +40,23 @@ export function readSchemeName(colorScheme: string | undefined): SchemeName | un
   return colorScheme === 'light' || colorScheme === 'dark' ? colorScheme : undefined
 }
 
-/** Whether the condition key `key` holds for `current`: it is a condition key, and the nearest theme or color scheme is the one it names. */
-export function matchesCondition(key: string, current: NativeCondition | undefined): boolean {
+/**
+ * What a component is doing, for the `state()` keys: each state that holds is `true`; a state that is
+ * not given does not hold. The names are the platform's (`Pressable` reports `{ pressed }`).
+ */
+export type InteractionState = { readonly [N in StateName]?: boolean }
+
+/**
+ * Whether the condition key `key` holds: a `when()` or `whenScheme()` key when the nearest theme or color
+ * scheme of `current` is the one it names, a `state()` key when its state is `true` in `interaction`.
+ */
+export function matchesCondition(
+  key: string,
+  current: NativeCondition | undefined,
+  interaction?: InteractionState
+): boolean {
+  const stateName = readState(key)
+  if (stateName !== undefined) return interaction?.[stateName] === true
   const condition = readCondition(key)
   if (condition === undefined || current === undefined) return false
   if (condition.kind === 'theme') return themesById.get(condition.id) === current.theme

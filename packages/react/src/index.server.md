@@ -23,7 +23,7 @@ files of the server build, so the bundle of server components holds none of the 
 flowchart LR
   shared["readSharedState 'react.server-default-style@1'"] --> make["createDefaultStyle of defaultStyle.server"]
   make --> names["destructured named exports"]
-  core["core: add, alpha, at, divide, multiply, negate, subtract"] --> out["public API"]
+  core["core: add, alpha, at, divide, multiply, negate, state, subtract"] --> out["public API"]
   names --> out
   cs["createStyle.server.ts, defaultStyle.server.ts, types.ts"] --> out
 ```

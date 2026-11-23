@@ -62,6 +62,7 @@ export {
   type SheetEntry,
 } from './sheetEntry'
 export { readSharedState } from './sharedState'
+export * from './state'
 export * from './styleTypes'
 export * from './tagShorthands'
 export { isTemplateStrings, parseKeyframesTemplate, parseStyleTemplate } from './templateStyle'

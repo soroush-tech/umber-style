@@ -2,9 +2,10 @@
 
 ## What it does
 
-Decides whether a condition key in a style (`when(theme)` or `whenScheme('dark')`) holds right now. It gives
-`when` its key (`createNativeThemeKey`), reads the scheme name a provider was given (`readSchemeName`), and
-answers `matchesCondition(key, current)` against the nearest provider's `NativeCondition`.
+Decides whether a condition key in a style (`when(theme)`, `whenScheme('dark')` or `state('pressed')`) holds
+right now. It gives `when` its key (`createNativeThemeKey`), reads the scheme name a provider was given
+(`readSchemeName`), and answers `matchesCondition(key, current, interaction?)` against the nearest
+provider's `NativeCondition` and, for a state key, the `InteractionState` of the component.
 
 ## Why it exists
 
@@ -24,7 +25,9 @@ flowchart TD
   known -->|"yes"| reuse["same id"]
   mint --> key["createThemeKey(id)"]
   reuse --> key
-  m["matchesCondition(key, current)"] --> rc{"readCondition: a condition key and a current?"}
+  m["matchesCondition(key, current, interaction)"] --> st{"readState: a state key?"}
+  st -->|"yes"| inter["interaction of that state is true?"]
+  st -->|"no"| rc{"readCondition: a condition key and a current?"}
   rc -->|"no"| f["false"]
   rc -->|"yes"| kind{"kind"}
   kind -->|"theme"| cmp["themesById(id) is current.theme?"]
@@ -32,6 +35,10 @@ flowchart TD
 ```
 
 ## The data
+
+`InteractionState` is `{ hovered?, pressed?, focused?, disabled? }`, booleans named as the platform names
+them (`Pressable` gives `{ pressed }`); a state that is not given does not hold. `styled.ts` makes it
+(`interaction.ts`), `toNativeStyle.ts` passes it down.
 
 `NativeCondition` is `{ theme: object | undefined, colorScheme: SchemeName | undefined }`: the object given to
 the nearest provider's `theme` prop (the base theme with no provider) and the scheme of the nearest provider
@@ -43,7 +50,8 @@ that has one. The id table is two maps, `themesById` (a `Map`) and `idsByTheme` 
 - The same theme object always gets the same id, so equal `when(theme)` calls give equal keys.
 - The tables are shared state under the name `react-native.theme-ids@1`, so two copies of the binding in one
   program never give one id to two themes (the comment on the declaration says so; `copies.test.tsx`).
-- `matchesCondition` returns `false` for a key that is not a condition key, and for no `current`.
+- `matchesCondition` returns `false` for a key that is not a condition key, and for no `current`; a state key
+  is decided by `interaction` alone, and with no `interaction` it does not hold.
 - A scheme key with no scheme on the provider falls back to `Appearance.getColorScheme()`.
 - `readSchemeName` maps anything but `'light'` or `'dark'` (`light dark`, nothing) to `undefined`.
 

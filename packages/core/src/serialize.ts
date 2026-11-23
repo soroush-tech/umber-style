@@ -11,6 +11,7 @@ import {
   type Condition,
   type Scoping,
 } from './scope'
+import { readState, STATE_SELECTORS } from './state'
 import { PREFIXED_FORMS, type PrefixedForm } from './vendorPrefixes'
 
 /** The value of a key of a style: a CSS value, a falsy value that is left out, a list of values (one declaration each, in order), or a nested style. */
@@ -487,7 +488,11 @@ function compileCondition(
   return guarded.length > 0 ? [...scoped, query] : scoped
 }
 
-/** The rules of the nested style `value` under `key`: a condition scopes them, an at-rule wraps them, any other key is a selector inside `selector`. */
+/**
+ * The rules of the nested style `value` under `key`: a condition scopes them, a state key is the
+ * selector of its state (`STATE_SELECTORS`), as if that selector were the key, an at-rule wraps them,
+ * any other key is a selector inside `selector`.
+ */
 function compileNested(
   selector: string,
   key: string,
@@ -496,8 +501,10 @@ function compileNested(
 ): string[] {
   const condition = readCondition(key)
   if (condition) return compileCondition(selector, condition, value, context)
-  if (!key.startsWith('@')) {
-    return compileStyle(resolveSelector(selector, key), value, context)
+  const stateName = readState(key)
+  const selectorKey = stateName === undefined ? key : STATE_SELECTORS[stateName]
+  if (!selectorKey.startsWith('@')) {
+    return compileStyle(resolveSelector(selector, selectorKey), value, context)
   }
   return compileStyle(selector, value, context).map((rule) => `${key}{${rule}}`)
 }
@@ -608,7 +615,7 @@ function compileStyle(selector: string, style: StyleObject, context: CompileCont
 /**
  * The flat CSS rules of `style` for `selector`; without `hasColorFallbacks` an `alpha()` result is
  * written as its mix alone. A `when()` or `whenScheme()` key becomes a scoped rule, written as
- * `scoping` says. With `hasValueRepair` the string forms of token maths that are never valid CSS
+ * `scoping` says, and a `state()` key the rule of its selector. With `hasValueRepair` the string forms of token maths that are never valid CSS
  * (`var(--x)1F`, `-var(--x)`, `var(--x)ms`) are rewritten in each value.
  */
 export function compileRules(

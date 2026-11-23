@@ -13,7 +13,7 @@
 //   - a styled React component renders on the server with a class and its CSS;
 //   - TypeScript resolves the declarations of every entry under `moduleResolution` bundler and
 //     node16, with `skipLibCheck` off, including a styled component with a typed theme.
-// `react-native` cannot be loaded by Node, so a stand-in package with the two values the binding
+// `react-native` cannot be loaded by Node, so a stand-in package with the values the binding
 // imports takes its place; the real types of `react-native` are covered by the workspace typecheck.
 // The temporary folder is removed at the end, unless `--keep` is given. Needs the network (npm).
 import { spawnSync } from 'node:child_process'
@@ -74,6 +74,7 @@ const ENTRIES = {
     'useTheme',
     'StyleSheet',
     'at',
+    'state',
     'Global',
     'keyframes',
     'css',
@@ -81,6 +82,7 @@ const ENTRIES = {
   '@umber-style/styled': ['default'],
   '@umber-style/react-native': [
     'createStyle',
+    'state',
     'styled',
     'ThemeProvider',
     'useTheme',
@@ -91,6 +93,7 @@ const ENTRIES = {
   ],
   '@umber-style/vue': [
     'createStyle',
+    'state',
     'styled',
     'ThemeProvider',
     'useTheme',
@@ -99,7 +102,7 @@ const ENTRIES = {
     'keyframes',
     'css',
   ],
-  'umber-style': ['createEngine', 'createCache', 'extractPageStyles'],
+  'umber-style': ['createEngine', 'createCache', 'extractPageStyles', 'state'],
   'umber-style/react': [
     'createStyle',
     'styled',
@@ -283,6 +286,7 @@ try {
       'exports.StyleSheet = { create: (styles) => styles, flatten: (style) => style, hairlineWidth: 1 }',
       'exports.Dimensions = { get: () => ({ width: 400, height: 800, scale: 1, fontScale: 1 }), addEventListener: () => ({ remove() {} }) }',
       'exports.AccessibilityInfo = { isReduceMotionEnabled: () => Promise.resolve(false), addEventListener: () => ({ remove() {} }) }',
+      'exports.Pressable = function Pressable() { return null }',
       '',
     ].join('\n')
   )
@@ -296,6 +300,7 @@ try {
       'export const StyleSheet: { create<T>(styles: T): T; flatten<T>(style: T): T; hairlineWidth: number }',
       'export const Dimensions: { get(dimension: string): { width: number; height: number; scale: number; fontScale: number }; addEventListener(type: "change", handler: Function): { remove(): void } }',
       'export const AccessibilityInfo: { isReduceMotionEnabled(): Promise<boolean>; addEventListener(eventName: "reduceMotionChanged", handler: (isEnabled: boolean) => void): { remove(): void } }',
+      'export function Pressable(props: { style?: unknown; children?: unknown }): null',
       '',
     ].join('\n')
   )

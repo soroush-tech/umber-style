@@ -55,8 +55,10 @@ condition scripts with `--conditions=react-server` and `--conditions=react-nativ
   react-native, vue, umber-style).
 - `ENTRIES`: specifier -> the names that entry must export (`'@umber-style/core': ['createEngine',
   'createCache', 'extractPageStyles', 'at']`, `'@umber-style/css/create-instance': []`).
-- The stand-in `react-native`: a small package of four values (`Appearance`, `StyleSheet`, `Dimensions`,
-  `AccessibilityInfo`) and their types.
+- The stand-in `react-native`: a small package of five values (`Appearance`, `StyleSheet`, `Dimensions`,
+  `AccessibilityInfo`, and a `Pressable` that renders nothing, which the binding compares a component
+  with) and their types. A value the binding imports that the stand-in lacks fails the ESM checks
+  (`does not provide an export named`).
 - The consumer's `overrides` map each package name to `$<name>`, so the tarballs, which name each other
   with versions npm does not hold yet, resolve to the files.
 

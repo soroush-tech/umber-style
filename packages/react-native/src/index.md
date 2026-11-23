@@ -4,7 +4,7 @@
 
 The entry of `@umber-style/react-native`. It makes the default style once, exports its members by name
 (`configure`, `styled`, `StyleSheet`, `useStyle`, `ThemeProvider`, `useTheme`, `css`, `when`, `whenScheme`, and
-the rest), and re-exports `at` from the core, `CacheProvider`, `createStyle`, the calc helpers, `alpha`, and
+the rest), and re-exports `at` and `state` (with the types `StateName` and `StateKey`) from the core, `CacheProvider`, `createStyle`, the calc helpers, `alpha`, and
 the types.
 
 ## Why it exists
@@ -20,7 +20,7 @@ re-exports this entry as `umber-style/react-native`.
 flowchart LR
   ds["defaultStyle.createDefaultStyle"] --> shared["readSharedState react-native.default-style@1"]
   shared --> members["named exports: configure, styled, StyleSheet, ..."]
-  core["@umber-style/core"] --> at["at"]
+  core["@umber-style/core"] --> at["at, state, StateName, StateKey"]
   cp["CacheProvider.ts"] --> out["package entry"]
   cs["createStyle.ts"] --> out
   calc["calc.ts, alpha.ts"] --> out
@@ -34,7 +34,9 @@ flowchart LR
 - One default style for the whole program, however many copies of the package are loaded.
 - Creating it does not touch the platform or read a theme: `createDefaultStyle` makes the style lazily.
 - `export *` of `defaultStyle`, `nativeStyle` and `types` adds only what those files export.
-- `NativeLength`, `NativeTheme` and `MediaQueryOptions` are exported as types only.
+- `NativeLength`, `NativeTheme`, `MediaQueryOptions`, `StateName` and `StateKey` are exported as types only.
+- `state` is the core's function, the same object as in every other entry, so a style made with any of them
+  holds the same key.
 
 ## Decisions
 

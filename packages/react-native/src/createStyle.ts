@@ -57,7 +57,7 @@ interface RegisteredSheet<S extends NativeSheetStyles> {
 }
 
 const NO_QUERIES: readonly string[] = []
-const NO_KEYS: StyleKeys = { isConditional: false, hasScheme: false, queries: [] }
+const NO_KEYS: StyleKeys = { isConditional: false, hasScheme: false, queries: [], states: [] }
 
 /** The name of the sheet entry `key` in the development warnings. */
 const toEntryName = (key: string) => `sheet entry "${key}"`

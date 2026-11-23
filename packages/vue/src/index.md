@@ -20,7 +20,7 @@ one copy reads the provider of the other (the comment says so). The umbrella pac
 flowchart LR
   ds["defaultStyle.createDefaultStyle"] --> sh["readSharedState vue.default-style@1"]
   sh --> mem["named exports: configure, styled, ..."]
-  core["@umber-style/core"] --> h["add, alpha, at, divide, multiply, negate, subtract"]
+  core["@umber-style/core"] --> h["add, alpha, at, divide, multiply, negate, state, subtract"]
   cp["CacheProvider.ts"] --> api["package entry"]
   cr["createStyle.ts: bindEngine, createStyle"] --> api
   df["defaultStyle.ts: createDefaultStyle, DefaultStyleOptions"] --> api
@@ -37,5 +37,5 @@ flowchart LR
 
 ## Decisions
 
-- The helpers `add`, `alpha`, `at`, `divide`, `multiply`, `negate`, `subtract` are the core's, not the
+- The helpers `add`, `alpha`, `at`, `divide`, `multiply`, `negate`, `state`, `subtract` are the core's, not the
   binding's. The React Native entry has its own `alpha` and calc helpers; the reason is not recorded here.

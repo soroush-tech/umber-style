@@ -26,7 +26,7 @@ export const {
   Global,
 } = defaults
 
-export { at } from '@umber-style/core'
+export { at, state, type StateKey, type StateName } from '@umber-style/core'
 export { CacheProvider } from './CacheProvider'
 export * from './alpha'
 export * from './calc'
