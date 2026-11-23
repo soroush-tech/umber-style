@@ -40,8 +40,9 @@ flowchart TD
 ```
 
 `sync()` is the key step for the theme: when the family's base theme differs from the one the engine's tokens
-were made from, it makes new tokens, empties the view caches, registers the `@property` rules and the token
-values (for value repair), marks the always-declared variables as used and counts a new `version`.
+were made from, it takes the tokens of the family for it (`readFamilyTokens`: made once for each theme
+object and prefix), empties the view caches, registers the `@property` rules and the token values (for value
+repair), marks the always-declared variables as used and counts a new `version`.
 Everything that depends on the base theme calls `readTokens()` first.
 
 Theme classes and root rules are made once for each theme object and colour scheme (a `WeakMap` of
@@ -59,9 +60,11 @@ passes, a number, `true` or a function warns once and becomes `undefined`).
 
 ## The data
 
-- `EngineFamily`: `{ theme, givenTheme, engines: WeakMap<Cache, Engine> }`, shared by the engines made
-  with `withCache`, so `setTheme` of either is the base of both. `givenTheme` is only what was given on
-  purpose, never one adopted from a provider.
+- `EngineFamily`: `{ theme, givenTheme, engines: WeakMap<Cache, Engine>, tokens }`, shared by the engines
+  made with `withCache`, so `setTheme` of either is the base of both. `givenTheme` is only what was given on
+  purpose, never one adopted from a provider. `tokens` holds, for each prefix, the tokens last made with
+  the theme object and the token options they were made from: one entry for each prefix, replaced when
+  the base theme is another object, whatever the number of styles or caches.
 - `Plan`: `{ baseClass, leading, propsStyles }`, one per theme view (`WeakMap`).
 - `labelStyles`: a shared `WeakSet` (`core.label-styles@1`) of the `{ label }` objects a styler puts in its
   list, so a wrapper finds the labels of the components it wraps, also from another copy of the core.
@@ -93,6 +96,13 @@ passes, a number, `true` or a function warns once and becomes `undefined`).
   is warned about once in development by `warnRenamedOption`, before the cache is chosen, with a cache or
   without; the engine passes its cache options to `createCache` one by one, so the cache never sees the old
   name and does not warn again.
+- The tokens of the base theme are made once for each theme object and prefix, and shared by the engines
+  of the family (`readFamilyTokens`): the engine of a fresh cache, a `CacheProvider`'s for one render,
+  made them again from the same object with the same options, and gets the same names and references
+  (`makes the tokens of the base theme once for a prefix`). It relies on what the engine assumes already,
+  that a theme object is not changed after it is used. A cold render of 48 fixed elements went from 229 to
+  172 us, of nested providers from 377 to 316 us (sandbox, five rounds); `refs` is one object for those
+  engines.
 - Warning about unmatched `modes`, `registered` and `alwaysDeclare` paths happens in `sync()`, with checks on.
 
 ## Limits

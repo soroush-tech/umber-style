@@ -37,6 +37,9 @@ type Kind = 'function' | 'fixed' | 'window' | 'conditional'
 
 const NO_KEYS: StyleKeys = { isConditional: false, hasScheme: false, queries: [], states: [] }
 
+/** The states, in the order of the part of the key of a resolved style that says which of them hold. */
+const STATE_ORDER: readonly StateName[] = ['hovered', 'pressed', 'focused', 'disabled']
+
 /** The name a component is known by: its `displayName`, else the name of its function; undefined when it has neither. */
 function readComponentName(component: Exclude<ElementType, string>): string | undefined {
   const { displayName, name } = component as { displayName?: string; name?: string }
@@ -128,6 +131,44 @@ export function createStyled<T>(
         return found
       }
 
+      // The conditional object styles as they were resolved, by the theme of the condition (held weakly),
+      // then by the rest of what resolving them reads (see `readResolved`).
+      const resolvedByTheme = new WeakMap<object, Map<string, NativeStyleObject>>()
+      const resolvedWithoutTheme = new Map<string, NativeStyleObject>()
+
+      /**
+       * The object style at `index`, which has condition or state keys, resolved for the render: made once
+       * for each theme of the condition, color scheme of the provider, key of the window (the queries that
+       * match, and the system color scheme where it is read) and set of states, and the same object after.
+       * The style is fixed when the component is made, as the fixed styles are, and what resolves it reads
+       * nothing else, so the resolved style is the same.
+       */
+      const readResolved = (
+        index: number,
+        key: string,
+        condition: NativeCondition,
+        state: WindowState | undefined,
+        interaction: InteractionState | undefined
+      ): NativeStyleObject => {
+        const { theme, colorScheme = '' } = condition
+        let found = theme === undefined ? resolvedWithoutTheme : resolvedByTheme.get(theme)
+        if (found === undefined) {
+          found = new Map()
+          resolvedByTheme.set(theme as object, found)
+        }
+        const states = STATE_ORDER.map((name) => (interaction?.[name] === true ? '1' : '0')).join(
+          ''
+        )
+        const cacheKey = `${index}|${key}|${colorScheme}|${states}`
+        let resolved = found.get(cacheKey)
+        if (resolved === undefined) {
+          const style = styles[index] as Record<string, unknown>
+          resolved = toNativeStyle(style, condition, settings, state, interaction)
+          found.set(cacheKey, resolved)
+        }
+        return resolved
+      }
+
       /** The styles of a render, in order, for the key of the render, the providers, the window and what the component is doing. */
       const resolve = (
         key: string,
@@ -136,22 +177,15 @@ export function createStyled<T>(
         state: WindowState | undefined,
         interaction?: InteractionState
       ) =>
-        styles.flatMap((style, index) => {
+        styles.flatMap((_style, index) => {
           switch (kinds[index]) {
             case 'fixed':
               return [registered[`s${index}`]]
             case 'window':
               return [readWindowStyles(key)[`s${index}`]]
             case 'conditional':
-              return [
-                toNativeStyle(
-                  style as Record<string, unknown>,
-                  condition,
-                  settings,
-                  state,
-                  interaction
-                ),
-              ]
+              // A conditional style is rendered by a component that reads the condition: there is one.
+              return [readResolved(index, key, condition as NativeCondition, state, interaction)]
             default: {
               const result = (results as StyleResult[])[index]
               return result ? [toNativeStyle(result, condition, settings, state, interaction)] : []

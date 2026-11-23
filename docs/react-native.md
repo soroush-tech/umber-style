@@ -321,15 +321,15 @@ Where the styles name a state, `pressed`, `hovered` and `focused` are the bindin
 
 `packages/react-native/bench/states-pressables.bench.ts` renders 48 pressables of one look (every fourth disabled) with no state key, with the state keys, and with the same look written by hand as a `style` function on the platform `Pressable`, and calls the `style` function as a press does.
 
-| Case                                                                | Average   | Allocated |
-| ------------------------------------------------------------------- | --------- | --------- |
-| 48 pressables, no state key (a style array)                         | 257.94 us | 128.18 KB |
-| 48 pressables, state keys (a `style` function)                      | 644.81 us | 254.21 KB |
-| 48 pressables, the same look as an own `style` function, no binding | 48.81 us  | 95 B      |
-| One press, state keys                                               | 7.93 us   | 111 B     |
-| One press, the own `style` function                                 | 4 ns      | 0 B       |
+| Case                                                                | Average  | Allocated |
+| ------------------------------------------------------------------- | -------- | --------- |
+| 48 pressables, no state key (a style array)                         | 46.37 us | 125.21 KB |
+| 48 pressables, state keys (a `style` function)                      | 59.94 us | 166 B     |
+| 48 pressables, the same look as an own `style` function, no binding | 12.41 us | 104 B     |
+| One press, state keys                                               | 441 ns   | 106 B     |
+| One press, the own `style` function                                 | 2 ns     | 0 B       |
 
-Measured once with `pnpm bench react-native states` in the soroush-bench Docker sandbox, on a machine that was running other containers at the time: read the ratios, not the times. A pressable with state keys costs about 2.5 times one without on a render, because its state parts are resolved on each render; a press costs one resolution of the state styles (8 us), where a hand-written function over registered entries only picks one. The binding's cost against no binding at all (the third row) is that of `styled` itself, with or without state keys.
+Measured with `pnpm bench react-native states --rounds 3` in the soroush-bench Docker sandbox (the median of three rounds): read the ratios, not the times, and an allocation under about 1 KB as noise. A pressable with state keys costs about 1.3 times one without on a render: its state parts are resolved once for each combination of the theme, the color scheme of the provider, the matching queries and the states, and the same object is given again after (resolved on each render, as they were first written, it was 2.5 times); a press looks up the style resolved for its states (441 ns), where a hand-written function over registered entries only picks one. The binding's cost against no binding at all (the third row) is that of `styled` itself, with or without state keys.
 
 ## Development warnings
 

@@ -23,7 +23,7 @@ flowchart TD
   tag -->|"no"| kinds["classify each style"]
   kinds --> k{"kind of style"}
   k -->|"function"| fn["computed on each render"]
-  k -->|"object with when, whenScheme or state key"| cond["resolved on each render"]
+  k -->|"object with when, whenScheme or state key"| cond["resolved once for each theme, scheme, window key and states, then reused"]
   k -->|"object with media keys"| win["registered once for each set of matching queries"]
   k -->|"plain object"| fixed["registered once, now"]
   fn --> pick{"which component?"}
@@ -57,7 +57,10 @@ flowchart TD
 states; the queries of object styles come first in the key, so the key of a render starts with theirs, and
 the states of object styles come before the states that function styles return. `heldNames` are the
 states among the object styles' that are kept from events (`hovered`, `focused`). The interaction of a
-render is `InteractionState` (`interaction.ts`).
+render is `InteractionState` (`interaction.ts`). The conditional object styles as resolved are kept in a
+`WeakMap` from the theme of the condition (held weakly; a `Map` without a theme) to a `Map` keyed by the index
+of the style, the media key of the render, the color scheme of the provider and the four states as bits: an
+entry leaves with its theme object, and a component has at most 16 for each theme, scheme and window key.
 
 ## What it guarantees
 
@@ -105,8 +108,13 @@ render is `InteractionState` (`interaction.ts`).
   add a hook. Rejected: one constant extra hook in every component with a function style (it would change
   the hooks of every existing such component). A function style that names them in a component without the
   hook follows the props of those names alone, with a development warning (`warnAboutUnheldState`).
-- A state style is resolved on each render (and on each call of the style function), not registered: it
-  changes with the press. The cost is on record in `bench/states-pressables.bench.ts`.
+- A state style is not registered: it changes with the press. It is resolved once for each combination of
+  what resolving it reads (`readResolved`): the theme of the condition, the color scheme of the provider,
+  the media key of the render (which holds the matching queries, and the system scheme where a scheme key
+  reads it) and the states; the style itself is fixed when the component is made, as the fixed styles are.
+  The values are those `toNativeStyle` gives (`gives each render the values that resolving it gives`), and
+  the same combination gives the same object. In `bench/states-pressables.bench.ts` 48 pressables with
+  state keys went from 113 to 60 us (48 without a state key: 46 us), a press from 1.65 us to 441 ns.
 
 ## Limits
 

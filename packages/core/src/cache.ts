@@ -471,6 +471,38 @@ interface WrittenAs extends Required<StyleOptions> {
   readonly reported: CompileContext
   /** Makes an entry of another cache one of this cache, written with these options. */
   readonly adopt: (entry: SheetEntry) => SheetEntry
+  /** The merges of class names alone made with these options, by `readMergeKey`, oldest first (see `MergeMemo`). */
+  readonly merges: Map<string, MergeMemo>
+}
+
+/**
+ * A class that `cssWith` made of class names alone, and what it was made from: the names, and the style
+ * of each in `registered` at that time (undefined for a name that is not registered). While each name
+ * still has that same style and the class is written, the same names make the same class, so it is not
+ * merged, compiled and hashed again.
+ */
+interface MergeMemo {
+  readonly names: readonly string[]
+  readonly sources: readonly (StyleObject | undefined)[]
+  /** The merged style, which `registered` holds for the class. */
+  readonly merged: StyleObject
+  readonly className: string
+  /** What `cssWith` returned: the names that pass through, then the class. */
+  readonly result: string
+}
+
+/** How many merges of class names a cache remembers for each set of style options; the oldest leaves first. */
+const MERGE_LIMIT = 1000
+
+/** The key of a merge of `values` in `merges` when every value is a class string, else undefined. */
+function readMergeKey(
+  values: readonly ClassValue[],
+  layer: ClassLayer,
+  label: string | undefined,
+  after: string
+): string | undefined {
+  for (const value of values) if (typeof value !== 'string') return undefined
+  return `${layer}\n${label ?? ''}\n${after}\n${values.join(' ')}`
 }
 
 /** A sheet that keeps its rules in memory, for a server render or a test. */
@@ -965,6 +997,7 @@ export function createCache(options: CacheOptions = {}): Cache {
       naming: { ...plain, hasVendorPrefixes: false },
       reported: { ...plain, report: reportRepair },
       adopt: (entry) => adoptEntry(entry, written),
+      merges: new Map(),
     }
     return written
   }
@@ -1431,8 +1464,60 @@ export function createCache(options: CacheOptions = {}): Cache {
     return compileStyleRules(`.${className}`, merged, written.reported)
   }
 
+  /** Registers the class `className` of the style `merged` for good, made after `after`, and writes it when it is not written. */
+  const registerClass = (
+    className: string,
+    merged: StyleObject,
+    layer: ClassLayer,
+    after: string,
+    written: WrittenAs
+  ): void => {
+    // A held class that is made here for good is held no more.
+    if (held.size > 0) held.delete(className)
+    registered.set(className, merged)
+    if (after !== '') afters.set(className, after)
+    // A class that is written already gets no rules: they are compiled only to be written, and
+    // `insertClass` writes nothing for it. With the development checks they still are, for the check.
+    if (warnValue || !insertedIds.has(className)) {
+      insertClass(className, compileClass(className, merged, written), layer, written)
+    }
+  }
+
+  /** The merge remembered under `key`, when each of its names still has the style it had then and its class is written. */
+  const findMerge = (written: WrittenAs, key: string | undefined): MergeMemo | undefined => {
+    if (key === undefined) return undefined
+    const memo = written.merges.get(key)
+    if (memo === undefined || !insertedIds.has(memo.className)) return undefined
+    const { names, sources } = memo
+    for (let index = 0; index < names.length; index++) {
+      if (registered.get(names[index]) !== sources[index]) return undefined
+    }
+    return memo
+  }
+
+  /** Remembers the merge of the class strings `values` under `key`, with the styles its names have now; the oldest leaves past `MERGE_LIMIT`. */
+  const rememberMerge = (
+    written: WrittenAs,
+    key: string,
+    values: readonly string[],
+    made: Omit<MergeMemo, 'names' | 'sources'>
+  ): void => {
+    const { merges } = written
+    merges.delete(key)
+    if (merges.size >= MERGE_LIMIT) merges.delete(merges.keys().next().value as string)
+    const names = values.flatMap((value) => splitClassNames(value))
+    merges.set(key, { ...made, names, sources: names.map((name) => registered.get(name)) })
+  }
+
   const cssWith = (written: WrittenAs, options: ClassOptions, values: ClassValue[]): string => {
     const { layer = 'components', label, after = '' } = options
+    // With the development checks every call is checked, so no merge is taken as remembered.
+    const key = warnValue ? undefined : readMergeKey(values, layer, label, after)
+    const memo = findMerge(written, key)
+    if (memo) {
+      registerClass(memo.className, memo.merged, layer, after, written)
+      return memo.result
+    }
     const { adopt } = written
     const report = createLeftOutReporter(label)
     const { styles, rawClasses, sole } = sortClassValues(values, registered, adopt, report)
@@ -1440,12 +1525,12 @@ export function createCache(options: CacheOptions = {}): Cache {
     const prepared = prepareClass(layer, label, after, styles, written)
     if (prepared === undefined) return rawClasses.join(' ')
     const { merged, className } = prepared
-    // A held class that is made here for good is held no more.
-    if (held.size > 0) held.delete(className)
-    registered.set(className, merged)
-    if (after !== '') afters.set(className, after)
-    insertClass(className, compileClass(className, merged, written), layer, written)
-    return [...rawClasses, className].join(' ')
+    registerClass(className, merged, layer, after, written)
+    const result = [...rawClasses, className].join(' ')
+    if (key !== undefined) {
+      rememberMerge(written, key, values as string[], { merged, className, result })
+    }
+    return result
   }
 
   /**
@@ -1732,10 +1817,15 @@ export function createCache(options: CacheOptions = {}): Cache {
     } = pageOptions
     const wanted = new Set([...classNames, ...offered])
     const themeIds = [...wanted].filter((name) => themeNames.has(name)).sort(compareCodeUnits)
+    const classStart = `${prefix}-`
+    // The key of each class is made once, not in every comparison; the keys differ, so the order is
+    // the one a comparison of the keys gives.
     const classIds = [...wanted]
-      .filter((name) => name.startsWith(`${prefix}-`) && !themeNames.has(name))
+      .filter((name) => name.startsWith(classStart) && !themeNames.has(name))
       .filter((name) => insertedRules.has(name))
-      .sort((first, second) => (readSortKey(first) < readSortKey(second) ? -1 : 1))
+      .map((id): [string, string] => [readSortKey(id), id])
+      .sort(([first], [second]) => (first < second ? -1 : 1))
+      .map(([, id]) => id)
     // The global rules of this page: those of the app, and those of a component that the page rendered.
     const pageSets = [...globals].filter(
       ([id, entry]) => entry.appCount > 0 || rendered.has(id) || carried.has(id)

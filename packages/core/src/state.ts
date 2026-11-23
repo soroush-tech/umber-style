@@ -1,5 +1,8 @@
 import { isDevelopment } from './devChecks'
 
+/** `process` where there is one, as `devChecks.ts` declares it. */
+declare const process: { env: { NODE_ENV?: string } }
+
 /** The interaction states a style can name with `state()`: the same four on every platform. */
 export type StateName = 'hovered' | 'pressed' | 'focused' | 'disabled'
 
@@ -34,7 +37,16 @@ const warnedNames = new Set<string>()
  * a name that is not one of the four is warned about once.
  */
 export function state(name: StateName): StateKey {
-  if (!STATE_NAMES.has(name) && !warnedNames.has(name) && isDevelopment()) {
+  // What `isDevelopment()` reads is written out in front of it, so that a bundler that writes in
+  // production for `process.env.NODE_ENV` drops the warning and its text (see `devChecks.md`).
+  if (
+    !STATE_NAMES.has(name) &&
+    !warnedNames.has(name) &&
+    typeof process !== 'undefined' &&
+    process.env != null &&
+    process.env.NODE_ENV !== 'production' &&
+    isDevelopment()
+  ) {
     warnedNames.add(name)
     console.warn(
       `[umber-style] state(${JSON.stringify(name)}) names no state: the states are hovered, pressed, focused and disabled. Its key matches nothing: the web writes it as an at-rule that the browser drops, and React Native drops it.`

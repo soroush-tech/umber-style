@@ -363,6 +363,8 @@ function joinSelector(one: string, part: string): string {
 
 /** The selector a nested key makes inside `parent`, with `&` standing for the parent. */
 function resolveSelector(parent: string, key: string): string {
+  // With no comma there is one part on each side: what the split would give, without the lists.
+  if (!parent.includes(',') && !key.includes(',')) return joinSelector(parent.trim(), key.trim())
   const parents = splitSelectors(parent)
   return splitSelectors(key)
     .flatMap((part) => parents.map((one) => joinSelector(one, part)))
@@ -408,10 +410,13 @@ function mergeValue(key: string, earlier: StyleValue, value: StyleValue): StyleV
 export function mergeStyles(styles: readonly StyleObject[]): StyleObject {
   const merged: StyleObject = {}
   for (const style of styles) {
-    for (const [key, value] of Object.entries(resolveWebParts(style))) {
+    const resolved = resolveWebParts(style)
+    for (const key of Object.keys(resolved)) {
+      const value = resolved[key]
       if (value === undefined || value === null || value === false) continue
       const earlier = merged[key]
-      delete merged[key]
+      // Only a key that is there moves to the end; a delete of one that is not changes nothing, and is slow.
+      if (earlier !== undefined) delete merged[key]
       merged[key] = mergeValue(key, earlier, value)
     }
   }
@@ -603,10 +608,12 @@ function compileStyle(selector: string, style: StyleObject, context: CompileCont
   let declarations = ''
   const nested: string[] = []
 
-  for (const [key, value] of Object.entries(style)) {
+  for (const key of Object.keys(style)) {
+    const value = style[key]
     if (key === 'label' || value === null || value === undefined || value === false) continue
-    if (isStyleObject(value)) nested.push(...compileNested(selector, key, value, context))
-    else declarations += toDeclarations(key, value, style, selector, context)
+    if (isStyleObject(value)) {
+      for (const rule of compileNested(selector, key, value, context)) nested.push(rule)
+    } else declarations += toDeclarations(key, value, style, selector, context)
   }
 
   return declarations ? [`${selector}{${declarations}}`, ...nested] : nested

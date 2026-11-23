@@ -93,6 +93,12 @@ a label already a whole run of the earlier one is not written again.
   translate it, so a style with both `@state pressed` and `&:active` keeps two keys and writes two rules for
   the same selector, the later one winning in the cascade.
 - Labels are joined, not replaced, so a merged style names every style that has one.
+- Written for speed, with the same output (issue 10): a style's keys are read with `Object.keys` and
+  each value by its key, not as `Object.entries` pairs; `mergeStyles` deletes a key only when it is
+  there to move to the end (a delete of a missing key changes nothing, and slows the object down); a
+  nested key and its parent with no comma are joined as one part each, without splitting them into
+  lists. Together they took a hit of a small style from 1.28 to 0.93 us, of the large one from 13.3 to
+  7.7 us, and a new small style from 3.1 to 1.8 us (host, one process).
 - The reason the unit list `REPAIR_UNITS` is the one it is (for example, why `in` and `pc` are present)
   is not recorded in the code beyond "a unit a `calc()` can multiply a number by".
 

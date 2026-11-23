@@ -67,6 +67,17 @@ flowchart TD
 - Missing-style problems are deduplicated by `problem.key`; unsupported declarations by their message with
   a `declaration:` prefix, so the two kinds cannot collide.
 - `process` is declared locally, so the core needs no type package for it (the comment in the code).
+- A warning that only development gives is written in a branch whose condition starts with what
+  `isDevelopment()` reads, written out: `typeof process !== 'undefined' && process.env != null &&
+  process.env.NODE_ENV !== 'production' && isDevelopment()`. A bundler that writes `"production"` in place
+  of `process.env.NODE_ENV` folds that to false and leaves out the branch, and the text and functions only
+  it uses; a call of `isDevelopment()` alone is a call it cannot see into. The condition is true exactly
+  when `isDevelopment()` is, and throws nowhere it would not (no `process`, no `env`). It is used by
+  `warnRenamedOption` here, `registerCopy` of `sharedState.ts`, `state()` of `state.ts` and the default
+  style of the React binding. Not done for the development checks (`hasDevChecks`, the engine's checks of
+  results): `hasDevChecks: true` turns them on in any build, a production one too, so they are reachable
+  there. Folding them the same way would leave about 4 KB gzipped out of a small React app, and would turn
+  off what `hasDevChecks: true` asks for in a production build; that is a change of behaviour, not made.
 - The unknown-environment answer differs by question: not development, and production.
 
 ## Limits

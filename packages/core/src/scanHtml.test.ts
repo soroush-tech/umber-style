@@ -26,6 +26,50 @@ describe('scanHtml', () => {
     ).toEqual(['a', 'b', 'c', 'd', 'e', 'f'])
   })
 
+  it('cuts a value at each run of white space, as the split on \\s+ it made before', () => {
+    // Printable ASCII is cut at its spaces; a value with any other character, white space or not, is
+    // split on every white space a regular expression knows, as before.
+    const values = [
+      '  a  b c ',
+      'a',
+      '',
+      ' ',
+      'a\tb\nc\rd\fe\vf',
+      'a\u00a0b\u2003c\u3000d\ufeffe\u2028f\u1680g\u202fh\u205fi',
+      'caf\u00e9 b',
+      ' caf\u00e9  b ',
+      'a\u0001b',
+    ]
+    for (const value of values) {
+      const expected = [...new Set(value.split(/\s+/).filter(Boolean))]
+      expect(classes(`<div class="${value}"></div>`)).toEqual(expected)
+    }
+    expect(classes('<div class="  x  y "></div><p class="y z">')).toEqual(['x', 'y', 'z'])
+    // A value that comes again adds nothing new, in the order of first sight.
+    expect(
+      classes('<i class="b a"></i><i class="c"></i><i class="b a"></i><i class="a d">')
+    ).toEqual(['b', 'a', 'c', 'd'])
+  })
+
+  it('reads a name in any case of ASCII, and no other character as a letter of it', () => {
+    // As the lower case of each name was compared before: only ASCII capitals lower to these letters.
+    expect(
+      classes('<i CLASS="a"></i><i ClAsSnAmE="b"></i><i cla\u017fs="c"></i><i \u212alass="d">')
+    ).toEqual(['a', 'b'])
+    expect([
+      ...scanHtml('<i DATA-HREF="k"></i><META NAME="u-global" CONTENT="g">').carried,
+    ]).toEqual(['k'])
+    expect([...scanHtml('<META NAME="u-global" CONTENT="g">').rendered]).toEqual(['g'])
+    expect(
+      classes('<ScRiPt><i class="no"></i></sCrIpT><TEXTAREA><i class="no"></TEXTAREA>')
+    ).toEqual([])
+    expect(classes('<T\u0130TLE><i class="yes"></i></T\u0130TLE><metas class="x">')).toEqual([
+      'yes',
+      'x',
+    ])
+    expect([...scanHtml('<div data-href=" a  b "></div>').carried]).toEqual(['a', 'b'])
+  })
+
   it('reads className and any case of the name', () => {
     expect(classes('<div className="a" CLASS="b" ClassName=c>')).toEqual(['a', 'b', 'c'])
   })

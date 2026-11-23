@@ -40,7 +40,35 @@ export function createGlobalMarker(
 }
 
 /** The elements whose content is text, not markup: nothing in them is an attribute. */
-const RAW_TEXT_ELEMENTS = new Set(['script', 'style', 'textarea', 'title'])
+const RAW_TEXT_ELEMENTS = ['script', 'style', 'textarea', 'title']
+
+/** The tags that the scan reads by name: the `<meta>` of a marker, and the raw text elements. */
+const TAG_NAMES = ['meta', ...RAW_TEXT_ELEMENTS]
+
+/** The attributes that the scan reads. */
+const ATTRIBUTE_NAMES = ['class', 'classname', 'data-href', 'name', 'content']
+
+/**
+ * The one of `words` (each in lower case) that the name from `start` to `end` of `html` is in any case,
+ * or undefined: what comparing its `toLowerCase()` with each word gives, without making the name. Only
+ * ASCII capitals are lowered here; no other character lowers to a letter of these words.
+ */
+function findWord(
+  html: string,
+  start: number,
+  end: number,
+  words: readonly string[]
+): string | undefined {
+  return words.find((word) => {
+    if (word.length !== end - start) return false
+    for (let index = 0; index < word.length; index++) {
+      const code = codeAt(html, start + index)
+      const lower = code >= 65 && code <= 90 ? code + 32 : code
+      if (lower !== word.codePointAt(index)) return false
+    }
+    return true
+  })
+}
 
 /** Whether `code` is whitespace in HTML: tab, line feed, vertical tab, form feed, carriage return, space. */
 function isSpace(code: number): boolean {
@@ -64,11 +92,25 @@ function skipSpaces(html: string, index: number): number {
   return position
 }
 
+/** A character other than a space or a printable ASCII one: one character, so nothing to backtrack. */
+const OTHER_CHARACTER = /[^ -~]/
+
 /** Adds the whitespace-separated tokens of `value` to `target`. */
 function addTokens(target: Set<string>, value: string): void {
-  for (const token of value.split(/\s+/)) {
-    if (token !== '') target.add(token)
+  if (OTHER_CHARACTER.test(value)) {
+    for (const token of value.split(/\s+/)) {
+      if (token !== '') target.add(token)
+    }
+    return
   }
+  // In printable ASCII the space is the only white space: the value is cut at each one, as the split
+  // above would cut it, without making the list.
+  let start = 0
+  for (let space = value.indexOf(' '); space !== -1; space = value.indexOf(' ', start)) {
+    if (space > start) target.add(value.slice(start, space))
+    start = space + 1
+  }
+  if (start < value.length) target.add(value.slice(start))
 }
 
 /** The value that starts at `index` (quoted with ' or ", or bare) and the index after it. */
@@ -95,12 +137,25 @@ interface MetaAttributes {
   content: string
 }
 
-/** Adds what the attribute `name` with `value` says to `found`, or keeps it in `meta`. */
-function addAttribute(found: HtmlTokens, meta: MetaAttributes, name: string, value: string): void {
-  if (name === 'class' || name === 'classname') addTokens(found.classes, value)
-  else if (name === 'data-href') addTokens(found.carried, value)
+/**
+ * Adds what the attribute `name` with `value` says to `found`, or keeps it in `meta`. A class value read
+ * before (in `classValues`) added its tokens then: many elements of a page carry the same classes.
+ */
+function addAttribute(
+  found: HtmlTokens,
+  meta: MetaAttributes,
+  name: string,
+  value: string,
+  classValues: Set<string>
+): void {
+  if (name === 'class' || name === 'classname') {
+    if (classValues.has(value)) return
+    classValues.add(value)
+    addTokens(found.classes, value)
+  } else if (name === 'data-href') addTokens(found.carried, value)
   else if (name === 'name') meta.name = value
-  else if (name === 'content') meta.content = value
+  // The last of `ATTRIBUTE_NAMES`.
+  else meta.content = value
 }
 
 /** Reads the attribute that starts at `index`, adds what matters to `found` or `meta`, and returns the index after it. */
@@ -108,20 +163,27 @@ function readAttribute(
   html: string,
   index: number,
   found: HtmlTokens,
-  meta: MetaAttributes
+  meta: MetaAttributes,
+  classValues: Set<string>
 ): number {
   let position = readNameEnd(html, index)
   if (position === index) position++
-  const name = html.slice(index, position).toLowerCase()
+  const name = findWord(html, index, position, ATTRIBUTE_NAMES)
   position = skipSpaces(html, position)
   if (html[position] !== '=') return position
   const { value, end } = readValue(html, skipSpaces(html, position + 1))
-  addAttribute(found, meta, name, value)
+  if (name !== undefined) addAttribute(found, meta, name, value, classValues)
   return end
 }
 
 /** Reads the attributes of the tag whose name ended at `index`, adds what matters to `found`, and returns the index after the `>`. A `<meta>` (`isMeta`) is read for the marker of global rules too. */
-function readAttributes(html: string, index: number, found: HtmlTokens, isMeta: boolean): number {
+function readAttributes(
+  html: string,
+  index: number,
+  found: HtmlTokens,
+  isMeta: boolean,
+  classValues: Set<string>
+): number {
   const meta: MetaAttributes = { name: '', content: '' }
   let position = index
   while (position < html.length) {
@@ -131,7 +193,9 @@ function readAttributes(html: string, index: number, found: HtmlTokens, isMeta: 
       return position + 1
     }
     position =
-      isSpace(code) || code === 47 ? position + 1 : readAttribute(html, position, found, meta)
+      isSpace(code) || code === 47
+        ? position + 1
+        : readAttribute(html, position, found, meta, classValues)
   }
   return html.length
 }
@@ -173,6 +237,7 @@ function readNameEnd(html: string, index: number): number {
  */
 export function scanHtml(html: string): HtmlTokens {
   const found: HtmlTokens = { classes: new Set(), carried: new Set(), rendered: new Set() }
+  const classValues = new Set<string>()
   let position = html.indexOf('<')
   while (position !== -1) {
     if (html.startsWith('<!--', position)) {
@@ -182,9 +247,9 @@ export function scanHtml(html: string): HtmlTokens {
       position = end + 3
     } else if (isLetter(codeAt(html, position + 1))) {
       const nameEnd = readNameEnd(html, position + 1)
-      const name = html.slice(position + 1, nameEnd).toLowerCase()
-      position = readAttributes(html, nameEnd, found, name === 'meta')
-      if (RAW_TEXT_ELEMENTS.has(name)) position = findClosingTag(html, position, name)
+      const name = findWord(html, position + 1, nameEnd, TAG_NAMES)
+      position = readAttributes(html, nameEnd, found, name === 'meta', classValues)
+      if (name !== undefined && name !== 'meta') position = findClosingTag(html, position, name)
     } else {
       position++
     }

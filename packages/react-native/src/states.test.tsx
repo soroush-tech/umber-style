@@ -5,6 +5,7 @@ import { at, state } from '@umber-style/core'
 import { platform } from '../vitest.react-native'
 import { matchesCondition } from './conditions'
 import { createStyle } from './createStyle'
+import { createDefaultStyle } from './defaultStyle'
 import { collectKeys, toNativeStyle } from './toNativeStyle'
 import { warnAboutDroppedKey } from './warnStyle'
 
@@ -420,6 +421,85 @@ describe('a function style that names a state on one render and not on the next'
     act(() => setLive(true))
     expect(typeof record.props.style).toBe('function')
     expect(error).not.toHaveBeenCalled()
+  })
+})
+
+describe('a style with state and condition keys over many renders', () => {
+  it('gives each render the values that resolving it gives, the same object for the same combination', () => {
+    const { styled, ThemeProvider, when } = createStyle(theme)
+    const { View, calls } = createStandIn()
+    const look = {
+      opacity: 1,
+      [when(dark)]: { opacity: 0.9, ...at(state('pressed'), { opacity: 0.2 }) },
+      ...at(state('disabled'), { opacity: 0.4, [wide]: { margin: 4 } }),
+      ...at(state('pressed'), { opacity: 0.7 }),
+    }
+    const Card = styled(View)(look)
+    const renders: [object, Props][] = [
+      [theme, {}],
+      [theme, { disabled: true }],
+      [dark, { disabled: true }],
+      [dark, {}],
+      [theme, { disabled: true }],
+      [theme, { pressed: true }],
+      [dark, { disabled: true }],
+      [theme, {}],
+    ]
+    const { rerender } = render(<ThemeProvider theme={theme}>{null}</ThemeProvider>)
+    for (const [given, props] of renders) {
+      rerender(
+        <ThemeProvider theme={given}>
+          <Card {...props} />
+        </ThemeProvider>
+      )
+    }
+    platform.resize(700, 800)
+    rerender(
+      <ThemeProvider theme={theme}>
+        <Card disabled />
+      </ThemeProvider>
+    )
+    const styles = calls.map((call) => (call.style as object[])[0])
+    expect(styles).toEqual([
+      { opacity: 1 },
+      { opacity: 0.4 },
+      { opacity: 0.4 },
+      { opacity: 0.9 },
+      { opacity: 0.4 },
+      { opacity: 0.7 },
+      { opacity: 0.4 },
+      { opacity: 1 },
+      { opacity: 0.4, margin: 4 },
+    ])
+    // Each is what resolving the style for that render gives, and a combination seen before is its object.
+    const window = {
+      width: 400,
+      height: 800,
+      colorScheme: 'light' as const,
+      isReducedMotion: false,
+    }
+    renders.forEach(([given, props], index) => {
+      const condition = { theme: given, colorScheme: undefined }
+      expect(styles[index]).toEqual(toNativeStyle(look, condition, settings, window, props))
+    })
+    expect(styles[4]).toBe(styles[1])
+    expect(styles[6]).toBe(styles[2])
+    expect(styles[7]).toBe(styles[0])
+    expect(styles[8]).not.toBe(styles[1])
+  })
+})
+
+describe('a style with state keys and no theme at all', () => {
+  it('is resolved for each set of states, as with a theme', () => {
+    const { styled } = createDefaultStyle()
+    const { View, calls } = createStandIn()
+    const Card = styled(View)({ opacity: 1, ...at(state('disabled'), { opacity: 0.4 }) })
+    const { rerender } = render(<Card />)
+    rerender(<Card disabled />)
+    rerender(<Card />)
+    const styles = calls.map((call) => (call.style as object[])[0])
+    expect(styles).toEqual([{ opacity: 1 }, { opacity: 0.4 }, { opacity: 1 }])
+    expect(styles[2]).toBe(styles[0])
   })
 })
 

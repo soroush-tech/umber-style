@@ -64,8 +64,21 @@ function isLeaf(value: unknown): value is string | number {
   return typeof value === 'string' || typeof value === 'number'
 }
 
+/** Whether every character of `key` is a lowercase letter, a digit, `_` or `-`: a part of a name as it is. */
+function isSegment(key: string): boolean {
+  for (let index = 0; index < key.length; index++) {
+    const code = key.codePointAt(index) as number
+    const isKept =
+      (code >= 97 && code <= 122) || (code >= 48 && code <= 57) || code === 95 || code === 45
+    if (!isKept) return false
+  }
+  return true
+}
+
 /** A theme key as one part of a variable name. */
 function toSegment(key: string): string {
+  // Such a key has nothing to rewrite: no capital to split before, nothing to lower or to replace.
+  if (isSegment(key)) return key
   return key
     .replace(/([a-z0-9])([A-Z])/g, '$1-$2')
     .toLowerCase()
@@ -85,6 +98,8 @@ interface Declared {
 
 /** The value of the longest dotted path in `entries` that `path` starts with, or undefined. */
 function findByPath<V>(entries: ReadonlyMap<string, V>, path: readonly string[]): V | undefined {
+  // No entry has any path: there is nothing to join and look up.
+  if (entries.size === 0) return undefined
   for (let length = path.length; length > 0; length--) {
     const value = entries.get(path.slice(0, length).join('.'))
     if (value !== undefined) return value
@@ -179,7 +194,8 @@ export function createTokens<T extends object>(theme: T, options: TokenOptions =
   const isKept = (path: readonly string[]): boolean => {
     const mode = readMode(path)
     const hasDeeper =
-      parents.has(path.join('.')) || patternParents.some((parts) => matchesPattern(parts, path))
+      (parents.size > 0 && parents.has(path.join('.'))) ||
+      patternParents.some((parts) => matchesPattern(parts, path))
     return (mode === 'raw' || mode === 'inline') && !hasDeeper
   }
 

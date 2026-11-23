@@ -1,5 +1,8 @@
 import { isDevelopment } from './devChecks'
 
+/** `process` where there is one, as `devChecks.ts` declares it. */
+declare const process: { env: { NODE_ENV?: string } }
+
 /** The version of this copy of the core: what it records, and names in a warning, when it first reads the shared state. */
 export const CORE_VERSION = '0.4.0'
 
@@ -39,7 +42,16 @@ function registerCopy(shared: Map<string, unknown>): void {
     copies = []
     shared.set(COPIES_KEY, copies)
   }
-  const warning = copies.length > 0 && isDevelopment() ? describeCopies(copies) : undefined
+  // What `isDevelopment()` reads is written out in front of it, so that a bundler that writes in
+  // production for `process.env.NODE_ENV` drops the warning and its text (see `devChecks.md`).
+  const warning =
+    copies.length > 0 &&
+    typeof process !== 'undefined' &&
+    process.env != null &&
+    process.env.NODE_ENV !== 'production' &&
+    isDevelopment()
+      ? describeCopies(copies)
+      : undefined
   if (warning !== undefined) console.warn(warning)
   copies.push(CORE_VERSION)
 }

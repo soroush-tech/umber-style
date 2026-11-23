@@ -234,6 +234,46 @@ interface EngineFamily<T> {
   /** The base theme as it was given on purpose (`setTheme`), not adopted from the first theme seen. */
   givenTheme: T | undefined
   engines: WeakMap<Cache, Engine<T>>
+  /** The tokens last made for each prefix, with the theme and the options they were made from (see `readFamilyTokens`). */
+  tokens: Map<string, FamilyTokens<T>>
+}
+
+/** The tokens of one theme object for one set of token options. */
+interface FamilyTokens<T> {
+  theme: T
+  options: TokenOptions
+  tokens: Tokens<T>
+}
+
+/** Whether two sets of token options are the same objects, as the engines of one family pass them on. */
+function isSameTokenOptions(first: TokenOptions, second: TokenOptions): boolean {
+  return (
+    first.prefix === second.prefix &&
+    first.rawKeys === second.rawKeys &&
+    first.lengthKeys === second.lengthKeys &&
+    first.modes === second.modes &&
+    first.registered === second.registered
+  )
+}
+
+/**
+ * The tokens of `theme` with `options`, made once for each theme object and prefix and shared by the
+ * engines of the family: the engine of a fresh cache (a cache provider's, made for one render) reads
+ * the base theme of the family again, and the tokens of the same object with the same options are the
+ * same. A theme object is not changed after it is used (the engine reads each once, `themeId`).
+ */
+function readFamilyTokens<T extends object>(
+  family: EngineFamily<T>,
+  theme: T,
+  options: TokenOptions
+): Tokens<T> {
+  // The engine always gives its prefix.
+  const key = options.prefix as string
+  const made = family.tokens.get(key)
+  if (made?.theme === theme && isSameTokenOptions(made.options, options)) return made.tokens
+  const tokens = createTokens(theme, options)
+  family.tokens.set(key, { theme, options, tokens })
+  return tokens
 }
 
 /** `text` in kebab-case: ButtonBase gives button-base. */
@@ -393,6 +433,7 @@ export function createLazyEngine<T extends object = Theme>(options: EngineOption
     theme: undefined,
     givenTheme: undefined,
     engines: new WeakMap(),
+    tokens: new Map(),
   })
 }
 
@@ -431,7 +472,7 @@ function createFamilyEngine<T extends object>(
     const theme = family.theme
     if (theme === tokensTheme) return
     tokensTheme = theme
-    tokens = createTokens(theme as T, tokenOptions)
+    tokens = readFamilyTokens(family, theme as T, tokenOptions)
     if (isChecked && theme) warnMissingPaths(theme, { modes, registered, alwaysDeclare }, warn)
     views = new WeakMap()
     recentViews = []

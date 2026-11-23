@@ -22,15 +22,19 @@ and `@umber-style/server` build on its public members.
 
 ```mermaid
 flowchart TD
-  entry["css, cssIn, cssWith(values)"] --> sort["sortClassValues: styles, raw class names, entries"]
+  entry["css, cssIn, cssWith(values)"] --> names{"no development checks, and every value a class string?"}
+  names -->|yes| memo{"a merge of these names remembered, each name with the same style, its class written?"}
+  memo -->|yes| again["registered.set(name, the merged style of then); return what it returned"]
+  memo -->|no| sort
+  names -->|no| sort["sortClassValues: styles, raw class names, entries"]
   sort --> sole{"one entry only, and no 'after'?"}
   sole -->|yes| use["entry.use(layer): its class, written if new"]
   sole -->|no| prep["prepareClass: merge styles, compile to rules for '&', name = prefix-label-hash"]
   prep --> empty{"no rules?"}
   empty -->|yes| raw["return the raw class names"]
   empty -->|no| reg["registered.set(name, merged)"]
-  reg --> seen{"name already in insertedIds?"}
-  seen -->|yes| ret["return raw names and name"]
+  reg --> seen{"name already in insertedIds, and no development checks?"}
+  seen -->|yes| ret["return raw names and name; class names alone are remembered"]
   seen -->|no| comp["compileClass: development value checks, then rules for '.name'"]
   comp --> kf["findAnimationNames: write each @keyframes once, outside layers"]
   kf --> once["insertOnce: wrap in layer, insertLayered into the sheet"]
@@ -115,6 +119,13 @@ The rest of the closure, in the order of the file:
 
 ## The data
 
+- `merges` (one for each set of style options, on `WrittenAs`): the merges of class names alone (`css(a, b)`,
+  `cx`), keyed by layer, label, `after` and the names joined; each entry holds the names, the style each had
+  in `registered` then, the merged style, the class and what `cssWith` returned. It is checked by identity:
+  a name whose style was set again (a hit, a held class written again) or removed makes the entry stale, and
+  it is made again. At most `MERGE_LIMIT` (1000) entries; the oldest leaves first. Measured: about 450 KB for
+  1000 entries, the same after 10,000 distinct merges of 10,000 classes (measured with `--expose-gc` on
+  the build, for issue 10).
 - `registered`: class name -> merged `StyleObject`. `insertedIds`: what is written or found on the page.
   `insertedRules`: id -> the rules written for it. `animations`: class -> names it uses. `afters`: props
   class -> its base class.
@@ -131,6 +142,8 @@ The rest of the closure, in the order of the file:
   after two classes is two classes.
 - Rules with the same text are never written twice (`@property` rules are keyed by name and text hash).
 - The layer order statement is the first rule written, once.
+- A remembered merge gives what merging again would give: the same names, each with the same style object,
+  merge to the same class, and nothing is remembered with the development checks on.
 - `extractPage` reads the cache and changes nothing, so pages rendered in any order get the same CSS, apart
   from the root theme, which is the one inserted last.
 - Without a document nothing browser-specific runs: the sheet is in memory and nothing is watched. Nothing
@@ -140,6 +153,24 @@ The rest of the closure, in the order of the file:
 
 ## Decisions
 
+- A class that is written already is not compiled for its selector again: those rules are made only to be
+  written, and `insertClass` writes nothing for a written class. With the development checks they still
+  are, because `compileClass` checks the values first (a class a server sent is checked there too). This
+  took a hit of a small style from 1.64 to 1.30 us and of the large one from 21.4 to 13.5 us (host, one
+  process; with the serializer's changes 0.93 and 7.7 us).
+- The merges of class names alone are remembered (`merges`), because a merge redid the merge, both compiles
+  and the hash on every call: two classes went from 3.5 to 0.4 us, five from 6.8 to 0.6 us. Only class
+  strings are remembered, never a style object, which code may change between two calls; and an entry is
+  trusted only while each name still has the very style object it had, so a name made again, removed or
+  registered for the first time makes the merge again. The class's `registered` style is then the merged
+  style of the remembered call, equal to what merging again gives. Rejected: a memo by the identity of a
+  style object (a hit in 0.03 us instead of 0.9): it would keep the class of an object that was changed
+  after its first use, which today gives a new class; that is a change of behaviour, not made.
+- `registered` is set again on every call, also on a hit: two styles with the same rules can differ in
+  what writes no rule (an empty nested object, a function value), and a later merge of the class name reads
+  the style of the last call. Keeping the first one would be faster and is not done.
+- The classes of a page are sorted by keys made once for each class, not in each comparison (the keys are
+  distinct, so the order is the same).
 - Pruning is the default: a theme class holds only variables a rule uses, so a page does not carry tokens it
   never reads. Without pruning every variable is declared.
 - The class name is made from rules compiled without vendor prefixes (`naming`), so the name is the same

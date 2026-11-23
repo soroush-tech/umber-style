@@ -56,7 +56,8 @@ a weak-type error on React Native). `STATE_SELECTORS` from `state.test.ts`:
 - A style with a state key compiles to the same rules, class name and order as the same style with the
   selector key (`state.test.ts`, and the binding tests of React, its server build and Vue).
 - The warning is given once for each unknown name, only in development (`isDevelopment()` of
-  `devChecks.ts`), and the key is returned all the same.
+  `devChecks.ts`, written out in front of it so that a production bundle leaves the warning and its text
+  out: `devChecks.md`), and the key is returned all the same.
 - Nothing touches a browser global.
 
 ## Decisions
