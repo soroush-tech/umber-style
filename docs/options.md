@@ -14,7 +14,7 @@ After this page you can look up any option or prop of UmberStyle: its name, type
 | `styled(tag, options)`                                             | The styled options below                                                                                                                                       |
 | `<ThemeProvider />`                                                | The props below                                                                                                                                                |
 
-An engine makes its own cache from the options that are shared with the cache. If you give the engine a `cache` (or a `CacheProvider` gives one), the options that describe how the styles are written (`hasValueRepair`, `hasColorFallbacks`, `hasVendorPrefixes`, `hasBaseClass`, and the token options) are the engine's when it was given them, else the cache's; the options that say how classes are named and where rules are stored (`suffix`, `hasLabels`, `hasLayers`, `hasPruning`, `hasScope`, `speedy`, `nonce`) are the cache's, and with the development checks the engine warns about each of them it was given. See [The cache and server packages](cache-and-server.md).
+An engine makes its own cache from the options that are shared with the cache. If you give the engine a `cache` (or a `CacheProvider` gives one), the options that describe how the styles are written (`hasValueRepair`, `hasColorFallbacks`, `hasVendorPrefixes`, `hasBaseClass`, and the token options) are the engine's when it was given them, else the cache's; the options that say how classes are named, found and stored (`suffix`, `hasLabels`, `hasLayers`, `hasPruning`, `hasScope`, `hasStyleMemo`, `speedy`, `nonce`) are the cache's, and with the development checks the engine warns about each of them it was given. See [The cache and server packages](cache-and-server.md).
 
 ## Engine options
 
@@ -32,6 +32,7 @@ An engine makes its own cache from the options that are shared with the cache. I
 | `hasVendorPrefixes` | `boolean`                                  | `true`                                                                                            | Whether a declaration that a supported browser still needs in a prefixed form is written after that form (`-webkit-user-select:none;user-select:none;`). The class name does not change. See [Browser support](browser-support.md#vendor-prefixed-declarations)                                                                                                                                                                                                                      |
 | `hasValueRepair`    | `boolean`                                  | `false`                                                                                           | Whether the string forms of token maths that are not valid CSS (`var(--x)1F`, `-var(--x)`, `var(--x)ms`) are rewritten in each value. See [Tokens](tokens.md#string-forms-of-token-maths)                                                                                                                                                                                                                                                                                            |
 | `hasScope`          | `boolean`                                  | `true`                                                                                            | Whether `when()` and `whenScheme()` use `@scope`. Without it the rule is a plain descendant selector, which is wrong for nested themes. See [Theme conditions](theme-conditions.md)                                                                                                                                                                                                                                                                                                  |
+| `hasStyleMemo`      | `boolean`                                  | `false`                                                                                           | Whether the cache remembers the class of a style by its contents, so that the same contents in a new object are not compiled again. The classes and rules are the same with it or without. See [`hasStyleMemo`](#hasstylememo)                                                                                                                                                                                                                                                       |
 | `hasPruning`        | `boolean`                                  | `true`                                                                                            | Whether a theme class declares only the variables that rules use. See [Tokens](tokens.md)                                                                                                                                                                                                                                                                                                                                                                                            |
 | `alwaysDeclare`     | `readonly string[]`                        | `[]`                                                                                              | Theme paths (a top-level key or a dotted path) whose variables are always declared                                                                                                                                                                                                                                                                                                                                                                                                   |
 | `cache`             | `Cache`                                    | one is made                                                                                       | The cache to use. Its `prefix` is the prefix of the engine too: variables and classes use the same one                                                                                                                                                                                                                                                                                                                                                                               |
@@ -40,7 +41,7 @@ An engine makes its own cache from the options that are shared with the cache. I
 | `modes`             | `Record<string, TokenMode>`                | none                                                                                              | The mode of a token by dotted theme path, or by a pattern with `*` for any one key (`'typography.*.fontSize'`): `'variable'`, `'inline'`, `'reference'` or `'raw'`. The longest path wins, an exact path before a pattern, and an entry beats `rawKeys`. With the development checks a path that matches no key of the theme is warned about                                                                                                                                         |
 | `registered`        | `Record<string, RegisteredSyntax \| true>` | none                                                                                              | Tokens that are registered custom properties (an `@property` rule), by dotted path. `true` infers the syntax. See [Tokens](tokens.md)                                                                                                                                                                                                                                                                                                                                                |
 
-`hasLayers`, `hasScope`, `hasPruning`, `speedy`, `nonce`, `suffix` and `hasLabels` are used when the engine makes its cache. `hasBaseClass`, `hasColorFallbacks`, `hasValueRepair` and `hasVendorPrefixes` are used when the engine makes its cache, and over a cache it was given too. `hasDevChecks` is used by the cache it makes and by the engine itself: with a `cache` given, the engine checks what its style functions return when this option says so, or, without it, when that cache has the checks on or the build is a development one. `rawKeys`, `lengthKeys`, `modes`, `registered` and `alwaysDeclare` are always the engine's. The `prefix` is the cache's: a given cache sets it, and an engine `prefix` that differs from it throws a `TypeError` that names both.
+`hasLayers`, `hasScope`, `hasPruning`, `hasStyleMemo`, `speedy`, `nonce`, `suffix` and `hasLabels` are used when the engine makes its cache. `hasBaseClass`, `hasColorFallbacks`, `hasValueRepair` and `hasVendorPrefixes` are used when the engine makes its cache, and over a cache it was given too. `hasDevChecks` is used by the cache it makes and by the engine itself: with a `cache` given, the engine checks what its style functions return when this option says so, or, without it, when that cache has the checks on or the build is a development one. `rawKeys`, `lengthKeys`, `modes`, `registered` and `alwaysDeclare` are always the engine's. The `prefix` is the cache's: a given cache sets it, and an engine `prefix` that differs from it throws a `TypeError` that names both.
 
 `TokenMode` is `'variable' | 'inline' | 'reference' | 'raw'`. `RegisteredSyntax` is `'<color>' | '<length>' | '<number>' | '<percentage>' | '<length-percentage>' | '<angle>' | '<time>' | '*'`.
 
@@ -64,6 +65,7 @@ An engine makes its own cache from the options that are shared with the cache. I
 | `hasVendorPrefixes` | `boolean` | `true`                                                             | Whether a declaration that a supported browser needs in a prefixed form gets that form first. See [Browser support](browser-support.md#vendor-prefixed-declarations)                                                                         |
 | `hasValueRepair`    | `boolean` | `false`                                                            | Whether `var(--x)1F`, `-var(--x)`, `var(--x)ms` and `var(--x)s` are rewritten as `alpha()`, `negate()` and a `calc()` of a time write them                                                                                                   |
 | `hasScope`          | `boolean` | `true`                                                             | Whether conditional rules use `@scope`                                                                                                                                                                                                       |
+| `hasStyleMemo`      | `boolean` | `false`                                                            | Whether the cache remembers the class of a style by its contents. See [`hasStyleMemo`](#hasstylememo)                                                                                                                                        |
 | `sheet`             | `Sheet`   | a DOM sheet when `document` exists, otherwise an in-memory one     | Where rules go                                                                                                                                                                                                                               |
 
 A `Sheet` has `insert(rule)`, a readonly `rules` list, and optionally `replace(index, rule)` and `remove(index)`. Without `remove`, released global rules stay, and so does every class made from a plain object in `style` (see [No inline styles](no-inline-styles.md)). `createMemorySheet()` and `createDomSheet(key, container = document.head, { speedy })` make the two sheets that the package has. A DOM sheet without `speedy` writes each rule as the text of a `<style data-style="<key>">` element of its own, each one right after the element of the rule before it, and removes a rule by removing its element (the last one stays, empty, where the rules were, for the next rule), so the text of the elements is always the live rules, in order; it starts in an empty element of the key that the page has, else in one it makes in its container, never in one that a server filled, which it leaves to the server's rules, and the cache never reads the text it wrote as a server's. With `speedy` it writes with `insertRule`, into one element of its key, and skips a rule the browser rejects. Neither has `replace`, so a cache writes the same rules in both ways. A sheet may have a `document`: the document whose style element holds its rules. `createDomSheet` gives the document of its container, and the cache then reads that document (an iframe's) instead of the global one; see [The cache and server packages](cache-and-server.md).
@@ -96,6 +98,60 @@ When to set it by hand:
 - To read the CSS of a production build in the inspector: `speedy: false`.
 
 It is the one boolean option whose name does not start with `is` or `has`: it is the name that apps already pass, and it stays. `hasRuleText`, its name before 0.3.0 with the opposite meaning, is not an option any more: passing it is a type error, and in development an options object that still has it gets one warning that says what to write instead (`hasRuleText: false` is `speedy: true`, `hasRuleText: true` is `speedy: false`). Its value is not read: the default applies.
+
+### `hasStyleMemo`
+
+A component that writes a condition in its style makes a new object on every render, with one of a few
+contents: `({ isMobile }) => ({ fontSize: isMobile ? 12 : 48 })`. Without the memo the cache compiles
+each object to its rules and hashes them before it finds that it has the class. With `hasStyleMemo:
+true` it remembers, for each set of contents, the class it made, and finds it again without compiling.
+The class names, the rules and their order are the same with the memo and without it, on the server and
+in a document; only the time and the memory differ.
+
+```ts
+const cache = createCache({ prefix: 'm', sheet: createMemorySheet(), hasStyleMemo: true })
+cache.css({ width: 1 }) // compiled and named
+cache.css({ width: 1 }) // the same contents again: compiled, and remembered
+cache.css({ width: 1 }) // and from now on found, not compiled
+cache.css({ width: '1' }) // other contents: a string is not a number, and gets no unit
+```
+
+(`cache.memo.test.ts`.) The same option goes to `createEngine`, `createStyle` and `configure`, and
+`createInstance` of `@umber-style/css`.
+
+What it covers, and what takes the full path as before:
+
+- It covers a call whose values are style objects (any number of them, merged as always), whose values
+  are strings and numbers, with nested selectors and at-rules of the same, at any depth.
+- A class name or a sheet entry among the values, a list of fallback values, an `alpha()` value, a live
+  value of `useStyleValue`, a function, an object that is not a plain object, or a getter in a nested
+  style: that call takes the full path, and is not remembered.
+- With the development checks on (`hasDevChecks`), or value repair (`hasValueRepair`, whose result reads
+  the values of the tokens), there is no memo: every call takes the full path and is checked as before.
+- A held class (a plain object given to `style`) is not remembered.
+
+What it costs: one walk of the contents of the call's merged style, on every call it covers. A style is
+remembered the second time its class is made, so a style whose contents never repeat (a new number on
+every call) pays that walk and nothing more. It holds at most 10,000 steps (a step is one key with its
+value) for each set of style options, and is emptied when full; see
+[Benchmarks](benchmarks.md#what-is-measured) for the times.
+
+The cases it is made against, each with a test that fails if the memo gets it wrong:
+
+- A rule the cache removed, and the same contents again (a held class let go, a sheet emptied by
+  `flush()`): the memo gives a class name only, and every call registers that class as a call without the
+  memo does, writing its rule when the sheet lacks it. A memo belongs to one cache, so a fresh cache (one
+  for each request, a `CacheProvider`) starts with an empty one.
+- A number against a string of the same text (`{ width: 1 }` gets `1px`, `{ width: '1' }` stays `1`):
+  the memo keeps the values themselves, not their text, so a number and a string are never one entry.
+- A value that holds the characters that would join two declarations (`{ a: 'b;c:d' }` against
+  `{ a: 'b', c: 'd' }`): nothing is joined into text, each key and each value is a step of its own.
+- Keys in another order (`{ margin: 0, marginLeft: 4 }` against `{ marginLeft: 4, margin: 0 }`, which
+  differ in CSS): the steps follow the order of the keys, so the two are two entries, as they are two
+  classes.
+- Entries that write no rule (`undefined`, `null`, `false`, an empty nested object, a label): the class
+  is the class of the rules, as without the memo, and the cache keeps the style of the last call, which a
+  later merge of the class name reads, as without the memo.
 
 ## Binding options
 
@@ -142,3 +198,11 @@ On the web the outermost provider (none above it) renders no element and declare
 | `createStyleTag(cache, options?)`         | `options.nonce`: `string`, default `cache.nonce`   | The `nonce` attribute of the tag, escaped                                             |
 | `extractPageStyles(cache, html, options)` | `options.nonce`: `string`, default `cache.nonce`   | The `nonce` attribute of `tag`, escaped; `css` is the same with it or without         |
 | `<CacheProvider value={cache}>`           | `value`: a cache                                   | The cache of the subtree; under it no server style element is rendered (React)        |
+
+## Limits
+
+- `hasStyleMemo` is measured on the server and in Node (`docs/benchmarks.md`); its cost in a browser's
+  memory, and over a long session, is not measured.
+- A nested style that is a `Proxy` whose traps answer differently from one read to the next is read
+  through its property descriptors by the memo and through its values by the compiler; the memo does not
+  check for it.

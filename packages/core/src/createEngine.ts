@@ -335,6 +335,7 @@ const CACHE_OPTIONS = [
   'hasLayers',
   'hasPruning',
   'hasScope',
+  'hasStyleMemo',
   'speedy',
   'nonce',
 ] as const
@@ -394,6 +395,7 @@ function selectCache(options: EngineOptions, prefix: string): Cache {
     hasScope: options.hasScope,
     hasBaseClass: options.hasBaseClass,
     hasDevChecks: options.hasDevChecks,
+    hasStyleMemo: options.hasStyleMemo,
     speedy: options.speedy,
     nonce: options.nonce,
     tokenSignature: createTokenSignature([rawKeys, lengthKeys, modes, registered, alwaysDeclare]),

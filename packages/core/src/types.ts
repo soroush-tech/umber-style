@@ -25,6 +25,8 @@ export interface EngineOptions extends TokenOptions {
   hasPruning?: boolean
   /** Whether a component's styles are split by position into a base class (made once) and a props class (made for each render). Default true; used when the engine makes its cache. */
   hasBaseClass?: boolean
+  /** Whether the cache remembers the class of a style by its contents (`CacheOptions.hasStyleMemo`). Default false; used when the engine makes its cache. */
+  hasStyleMemo?: boolean
   /**
    * Whether the development checks run, each problem warned about once: the cache checks the page in the
    * browser (`findMissingStyles`, and each inserted declaration that `CSS.supports` rejects) and each value

@@ -22,7 +22,13 @@ and `@umber-style/server` build on its public members.
 
 ```mermaid
 flowchart TD
-  entry["css, cssIn, cssWith(values)"] --> names{"no development checks, and every value a class string?"}
+  call["css, cssIn, cssWith(values)"] --> memoOn{"hasStyleMemo, no development checks, no value repair (chosen once)?"}
+  memoOn -->|no| entry
+  memoOn -->|yes| objects{"every value a style object?"}
+  objects -->|no| entry
+  objects -->|yes| contents["cssContents: merge, find the class by contents (contentMemo.ts), else compile, name, remember"]
+  contents --> reg
+  entry["cssWith"] --> names{"no development checks, and every value a class string?"}
   names -->|yes| memo{"a merge of these names remembered, each name with the same style, its class written?"}
   memo -->|yes| again["registered.set(name, the merged style of then); return what it returned"]
   memo -->|no| sort
@@ -127,6 +133,10 @@ The rest of the closure, in the order of the file:
   it is made again. At most `MERGE_LIMIT` (1000) entries; the oldest leaves first. Measured: about 450 KB for
   1000 entries, the same after 10,000 distinct merges of 10,000 classes (measured with `--expose-gc` on
   the build, for issue 10).
+- `contents` (one for each set of style options, on `WrittenAs`, only with `hasStyleMemo` and without the
+  development checks and value repair): the class of each merged style made of style objects alone, by
+  its layer, `after` and contents (`contentMemo.md`). At most `CONTENT_STEP_LIMIT` (10,000) steps, then
+  emptied.
 - `registered`: class name -> merged `StyleObject`. `insertedIds`: what is written or found on the page.
   `insertedRules`: id -> the rules written for it. `animations`: class -> names it uses. `afters`: props
   class -> its base class.
@@ -167,6 +177,11 @@ The rest of the closure, in the order of the file:
   style of the remembered call, equal to what merging again gives. Rejected: a memo by the identity of a
   style object (a hit in 0.03 us instead of 0.9): it would keep the class of an object that was changed
   after its first use, which today gives a new class; that is a change of behaviour, not made.
+- With `hasStyleMemo` (off by default) a call of style objects alone finds its class by the contents of
+  the merged style and is not compiled or hashed; it is merged and registered as every call is, so the
+  class, the rules, `registered` and the sheet are what the full path leaves (`contentMemo.md`, with the
+  cases it guards against). The compilers choose `cssWithMemo` or `cssWith` once, when they are made, so
+  without the option the path is the one before it, with no check added.
 - `registered` is set again on every call, also on a hit: two styles with the same rules can differ in
   what writes no rule (an empty nested object, a function value), and a later merge of the class name reads
   the style of the last call. Keeping the first one would be faster and is not done.

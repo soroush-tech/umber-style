@@ -90,7 +90,7 @@ passes, a number, `true` or a function warns once and becomes `undefined`).
 - A view is planned once with the props of the first call; a function that read no prop then takes the
   same path for every later call with that view.
 - Engine options that only a cache holds (`CACHE_OPTIONS`: `suffix`, `hasLabels`, `hasLayers`, `hasPruning`,
-  `hasScope`, `speedy`, `nonce`) are ignored, with a warning, when a cache is given: the cache decides.
+  `hasScope`, `hasStyleMemo`, `speedy`, `nonce`) are ignored, with a warning, when a cache is given: the cache decides.
   `nonce` is passed to the cache the engine makes, for its style element and the tags made from it.
 - An options object that still has `hasRuleText` (renamed to `speedy` in 0.3.0, with the opposite meaning)
   is warned about once in development by `warnRenamedOption`, before the cache is chosen, with a cache or
