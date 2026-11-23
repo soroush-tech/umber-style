@@ -69,10 +69,11 @@ which grew with the square of N):
 ```mermaid
 flowchart TD
   create["createDomSheet(key, container, speedy)"] --> renamed["warnRenamedOption: hasRuleText in development"]
-  renamed --> mode{"speedy?"}
-  mode -->|yes| ruleEl["element of key not written by text, else a new one in container"]
-  ruleEl --> insertRule["insert: insertRule into it; remove: deleteRule of the object kept"]
-  mode -->|no| firstEl["first element: an empty one of key that no sheet uses, else a new one in container"]
+  renamed --> nothing["nothing is added to the document; the element is claimed at the first rule"]
+  nothing --> mode{"speedy?"}
+  mode -->|yes| ruleEl["first insert: element of key not written by text, else a new one in container"]
+  ruleEl --> insertRule["insert: insertRule into it; remove: deleteRule of the object kept; the element stays"]
+  mode -->|no| firstEl["first insert: an empty element of key that no sheet uses, else a new one in container"]
   firstEl --> anchor["anchor = first element"]
   anchor --> ins{"insert: anchor set?"}
   ins -->|yes| intoAnchor["text node into the anchor, anchor cleared"]
@@ -183,6 +184,19 @@ The rest of the closure, in the order of the file:
   sheet's last rule, so the rules of a sheet stay together and in the order of `rules`. Two sheets of one
   key never share an element (each element holds one rule of one sheet): a text sheet takes only an empty
   element that no sheet marked, and a second sheet of the key starts in the container.
+- A DOM sheet finds or makes its element when its first rule is written, not when it is made, in both
+  ways of writing: a cache or a sheet that writes nothing adds nothing to the document. Before, a style
+  made at the top of a module with no nonce put an empty element with no nonce in the page at once, and a
+  cache of the same key that had the nonce (a registry's, under a `CacheProvider`) found it and wrote into
+  it, under a strict policy into an element the browser had refused. The element goes where it went (the
+  end of `container`, at the time of the first rule now, so after what came into the container since the
+  sheet was made). An empty element of the key that the page placed is still used and still not made by
+  the engine; it goes to the first sheet of the key that writes, which may be one made after another
+  sheet of the key. What reads the document needs no element of the sheet: `sheet.document` is the
+  document of the container, the page is read and watched as before (the element, when it comes, is one
+  the watch skips or finds empty), and `findCache` reads the cache by its document. Written with
+  `insertRule`, the element stays when the last rule is removed, as the anchor of a text sheet does, so
+  that a sheet is in one element for its whole life.
 - When the last rule of a text sheet is removed, its element stays, empty, as the anchor of the next rule,
   rather than a reference to its neighbours, which other code may move or remove. The anchor is marked
   `text`, so no other sheet takes it.

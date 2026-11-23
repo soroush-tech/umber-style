@@ -592,13 +592,14 @@ function createStyleElement(
 /**
  * A sheet that writes each rule as the text of a style element of its own, so that the document parses
  * that rule alone, and never again the rules written before it: the cost of a rule does not grow with the
- * sheet. The first rule goes into `first`; each later one into an element made right after the element of
- * the rule before it, so the rules of the sheet stay together and in order. Removing a rule removes its
+ * sheet. The first rule goes into the element that `claim` gives at that rule (no element is made or
+ * taken before a rule is written); each later one into an element made right after the element of the
+ * rule before it, so the rules of the sheet stay together and in order. Removing a rule removes its
  * element, but the last one left keeps its place, empty, for the next rule. It has no `replace`, as a
  * sheet of `insertRule` has none, so that a cache writes the same rules in both ways.
  */
 function createTextSheet(
-  first: HTMLStyleElement,
+  claim: () => HTMLStyleElement,
   owner: Document,
   key: string,
   nonce: string | undefined
@@ -606,13 +607,19 @@ function createTextSheet(
   const rules: string[] = []
   const elements: HTMLStyleElement[] = []
   // While the sheet holds no rule: the empty element that keeps the place of its rules.
-  let anchor: HTMLStyleElement | undefined = first
+  let anchor: HTMLStyleElement | undefined
+  // What gives the first element, until the first rule takes it.
+  let claimFirst: (() => HTMLStyleElement) | undefined = claim
   return {
     rules,
     document: owner,
     insert(rule) {
       const node = owner.createTextNode(rule)
       writtenText.add(node)
+      if (claimFirst) {
+        anchor = claimFirst()
+        claimFirst = undefined
+      }
       if (anchor === undefined) {
         const element = createStyleElement(owner, key, nonce)
         elementModes.set(element, 'text')
@@ -646,19 +653,25 @@ function readRuleSelector(rule: string): string {
   return (head.at(-2) ?? rule).trim()
 }
 
-/** A sheet that writes with `insertRule`: it keeps the browser's object of each rule, and removes a rule by finding where that object is at the time. */
+/**
+ * A sheet that writes with `insertRule` into the element that `claim` gives at the first rule (none is
+ * made or taken before): it keeps the browser's object of each rule, and removes a rule by finding where
+ * that object is at the time. The element stays when the last rule is removed, as the anchor of a text
+ * sheet does.
+ */
 function createRuleSheet(
-  element: HTMLStyleElement,
+  claim: () => HTMLStyleElement,
   owner: Document,
   onReject: DomSheetOptions['onReject']
 ): Sheet {
-  const sheet = element.sheet as CSSStyleSheet
+  let sheet: CSSStyleSheet | undefined
   const rules: string[] = []
   const objects: CSSRule[] = []
   return {
     rules,
     document: owner,
     insert(rule) {
+      sheet ??= claim().sheet as CSSStyleSheet
       try {
         const index = sheet.insertRule(rule, sheet.cssRules.length)
         objects.push(sheet.cssRules[index])
@@ -676,7 +689,8 @@ function createRuleSheet(
 }
 
 /**
- * A sheet in the style elements marked `data-style="<key>"` of the document of `container`. Without
+ * A sheet in the style elements marked `data-style="<key>"` of the document of `container`, found or
+ * made when its first rule is written: making the sheet adds nothing to the document. Without
  * `speedy` each rule is the text of an element of its own, kept as it is given (the browser drops a
  * rule it rejects when it parses the text): the first element is an empty one of the document that no
  * sheet uses, else one it creates in `container`, and the next ones follow it. With it, a rule goes in
@@ -695,15 +709,20 @@ export function createDomSheet(
   const { speedy = isProduction(), onReject, nonce } = options
   const mode = speedy ? 'rules' : 'text'
   const owner = container.ownerDocument as Document
-  let element = findSheetElement(owner, key, mode)
-  if (!element) {
-    element = createStyleElement(owner, key, nonce)
-    container.appendChild(element)
+  // The element is found or made when the first rule is written: a sheet that writes nothing adds
+  // nothing to the document, so a style made with no nonce leaves no element for a cache that has one.
+  const claim = (): HTMLStyleElement => {
+    let element = findSheetElement(owner, key, mode)
+    if (!element) {
+      element = createStyleElement(owner, key, nonce)
+      container.appendChild(element)
+    }
+    elementModes.set(element, mode)
+    return element
   }
-  elementModes.set(element, mode)
   return speedy
-    ? createRuleSheet(element, owner, onReject)
-    : createTextSheet(element, owner, key, nonce)
+    ? createRuleSheet(claim, owner, onReject)
+    : createTextSheet(claim, owner, key, nonce)
 }
 
 /**

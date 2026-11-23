@@ -216,7 +216,7 @@ client.injectGlobal({ body: { margin: 0 } }) // no rule written
 
 ### `flush`
 
-`flush()` removes every rule from the sheet of the instance and starts a new, empty cache over it: the classes, the global rules and the hydrated ids are forgotten, and a style is written again when it is next used. `cache` reads the new cache after it. In a browser the rules are removed from the style element.
+`flush()` removes every rule from the sheet of the instance and starts a new, empty cache over it: the classes, the global rules and the hydrated ids are forgotten, and a style is written again when it is next used. `cache` reads the new cache after it. In a browser the rules are removed from the style element, which stays, empty, for the next rule; the element is made at the first rule an instance writes, so an instance that writes nothing adds none.
 
 ```ts
 const name = css({ margin: 2 })

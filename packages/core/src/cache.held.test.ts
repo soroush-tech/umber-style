@@ -235,8 +235,9 @@ describe('the removal of a held class', () => {
 
   it('deletes the rules from a style element of the browser, written by insertRule', () => {
     const { cache } = setup({ sheet: createDomSheet('u', undefined, { speedy: true }) })
-    const element = document.querySelector('style[data-style="u"]') as HTMLStyleElement
     const kept = cache.css({ color: 'blue' })
+    // The element of the sheet is made at its first rule.
+    const element = document.querySelector('style[data-style="u"]') as HTMLStyleElement
     const { hold } = cache.cssHeld({}, { width: 7 })
     ;(element.sheet as CSSStyleSheet).insertRule('main{order:1;}', 0)
     ;(hold as () => () => void)()()

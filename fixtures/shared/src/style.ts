@@ -13,8 +13,8 @@ const readPageNonce = (): string | undefined =>
 
 // One style for the whole app. It is imported by the server and by the browser, so both make the
 // same class names: the prefix and the themes are the same. Its own cache makes a style element in the
-// browser as soon as it is made, and writes the rules of the theme classes below into it: under a
-// strict policy that element needs the page's nonce, which is not in a rule, a class or the stamp.
+// browser at its first rule, the rules of the theme classes below, at start-up: under a strict policy
+// that element needs the page's nonce, which is not in a rule, a class or the stamp.
 export const style = createStyle(lightTheme, { prefix: 'umber', nonce: readPageNonce() })
 
 export const {

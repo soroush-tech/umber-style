@@ -68,7 +68,9 @@ bound to it, so `get`, `has` and `size` still work.
 - `speedy` is the name apps pass from the library they move from, and since 0.3.0 the core's own name, so
   this package has no option of its own for it and translates nothing; the code names no such library.
 - `key` replaces `prefix` as the name of the option.
-- The sheet's `tags` is a getter, so it lists the elements at the time it is read, not at creation.
+- The sheet's `tags` is a getter, so it lists the elements at the time it is read, not at creation. The
+  cache's own element is made at its first rule (`createDomSheet` of the core), so a cache that has written
+  nothing lists only the elements a server sent, and a cache that writes nothing never adds one.
 - `compat` starts `false`; a set-up can set it to `true` to have `inserted` hold CSS text.
 
 ## Limits

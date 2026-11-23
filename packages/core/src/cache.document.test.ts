@@ -32,9 +32,11 @@ describe('createDomSheet in another document', () => {
     const frame = createFrameDocument()
     const sheet = createDomSheet('u', frame.head)
     expect(sheet.document).toBe(frame)
+    // Its element is made at its first rule, in that document; none before.
+    expect(frame.querySelectorAll('style[data-style="u"]')).toHaveLength(0)
+    sheet.insert('.u-a{color:red;}')
     expect(frame.querySelectorAll('style[data-style="u"]')).toHaveLength(1)
     expect(document.querySelector('style[data-style="u"]')).toBeNull()
-    sheet.insert('.u-a{color:red;}')
     expect(frame.querySelector('style')?.sheet?.cssRules[0].cssText).toBe('.u-a { color: red; }')
     // A second sheet of the key looks in that document: one by insertRule finds the element there that
     // is not written by text; one by text uses an empty element there that no sheet uses.
