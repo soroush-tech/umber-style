@@ -44,7 +44,7 @@ export function createDefaultStyle() {
       // the watch and its text out of the bundle.
       if (
         !isConfigured &&
-        typeof process !== 'undefined' &&
+        typeof process === 'object' &&
         process.env != null &&
         process.env.NODE_ENV !== 'production' &&
         isDevelopment()

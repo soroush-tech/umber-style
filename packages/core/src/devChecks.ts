@@ -38,7 +38,7 @@ export function warnRenamedOption(prefix: string, options: object): void {
   // What `isDevelopment()` reads is written out in front of it, so that a bundler that writes in
   // production for `process.env.NODE_ENV` drops the branch and its text (see `devChecks.md`).
   if (
-    typeof process !== 'undefined' &&
+    typeof process === 'object' &&
     process.env != null &&
     process.env.NODE_ENV !== 'production' &&
     isDevelopment()

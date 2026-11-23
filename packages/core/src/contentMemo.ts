@@ -55,25 +55,32 @@ function readNestedValue(style: StyleObject, key: string): unknown {
  */
 export function readStableStyle(style: StyleObject, isNested = false): StyleObject | undefined {
   const keys = Object.keys(style)
+  if (isNested && keys.includes('__proto__')) return undefined
   let copy: StyleObject | undefined = isNested ? {} : undefined
   for (let index = 0; index < keys.length; index++) {
     const key = keys[index]
-    if (isNested && key === '__proto__') return undefined
     const value = isNested ? readNestedValue(style, key) : style[key]
-    if (isPlainValue(value)) {
-      if (copy) copy[key] = value
-      continue
-    }
-    if (!isNestedStyle(value)) return undefined
-    const inner = readStableStyle(value, true)
-    if (inner === undefined) return undefined
-    if (copy === undefined) {
-      copy = {}
-      for (const before of keys.slice(0, index)) copy[before] = style[before]
-    }
-    copy[key] = inner
+    const stable = readStableValue(value)
+    if (stable === NOT_DATA) return undefined
+    // A nested style is held as a copy, so the style that holds it is a copy too, from its first key.
+    if (copy === undefined && stable !== value) copy = copyFirstKeys(style, keys, index)
+    if (copy) copy[key] = stable as StyleObject[string]
   }
   return copy ?? style
+}
+
+/** The stable form of one value of a style: the value when it is plain, a copy of a nested style, `NOT_DATA` for anything else. */
+function readStableValue(value: unknown): unknown {
+  if (isPlainValue(value)) return value
+  if (!isNestedStyle(value)) return NOT_DATA
+  return readStableStyle(value, true) ?? NOT_DATA
+}
+
+/** A style with the first `count` keys of `style`, in order. */
+function copyFirstKeys(style: StyleObject, keys: readonly string[], count: number): StyleObject {
+  const copy: StyleObject = {}
+  for (let index = 0; index < count; index++) copy[keys[index]] = style[keys[index]]
+  return copy
 }
 
 /**

@@ -46,7 +46,7 @@ function registerCopy(shared: Map<string, unknown>): void {
   // production for `process.env.NODE_ENV` drops the warning and its text (see `devChecks.md`).
   const warning =
     copies.length > 0 &&
-    typeof process !== 'undefined' &&
+    typeof process === 'object' &&
     process.env != null &&
     process.env.NODE_ENV !== 'production' &&
     isDevelopment()

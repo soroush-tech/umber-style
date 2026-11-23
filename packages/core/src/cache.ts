@@ -529,8 +529,13 @@ function readMergeKey(
   label: string | undefined,
   after: string
 ): string | undefined {
-  for (const value of values) if (typeof value !== 'string') return undefined
-  return `${layer}\n${label ?? ''}\n${after}\n${values.join(' ')}`
+  let names = ''
+  for (let index = 0; index < values.length; index++) {
+    const value = values[index]
+    if (typeof value !== 'string') return undefined
+    names += index === 0 ? value : ` ${value}`
+  }
+  return `${layer}\n${label ?? ''}\n${after}\n${names}`
 }
 
 /** A sheet that keeps its rules in memory, for a server render or a test. */

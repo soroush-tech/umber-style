@@ -42,7 +42,7 @@ export function state(name: StateName): StateKey {
   if (
     !STATE_NAMES.has(name) &&
     !warnedNames.has(name) &&
-    typeof process !== 'undefined' &&
+    typeof process === 'object' &&
     process.env != null &&
     process.env.NODE_ENV !== 'production' &&
     isDevelopment()
