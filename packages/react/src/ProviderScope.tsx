@@ -28,6 +28,11 @@ export interface ThemeScopeValue {
 export interface ProviderMark {
   /** The wrapper of the nearest nested provider, or null when there is none below the outermost one. */
   readonly scope: ThemeScopeValue | null
+  /**
+   * The themes that the nested providers gave, from the one below the outermost provider down to the
+   * nearest, merged: what the class of a merged theme declares. Undefined when no nested provider is above.
+   */
+  readonly nested?: object
 }
 
 /**
@@ -153,6 +158,8 @@ export interface ScopeTheme {
   readonly base?: ScopeBase
   /** The style elements of the other classes of the wrapper: the scope class, and the classes in `className`. */
   readonly styles: readonly StyleText[]
+  /** The nonce of the cache (`CacheOptions.nonce`), which every style element of the provider carries. */
+  readonly nonce?: string
 }
 
 /** The props of `ProviderScope`: what a provider of the server build hands to its browser part. */
@@ -278,7 +285,16 @@ export function ProviderScope({
   // With isRoot the theme is the class on an ancestor, as for a provider of the client build with isRoot:
   // it passes on the wrapper above.
   const scope = theme === undefined ? (above?.scope ?? null) : (wrapper ?? null)
-  const below = React.useMemo(() => addMark(marks, prefix, { scope }), [marks, prefix, scope])
+  // A nested provider adds its theme to those of the nested providers above, for the merged class of a
+  // nested provider of the client build below; the outermost one adds nothing, and isRoot passes them on.
+  const nested = React.useMemo(() => {
+    if (isNested) return mergeTheme(above?.nested, given)
+    return theme === undefined ? above?.nested : undefined
+  }, [isNested, above, given, theme])
+  const below = React.useMemo(
+    () => addMark(marks, prefix, { scope, nested }),
+    [marks, prefix, scope, nested]
+  )
   const { contexts, holder } = readPrefixStyle(prefix)
   const outer = (React.use(contexts.ThemeContext) ?? holder?.givenTheme) as object | undefined
   const merged = React.useMemo(() => mergeTheme(outer, given), [outer, given])
@@ -307,7 +323,11 @@ export function ProviderScope({
     React.Fragment,
     null,
     styles.list.map(({ href, text }) =>
-      React.createElement('style', { key: href, href, precedence: prefix }, text)
+      React.createElement(
+        'style',
+        { key: href, href, precedence: prefix, nonce: theme?.nonce },
+        text
+      )
     ),
     wrapper === undefined
       ? content

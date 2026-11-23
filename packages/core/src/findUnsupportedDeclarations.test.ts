@@ -121,7 +121,9 @@ describe('findUnsupportedDeclarations', () => {
     const spaces = ' '.repeat(100_000)
     const started = performance.now()
     const found = find(`.u-a{elevation:a${spaces}b;display:no !${spaces}x}`)
-    expect(performance.now() - started).toBeLessThan(250)
+    // A reader that goes back over the spaces takes many seconds here; the limit leaves room for a busy
+    // machine and for coverage, under which this took 260 ms once.
+    expect(performance.now() - started).toBeLessThan(2000)
     expect(found).toHaveLength(2)
   })
 

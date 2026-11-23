@@ -94,6 +94,9 @@ export function createDefaultStyle() {
 
   const useStyle = ((sheet: never) => getStyle().useStyle(sheet)) as WebStyle<Theme>['useStyle']
 
+  const useStyleValue: WebStyle<Theme>['useStyleValue'] = (initial, unit) =>
+    getStyle().useStyleValue(initial, unit)
+
   function useTheme(): Theme {
     return getStyle().useTheme()
   }
@@ -120,6 +123,7 @@ export function createDefaultStyle() {
     styled,
     StyleSheet,
     useStyle,
+    useStyleValue,
     useTheme,
     ThemeProvider,
     ThemeScope,

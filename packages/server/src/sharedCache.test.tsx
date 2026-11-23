@@ -13,7 +13,7 @@ afterEach(() => {
 })
 
 describe('one cache for the css package and a styled component under a CacheProvider', () => {
-  it('holds the rules of both in one style element, and the server instance extracts them together', () => {
+  it('holds the rules of both in the style elements of one cache, and the server instance extracts them together', () => {
     const sheet = createDomSheet('app')
     const cache = createCache({ prefix: 'app', sheet, hasDevChecks: false })
     const { css } = createCssInstance({ cache, sheet })
@@ -32,9 +32,12 @@ describe('one cache for the css package and a styled component under a CacheProv
     )
     const boxClass = /app-box-root-\w+/.exec(html)?.[0] as string
 
-    const elements = document.querySelectorAll<HTMLStyleElement>('style[data-style="app"]')
-    expect(elements).toHaveLength(1)
-    const written = [...(elements[0].sheet?.cssRules ?? [])].map((rule) => rule.cssText).join('')
+    // Outside production each rule is an element of its own.
+    const elements = [...document.querySelectorAll<HTMLStyleElement>('style[data-style="app"]')]
+    const written = elements
+      .flatMap((element) => [...(element.sheet as CSSStyleSheet).cssRules])
+      .map((rule) => rule.cssText)
+      .join('')
     expect(written).toContain(`.${badge}`)
     expect(written).toContain(`.${boxClass}`)
 

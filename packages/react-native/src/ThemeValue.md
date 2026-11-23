@@ -41,7 +41,8 @@ flowchart TD
 ## The data
 
 - `ThemeHolder<T>` is `{ baseTheme: T | undefined }`: the base theme given by the app (`createStyle(theme)`,
-  `configure({ theme })`), never set by a provider.
+  `configure({ theme })`), never set by a provider. It is the one holder type of the binding: `createStyle.ts`
+  and `defaultStyle.ts` import it from here.
 - `nativeByTheme` (theme -> native theme) and `themeByNative` (native -> original), both `WeakMap`s.
 - The condition's `theme` is `given`, the theme as this provider was given it, not the merged one.
 
@@ -63,4 +64,6 @@ flowchart TD
 
 ## Limits
 
-- `ThemeHolder` has the same shape as `NativeHolder` in `createStyle.ts`; the two are declared separately.
+- The base theme of the holder is read at each render, not watched: a holder whose `baseTheme` changed
+  after a render would not render anything again. The binding never changes it then (`configure` throws
+  once the default style was used, and `createStyle` fills its holder once).

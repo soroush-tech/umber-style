@@ -4,7 +4,7 @@ Build: client. The server counterpart is `defaultStyle.server.ts`.
 
 ## What it does
 
-`createDefaultStyle()` makes the default styling: `styled`, `StyleSheet`, `useStyle`, `useTheme`,
+`createDefaultStyle()` makes the default styling: `styled`, `StyleSheet`, `useStyle`, `useStyleValue`, `useTheme`,
 `ThemeProvider`, `ThemeScope`, `useThemeClass`, `ThemeContext`, `apply`, `css`, `when`, `whenScheme`,
 `themeClass`, `keyframes`, `globalStyles`, `Global`, plus `configure` and `getEngine`. Each is a thin function
 that forwards to a style bound on first use.

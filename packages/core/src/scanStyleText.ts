@@ -1,4 +1,5 @@
 import { codeAt } from './codeAt'
+import { ROOT_SELECTOR } from './theme'
 import { scanVariables } from './variables'
 
 /** What the CSS text of an engine's style element holds: the picture of a page that a cache builds at start-up. */
@@ -50,7 +51,6 @@ interface OpenBlock {
 }
 
 const LAYER_AT_RULE = '@layer'
-const ROOT_SELECTOR = ':where(:root)'
 const PROPERTY_AT_RULE = '@property'
 const KEYFRAMES_AT_RULE = '@keyframes'
 

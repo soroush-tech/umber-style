@@ -127,7 +127,9 @@ describe('the layers of a cache', () => {
     const cache = createCache({ prefix: 'u', sheet: createDomSheet('u') })
     cache.css({ color: 'red' })
     cache.cssIn('overrides', { color: 'blue' })
-    const rules = [...(document.querySelector('style')?.sheet?.cssRules ?? [])]
+    const rules = [...document.querySelectorAll('style')].flatMap((element) => [
+      ...(element.sheet as CSSStyleSheet).cssRules,
+    ])
     expect(rules).toHaveLength(3)
     expect(rules[0]?.constructor.name).toBe('CSSLayerStatementRule')
     expect(rules.slice(1).every((rule) => rule.constructor.name === 'CSSLayerBlockRule')).toBe(true)

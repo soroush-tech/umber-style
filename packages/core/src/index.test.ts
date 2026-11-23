@@ -81,9 +81,27 @@ describe('the core', () => {
       'negate',
       'keyframes',
       'globalStyles',
+      'createNonceAttribute',
+      'createLiveValue',
+      'declareLiveValue',
+      'isLiveValue',
+      'writeLiveValue',
     ]) {
       expect(core).toHaveProperty(name)
     }
     expect(core).not.toHaveProperty('createStyle')
+  })
+
+  it('has every value it exports in the table of docs/plain-javascript.md, and nothing else there', () => {
+    const page = readFileSync(join(SOURCE, '../../../docs/plain-javascript.md'), 'utf8')
+    const start = page.indexOf('## Everything `@umber-style/core` exports')
+    const section = page.slice(start, page.indexOf('\n## ', start + 1))
+    const listed = section
+      .split('\n')
+      .filter((line) => line.startsWith('| `'))
+      .flatMap((line) => [...line.split('|')[1].matchAll(/`(\w+)`/g)].map(([, name]) => name))
+    expect(start).toBeGreaterThan(0)
+    expect(listed.length).toBe(new Set(listed).size)
+    expect([...listed].sort()).toEqual(Object.keys(core).sort())
   })
 })

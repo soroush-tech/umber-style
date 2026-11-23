@@ -224,11 +224,45 @@ describe('the root rules of a registry element streamed into the body', () => {
     expect(hasRoot(late)).toBe(false)
   })
 
-  it.fails('KNOWN: a root rule that arrives in the body after the browser cache declared its root theme is kept, after the rule of the cache in the document, so its old values win', async () => {
+  it('are removed on arrival when the element comes after the browser cache declared its root theme', async () => {
     const cache = createCache({ hasLayers: false, prefix: 'u', sheet: createMemorySheet() })
     declareRootTheme(cache, dark)
     const late = addLateElement(':where(:root){--u-a:1;--u-b:2;}')
     await settle()
     expect(hasRoot(late)).toBe(false)
+  })
+
+  it('are removed on arrival after a switch of the theme, so the theme switched to stays in effect', async () => {
+    // A cache whose sheet is in the page, so that the computed value on the root shows what is in effect.
+    const cache = createCache({ hasLayers: false, prefix: 'u' })
+    cache.css({ color: 'var(--u-a)' })
+    const readA = () => getComputedStyle(document.documentElement).getPropertyValue('--u-a')
+    declareRootTheme(cache, light)
+    expect(readA()).toBe('1')
+    // The theme is switched while the page streams; then the late chunk arrives with the server's root rule.
+    declareRootTheme(cache, dark)
+    expect(readA()).toBe('10')
+    const late = addLateElement(':where(:root){--u-a:1;--u-b:2;}')
+    await settle()
+    expect(hasRoot(late)).toBe(false)
+    expect(readA()).toBe('10')
+  })
+
+  it('are removed on arrival with the other rules of the element kept', async () => {
+    const cache = createCache({ hasLayers: false, prefix: 'u', sheet: createMemorySheet() })
+    declareRootTheme(cache, dark)
+    const late = addLateElement('.u-late-1abc{color:var(--u-a);}:where(:root){--u-a:1;}')
+    await settle()
+    const texts = [...(late.sheet as CSSStyleSheet).cssRules].map((rule) => rule.cssText)
+    expect(texts).toHaveLength(1)
+    expect(texts[0]).toContain('.u-late-1abc')
+  })
+
+  it('are left on arrival where the browser kept a different number of rules', async () => {
+    const cache = createCache({ hasLayers: false, prefix: 'u', sheet: createMemorySheet() })
+    declareRootTheme(cache, dark)
+    const late = addLateElement(':where(:root){--u-a:1;}@unknown{}')
+    await settle()
+    expect(hasRoot(late)).toBe(true)
   })
 })

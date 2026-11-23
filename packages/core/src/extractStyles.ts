@@ -1,9 +1,35 @@
 import type { Cache, PageExtractOptions, PageParts } from './cache'
 import { scanHtml } from './scanHtml'
 
-/** The style element of `css`: the cache's key, and the stamp of its options for the browser to compare. */
-function createTag(cache: Cache, css: string): string {
-  return `<style data-style="${cache.prefix}" data-options="${cache.fingerprint}">${css}</style>`
+// The characters that end or open something in the value of an attribute in double quotes.
+const ATTRIBUTE_ESCAPES: Readonly<Record<string, string>> = {
+  '&': '&amp;',
+  '"': '&quot;',
+  '<': '&lt;',
+  '>': '&gt;',
+}
+
+/**
+ * The ` nonce="..."` attribute of a style tag written as text, with `&`, `"`, `<` and `>` escaped, or ''
+ * without a nonce. Its space comes first, so that it is written right after the name of the tag or
+ * another attribute.
+ */
+export function createNonceAttribute(nonce: string | undefined): string {
+  if (nonce === undefined) return ''
+  let escaped = ''
+  for (const character of nonce) escaped += ATTRIBUTE_ESCAPES[character] ?? character
+  return ` nonce="${escaped}"`
+}
+
+/** What a style tag is written with, besides its CSS. */
+export interface StyleTagOptions {
+  /** The nonce of the tag, for a policy that allows style elements by nonce. Default: the cache's (`CacheOptions.nonce`). */
+  nonce?: string
+}
+
+/** The style element of `css`: the cache's key, the stamp of its options for the browser to compare, and its nonce. */
+function createTag(cache: Cache, css: string, nonce = cache.nonce): string {
+  return `<style data-style="${cache.prefix}" data-options="${cache.fingerprint}"${createNonceAttribute(nonce)}>${css}</style>`
 }
 
 /**
@@ -11,10 +37,11 @@ function createTag(cache: Cache, css: string): string {
  * inserted it. A cache that renders more than one page (a server process) should use `extractPageStyles`,
  * which carries only what one page uses. The element is stamped with the options of the cache
  * (`data-options`), which a cache made in the browser compares with its own; it holds no list of ids,
- * because the browser reads the rules themselves.
+ * because the browser reads the rules themselves. It carries the nonce of `options`, else that of the
+ * cache, when there is one.
  */
-export function createStyleTag(cache: Cache): string {
-  return createTag(cache, cache.extract().css)
+export function createStyleTag(cache: Cache, options: StyleTagOptions = {}): string {
+  return createTag(cache, cache.extract().css, options.nonce)
 }
 
 /** What one page needs: its CSS, what that CSS covers, and the element to put in its head. */
@@ -25,7 +52,7 @@ export interface PageStyles {
   ids: string[]
   /** The stamp of the options of the cache: the `data-options` of the style element, for a page that writes the element itself. */
   options: string
-  /** The style element with `css`, stamped with the options of the cache. */
+  /** The style element with `css`, stamped with the options of the cache, with the nonce of the options or of the cache. */
   tag: string
 }
 
@@ -48,14 +75,16 @@ export interface PageStyleOptions {
  * (`engine.insertGlobal`), which are in every page, and those of the `Global` components that `html`
  * rendered: a style element it carries, or a marker that names the set (a `<meta name="<prefix>-global">`
  * of React, a comment `<!--<prefix>-global ...-->` of Vue). A set that another page rendered is not.
+ * The tag carries the nonce of `options`, else that of the cache, when there is one: a server whose cache
+ * serves many requests gives the nonce of each request here.
  */
 export function extractPageStyles(
   cache: Cache,
   html: string,
-  options: PageStyleOptions = {}
+  options: PageStyleOptions & StyleTagOptions = {}
 ): PageStyles {
   const { css, ids } = cache.extractPage(...readPage(html, options))
-  return { css, ids, options: cache.fingerprint, tag: createTag(cache, css) }
+  return { css, ids, options: cache.fingerprint, tag: createTag(cache, css, options.nonce) }
 }
 
 /** The class names of `html`, and what `extractPage` is told besides them. */

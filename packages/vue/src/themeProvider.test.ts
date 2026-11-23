@@ -120,7 +120,7 @@ describe('the outermost provider', () => {
 })
 
 describe('a nested provider', () => {
-  it('renders one wrapper: the class of what it changes, of its merged theme, and the scope', async () => {
+  it('renders one wrapper under the outermost provider: the class of what it changes, and the scope', async () => {
     const style = setup()
     const { Child, renders } = createCounted(style)
     const theme = ref<object>({ palette: { primary: '#ff0000' } })
@@ -130,13 +130,11 @@ describe('a nested provider', () => {
       )
     )
     const wrapper = root.firstElementChild as HTMLElement
-    const [own, boundary, full, scope] = wrapper.className.split(' ')
+    // The class of its merged theme is the class of its own theme: the outermost theme is on :root.
+    const [own, boundary, scope] = wrapper.className.split(' ')
     expect([boundary, scope]).toEqual(['v-boundary', 'v-scope'])
-    expect(style.ruleOf(own)).toBe(`.${own}{--v-palette-primary:#ff0000;}`)
     style.engine.css({ color: style.engine.refs.palette.text })
-    expect(style.ruleOf(full)).toBe(
-      `.${full}{--v-palette-primary:#ff0000;--v-palette-text:#111111;}`
-    )
+    expect(style.ruleOf(own)).toBe(`.${own}{--v-palette-primary:#ff0000;}`)
     const before = wrapper.className
     theme.value = { palette: { primary: '#00ff00' } }
     await nextTick()
@@ -174,7 +172,31 @@ describe('a nested provider', () => {
     expect(seen).toBe(wrapper.className)
   })
 
-  it('declares its whole merged theme when it is in teleported content', () => {
+  it('three deep, has the class of the nested themes above it and its own, merged, and never the outermost theme, through isRoot too', () => {
+    const style = setup()
+    style.engine.css({
+      color: style.engine.refs.palette.primary,
+      fill: style.engine.refs.palette.text,
+    })
+    const root = mount(() =>
+      h(style.ThemeProvider, { theme: light }, () =>
+        h(style.ThemeProvider, { theme: { palette: { text: '#00ff00' } } }, () =>
+          h(style.ThemeProvider, { theme: light, isRoot: true }, () =>
+            h(style.ThemeProvider, { theme: { palette: { primary: '#ff0000' } } })
+          )
+        )
+      )
+    )
+    const inner = root.firstElementChild?.firstElementChild as HTMLElement
+    const [own, boundary, full, scope] = inner.className.split(' ')
+    expect([boundary, scope]).toEqual(['v-boundary', 'v-scope'])
+    expect(style.ruleOf(own)).toBe(`.${own}{--v-palette-primary:#ff0000;}`)
+    expect(style.ruleOf(full)).toBe(
+      `.${full}{--v-palette-text:#00ff00;--v-palette-primary:#ff0000;}`
+    )
+  })
+
+  it('declares the nested themes above it and its own when it is in teleported content', () => {
     const style = setup()
     const target = document.createElement('div')
     document.body.appendChild(target)

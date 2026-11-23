@@ -42,6 +42,11 @@ A name that mirrors a platform term, or an interface kept for compatibility, kee
 option that carries a CSS or platform word (`wrap`, `reducedMotion`, `colorScheme`). Every other
 boolean takes the prefix.
 
+One option of the engine is the exception, on purpose: `speedy` (`true`: rules written with
+`insertRule`; `false`: each rule as the text of a style element of its own). It is the name that apps
+already pass from the styling library they move from, so it was named so in 0.3.0 (it was
+`hasRuleText`, with the opposite meaning). Do not rename it to fit the rule (`docs/options.md#speedy`).
+
 ## Functions & Methods - camelCase + verb prefix
 
 ```ts

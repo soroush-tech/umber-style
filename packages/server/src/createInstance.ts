@@ -1,4 +1,4 @@
-import { extractPageStyleParts, type Cache } from '@umber-style/core'
+import { createNonceAttribute, extractPageStyleParts, type Cache } from '@umber-style/core'
 
 /** The CSS of one key of a page, and the ids it covers. */
 export interface StyleChunk {
@@ -38,7 +38,7 @@ export interface ServerInstance {
    * and `<key>` (the rules of the classes of the page; its ids are the classes).
    */
   extractCriticalToChunks(html: string): CriticalChunks
-  /** One `<style data-umber="<key> <ids>">` element for each chunk that has CSS, in order, as text. */
+  /** One `<style data-umber="<key> <ids>">` element for each chunk that has CSS, in order, as text, with the nonce of the cache when it has one. */
   constructStyleTagsFromChunks(chunks: Pick<CriticalChunks, 'styles'>): string
   /** `html` with the style elements of its chunks put first: right after its `<head>` when it has one, else at its start. */
   renderStylesToString(html: string): string
@@ -46,9 +46,9 @@ export interface ServerInstance {
 
 const HEAD_PATTERN = /<head(?:\s[^>]*)?>/i
 
-/** The style element of one chunk. */
-function createTag({ key, ids, css }: StyleChunk): string {
-  return `<style data-umber="${[key, ...ids].join(' ')}">${css}</style>`
+/** The style element of one chunk, with `nonceAttribute` (see `createNonceAttribute`). */
+function createTag({ key, ids, css }: StyleChunk, nonceAttribute: string): string {
+  return `<style data-umber="${[key, ...ids].join(' ')}"${nonceAttribute}>${css}</style>`
 }
 
 /**
@@ -56,9 +56,11 @@ function createTag({ key, ids, css }: StyleChunk): string {
  * `extractPageStyleParts`: the CSS of a page is decided from the class names in its HTML, plus the global
  * rules, the `@keyframes` rules those use and the theme classes trimmed to the variables in use. The cache
  * is not changed, so one cache can serve pages rendered at once, and the same page gets the same CSS.
+ * The style elements carry the nonce of the cache (`createCache({ key, nonce })`), escaped.
  */
 export default function createInstance(cache: Cache): ServerInstance {
   const key = cache.prefix
+  const nonceAttribute = createNonceAttribute(cache.nonce)
 
   const extractCriticalToChunks = (html: string): CriticalChunks => {
     const { global, classes } = extractPageStyleParts(cache, html)
@@ -74,7 +76,7 @@ export default function createInstance(cache: Cache): ServerInstance {
   const constructStyleTagsFromChunks = ({ styles }: Pick<CriticalChunks, 'styles'>): string =>
     styles
       .filter(({ css }) => css !== '')
-      .map(createTag)
+      .map((chunk) => createTag(chunk, nonceAttribute))
       .join('')
 
   return {

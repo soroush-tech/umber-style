@@ -28,7 +28,7 @@ export function playScopes(
     const styles = isNested ? createNestedStyles(prefix, given, theme) : root ? [root.style] : []
     const elements = styles.map(({ href, text }): ResolvedNode => ({
       type: 'style',
-      props: { href, precedence: prefix },
+      props: { href, precedence: prefix, nonce: theme.nonce },
       children: [text],
     }))
     if (!isNested) return [...elements, ...children]

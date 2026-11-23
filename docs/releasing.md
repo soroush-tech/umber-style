@@ -58,6 +58,8 @@ The run does these things, in this order, and stops at the first one that fails:
 5. Publishes each package with `pnpm publish` under the channel's tag. A package that fails stops the run, because the ones after it depend on it; run it again and what is already on npm is skipped.
 6. For `rc` and `stable`, creates a GitHub Release for each package, tagged `<name>@<version>`, with the notes file as its body, and does nothing when the release exists. An rc is a pre-release and is never marked latest.
 
+Then a second job, `bench-report`, makes the benchmark report of what was published: once the registry lists the new version, the scenarios of the gate run with the new version, the last stable and, for an alpha or an rc, the previous one of its channel, each installed from npm. Only `@umber-style/core` has these scenarios; the other packages get a line that says so. The table is in the summary of the run and, for an rc or a stable release, below the notes of its GitHub Release (the notes file is not changed). The report never fails the release: when it cannot run, the summary says so. How to read it: [Benchmarks](benchmarks.md#the-report-after-a-release).
+
 Publishing uses npm Trusted Publishing: the run gets a short-lived token from GitHub and npm verifies it against the trusted publisher of each package (organization `soroush-tech`, repository `umber-style`, workflow `cd-packages.yml`, environment `cd-packages`). There is no npm token in the repository.
 
 ## Install a prerelease
@@ -118,3 +120,4 @@ Node cannot load `react-native`, so the test installs a small stand-in with the 
 - Trusted Publishing needs npm CLI 11.5.1 or later and Node 22.14.0 or later, according to the [npm documentation](https://docs.npmjs.com/trusted-publishers). The workflow checks the first and installs the newest 11.x when the one that came with Node is older. The same page names a higher version, 11.21.0, for managing dist-tags with `npm dist-tag`; the workflow does not call that command.
 - The packed-tarball test runs the React Native binding against a stand-in, so the types of the real `react-native` are checked only by the workspace typecheck, and the binding has never run in a real app.
 - Stable releases could later go through npm's staged publishing. The workflow does not use it.
+- The `bench-report` job has not run in GitHub Actions either. Its script and its benchmark files were run on a laptop for past releases as if they had just been published.

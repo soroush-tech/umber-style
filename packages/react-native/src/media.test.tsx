@@ -317,6 +317,25 @@ describe('styled with media keys', () => {
       [{ opacity: 1 }],
     ])
   })
+
+  it('keeps reduced motion as it was when the platform fails to answer, and still follows its changes', async () => {
+    vi.mocked(AccessibilityInfo.isReduceMotionEnabled).mockReturnValueOnce(
+      Promise.reject(new Error('no answer'))
+    )
+    const { styled } = createStyle(theme)
+    const { View, calls } = createStandIn()
+    const Motion = styled(View)({ opacity: 1, [reduced]: { opacity: 0 } })
+    render(<Motion />)
+    await act(async () => {})
+    expect(calls.map((call) => call.style)).toEqual([[{ opacity: 1 }]])
+    act(() => platform.setReducedMotion(true))
+    act(() => platform.setReducedMotion(false))
+    expect(calls.map((call) => call.style)).toEqual([
+      [{ opacity: 1 }],
+      [{ opacity: 0 }],
+      [{ opacity: 1 }],
+    ])
+  })
 })
 
 describe('a sheet with media keys', () => {

@@ -19,9 +19,10 @@ describe('a plain object in style, in a real browser', () => {
     const container = document.createElement('div')
     document.body.appendChild(container)
     const root = createRoot(container)
-    const page = document.querySelector('style[data-style="hb"]') as HTMLStyleElement
+    // Outside production each rule is a style element of its own: the rules of all of them, in order.
     const widthRules = () =>
-      [...(page.sheet as CSSStyleSheet).cssRules]
+      [...document.querySelectorAll<HTMLStyleElement>('style[data-style="hb"]')]
+        .flatMap((element) => [...(element.sheet as CSSStyleSheet).cssRules])
         .map((rule) => rule.cssText)
         .filter((text) => text.includes('width'))
 

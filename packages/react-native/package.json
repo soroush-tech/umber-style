@@ -1,6 +1,6 @@
 {
   "name": "@umber-style/react-native",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "UmberStyle for React Native: the same names as the React binding, over the real theme values.",
   "keywords": [
     "styling",

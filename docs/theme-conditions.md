@@ -44,12 +44,12 @@ The markup has one class for both cards. The rules decide which applies:
 
 ```html
 <div class="umber-card-root-c8wvsy"></div>
-<div class="umber-theme-8yk78z umber-boundary umber-scheme-dark umber-theme-6pu5tk umber-scope">
+<div class="umber-theme-8yk78z umber-boundary umber-scheme-dark umber-scope">
   <div class="umber-card-root-c8wvsy"></div>
 </div>
 ```
 
-The outermost provider renders no element: its theme and its `color-scheme: light` are declared on `:root`, which carries no marker class. So the first card follows the system preference for `whenScheme('dark')`, and no `when()` of the light theme can match it. Where a condition must see the theme of the root, put the theme class on `<html>` and render the provider with `isRoot`: see [The root theme and switching](root-theme.md). The nested provider carries the class of the theme it was given (`umber-theme-8yk78z`, which `when(darkTheme, 'dark')` names), the markers, and the class of its merged theme.
+The outermost provider renders no element: its theme and its `color-scheme: light` are declared on `:root`, which carries no marker class. So the first card follows the system preference for `whenScheme('dark')`, and no `when()` of the light theme can match it. Where a condition must see the theme of the root, put the theme class on `<html>` and render the provider with `isRoot`: see [The root theme and switching](root-theme.md). The nested provider carries the class of the theme it was given (`umber-theme-8yk78z`, which `when(darkTheme, 'dark')` names), and the markers; directly under the outermost provider it has no second theme class (see [Themes](themes.md#the-provider)).
 
 ```text
 @layer umber-components{.umber-card-root-c8wvsy{border:none;}}

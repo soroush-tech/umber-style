@@ -22,10 +22,11 @@ import {
   type UmberCache,
 } from './index'
 
-/** The text of the default instance's style element, rule by rule. */
+/** The rules of the default instance's style elements, as the document parsed them, in order. */
 function readStyleElement(): string[] {
-  const element = document.querySelector<HTMLStyleElement>('style[data-style="css"]')
-  return [...(element?.sheet?.cssRules ?? [])].map((rule) => rule.cssText)
+  return [...document.querySelectorAll<HTMLStyleElement>('style[data-style="css"]')].flatMap(
+    (element) => [...(element.sheet as CSSStyleSheet).cssRules].map((rule) => rule.cssText)
+  )
 }
 
 afterEach(() => {

@@ -205,11 +205,13 @@ describe('a cache made in the browser', () => {
 })
 
 describe('how the style element of the cache is written', () => {
-  /** The text of the style element of the cache `key`. */
+  /** The text of the style elements of the cache `key`, joined in document order. */
   const readText = (key: string) =>
-    document.querySelector(`style[data-style="${key}"]`)?.textContent
+    [...document.querySelectorAll(`style[data-style="${key}"]`)]
+      .map((element) => element.textContent)
+      .join('')
 
-  it('holds the rules as text outside production, and takes speedy as kept for compatibility', () => {
+  it('holds the rules as text outside production, and writes them with insertRule with speedy', () => {
     const text = createCache({ key: 'text', hasDevChecks: false })
     const box = text.css({ color: 'red' })
     expect(readText('text')).toBe(
@@ -217,11 +219,37 @@ describe('how the style element of the cache is written', () => {
     )
     createCache({ key: 'speedy', speedy: true, hasDevChecks: false }).css({ color: 'red' })
     createCache({ key: 'slow', speedy: false, hasDevChecks: false }).css({ color: 'red' })
-    createCache({ key: 'both', speedy: false, hasRuleText: false, hasDevChecks: false }).css({
-      color: 'red',
-    })
-    expect([readText('speedy'), readText('both')]).toEqual(['', ''])
+    expect(readText('speedy')).toBe('')
     expect(readText('slow')).toContain('{color:red;}')
+  })
+
+  it('warns once in development about hasRuleText, which was renamed to speedy and is not read', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    vi.stubEnv('NODE_ENV', 'development')
+    // @ts-expect-error hasRuleText is no option: it was renamed to speedy.
+    createCache({ key: 'renamed', hasRuleText: false, hasDevChecks: false }).css({ color: 'red' })
+    vi.unstubAllEnvs()
+    expect(warn.mock.calls.map(([message]) => message)).toEqual([
+      '[renamed] The option hasRuleText was renamed to speedy, with the opposite meaning: hasRuleText: false is not read, and the default applies. Write speedy: true instead.',
+    ])
+    // The default of development: the rules as text.
+    expect(readText('renamed')).toContain('{color:red;}')
+    warn.mockRestore()
+  })
+
+  it('carries the nonce it is given, in either way of writing, and keeps it as `nonce`', () => {
+    const text = createCache({ key: 'strict', nonce: 'n0nce', hasDevChecks: false })
+    const fast = createCache({ key: 'fast', nonce: 'n0nce', speedy: true, hasDevChecks: false })
+    text.css({ color: 'red' })
+    fast.css({ color: 'red' })
+    for (const key of ['strict', 'fast']) {
+      expect(document.querySelector(`style[data-style="${key}"]`)?.getAttribute('nonce')).toBe(
+        'n0nce'
+      )
+    }
+    expect([text.nonce, fast.nonce]).toEqual(['n0nce', 'n0nce'])
+    // By text, the layer order and the class are an element each, both with the nonce.
+    expect(text.sheet.tags.map((tag) => tag.getAttribute('nonce'))).toEqual(['n0nce', 'n0nce'])
   })
 })
 

@@ -14,6 +14,7 @@ import type {
   KeyframesInput,
   KeyframesOptions,
   KeyframesSteps,
+  LiveValue,
   ObjectSheet,
   SerializedStyles,
   SheetEntry,
@@ -43,6 +44,7 @@ export type {
   GlobalStyleObject,
   GlobalStyles,
   KeyframesSteps,
+  LiveValue,
   NestedKey,
   SchemeKey,
   SchemeName,
@@ -196,8 +198,26 @@ export interface GlobalProps<T> {
   styles: GlobalInput<T>
 }
 
+/**
+ * A value of `useStyleValue` in Vue: the reference to its variable in a style (`${left}`, or an
+ * operand of the helpers of tokens), with `value` in the shape of a ref: reading it gives the number,
+ * setting it changes the declaration of the variable in place, with no render. `get()` reads it too.
+ */
+export interface StyleValueRef extends LiveValue {
+  /** The number now; setting it changes what the variable declares. */
+  value: number
+}
+
 /** What `createStyle` and `bindEngine` return: the Vue styling of one engine. */
 export interface Style<T> {
+  /**
+   * A number that a style reads through a CSS variable of its own, for a value that changes often (a
+   * slider): `const left = useStyleValue(0, '%')` in `setup`, `${left}` in a style, `left.value = 40` to
+   * change it with no render. The number is written with `unit` after it, or as it is without one. Its
+   * rule is on `:root`, in the theme layer, while the component is mounted; the reference falls back to
+   * the first number, which a server render shows with no rule.
+   */
+  useStyleValue(initial: number, unit?: string): StyleValueRef
   /** The engine every member writes through. */
   engine: Engine<T>
   /** The cache of the engine: its rules and sheet. */

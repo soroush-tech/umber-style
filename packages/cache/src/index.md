@@ -21,9 +21,8 @@ fixture app of `fixtures/next-app` and the tests of `server` use it.
 flowchart TD
   call["createCache(options)"] --> hasOnInsert{"'onInsert' in options?"}
   hasOnInsert -->|yes| throwTE["throw TypeError"]
-  hasOnInsert -->|no| split["key, speedy, rest"]
-  split --> ruleText["hasRuleText = rest.hasRuleText, else !speedy, else undefined"]
-  ruleText --> engine["engine cache: prefix = key, onInsert calls cache.insert"]
+  hasOnInsert -->|no| split["key, rest"]
+  split --> engine["engine cache: rest as it is, prefix = key, onInsert calls cache.insert"]
   engine --> page["page = sheet.document, else global document, else none"]
   page --> sheetObj["sheet.tags: query the style elements of the key, live"]
   sheetObj --> seed["inserted: every name after the first word of each data-umber"]
@@ -42,8 +41,8 @@ bound to it, so `get`, `has` and `size` still work.
 
 ## The data
 
-- `UmberCacheOptions`: the options of the engine's cache without `prefix` and `onInsert`, plus `key` and
-  an optional `speedy`.
+- `UmberCacheOptions`: the options of the engine's cache without `prefix` and `onInsert`, plus `key`.
+  `speedy` is one of them, an option of the core.
 - `inserted`: `Record<string, string | true>`: name -> `true`, or the CSS text of the rule when `compat`
   is set (the test "records the CSS text of each rule when compat is set").
 - The seed: a style element carries `data-umber="<key> <name> <name>..."`; the first word is the key and
@@ -54,15 +53,20 @@ bound to it, so `get`, `has` and `size` still work.
 - The returned object is the engine's own cache object, so everything the engine does still works.
 - `onInsert` is the cache's own: passing it throws a `TypeError` (the check is for plain JavaScript; the
   type already forbids it).
-- `hasRuleText` wins over `speedy`; `speedy: true` means `hasRuleText: false`.
+- `speedy` is passed on as it is, with the core's meaning (`true`: `insertRule`). An object with
+  `hasRuleText`, the core's name for it before 0.3.0, reaches the core's `createCache` as `rest`, which
+  warns about it once in development and does not read it.
+- `nonce` is an option of the engine's cache, passed on as it is: the cache's own style element carries
+  it, `cache.nonce` holds it, and `@umber-style/server` writes it into its tags. A server that makes a cache
+  for each request gives each its request's nonce.
 - No browser global is read at module top level: `document` is read inside the call, guarded by
   `typeof document`. Without a document `sheet.tags` is `[]`.
 - Two caches with different keys keep their rules apart (test "keeps the rules of two caches apart").
 
 ## Decisions
 
-- `speedy` is kept for compatibility with what apps pass from the library they move from; the code names
-  no such library.
+- `speedy` is the name apps pass from the library they move from, and since 0.3.0 the core's own name, so
+  this package has no option of its own for it and translates nothing; the code names no such library.
 - `key` replaces `prefix` as the name of the option.
 - The sheet's `tags` is a getter, so it lists the elements at the time it is read, not at creation.
 - `compat` starts `false`; a set-up can set it to `true` to have `inserted` hold CSS text.

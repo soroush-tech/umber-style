@@ -29,19 +29,23 @@ flowchart TD
   setup --> giv["given = resolveThemeInput(theme, theme above or base)"]
   giv --> adopt["engine.adoptTheme(given): the first provider gives the token shape"]
   giv --> mer["merged = mergeTheme(outer, given)"]
-  mer --> prov["provide engine, theme, view, scope"]
+  mer --> prov["provide engine, theme, view, scope, nested"]
+  giv --> nst["nested = mergeTheme(nested above, given) when nested, else the nested above"]
+  nst --> prov
   none --> root{"isRoot is false?"}
   root -->|"yes"| decl["declareRoot(merged, colorScheme) now and when either changes"]
   root -->|"no"| skip["no rule, no element: the app uses themeClass"]
 ```
 
-The wrapper's classes are the class of the theme as given, the class of the merged theme (dropped when the
-first already starts with it), and the scope class (`display: contents`).
+The wrapper's classes are the class of the theme as given, the class of `nested`, the themes of the nested
+providers above it and its own merged (dropped when the first already starts with it, as it does directly
+under the outermost provider), and the scope class (`display: contents`).
 
 ## The data
 
-`ThemeKeys<T>` is four injection keys: `theme` and `view` (a `ComputedRef<T>` each), `scope`
-(`ComputedRef<ThemeScopeValue | null>`, with `{ as, className }`) and `engine`. `scope` is `null` under the
+`ThemeKeys<T>` is five injection keys: `theme` and `view` (a `ComputedRef<T>` each), `scope`
+(`ComputedRef<ThemeScopeValue | null>`, with `{ as, className }`), `nested` (`ComputedRef<T | undefined>`:
+undefined under the outermost provider, read only from a provider of the same engine) and `engine`. `scope` is `null` under the
 outermost provider and absent with no provider at all.
 
 ## What it guarantees
@@ -63,9 +67,13 @@ outermost provider and absent with no provider at all.
 
 - The view is a separate computed over the merged theme. The comment on `ThemeKeys` says the view is the same
   object while only the values of variables change; that is what `engine.createThemeView` gives.
-- The wrapper carries the full class of the merged theme as well, for use where it is not inside the wrapper
-  above it.
+- The wrapper carries the class of the nested themes merged as well, for use where it is not inside the
+  wrappers above it. It leaves out the theme of the outermost provider, which is on `:root` or on the class
+  of `<html>`, so a switch of that class reaches the tokens that no nested provider changes. The real theme
+  (`theme`, `view`) is still the whole merged one.
 
 ## Limits
 
 - `isNested` is fixed in `setup`: a later change of `isRoot` does not turn a nested provider into a rooted one.
+- With `isRoot` and the class of the theme on an ancestor other than `<html>`, a provider in teleported
+  content outside that ancestor does not see the root theme: neither `:root` nor its wrapper declares it.

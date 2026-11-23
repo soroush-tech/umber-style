@@ -39,6 +39,19 @@ function mount(component: Component) {
 }
 
 describe('the default style', () => {
+  it('has useStyleValue, a value named after the prefix of its cache', () => {
+    const { useStyleValue } = setup()
+    const element = mount(
+      defineComponent({
+        setup() {
+          const value = useStyleValue(3, 'px')
+          return () => h('i', String(value))
+        },
+      })
+    )
+    expect(element.textContent).toMatch(/^var\(--d-value-\w+, 3px\)$/)
+  })
+
   it('makes keyframes and global styles before configure, and writes them through Global with no theme', () => {
     const style = createDefaultStyle()
     const fade = style.keyframes({ from: { opacity: 0 } }, { label: 'fade' })

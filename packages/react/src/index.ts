@@ -11,6 +11,7 @@ export const {
   styled,
   StyleSheet,
   useStyle,
+  useStyleValue,
   useTheme,
   ThemeProvider,
   ThemeScope,

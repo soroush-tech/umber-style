@@ -21,6 +21,8 @@ const RGB = {
   text: 'rgb(31, 26, 23)',
   primary: 'rgb(138, 75, 42)',
   accent: 'rgb(179, 38, 30)',
+  darkBackground: 'rgb(16, 17, 20)',
+  darkAccent: 'rgb(255, 138, 128)',
 } as const
 
 /** What a scenario needs besides the page. */
@@ -295,17 +297,23 @@ export const REGISTRY_SCENARIOS: readonly RegistryScenario[] = [
   },
   {
     title:
-      '(c) the root rules of a chunk that streams in after the hydration are replaced too: one live root rule',
-    knownKey: 'registry-late-root',
+      '(c) a theme switched while the page streams stays when a late chunk arrives with the root rule of the server: one live root rule',
     async run(page, tools) {
       await page.goto(`http://localhost:${tools.fixture.port}/registry/stream`, {
         waitUntil: 'commit',
       })
       await waitForHydrated(page)
-      // The page hydrated before the late part arrived: the browser's cache declared its root theme first.
+      // The user switches the theme while the page is still streaming: the late part has not arrived.
       await expect(page.getByTestId('registry-fallback')).toBeVisible()
+      await page.getByTestId('registry-theme-switch').click()
+      await expect(page.locator('body')).toHaveCSS('background-color', RGB.darkBackground)
+      await expect(page.getByTestId('registry-fallback')).toBeVisible()
+      // The late chunk brings the root rule that the server wrote, with the light theme, later in the
+      // document than the rule of the browser's cache: the cache removes it as it arrives.
       await page.getByTestId('registry-late').waitFor()
       await page.waitForLoadState('networkidle')
+      await expect(page.locator('body')).toHaveCSS('background-color', RGB.darkBackground)
+      await expect(page.getByTestId('registry-late')).toHaveCSS('border-top-color', RGB.darkAccent)
       const roots = await page.evaluate((selector) => {
         const found: string[] = []
         for (const element of document.querySelectorAll<HTMLStyleElement>(selector)) {

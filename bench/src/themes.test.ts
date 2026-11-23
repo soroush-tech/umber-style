@@ -1,11 +1,9 @@
 import { cloneTheme, countTokens, createColor, createLargeTheme, createSmallTheme } from './themes'
 
 describe('the benchmark themes', () => {
-  it('has about 20 tokens in the small theme and about 300 in the large one', () => {
+  it('has 20 tokens in the small theme and 281 in the large one', () => {
     expect(countTokens(createSmallTheme())).toBe(20)
-    const large = countTokens(createLargeTheme())
-    expect(large).toBeGreaterThanOrEqual(280)
-    expect(large).toBeLessThanOrEqual(320)
+    expect(countTokens(createLargeTheme())).toBe(281)
   })
 
   it('builds the same theme every time', () => {

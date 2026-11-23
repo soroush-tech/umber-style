@@ -163,7 +163,7 @@ Without a `document`, the cache keeps its rules in memory (`createMemorySheet`),
 }
 ```
 
-The second map is that of `umber-style`: under the `react-server` condition, the compiler and the bundler both take the server entry, and the compiler reads the server declarations. The first was traced with `tsc --traceResolution`: with `customConditions: ["react-server"]` it resolves to `index.server.ts`, without to `index.ts`. A published package needs the same shape, with a `types` file for each build, in its `publishConfig`; none is published yet.
+The second map is that of `umber-style`: under the `react-server` condition, the compiler and the bundler both take the server entry, and the compiler reads the server declarations. The first was traced with `tsc --traceResolution`: with `customConditions: ["react-server"]` it resolves to `index.server.ts`, without to `index.ts`. The published packages have the same shape, with the built files: the `publishConfig` of `@umber-style/react` maps the `react-server` condition to `dist/index.server.mjs` and `dist/index.server.cjs`, with their own declaration files (`index.server.d.mts`, `index.server.d.cts`), ahead of the client build, and that of `umber-style` maps `./react` under `react-server` to `dist/react.server.*` with the declarations of `shared.server`.
 
 | Build                   | `useTheme()` gives                                 | Style elements                                                             | Hooks                                         |
 | ----------------------- | -------------------------------------------------- | -------------------------------------------------------------------------- | --------------------------------------------- |
@@ -309,6 +309,77 @@ React treats these elements as resources, not as part of the tree, so rendering 
 
 The condition applies to the whole program, so a project that also type-checks client components uses the condition only for the server files: a second `tsconfig` that extends the first and includes the server component files. Without the condition the types are those of the client build: `readTheme` is reported as missing, and `ThemeContext` is typed although it does not exist there. `@umber-style/react` and `umber-style/react` both follow it (the exports map of each names its own types under `react-server`): under it, `umber-style/react` types `useTheme` and `readTheme`. `readTheme` is typed in that entry only under the condition, because the React Native binding has no `readTheme` and no server build: shared code calls `useTheme`.
 
+## Content security policy
+
+The engine renders no `style` attribute (see [No inline styles](no-inline-styles.md)), but it writes CSS into `<style>` elements, and a policy whose `style-src` has no `'unsafe-inline'` blocks a style element unless it carries the policy's nonce. Give the nonce once, and every style element the engine makes carries it. It is never written into a rule, a class name or the stamp of the options, so the class names and the hydration are the same with it or without, and in a tag it is escaped (`&`, `"`, `<`, `>`).
+
+| Where the element is made                                                              | Where its nonce comes from                                                                                                     |
+| -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| The style element of the cache in the browser (`createDomSheet`, both ways of writing) | `createStyle(theme, { nonce })`, `configure({ nonce })`, `createCache({ nonce })`, `createDomSheet(key, container, { nonce })` |
+| `createStyleTag(cache)` and the `tag` of `extractPageStyles(cache, html)`              | `options.nonce` of the call, else the cache's                                                                                  |
+| The `<style data-umber>` tags of `@umber-style/server/create-instance`                 | The cache's: `createCache({ key, nonce })` of `@umber-style/cache`                                                             |
+| The `<style href precedence>` elements of React, in both builds                        | The cache's, as their `nonce` prop                                                                                             |
+| Vue on a server                                                                        | Vue makes no style element: the `tag` of `extractPageStyles`                                                                   |
+
+In the browser the nonce is set before the element goes into the document. From `packages/react/src/nonce.test.tsx`:
+
+```tsx
+const { styled } = createStyle(
+  { palette: { primary: '#0000ff' } },
+  {
+    prefix: 'nb',
+    nonce: 'n0nce',
+  }
+)
+const Box = styled('div', { name: 'Box' })(({ theme }) => ({ color: theme.palette.primary }))
+render(<Box />)
+document.head.querySelector('style[data-style="nb"]')?.getAttribute('nonce') // 'n0nce'
+```
+
+The page has to give the browser its nonce. The Vue fixture puts it on a `<meta property="csp-nonce" nonce="...">` and reads it where it makes its style (`fixtures/vue-ssr/src/style.ts`):
+
+```ts
+const readPageNonce = (): string | undefined =>
+  typeof document === 'undefined'
+    ? undefined
+    : document.querySelector<HTMLMetaElement>('meta[property="csp-nonce"]')?.nonce
+
+export const style = createStyle(lightTheme, { prefix: 'umber', nonce: readPageNonce() })
+```
+
+A server that renders many requests with one cache gives the nonce of each request to the call that writes its tag. From `packages/core/src/cache.nonce.test.ts`:
+
+```ts
+const shared = createCache({ hasLayers: false, prefix: 'u', sheet: createMemorySheet() })
+const name = shared.css({ color: 'red' })
+const page = extractPageStyles(shared, `<p class="${name}"></p>`, { nonce: 'request1' })
+page.tag // `<style data-style="u" data-options="${shared.fingerprint}" nonce="request1">.${name}{color:red;}</style>`
+page.css // `.${name}{color:red;}`
+```
+
+The Vue fixture does this in its render, `extractPageStyles(style.cache, html, { themes: [lightClass, darkClass], nonce })`, with a new nonce for each request, sent with `Content-Security-Policy: style-src 'nonce-<n>'; script-src 'self' 'nonce-<n>'` (`fixtures/vue-ssr/server.mjs`). A cache made for each request (a registry, `createInstance`) holds the nonce itself: `createCache({ key: 'app', nonce })`, and its tags are `<style data-umber="app-global ..." nonce="...">` (`packages/server/src/createInstance.test.ts`).
+
+React merges the `<style href precedence>` elements of one precedence into one element, and writes on it the style nonce of its own render, not the prop: give the render the same nonce. React keeps the rules of an element only when its `nonce` prop is that nonce, and in the browser it sets the prop on the element it adds after a client-side navigation. From `packages/react/src/nonce.ssr.test.tsx`:
+
+```tsx
+const { styled, Global, ThemeProvider, keyframes } = createStyle(theme, {
+  prefix: 'ns',
+  nonce: 'n0nce',
+})
+const stream = await renderToReadableStream(page, { nonce: { script: 'n0nce', style: 'n0nce' } })
+// <style nonce="n0nce" data-precedence="ns" data-href="ns-root-... ns-global-... fade-... ns-box-root-...">
+```
+
+Rendered with no style nonce, React sends the element with no `nonce` and logs:
+
+```text
+React encountered a style tag with `precedence` "%s" and `nonce` "%s". When React manages style rules using `precedence` it will only include a nonce attributes if you also provide the same style nonce value as a render option.
+```
+
+The server components build puts the cache's nonce on every style element it renders: a styled class, its animation, a `Global`, and both outcomes of a provider (`packages/react/src/nonce.server.test.tsx`, `ProviderScope.test.tsx`).
+
+The end-to-end suite loads a page of the Vue fixture under that policy (`e2e/tests/vue-ssr.csp.spec.ts`): its computed styles are those of the page with no policy, it hydrates with no console error, every style element holds the request's nonce, and after a client-side navigation to a page with classes the first HTML did not have, its styles are those of that page loaded with no policy and the browser reports no violation. With the nonce left out of the server's tag, the same test fails with 284 differences and `Applying inline style violates the following Content Security Policy directive`.
+
 ## Limits
 
 - `extractPageStyles` takes the root theme that the cache declared last. Two pages rendered at the same time with different root themes need the style elements of the React builds, which carry their root theme, or a render and an extraction that do not interleave.
@@ -325,6 +396,9 @@ The condition applies to the whole program, so a project that also type-checks c
 - A style element that is added to the body, or whose text is added after the element is, is not read by the observer; React's elements are complete when they are inserted into the head.
 - `hasServerStyleElements` does not know the framework: it is on wherever the client build runs with no `document`.
 - The browser reads the page when its cache is created. The style elements must be in the document before the module that creates the cache runs; those that come later are read by the observer.
-- There is no nonce option for the style elements: see [No inline styles](no-inline-styles.md).
+- The nonce of the engine's own cache is fixed when the engine is made. The style elements of React's builds read it from that cache, so a server that renders every request with one engine (a module-level `createStyle`, the server components build) sends the same nonce in each. A nonce for each request needs a cache for each request (under a `CacheProvider`, which renders no style element, with a registry that writes its own), or the `nonce` option of `extractPageStyles` for a classic render. The server components build has no nonce for each request.
+- React's own render writes the nonce of the merged `<style href precedence>` element (its `nonce: { style }` option). A framework that gives React no style nonce (or a string, which React takes as the script nonce only) sends that element with no nonce; whether a framework passes one is the framework's.
+- An element that the browser's cache finds instead of making one (written with `insertRule` it uses the server's element) keeps the nonce it has: the cache neither sets nor checks it. Rules added with `insertRule` are not checked by a style policy.
+- The end-to-end test of a policy runs on the production build of the Vue fixture only. That fixture has no development server in the development tier; a Vite development server can send a strict policy (its `html.cspNonce` option), which was not run. The React builds and `@umber-style/server` are tested at the unit tier: what React's server render writes, in Node, and what the client build adds, in jsdom. No React page ran under a policy in a browser.
 - On a server, global rules are never removed from the cache; a page extracted from it carries the sets it rendered and those written for the app. See the Limits of [Animations and global styles](animations-and-global-styles.md).
 - The registry of `@umber-style/cache` runs in the App Router fixture and the chunk functions of `@umber-style/server` on a page of the Vike fixture. Under a registry the styled components of client components go through it; those of server components still send their own style elements, and a page that does both was not run. See the Limits of [The cache and server packages](cache-and-server.md).

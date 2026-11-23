@@ -131,11 +131,14 @@ function isTemplate(value: unknown): value is TemplateStringsArray {
   return Array.isArray(value) && Object.hasOwn(value, 'raw')
 }
 
-/** The sheet of a cache made here: the style elements of the document, written as `hasRuleText` says, or one in memory where there is no document. */
-function createDefaultSheet(prefix: string, hasRuleText: boolean | undefined): Sheet {
+/** The sheet of a cache made here: the style elements of the document, written as `speedy` says and carrying `nonce`, or one in memory where there is no document. */
+function createDefaultSheet(
+  prefix: string,
+  { speedy, nonce }: Pick<CacheOptions, 'speedy' | 'nonce'>
+): Sheet {
   return typeof document === 'undefined'
     ? createMemorySheet()
-    : createDomSheet(prefix, undefined, { hasRuleText })
+    : createDomSheet(prefix, undefined, { speedy, nonce })
 }
 
 /** The items of `args`, lists flattened, without `false`, `null`, `undefined`, `''` and `true`. */
@@ -182,8 +185,7 @@ export default function createInstance(
     )
   }
   const prefix = key ?? 'css'
-  const sheet =
-    givenSheet ?? (given ? given.sheet : createDefaultSheet(prefix, cacheOptions.hasRuleText))
+  const sheet = givenSheet ?? (given ? given.sheet : createDefaultSheet(prefix, cacheOptions))
   if (!sheet) {
     throw new TypeError(
       'createInstance(): the given cache has no `sheet` member: give the sheet it writes to as `sheet` too.'

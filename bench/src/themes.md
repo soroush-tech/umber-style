@@ -2,7 +2,7 @@
 
 ## What it does
 
-Builds the two themes of the benchmarks, a small one (about 20 tokens) and a large one (a few hundred),
+Builds the two themes of the benchmarks, a small one (20 tokens) and a large one (281 tokens),
 as plain data. `countTokens` counts the leaves of a theme and `cloneTheme` returns a copy that is a
 different object with the same values.
 
@@ -51,6 +51,6 @@ flowchart TD
 
 ## Limits
 
-- The header comment says the large theme has "about 300 tokens" and the doc comment of
-  `createLargeTheme` says "about 280". `themes.test.ts` is where the count is checked.
+- The counts in the comments (20 and 281) are the ones `themes.test.ts` asserts: a change to a scale
+  changes the test and the comments together.
 - `countTokens` counts the elements of an array as leaves, as it does for `space`.

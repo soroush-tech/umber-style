@@ -53,11 +53,9 @@ describe('the client build rendered on a server', () => {
       </ThemeProvider>
     )
     // React merges the style elements of one precedence into one, with every href.
-    expect(html).toMatch(/data-href="[^"]*se-theme-\w+ [^"]*se-theme-\w+[^"]*"/)
+    expect(html).toMatch(/data-href="[^"]*se-theme-\w+[^"]*"/)
     expect(html).toContain('.se-scope{display:contents;}')
-    expect(html).toMatch(
-      /<div class="se-theme-\w+ se-boundary se-scheme-light se-theme-\w+ se-scope">/
-    )
+    expect(html).toMatch(/<div class="se-theme-\w+ se-boundary se-scheme-light se-scope">/)
   })
 
   it('sends the theme classes that the app made for a root provider, and renders no element', () => {

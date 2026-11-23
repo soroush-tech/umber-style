@@ -227,13 +227,12 @@ describe('ThemeProvider', () => {
     expect(container.firstElementChild).toBe(screen.getByText('outer'))
     const inner = container.querySelector('div') as HTMLElement
     expect(inner.hasAttribute('style')).toBe(false)
-    const [own, , full] = inner.className.split(' ')
+    // One theme class: what it changes is all that its merged class would declare, the rest is on :root.
+    const [own, , scope] = inner.className.split(' ')
+    expect(scope).toBe('t-scope')
 
     const themeRules = sheet.rules.filter((rule) => rule.startsWith('.t-theme-'))
-    expect(themeRules).toEqual([
-      `.${own}{--t-palette-primary:#ff0000;}`,
-      `.${full}{--t-palette-primary:#ff0000;--t-palette-text:#111111;--t-space-small:4px;}`,
-    ])
+    expect(themeRules).toEqual([`.${own}{--t-palette-primary:#ff0000;}`])
     expect(sheet.rules).toContain(
       ':where(:root){--t-palette-primary:#0000ff;--t-palette-text:#111111;--t-space-small:4px;}'
     )
@@ -250,9 +249,7 @@ describe('ThemeProvider', () => {
     )
     const element = container.firstElementChild as HTMLElement
     expect(element.tagName).toBe('SECTION')
-    expect(element.className).toMatch(
-      /^t-theme-[a-z0-9]+ t-boundary t-scheme-dark t-theme-[a-z0-9]+ t-scope mine$/
-    )
+    expect(element.className).toMatch(/^t-theme-[a-z0-9]+ t-boundary t-scheme-dark t-scope mine$/)
     expect(sheet.rules.find((rule) => rule.includes('color-scheme'))).toMatch(
       /color-scheme:dark;\}$/
     )
@@ -453,15 +450,18 @@ describe('the style element of a style', () => {
     document.head.innerHTML = ''
   })
 
-  it('holds the rules as text outside production, and gets them with insertRule with hasRuleText false', () => {
+  it('holds the rules as text outside production, and gets them with insertRule with speedy true', () => {
     const text = createStyle({}, { prefix: 'rt' })
     const name = text.engine.css({ color: 'red' })
-    const readText = (prefix: string) =>
-      document.querySelector(`style[data-style="${prefix}"]`)?.textContent
-    expect(readText('rt')).toBe(
-      `@layer rt-theme,rt-global,rt-components,rt-overrides;@layer rt-components{.${name}{color:red;}}`
-    )
-    createStyle({}, { prefix: 'fast', hasRuleText: false }).engine.css({ color: 'red' })
-    expect(readText('fast')).toBe('')
+    const readTexts = (prefix: string) =>
+      [...document.querySelectorAll(`style[data-style="${prefix}"]`)].map(
+        (element) => element.textContent
+      )
+    expect(readTexts('rt')).toEqual([
+      '@layer rt-theme,rt-global,rt-components,rt-overrides;',
+      `@layer rt-components{.${name}{color:red;}}`,
+    ])
+    createStyle({}, { prefix: 'fast', speedy: true }).engine.css({ color: 'red' })
+    expect(readTexts('fast')).toEqual([''])
   })
 })

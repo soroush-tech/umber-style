@@ -3,7 +3,7 @@
 import createCache from '@umber-style/cache'
 import { CacheProvider } from '@umber-style/react'
 import { Global, ThemeProvider } from '@umber-fixtures/shared/style'
-import { lightTheme } from '@umber-fixtures/shared/themes'
+import { darkTheme, lightTheme } from '@umber-fixtures/shared/themes'
 import { useServerInsertedHTML } from 'next/navigation'
 import { useState, type ReactNode } from 'react'
 
@@ -46,11 +46,14 @@ function useStyleRegistry() {
   return cache
 }
 
+// The fixture adds one thing to the file apps copy: a button that gives the outermost provider the dark
+// theme, for the test of a switch of the root theme after a chunk streamed in.
 export default function Providers({ children }: Readonly<{ children: ReactNode }>) {
   const cache = useStyleRegistry()
+  const [theme, setTheme] = useState(lightTheme)
   return (
     <CacheProvider value={cache}>
-      <ThemeProvider theme={lightTheme}>
+      <ThemeProvider theme={theme}>
         <Global
           styles={(theme) => ({
             '*, *::before, *::after': { boxSizing: 'border-box' },
@@ -63,6 +66,13 @@ export default function Providers({ children }: Readonly<{ children: ReactNode }
           })}
         />
         {children}
+        <button
+          type="button"
+          data-testid="registry-theme-switch"
+          onClick={() => setTheme(darkTheme)}
+        >
+          Dark
+        </button>
       </ThemeProvider>
     </CacheProvider>
   )

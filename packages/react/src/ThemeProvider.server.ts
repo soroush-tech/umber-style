@@ -116,6 +116,7 @@ export function createThemeProvider<T extends object>(
       isWhole,
       ...(base && { base }),
       styles: collectStyleTexts(cache, others),
+      ...(cache.nonce !== undefined && { nonce: cache.nonce }),
     }
   }
 

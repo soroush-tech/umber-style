@@ -25,6 +25,7 @@ import type {
   KeyframesInput,
   KeyframesOptions,
   KeyframesSteps,
+  LiveValue,
   ObjectSheet,
   SchemeKey,
   SchemeName,
@@ -58,6 +59,7 @@ export type {
   GlobalStyleObject,
   GlobalStyles,
   KeyframesSteps,
+  LiveValue,
   NestedKey,
   SchemeKey,
   SchemeName,
@@ -504,8 +506,22 @@ export interface ServerStyle<T> extends Omit<
   readTheme(): T
 }
 
+/** The setter of `useStyleValue`: a new number, or a function of the number before. */
+export type StyleValueSetter = (next: number | ((previous: number) => number)) => void
+
 /** The styling of the client build of the web binding: what `createStyle` returns, and the default style. */
 export interface WebStyle<T> extends Omit<Style<T, SheetEntry>, 'ThemeProvider' | 'apply'> {
+  /**
+   * A number that a style reads through a CSS variable of its own, and its setter, as the state hook of React gives a
+   * state: `const [left, setLeft] = useStyleValue(0, '%')`. In a style the value is the reference to the
+   * variable (`${left}`, or an operand of `add`, `multiply` and the other helpers), so the class does
+   * not change when the number does; `setLeft(next)` changes the declaration of the variable in place,
+   * and renders nothing. `left.get()` is the number now. The number is written with `unit` after it,
+   * or as it is without one. Its rule is on `:root`, in the theme layer, while the component is mounted;
+   * the reference falls back to the first number, which a server render shows with no rule. In the
+   * server components build the setter does nothing (a warning in development).
+   */
+  useStyleValue(initial: number, unit?: string): [LiveValue, StyleValueSetter]
   /** The props that apply sheet entries (or class names) to a plain element: a class name. */
   apply(...entries: (SheetEntry | string | null | undefined | false)[]): { className?: string }
   /**

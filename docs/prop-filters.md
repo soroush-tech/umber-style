@@ -74,7 +74,7 @@ import isPropValid from '@umber-style/is-prop-valid/vue'
 const theme = { palette: { primary: '#1b5fd1', text: '#1a1a1a' } }
 const { styled } = createStyle(theme, { prefix: 'umber' })
 
-const Box = styled('div', { shouldForwardProp: isPropValid })(({ tone }) => ({
+const Box = styled('div', { shouldForwardProp: isPropValid })(({ theme, tone }) => ({
   color: tone === 'primary' ? theme.palette.primary : theme.palette.text,
 }))
 

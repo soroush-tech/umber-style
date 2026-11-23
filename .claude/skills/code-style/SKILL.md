@@ -97,6 +97,15 @@ export function isAlphaColor(value: unknown): value is AlphaColor {
 
 ---
 
+### `speedy` keeps its name
+
+The option `speedy` of the cache, the engine and `createDomSheet` is the one boolean option without
+`is` or `has` (the `naming-conventions` skill): it is the name apps already pass, and it is not
+renamed. Its meaning is fixed too: `true` writes rules with `insertRule`, `false` writes each rule as
+the text of a style element of its own (`docs/options.md#speedy`).
+
+---
+
 ### Lint is not suppressed
 
 `pnpm lint` is `oxlint --deny-warnings`: a warning fails like an error. The rules are in

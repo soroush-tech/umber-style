@@ -441,11 +441,12 @@ jobs:
           CI: true
 
   # The benchmark gate of docs/benchmarks.md: the gate files in bench/gate run in the pinned Docker sandbox
-  # of soroush-bench (soroush-tech/bench-action), each comparing the build of this checkout (`local`) with
-  # the published release the baseline tag names (`previous`, installed from npm inside the sandbox). A
-  # case below the minimum speed ratio fails the job and, through ci-ok, the pull request. If the
-  # baseline cannot be installed the sandbox run fails, so the job fails: it never passes without a
-  # comparison.
+  # of soroush-bench (soroush-tech/bench-action), each comparing the build of this checkout (`current`)
+  # with the build of the last release of the core (`previous`), which bench/bin/previous.mjs checks out
+  # from its git tag and builds in .bench-previous, inside the checkout: both sides are files loaded by
+  # path in the same way. A case below the minimum speed ratio fails the job and, through ci-ok, the pull
+  # request. If the previous build cannot be made, the step fails before the gate: the job never passes
+  # without a comparison. `pnpm bench:gate` runs the same on a machine.
   bench:
     needs: [prepare, lint]
     runs-on: ubuntu-latest
@@ -453,7 +454,7 @@ jobs:
       contents: read
       pull-requests: write # bench-action posts/updates the results comment
       id-token: write # OIDC token for the branded comment relay (api.bench.soroush.tech)
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v7
@@ -467,10 +468,15 @@ jobs:
           manager: ${{ needs.prepare.outputs.manager }}
           command: ${{ needs.prepare.outputs.command }}
 
-      # The gate files import the built dist of the packages, so the comparison against the npm
-      # release's prebuilt dist is like-for-like.
+      # The `current` side: the gate files load the built dist of this checkout.
       - name: Build the packages
         run: ${{ needs.prepare.outputs.runner }} run build
+
+      # The `previous` side: the tag of the last release (BASELINE_RELEASE in bench/gate/baseline.ts) is
+      # fetched by its public address into this shallow clone, its tree extracted into .bench-previous,
+      # and the core installed and built there with that release's own lockfile.
+      - name: Build the core of the last release
+        run: node bench/bin/previous.mjs
 
       # Mint a token from the org's GitHub App so the results comment is posted under the brand bot
       # identity instead of github-actions[bot]. Skipped (and the gate falls back to GITHUB_TOKEN)

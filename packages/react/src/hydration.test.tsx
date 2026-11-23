@@ -17,11 +17,11 @@ const readPageRules = (prefix: string) =>
 describe('what a classic server render leaves for the client', () => {
   // Written by text, the client cache writes in a style element of its own, next to the server's.
   it.each([
-    { hasRuleText: true, elements: 2 },
-    { hasRuleText: false, elements: 1 },
+    { speedy: false, elements: 2 },
+    { speedy: true, elements: 1 },
   ])(
     'is a style element with the options, and the client cache inserts none of its rules again, %o',
-    ({ hasRuleText, elements }) => {
+    ({ speedy, elements }) => {
       const server = bindEngine(
         createEngine(theme, {
           prefix: 'h',
@@ -41,7 +41,7 @@ describe('what a classic server render leaves for the client', () => {
       document.head.innerHTML = tag
       const before = readPageRules('h').length
       expect(before).toBeGreaterThan(1)
-      const client = bindEngine(createEngine(theme, { prefix: 'h', hasRuleText }))
+      const client = bindEngine(createEngine(theme, { prefix: 'h', speedy }))
       const Again = client.styled('div')(({ theme: view }) => ({ color: view.palette.primary }))
       render(
         <client.ThemeProvider theme={theme}>
@@ -58,8 +58,8 @@ describe('what a pruned server render leaves for the client', () => {
   const two = { palette: { primary: '#0000ff', accent: '#ff0000' } }
 
   it.each([true, false])(
-    'has the client add only the variable that the server did not use, once, hasRuleText %s',
-    (hasRuleText) => {
+    'has the client add only the variable that the server did not use, once, speedy %s',
+    (speedy) => {
       const server = bindEngine(
         createEngine(two, {
           prefix: 'p',
@@ -78,7 +78,7 @@ describe('what a pruned server render leaves for the client', () => {
 
       expect(declaring('--p-palette-primary')).toHaveLength(1)
       expect(declaring('--p-palette-accent')).toHaveLength(0)
-      const client = bindEngine(createEngine(two, { prefix: 'p', hasRuleText }))
+      const client = bindEngine(createEngine(two, { prefix: 'p', speedy }))
       const Same = client.styled('div')(({ theme: view }) => ({ color: view.palette.primary }))
       const Other = client.styled('div')(({ theme: view }) => ({ color: view.palette.accent }))
       render(

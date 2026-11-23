@@ -76,12 +76,18 @@ export function createFortyEight(setup: Setup, kind: Kind): Vue.VNode[] {
   })
 }
 
-/** The tree of 500 styled elements: 100 rows, each a `Flex` with four `Cell`s. */
-export function createTree(setup: Setup): Vue.VNode[] {
+/**
+ * The tree of 500 styled elements: 100 rows, each a `Flex` with four `Cell`s. `shift` moves the
+ * combination of each row and the tone of each cell, so that a render with another `shift` has other
+ * props everywhere.
+ */
+export function createTree(setup: Setup, shift = 0): Vue.VNode[] {
   const { Flex, Cell } = setup
   return Array.from({ length: 100 }, (_, row) =>
-    h(Flex, { ...combinations[row % combinations.length] }, () =>
-      Array.from({ length: 4 }, (_, cell) => h(Cell, { tone: TONES[cell] }, () => String(row)))
+    h(Flex, { ...combinations[(row + shift) % combinations.length] }, () =>
+      Array.from({ length: 4 }, (_, cell) =>
+        h(Cell, { tone: TONES[(cell + shift) % TONES.length] }, () => String(row))
+      )
     )
   )
 }

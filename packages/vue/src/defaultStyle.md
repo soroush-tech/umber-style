@@ -3,7 +3,7 @@
 ## What it does
 
 `createDefaultStyle()` returns the members that an app imports from the package root: `configure`,
-`getEngine`, `styled`, `StyleSheet`, `useStyle`, `useTheme`, `ThemeProvider`, `ThemeScope`, `useThemeClass`,
+`getEngine`, `styled`, `StyleSheet`, `useStyle`, `useStyleValue`, `useTheme`, `ThemeProvider`, `ThemeScope`, `useThemeClass`,
 `apply`, `css`, `when`, `whenScheme`, `themeClass`, `keyframes`, `globalStyles` and `Global`. Each forwards to
 a style that is made on first use.
 

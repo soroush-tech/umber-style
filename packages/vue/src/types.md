@@ -36,6 +36,7 @@ flowchart TD
 - `PropsOf<C>` is the props of an intrinsic element, of a component with `$props`, or of a functional
   component.
 - `Style<T>.useStyle` has two overloads: an object sheet returns itself, a `Sheet<S>` is resolved.
+- `Style<T>.useStyleValue` returns a `StyleValueRef`: the core's `LiveValue` with a `value` of a ref's shape.
 
 ## What it guarantees
 

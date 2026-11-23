@@ -43,9 +43,9 @@ describe('the provider example of docs/themes.md', () => {
     const html = renderToStaticMarkup(<App />)
     expect(html).toBe(
       '<div class="umber-card-root-c45tr"></div>' +
-        '<div class="umber-theme-1lpp26f umber-boundary umber-theme-3cgoer umber-scope"><div class="umber-card-root-c45tr"></div></div>' +
-        '<div class="umber-theme-0 umber-boundary umber-theme-1x8aice umber-scope"><div class="umber-card-root-1h3unrm"></div></div>' +
-        '<div class="umber-theme-45hmwp umber-boundary umber-theme-q5wsxh umber-scope"><code>#0b7a4b</code></div>'
+        '<div class="umber-theme-1lpp26f umber-boundary umber-scope"><div class="umber-card-root-c45tr"></div></div>' +
+        '<div class="umber-theme-0 umber-boundary umber-scope"><div class="umber-card-root-1h3unrm"></div></div>' +
+        '<div class="umber-theme-45hmwp umber-boundary umber-scope"><code>#0b7a4b</code></div>'
     )
     const { css } = extractPageStyles(cache, html)
     expect(css).toContain(
@@ -54,9 +54,8 @@ describe('the provider example of docs/themes.md', () => {
     expect(css).toContain(
       '@layer umber-theme{.umber-theme-1lpp26f{--umber-palette-surface:#fff4d6;}}'
     )
-    expect(css).toContain(
-      '@layer umber-theme{.umber-theme-3cgoer{--umber-palette-text:#1a1a1a;--umber-palette-surface:#fff4d6;--umber-space-3:16px;}}'
-    )
+    // A nested provider under the outermost one has one theme class: the outermost theme is on :root.
+    expect(css.match(/\.umber-theme-\w+\{/g)).toEqual(['.umber-theme-1lpp26f{'])
     expect(css).toContain(
       '@layer umber-components{@media (min-width: 480px){.umber-card-root-1h3unrm{padding:var(--umber-space-3);}}}'
     )
@@ -155,7 +154,7 @@ describe('the conditions example of docs/theme-conditions.md', () => {
     )
     expect(html).toBe(
       '<div class="umber-card-root-c8wvsy"></div>' +
-        '<div class="umber-theme-8yk78z umber-boundary umber-scheme-dark umber-theme-6pu5tk umber-scope"><div class="umber-card-root-c8wvsy"></div></div>'
+        '<div class="umber-theme-8yk78z umber-boundary umber-scheme-dark umber-scope"><div class="umber-card-root-c8wvsy"></div></div>'
     )
     const { css } = extractPageStyles(cache, html)
     expect(css).toContain('@layer umber-theme{:where(:root){color-scheme:light;}}')

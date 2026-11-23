@@ -25,6 +25,25 @@ export function isProduction(): boolean {
   }
 }
 
+// The options objects warned about for `hasRuleText`: an object that is passed on is warned about once.
+const renamedWarned = new WeakSet<object>()
+
+/**
+ * In development, warns once about `options` when it still has `hasRuleText`, which was renamed to
+ * `speedy` with the opposite meaning: what to write instead, and that the value given is not read.
+ */
+export function warnRenamedOption(prefix: string, options: object): void {
+  const { hasRuleText } = options as { hasRuleText?: unknown }
+  if (hasRuleText === undefined || renamedWarned.has(options) || !isDevelopment()) return
+  renamedWarned.add(options)
+  // The option was a boolean: what was given is read as one, and so is what to write instead.
+  const given = hasRuleText ? 'true' : 'false'
+  const instead = hasRuleText ? 'speedy: false' : 'speedy: true'
+  console.warn(
+    `[${prefix}] The option hasRuleText was renamed to speedy, with the opposite meaning: hasRuleText: ${given} is not read, and the default applies. Write ${instead} instead.`
+  )
+}
+
 /** A function that warns `message` with the prefix in front, once for each `key`: the same problem is never warned about twice. */
 export function createWarner(prefix: string): (key: string, message: string) => void {
   const warned = new Set<string>()

@@ -29,8 +29,10 @@ describe('the development checker asks the browser about each declaration, in a 
     const name = cache.css(untyped({ elevation: 2, color: 'red' }))
     cache.css(untyped({ elevation: 2, color: 'red' }))
     await settle()
-    const sheet = document.querySelector<HTMLStyleElement>(`style[data-style="${prefix}"]`)?.sheet
-    const text = [...(sheet?.cssRules ?? [])].map((rule) => rule.cssText).join('')
+    const text = [...document.querySelectorAll<HTMLStyleElement>(`style[data-style="${prefix}"]`)]
+      .flatMap((element) => [...(element.sheet as CSSStyleSheet).cssRules])
+      .map((rule) => rule.cssText)
+      .join('')
     expect(text).toContain('color: red')
     expect(text).not.toContain('elevation')
     expect(warn.mock.calls).toEqual([

@@ -1,7 +1,7 @@
 // Theme builders for the benchmarks. Both are plain data, built the same way on every run, so two runs
-// measure the same input. The small theme has about 20 tokens, the large one about 300.
+// measure the same input. The small theme has 20 tokens, the large one 281 (`themes.test.ts` counts them).
 
-/** The shape of the small theme (about 20 tokens), with `breakpoints` that are real values. */
+/** The shape of the small theme (20 tokens), with `breakpoints` that are real values. */
 export interface SmallTheme {
   palette: Record<'primary' | 'secondary' | 'text' | 'background' | 'border' | 'danger', string>
   space: number[]
@@ -11,7 +11,7 @@ export interface SmallTheme {
   breakpoints: string[]
 }
 
-/** The shape of the large theme (about 300 tokens). */
+/** The shape of the large theme (281 tokens). */
 export interface LargeTheme {
   palette: Record<string, string>
   space: number[]
@@ -78,7 +78,7 @@ function createScale<V>(prefix: string, count: number, make: (index: number) => 
   )
 }
 
-/** The large theme: about 280 tokens across colours, spaces, sizes, radii, type, shadows, motion and more. */
+/** The large theme: 281 tokens across colours, spaces, sizes, radii, type, shadows, motion and more. */
 export function createLargeTheme(): LargeTheme {
   let seed = 0
   const palette: Record<string, string> = {}

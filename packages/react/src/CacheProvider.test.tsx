@@ -131,7 +131,8 @@ describe('a subtree under a CacheProvider', () => {
     expect(sub.css()).toContain(':where(:root){--sub-space-1:4px;}')
     expect(sub.css()).toContain('{body{margin:var(--sub-space-1);}}')
     expect(sub.css()).toContain(`@keyframes ${fade}{`)
-    expect(sub.css()).toMatch(/@layer sub-theme\{\.sub-theme-\w+\{--sub-space-1:4px;\}\}/)
+    // The nested provider changes no token that a rule uses, so its theme class declares nothing.
+    expect(sub.css()).not.toMatch(/\.sub-theme-\w+\{--sub-space-1/)
     expect(base.sheet.rules.join('')).not.toContain('sub-')
     expect(base.sheet.rules.join('')).not.toContain('@keyframes')
   })

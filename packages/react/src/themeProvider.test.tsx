@@ -162,7 +162,7 @@ describe('the outermost provider', () => {
 })
 
 describe('a nested provider', () => {
-  it('renders one wrapper: the class of what it changes, of its whole merged theme, and the scope', () => {
+  it('renders one wrapper under the outermost provider: the class of what it changes, and the scope', () => {
     const style = setup()
     const { Text } = createCounted(style)
     const { container } = render(
@@ -173,13 +173,32 @@ describe('a nested provider', () => {
       </style.ThemeProvider>
     )
     const wrapper = container.firstElementChild as HTMLElement
-    const [own, boundary, full, scope, ...rest] = wrapper.className.split(' ')
+    // The class of its merged theme is the class of its own theme: the outermost theme is on :root.
+    const [own, boundary, scope, ...rest] = wrapper.className.split(' ')
     expect([boundary, scope, rest]).toEqual(['t-boundary', 't-scope', []])
-    expect(style.ruleOf(own)).toBe(`.${own}{--t-palette-primary:#ff0000;}`)
-    // Every variable of its merged theme that is used, for where it is not inside the outer theme.
     style.engine.css({ color: style.engine.refs.palette.text })
+    expect(style.ruleOf(own)).toBe(`.${own}{--t-palette-primary:#ff0000;}`)
+  })
+
+  it('three deep, has the class of the nested themes above it and its own, merged, and never the outermost theme', () => {
+    const style = setup()
+    const { Text } = createCounted(style)
+    style.engine.css({ color: style.engine.refs.palette.text })
+    const { container } = render(
+      <style.ThemeProvider theme={light}>
+        <style.ThemeProvider theme={{ palette: { text: '#00ff00' } }}>
+          <style.ThemeProvider theme={{ palette: { primary: '#ff0000' } }}>
+            <Text>x</Text>
+          </style.ThemeProvider>
+        </style.ThemeProvider>
+      </style.ThemeProvider>
+    )
+    const inner = container.firstElementChild?.firstElementChild as HTMLElement
+    const [own, boundary, full, scope] = inner.className.split(' ')
+    expect([boundary, scope]).toEqual(['t-boundary', 't-scope'])
+    expect(style.ruleOf(own)).toBe(`.${own}{--t-palette-primary:#ff0000;}`)
     expect(style.ruleOf(full)).toBe(
-      `.${full}{--t-palette-primary:#ff0000;--t-palette-text:#111111;}`
+      `.${full}{--t-palette-text:#00ff00;--t-palette-primary:#ff0000;}`
     )
   })
 

@@ -3,7 +3,7 @@
 ## What it does
 
 The entry of `@umber-style/vue`. It makes the default style once, exports its members by name (`configure`,
-`getEngine`, `styled`, `StyleSheet`, `useStyle`, `useTheme`, `ThemeProvider`, `ThemeScope`, `useThemeClass`,
+`getEngine`, `styled`, `StyleSheet`, `useStyle`, `useStyleValue`, `useTheme`, `ThemeProvider`, `ThemeScope`, `useThemeClass`,
 `apply`, `css`, `themeClass`, `when`, `whenScheme`, `keyframes`, `globalStyles`, `Global`), and re-exports the
 rest of the public API.
 

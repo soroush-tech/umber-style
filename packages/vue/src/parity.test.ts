@@ -78,9 +78,7 @@ describe('a ThemeProvider whose theme changes', () => {
     )
     const element = root.firstElementChild as HTMLElement
     expect(element.tagName).toBe('SECTION')
-    expect(element.className).toMatch(
-      /^p-theme-[a-z0-9]+ p-boundary p-theme-[a-z0-9]+ p-scope mine$/
-    )
+    expect(element.className).toMatch(/^p-theme-[a-z0-9]+ p-boundary p-scope mine$/)
   })
 })
 

@@ -179,9 +179,9 @@ describe('only the used variables', () => {
   })
 
   it.each([true, false])(
-    'appends the variable that a token adds later, in the browser, once and to the classes that have it, hasRuleText %s',
-    (hasRuleText) => {
-      const sheet = createDomSheet('e', undefined, { hasRuleText })
+    'appends the variable that a token adds later, in the browser, once and to the classes that have it, speedy %s',
+    (speedy) => {
+      const sheet = createDomSheet('e', undefined, { speedy })
       const cache = createCache({ prefix: 'e', hasLayers: false, sheet })
       const engine = createEngine<AppTheme>(theme, { prefix: 'e', cache })
       engine.themeId(theme)
@@ -199,37 +199,34 @@ describe('only the used variables', () => {
 })
 
 describe('a hydrated page', () => {
-  it.each([true, false])(
-    'neither loses nor repeats a declaration, hasRuleText %s',
-    (hasRuleText) => {
-      const server = setup()
-      const baseName = server.engine.themeId(theme)
-      const darkName = server.engine.themeId(dark, 'dark')
-      server.engine.css({ color: server.engine.refs.palette.primary })
-      document.head.innerHTML = createStyleTag(server.cache)
+  it.each([true, false])('neither loses nor repeats a declaration, speedy %s', (speedy) => {
+    const server = setup()
+    const baseName = server.engine.themeId(theme)
+    const darkName = server.engine.themeId(dark, 'dark')
+    server.engine.css({ color: server.engine.refs.palette.primary })
+    document.head.innerHTML = createStyleTag(server.cache)
 
-      const element = document.querySelector('style') as HTMLStyleElement
-      const sent = element.textContent
-      const sheet = createDomSheet('e', undefined, { hasRuleText })
-      const cache = createCache({ prefix: 'e', hasLayers: false, sheet })
-      const engine = createEngine<AppTheme>(theme, { prefix: 'e', cache })
-      expect(engine.themeId(theme)).toBe(baseName)
-      expect(engine.themeId(dark, 'dark')).toBe(darkName)
-      // One token the server covered, and one it did not.
-      engine.css({ color: engine.refs.palette.primary })
-      const inserted = engine.css({ background: engine.refs.palette.surface })
-      const rules = readPageRules()
-      expect(element.textContent).toBe(sent)
-      const declaring = (name: string, variable: string) =>
-        rules.filter((rule) => rule.includes(`.${name}`) && rule.includes(variable))
-      expect(declaring(baseName, '--e-palette-primary')).toHaveLength(1)
-      expect(declaring(darkName, '--e-palette-primary')).toHaveLength(1)
-      expect(declaring(baseName, '--e-palette-surface')).toHaveLength(1)
-      expect(declaring(darkName, '--e-palette-surface')).toHaveLength(1)
-      expect(rules.filter((rule) => rule.includes(`.${inserted}`))).toHaveLength(1)
-      expect(rules.filter((rule) => rule.includes('color-scheme'))).toHaveLength(1)
-    }
-  )
+    const element = document.querySelector('style') as HTMLStyleElement
+    const sent = element.textContent
+    const sheet = createDomSheet('e', undefined, { speedy })
+    const cache = createCache({ prefix: 'e', hasLayers: false, sheet })
+    const engine = createEngine<AppTheme>(theme, { prefix: 'e', cache })
+    expect(engine.themeId(theme)).toBe(baseName)
+    expect(engine.themeId(dark, 'dark')).toBe(darkName)
+    // One token the server covered, and one it did not.
+    engine.css({ color: engine.refs.palette.primary })
+    const inserted = engine.css({ background: engine.refs.palette.surface })
+    const rules = readPageRules()
+    expect(element.textContent).toBe(sent)
+    const declaring = (name: string, variable: string) =>
+      rules.filter((rule) => rule.includes(`.${name}`) && rule.includes(variable))
+    expect(declaring(baseName, '--e-palette-primary')).toHaveLength(1)
+    expect(declaring(darkName, '--e-palette-primary')).toHaveLength(1)
+    expect(declaring(baseName, '--e-palette-surface')).toHaveLength(1)
+    expect(declaring(darkName, '--e-palette-surface')).toHaveLength(1)
+    expect(rules.filter((rule) => rule.includes(`.${inserted}`))).toHaveLength(1)
+    expect(rules.filter((rule) => rule.includes('color-scheme'))).toHaveLength(1)
+  })
 })
 
 /** The text of every rule of the style elements of the prefix e that the browser took, in document order. */

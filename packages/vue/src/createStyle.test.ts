@@ -219,14 +219,13 @@ describe('ThemeProvider and useTheme', () => {
     })
     // The outermost provider renders no element; the nested one has its classes and the given one.
     const nested = root.querySelector('[class*="v-theme-"]') as HTMLElement
-    expect(nested.className).toMatch(
-      /^v-theme-[a-z0-9]+ v-boundary v-scheme-dark v-theme-[a-z0-9]+ v-scope mine$/
-    )
+    expect(nested.className).toMatch(/^v-theme-[a-z0-9]+ v-boundary v-scheme-dark v-scope mine$/)
     expect(root.querySelectorAll('[class*="v-theme-"]')).toHaveLength(1)
     expect(root.querySelectorAll('[style]')).toHaveLength(0)
     const buttons = [...root.querySelectorAll('button')].map((button) => button.className)
     expect(new Set(buttons).size).toBe(1)
-    expect(sheet.rules.filter((rule) => rule.startsWith('.v-theme-'))).toHaveLength(2)
+    // One theme class: below the outermost provider, the merged class is the class of its own theme.
+    expect(sheet.rules.filter((rule) => rule.startsWith('.v-theme-'))).toHaveLength(1)
     expect(sheet.rules.filter((rule) => rule.startsWith(':where(:root)'))).toHaveLength(1)
     expect(sheet.rules.join('')).toContain('color-scheme:dark;')
   })

@@ -49,10 +49,7 @@ export const fixtures: readonly FixtureConfig[] = [
     sharesProcess: false,
     scenarios: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M'],
     only: 'next-app*.spec.ts',
-    known: {
-      'registry-late-root':
-        'KNOWN: a registry style element that streams into the body after the browser cache declared its root theme keeps its root rules (packages/core/src/cache.root.test.ts)',
-    },
+    known: {},
     devPort: 4202,
   },
   {
@@ -89,6 +86,7 @@ export const fixtures: readonly FixtureConfig[] = [
     sharesProcess: true,
     scenarios: ['A', 'B', 'C', 'D', 'F', 'H', 'I', 'J', 'K', 'L', 'M'],
     known: {},
+    only: 'vue-ssr*.spec.ts',
   },
 ]
 

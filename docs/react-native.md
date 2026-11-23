@@ -278,6 +278,7 @@ The package exports `add`, `subtract`, `multiply`, `divide`, `negate` and `alpha
 
 ## Limits
 
+- `useStyleValue` of the web bindings is not exported here: React Native has no CSS variable, and its form on the platform waits for the animations of the platform (a later task). See [Writing styles](writing-styles.md#a-value-that-changes-without-a-render).
 - **The React Native binding was never run in a real app.** The tests alias the one import of the platform (`react-native`) to a stand-in whose `StyleSheet.create` returns its input and whose `Appearance` is a stub, and they use plain host components that record their props. The styles were compiled against the real `react-native` types.
 - Because of that, `StyleSheet.create` returning ids and the platform's own handling of an unknown key were not exercised. The events of `Dimensions`, `Appearance` and `AccessibilityInfo` were sent by stand-ins: a rotation and a window resize on a device were not observed.
 - The color scheme of the platform is read when a component renders. A change of the system setting renders again the components that read it through `prefers-color-scheme` or a `whenScheme()` key that no provider decides; a style function that reads `Appearance` itself is not rendered again.

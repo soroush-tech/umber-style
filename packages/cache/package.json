@@ -1,6 +1,6 @@
 {
   "name": "@umber-style/cache",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "The UmberStyle cache with the members that server-rendering setups read: key, compat, insert, inserted, registered and sheet.",
   "keywords": [
     "styling",

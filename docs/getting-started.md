@@ -14,7 +14,7 @@ pnpm add @umber-style/core         # plain JavaScript, no framework
 pnpm add umber-style               # all of them, as subpaths
 ```
 
-Until the first stable release, the packages are published as prereleases: add `@alpha` to the name, for example `pnpm add umber-style@alpha`. Without it you get an empty `0.0.0` placeholder. See [Releasing](releasing.md).
+Every package has a stable release on the `latest` tag of npm, which the lines above install. Prereleases go to the `alpha` and `rc` tags, for trying a change before it reaches `latest`: `pnpm add umber-style@alpha`. See [Releasing](releasing.md).
 
 `umber-style` re-exports the core at its root and each binding as `umber-style/react`, `umber-style/react-native` and `umber-style/vue`. The pages use the scoped packages for web code. `umber-style/react` is special: it is the entry for one source that runs on the web and on React Native, and its types are the intersection of both platforms. See [Typed styles](typed-styles.md) and [Style sheets and the style prop](style-sheets.md).
 
@@ -84,7 +84,7 @@ createApp({
 }).mount('#app')
 ```
 
-The examples use render functions. Single-file components with a template use the same components, but no test in the repository compiles a template, so that form is not verified.
+The examples use render functions. A template of a single-file component uses the same components: one is compiled with the compiler of single-file components in a test of the Vue binding, and gives the class names of the same tree written with `h` (see [Vue](vue.md#limits)).
 
 ## React Native
 
@@ -151,6 +151,6 @@ const night = engine.themeClass(dark, 'dark')
 
 ## Limits
 
-- Nothing here has run on npm: the install lines are what they will be.
+- The install lines install the release on `latest`; the examples here are checked against the code of this repository, which can be ahead of that release (see the release notes of each package).
 - The React Native example was compiled against the real `react-native` types and run against a stand-in for the platform in a test. The binding has never been run in a real app.
-- The Vue template form is not verified, as said above.
+- The Vue template form is compiled and rendered on a server in a test; it is not run in a browser in this repository.
