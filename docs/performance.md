@@ -12,7 +12,7 @@ Times are written in `ns` (nanoseconds), `us` (microseconds) and `ms` (milliseco
 - **A change of theme renders nothing.** Sending a page in another theme from a server took 0.11 to 0.13 of the time Used before takes to render it again (measured with 0.3.0).
 - **The first render over a fresh cache is slower**: 1.5 to 2.8 times on 48 elements, 3.2 times with nested providers, 1.43 times on the tree of 500.
 - **The CSS of one page, read from its HTML, is 2.95 times slower.**
-- **The bundle is 3.0 times larger**: 32.4 KB gzipped for a small app, against 10.7 KB.
+- **It is a larger download**: it adds 32.4 KB, gzipped, to the JavaScript a visitor downloads for a small app, against 10.7 KB: 3.0 times as much.
 - **A style seen before, in a new object, is 1.4 to 1.7 times slower** with the defaults. With the style memo on, the same calls are 1.5 to 3.4 times faster than Used before.
 - **Against 0.3.0, 0.4.0 is faster or level everywhere**: 1.21 to 23.7 times faster in the gate, and faster or level on every row of the comparison.
 
@@ -97,7 +97,7 @@ With the memo off, 0.4.0 takes the path it took before the memo existed: the cor
 
 ## Against the styling library the design system used before
 
-Every table of this section is from round 2, except the bundle (round 1). The last column compares each UmberStyle column with Used before. [The style memo](style-memo.md) has a section that compares UmberStyle, with the memo off and on, with two other styling libraries by name.
+Every table of this section is from round 2, except the download size (round 1). The last column compares each UmberStyle column with Used before. [The style memo](style-memo.md) has a section that compares UmberStyle, with the memo off and on, with two other styling libraries by name.
 
 ### A class from a style object, no framework
 
@@ -174,20 +174,20 @@ One operation is the CSS of the tree of 500 read from its HTML, as one style tag
 | --------------- | ----------: | -------------------: | ------------------: | ------------------------------------------- |
 | The tree of 500 |     45.8 us |               137 us |              129 us | off 2.95 times slower; on 2.80 times slower |
 
-### The bundle
+### Download size
 
-Round 1. A small app (one theme, one styled button that reads it, one provider, `createRoot`), bundled with esbuild 0.25.12 (`--bundle --minify`, ESM, for a browser, `process.env.NODE_ENV` written as `production`), less the same app with no styling library.
+This is the size of the library's own JavaScript that a browser downloads, not the CSS written for a page; the CSS a page gets is measured in [The CSS a page gets](style-memo.md#the-css-a-page-gets). This is not a speed. It is how much JavaScript the library adds to what a visitor's browser downloads before the page can run. Round 1. One small page (one theme, one provider, one styled button that reads a colour from the theme) was built for production once with each library, and once with no styling library; the size of that last one was taken away, so what is left is what the library adds. The first row below is the one a visitor pays for, since servers send JavaScript gzipped. The build: esbuild 0.25.12 (`--bundle --minify`, an ES module for a browser, `process.env.NODE_ENV` set to `production`).
 
-| What the styling adds to the app | Used before | UmberStyle 0.4.0 | UmberStyle is    |
-| -------------------------------- | ----------: | ---------------: | ---------------- |
-| Minified                         |     27.2 KB |          87.1 KB | 3.2 times larger |
-| Gzipped                          |     10.7 KB |          32.4 KB | 3.0 times larger |
+| What the library adds to the download   | Used before | UmberStyle 0.4.0 | UmberStyle is    |
+| --------------------------------------- | ----------: | ---------------: | ---------------- |
+| As sent to the browser (gzipped)        |     10.7 KB |          32.4 KB | 3.0 times larger |
+| After the browser unpacks it (minified) |     27.2 KB |          87.1 KB | 3.2 times larger |
 
 Of the minified 87.1 KB, the core is 72.4 KB and the React binding 8.9 KB. The style memo, added in round 2, made the core 0.8 KB larger gzipped, on or off; the app was not bundled again after it.
 
 ### The score
 
-Of the 27 timed rows above (the bundle is not counted):
+Of the 27 timed rows above (the download size is not counted):
 
 | UmberStyle 0.4.0 | Faster than Used before | Level | Slower |
 | ---------------- | ----------------------: | ----: | -----: |
@@ -226,7 +226,7 @@ What would close it: sharing what one cache compiled with the next cache of the 
 
 UmberStyle collects the class names of the HTML, then builds the page's CSS in a fixed order: the layer order, the root theme trimmed to the variables the page uses, the theme classes and the classes sorted by name, each props class after its base class, and a stamp of the options. That order is what makes the CSS of a page the same whatever order the pages were rendered in. Used before runs one regular expression over the HTML and joins the CSS texts it stored when it wrote them, in the order it wrote them. 0.4.0 compares names in place, reads a repeated class once and sorts by keys made once (1.82 times faster than 0.3.0 in the comparison), and is still 2.95 times slower. No issue of the repository plans more.
 
-### The bundle
+### Download size
 
 Almost all of the core is reachable through the object a style returns: `createStyle` returns `css`, `keyframes`, `globalStyles`, the sheets and the template parser, so a bundler keeps all of them even when an app uses none. The development checks are about 4 KB gzipped of the app, and stay, because `hasDevChecks: true` turns them on in any build, a production one too: leaving them out of a production bundle was measured at 4.3 KB smaller and not made, since it would change what that option does. What would close the rest is entries an app imports one by one instead of functions on one object; that would change the API, and no issue of the repository plans it.
 
