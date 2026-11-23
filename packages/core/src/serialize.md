@@ -4,7 +4,7 @@
 
 Turns a style object into flat CSS rules and merges style objects. `compileRules` and `compileStyleRules`
 take a selector and a style and return an array of rule strings: declarations in camelCase or as written,
-nested selectors with `&`, at-rules, `@theme` and `@scheme` conditions, `alpha()` values with a fallback,
+nested selectors with `&`, at-rules, `@theme` and `@scheme` conditions, `@state` keys, `alpha()` values with a fallback,
 fallback lists, vendor-prefixed forms and, when asked, a repair of string forms of token maths.
 `mergeStyles` merges style objects left to right. `joinLabels`, `readLabel` and `toSelectorText` are small
 helpers around labels and selector lists.
@@ -29,7 +29,10 @@ flowchart TD
   skip -->|no| obj{"value is a nested style object?"}
   obj -->|yes| cond{"key is @theme or @scheme?"}
   cond -->|yes| scoped["compileCondition: @scope rule; scheme adds a guarded media rule"]
-  cond -->|no| at{"key starts with @?"}
+  cond -->|no| state{"readState: a known @state key?"}
+  state -->|yes| swap["the key is STATE_SELECTORS of the state, e.g. '&:active'"]
+  state -->|no| at{"key starts with @?"}
+  swap --> sel
   at -->|yes| wrap["rules of the value, each wrapped in key{...}"]
   at -->|no| sel["resolveSelector: & is the parent, ':' is the parent itself, else a descendant"]
   obj -->|no| decl["toDeclarations(key, value)"]
@@ -53,6 +56,10 @@ is not a custom property goes through `repairValue`: `var(--x)1F` becomes the `a
 becomes what `negate()` writes, and `var(--x)px` becomes the bare reference when the token has that unit,
 a `calc(ref * 1px)` when it is a plain number, else is left as it is and reported.
 
+A state key (`state.ts`) is read before the at-rule test: its selector takes the place of the key, and the
+rest is the path of a selector key, so `@state pressed` and `&:active` give the same rules, and so the same
+class name. A `@state` key with another name is an at-rule, as before.
+
 `mergeStyles` first resolves `web` and `native` parts (the `web` part is merged over the rest, `native` is
 dropped), skips `undefined`, `null` and `false`, deletes the earlier key so a later key moves to the end,
 merges nested objects the same way, and joins two labels with `joinLabels`.
@@ -66,6 +73,7 @@ a label already a whole run of the earlier one is not written again.
 
 ## What it guarantees
 
+- A state key gives exactly the rules of its selector key, in the place it is written (`state.test.ts`).
 - Output is deterministic: key order is the order of the object, so equal objects give equal text.
 - A function value is never written as CSS; it is left out.
 - A custom property value is never repaired and never gets an alpha fallback (it would always win there).
@@ -80,7 +88,17 @@ a label already a whole run of the earlier one is not written again.
   takes the whole `context` (comment on `compileStyleRules`).
 - A prefixed form is written before the standard declaration in the same rule, and not at all when the
   author declared that form under either spelling (`vendorPrefixes.test.ts`).
+- A state key is translated here, at the one place a nested key is read, rather than in `state()`: a style
+  holds the same key on every platform, and only the web writes it as a selector. `mergeStyles` does not
+  translate it, so a style with both `@state pressed` and `&:active` keeps two keys and writes two rules for
+  the same selector, the later one winning in the cascade.
 - Labels are joined, not replaced, so a merged style names every style that has one.
+- Written for speed, with the same output (issue 10): a style's keys are read with `Object.keys` and
+  each value by its key, not as `Object.entries` pairs; `mergeStyles` deletes a key only when it is
+  there to move to the end (a delete of a missing key changes nothing, and slows the object down); a
+  nested key and its parent with no comma are joined as one part each, without splitting them into
+  lists. Together they took a hit of a small style from 1.28 to 0.93 us, of the large one from 13.3 to
+  7.7 us, and a new small style from 3.1 to 1.8 us (host, one process).
 - The reason the unit list `REPAIR_UNITS` is the one it is (for example, why `in` and `pc` are present)
   is not recorded in the code beyond "a unit a `calc()` can multiply a number by".
 

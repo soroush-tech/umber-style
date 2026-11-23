@@ -50,7 +50,7 @@ The call must also run before the first `styled(...)(...)` of the default style,
 
 In development, a component of a default style that was never configured warns once when it renders under a `CacheProvider` whose cache has another key (the `key` of `createCache`): the warning names both prefixes and these two causes. A configured style may use a cache of any key, and a cache with the key `css` is the default prefix on purpose: neither warns. See [The cache and server packages](cache-and-server.md).
 
-**`@umber-style/styled`** has the `styled` of the default style as its default export, for code that imports it that way. It is the same function, so `configure` from `@umber-style/react` sets it up, and under the `react-server` condition it is the `styled` of the server build:
+**`@umber-style/styled`** has the `styled` of the default style as its default export, for code that imports it that way, and as the named export `styled` (`import { styled } from '@umber-style/styled'`). It is the same function, so `configure` from `@umber-style/react` sets it up, and under the `react-server` condition it is the `styled` of the server build:
 
 ```tsx
 import styled from '@umber-style/styled'
@@ -59,6 +59,24 @@ const Card = styled.div({ padding: 16, borderRadius: 8 })
 ```
 
 Its types are `Styled`, `StyledComponent`, `StyledFactory`, `StyledOptions`, `StyledStatics`, `StyledTags`, `StyleProp`, `CreateStyled`, `FilteringStyledOptions`, `PropsOf`, `CSSObject`, `Interpolation` and `Theme`, the same as in `@umber-style/react`.
+
+### A library that ships a CommonJS build
+
+A library that is an ES module package (`"type": "module"`) and also ships a CommonJS build imports the entries that have a default export by name. Each has its function as the default export and as a named one, the same function (the subpaths of `@umber-style/is-prop-valid` have `isPropValid`). From the CommonJS file that `pnpm smoke:packed` compiles:
+
+```ts
+import { createCache } from '@umber-style/cache'
+import { createInstance as createCssInstance } from '@umber-style/css/create-instance'
+import { createInstance } from '@umber-style/server/create-instance'
+import { styled } from '@umber-style/styled'
+
+export const cache = createCache({ key: 'lib' })
+export const badge: string = createCssInstance({ cache }).css({ margin: 4 })
+export const Card = styled.div({ padding: 4 })
+export const page: string = createInstance(cache).renderStylesToString('<p></p>')
+```
+
+The bundler compiles an import for the CommonJS build as Node's interop does, where the default is the whole `module.exports` of our CommonJS file, an object, so `import styled from '@umber-style/styled'` gives that object and the call throws `(0, _mod.default) is not a function`. A name is read from `module.exports` itself, so it gives the function; an app is not affected, because it resolves the ES module build.
 
 ## What the binding exports
 
@@ -156,4 +174,5 @@ The package has a second build for server components, picked by the `react-serve
 - Under a nested provider the DOM has one more element; a portal without `ThemeScope` sees the outer theme. See [Themes](themes.md).
 - The default style is one for the program: two copies of the package in one app share it, as they share the contexts of each prefix and of `CacheProvider` (see [How it works](how-it-works.md#two-copies-in-one-program)). A copy of 0.1.0 shares nothing.
 - An element that is given a plain object in `style` renders a second child next to it, which renders nothing: the element's own state is kept when the object comes and goes (checked in jsdom), but the component's root is then a fragment.
+- The CommonJS build of a library is checked with the interop of Node written out in `scripts/smoke-packed.mjs` (the default is the whole `module.exports`, the names are read from it), on the packed tarballs; no bundler's own output was run.
 - `apply`, `themeClass`, `when` and `whenScheme` are not hooks and do not see a `CacheProvider`: read a sheet with `useStyle` under the provider, so that `apply` writes its entries there. The server components build has no `CacheProvider`. The other limits of the provider are in [The cache and server packages](cache-and-server.md).

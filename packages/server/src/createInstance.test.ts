@@ -1,7 +1,8 @@
 // @vitest-environment node
 import createCache from '@umber-style/cache'
 import { createEngine } from '@umber-style/core'
-import createInstance from './createInstance'
+import { expectTypeOf } from 'vitest'
+import createInstance, { createInstance as namedCreateInstance } from './createInstance'
 
 const theme = { palette: { primary: '#0000ff', accent: '#ff0000' }, space: [0, 4, 8] }
 
@@ -19,6 +20,11 @@ function setup(key = 'app') {
 }
 
 describe('createInstance', () => {
+  it('is the named export too, with the same type', () => {
+    expect(namedCreateInstance).toBe(createInstance)
+    expectTypeOf(namedCreateInstance).toEqualTypeOf(createInstance)
+  })
+
   it('extracts the chunks of a page: the global rules apart from the classes, with their ids', () => {
     const { cache, themeId, fade, box, unused, html } = setup()
     const { extractCriticalToChunks } = createInstance(cache)

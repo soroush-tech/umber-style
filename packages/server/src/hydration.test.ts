@@ -30,10 +30,10 @@ describe('a page written with constructStyleTagsFromChunks', () => {
     document.body.innerHTML = html
 
     const cache = createCache({ key: 'app', hasDevChecks: false })
+    // The elements the server sent; the cache's own is made at its first rule, and it writes none.
     expect(cache.sheet.tags.map((tag) => tag.dataset.umber?.split(' ')[0])).toEqual([
       'app-global',
       'app',
-      undefined,
     ])
     const written: string[] = []
     const prevInsert = cache.insert

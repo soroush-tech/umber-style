@@ -22,10 +22,10 @@ describe('the nonce of a style element the engine makes', () => {
   })
 
   it('is not set without one, and an element that the document had is used as it is', () => {
-    createDomSheet('t')
+    createDomSheet('t').insert('.a{color:red;}')
     expect(findElement('t')?.hasAttribute('nonce')).toBe(false)
     document.head.innerHTML = '<style data-style="own"></style>'
-    createDomSheet('own', document.head, { nonce: 'n0nce' })
+    createDomSheet('own', document.head, { nonce: 'n0nce' }).insert('.a{color:red;}')
     expect(document.head.querySelectorAll('style')).toHaveLength(1)
     expect(findElement('own')?.hasAttribute('nonce')).toBe(false)
   })

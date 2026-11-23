@@ -3,6 +3,7 @@ import {
   warnAboutDroppedKey,
   warnAboutIgnoredOptions,
   warnAboutQuery,
+  warnAboutUnheldState,
   warnAboutValues,
 } from './warnStyle'
 
@@ -198,6 +199,19 @@ describe('warnAboutIgnoredOptions', () => {
     ])
     process.env.NODE_ENV = 'production'
     warnAboutIgnoredOptions({ suffix: '-x' })
+    expect(warn).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('warnAboutUnheldState', () => {
+  it('warns once for each component and state, and not in production', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    warnAboutUnheldState('hovered', 'HoverCard')
+    warnAboutUnheldState('hovered', 'HoverCard')
+    expect(warn).toHaveBeenCalledTimes(1)
+    expect(warn.mock.calls[0][0]).toContain('follow onHoverIn and onHoverOut')
+    process.env.NODE_ENV = 'production'
+    warnAboutUnheldState('focused', 'HoverCard')
     expect(warn).toHaveBeenCalledTimes(1)
   })
 })

@@ -29,7 +29,7 @@ returns `umber-1p2a3xt` and writes three rules, each in a cascade layer (see [Ca
 @layer umber-components{@media (min-width: 40em){.umber-1p2a3xt{padding:16px;}}}
 ```
 
-There is no CSS processor and no build step. The serializer is a function that runs when the page runs. In the browser the rules go into `<style data-style="<prefix>">` elements: outside production each rule is the text of an element of its own, in the order the rules were written, so the element inspector and `textContent` show the live rules, and the browser parses each rule once; in production they go into one element with the browser's `insertRule`, which is faster and leaves the text empty. `speedy` decides it either way: see [`speedy`](options.md#speedy).
+There is no CSS processor and no build step. The serializer is a function that runs when the page runs. In the browser the rules go into `<style data-style="<prefix>">` elements, the first one made when the first rule is written (a cache that writes nothing adds none): outside production each rule is the text of an element of its own, in the order the rules were written, so the element inspector and `textContent` show the live rules, and the browser parses each rule once; in production they go into one element with the browser's `insertRule`, which is faster and leaves the text empty. `speedy` decides it either way: see [`speedy`](options.md#speedy).
 
 ## The text of a rule
 

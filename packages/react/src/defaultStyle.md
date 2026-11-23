@@ -49,7 +49,9 @@ else `'css'`.
   claimed prefix may render before the style is first used.
 
 - In development, a style that `configure` was never called on warns once when a component of it renders
-  under a `CacheProvider` whose cache has another prefix (`watchProvidedCaches.ts`): the sign of a
+  under a `CacheProvider` whose cache has another prefix (`watchProvidedCaches.ts`; the test for
+  development is written out in front of `isDevelopment()`, as `devChecks.md` of the core says, so that a
+  production bundle leaves the watch out): the sign of a
   `configure` call that did not run. It changes nothing else.
 
 ## Decisions

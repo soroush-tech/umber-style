@@ -1,5 +1,5 @@
-import { readCondition } from '@umber-style/core'
-import { matchesCondition, type NativeCondition } from './conditions'
+import { readCondition, readState, type Condition, type StateName } from '@umber-style/core'
+import { matchesCondition, type InteractionState, type NativeCondition } from './conditions'
 import { isMediaKey, readMediaQuery, type WindowState } from './mediaQuery'
 import type { NativeStyleObject } from './nativeStyle'
 import { convertValues, DEFAULT_REM_BASE } from './units'
@@ -13,7 +13,7 @@ export interface NativeSettings {
   readonly name?: string
 }
 
-/** What a style depends on besides itself, at any depth of its `native` part and of its condition and media parts. */
+/** What a style depends on besides itself, at any depth of its `native` part and of its condition, state and media parts. */
 export interface StyleKeys {
   /** Whether it has a `when()` or `whenScheme()` key: then it depends on the providers above. */
   isConditional: boolean
@@ -21,7 +21,17 @@ export interface StyleKeys {
   hasScheme: boolean
   /** Its media query keys, each once, in the order they are met. */
   queries: string[]
+  /** The states its `state()` keys name, each once, in the order they are met: then it depends on what the component is doing. */
+  states: StateName[]
 }
+
+/** What a key of a part stands for: a media query, a state, or a condition of the providers. */
+type PartKey =
+  | { readonly kind: 'media' }
+  | { readonly kind: 'state'; readonly name: StateName }
+  | Condition
+
+const MEDIA_PART: PartKey = { kind: 'media' }
 
 const DEFAULT_SETTINGS: NativeSettings = { remBase: DEFAULT_REM_BASE }
 
@@ -54,23 +64,31 @@ export function collectKeys(
       found = collectKeys(value, found)
       continue
     }
-    const isMedia = isMediaKey(key)
-    const condition = isMedia ? undefined : readCondition(key)
-    if (!isMedia && condition === undefined) continue
-    found ??= { isConditional: false, hasScheme: false, queries: [] }
-    addKey(found, key, condition)
+    const part = readPartKey(key)
+    if (part === undefined) continue
+    found ??= { isConditional: false, hasScheme: false, queries: [], states: [] }
+    addKey(found, key, part)
     found = collectKeys(value, found)
   }
   return found
 }
 
-/** Adds the key `key` of a part to `found`: a media query (no `condition`) once, else that there is a condition, and whether it is a scheme. */
-function addKey(found: StyleKeys, key: string, condition: ReturnType<typeof readCondition>): void {
-  if (condition === undefined) {
+/** What the key `key` of a part stands for, or undefined when it is not a media, state or condition key. */
+function readPartKey(key: string): PartKey | undefined {
+  if (isMediaKey(key)) return MEDIA_PART
+  const name = readState(key)
+  return name === undefined ? readCondition(key) : { kind: 'state', name }
+}
+
+/** Adds the key `key` of a part to `found`: a media query or a state once, else that there is a condition, and whether it is a scheme. */
+function addKey(found: StyleKeys, key: string, part: PartKey): void {
+  if (part.kind === 'media') {
     if (!found.queries.includes(key)) found.queries.push(key)
+  } else if (part.kind === 'state') {
+    if (!found.states.includes(part.name)) found.states.push(part.name)
   } else {
     found.isConditional = true
-    found.hasScheme ||= condition.kind === 'scheme'
+    found.hasScheme ||= part.kind === 'scheme'
   }
 }
 
@@ -84,17 +102,19 @@ function matchesMedia(key: string, state: WindowState | undefined, remBase: numb
  * at-rules, custom properties, and the `animation*` and `transition*` properties, each dropped whole. Objects and arrays under any other key are kept
  * (`shadowOffset`, `transform`). A style written for both platforms has a `native` part, which is merged
  * over the rest, and a `web` part, which is dropped. A `when()` or `whenScheme()` key is a part that
- * applies when it matches `condition` (the nearest provider), and a media query key one that applies when
- * it holds for `state` (the window): the parts that apply are merged over the plain keys, in the order
- * they are written, as the web writes them after the base rule; with no `condition` or `state` they are
- * dropped. A string that is a length or a number becomes a number (`convertValues`).
+ * applies when it matches `condition` (the nearest provider), a media query key one that applies when
+ * it holds for `state` (the window), and a `state()` key one that applies when its state is `true` in
+ * `interaction` (what the component is doing): the parts that apply are merged over the plain keys, in
+ * the order they are written, as the web writes them after the base rule; with no `condition`, `state`
+ * or `interaction` they are dropped. A string that is a length or a number becomes a number (`convertValues`).
  * In development a dropped key that is a mistake, and a value that is not converted, are warned about.
  */
 export function toNativeStyle(
   style: Record<string, unknown>,
   condition?: NativeCondition,
   settings: NativeSettings = DEFAULT_SETTINGS,
-  state?: WindowState
+  state?: WindowState,
+  interaction?: InteractionState
 ): NativeStyleObject {
   const { web: _web, native, ...rest } = style
   const { name, remBase } = settings
@@ -108,12 +128,13 @@ export function toNativeStyle(
   )
   const matching = Object.entries(merged).filter(
     ([key, part]) =>
-      isNested(part) && (matchesCondition(key, condition) || matchesMedia(key, state, remBase))
+      isNested(part) &&
+      (matchesCondition(key, condition, interaction) || matchesMedia(key, state, remBase))
   )
   for (const [, part] of matching)
     Object.assign(
       resolved,
-      toNativeStyle(part as Record<string, unknown>, condition, settings, state)
+      toNativeStyle(part as Record<string, unknown>, condition, settings, state, interaction)
     )
   convertValues(resolved, remBase)
   warnAboutValues(resolved, name)

@@ -7,7 +7,7 @@ the CSS a page needs in two chunks, `extractCritical(html)` gives it in one piec
 `constructStyleTagsFromChunks(chunks)` writes `<style data-umber>` elements (with the nonce of the cache,
 when it has one), and
 `renderStylesToString(html)` puts those elements into the HTML. The subpath
-`@umber-style/server/create-instance` exports it as the default.
+`@umber-style/server/create-instance` exports it as the default and by name.
 
 ## Why it exists
 
@@ -57,6 +57,8 @@ the same attribute on the client (the first word is the key, the rest are names 
 - A chunk with no CSS gets no element.
 - `html` is returned as given, in `extractCritical` and `extractCriticalToChunks`.
 - No browser global is used.
+- The named export `createInstance` is the default export, with the same type (the test "is the named
+  export too, with the same type").
 
 ## Decisions
 
@@ -65,6 +67,13 @@ the same attribute on the client (the first word is the key, the rest are names 
   that makes a cache for each request has the nonce of that request. It is escaped once, when the instance
   is made, by `createNonceAttribute` of the core, which `createStyleTag` and `extractPageStyles` use too,
   so every tag of a server is written the same way.
+- The function is the default export and also a named one, the same function. A library that is an ES
+  module package and ships a CommonJS build has its bundler compile `import createInstance from '@umber-style/server/create-instance'` as Node's
+  interop does, where the default is the whole `module.exports` (`{ __esModule: true, default, createInstance }`),
+  not the function, so it throws `is not a function`; `import { createInstance } from '@umber-style/server/create-instance'` gets the function.
+  The shape of the CommonJS file (`cjsDefault: false` in `tsdown.config.ts`) was left as it is: making the
+  function `module.exports` would change what every existing `require` of the entry gets.
+  `scripts/smoke-packed.mjs` runs that interop on the packed tarball.
 - The head is found with `/<head(?:\s[^>]*)?>/i`, so `<header>` is not a head; with no head, such as a
   fragment, the tags go at the start.
 

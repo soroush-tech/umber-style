@@ -7,7 +7,8 @@ import {
   type StyleObject,
   type UmberSheet,
 } from '@umber-style/core'
-import createInstance from './createInstance'
+import { expectTypeOf } from 'vitest'
+import createInstance, { createInstance as namedCreateInstance } from './createInstance'
 
 /** An instance over an in-memory sheet, with its own key. */
 function createTestInstance(key = 't') {
@@ -470,5 +471,12 @@ describe('the prefixed forms in the plain layer', () => {
     const plain = createInstance({ key: 't', sheet: createMemorySheet(), hasVendorPrefixes: false })
     expect(plain.css({ userSelect: 'none' })).toBe(name)
     expect(plain.sheet.rules).toEqual([`.${name}{user-select:none;}`])
+  })
+})
+
+describe('the export', () => {
+  it('is the named export too, with the same type', () => {
+    expect(namedCreateInstance).toBe(createInstance)
+    expectTypeOf(namedCreateInstance).toEqualTypeOf(createInstance)
   })
 })

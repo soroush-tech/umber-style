@@ -11,6 +11,7 @@ import {
   type Condition,
   type Scoping,
 } from './scope'
+import { readState, STATE_SELECTORS } from './state'
 import { PREFIXED_FORMS, type PrefixedForm } from './vendorPrefixes'
 
 /** The value of a key of a style: a CSS value, a falsy value that is left out, a list of values (one declaration each, in order), or a nested style. */
@@ -362,6 +363,8 @@ function joinSelector(one: string, part: string): string {
 
 /** The selector a nested key makes inside `parent`, with `&` standing for the parent. */
 function resolveSelector(parent: string, key: string): string {
+  // With no comma there is one part on each side: what the split would give, without the lists.
+  if (!parent.includes(',') && !key.includes(',')) return joinSelector(parent.trim(), key.trim())
   const parents = splitSelectors(parent)
   return splitSelectors(key)
     .flatMap((part) => parents.map((one) => joinSelector(one, part)))
@@ -407,10 +410,13 @@ function mergeValue(key: string, earlier: StyleValue, value: StyleValue): StyleV
 export function mergeStyles(styles: readonly StyleObject[]): StyleObject {
   const merged: StyleObject = {}
   for (const style of styles) {
-    for (const [key, value] of Object.entries(resolveWebParts(style))) {
+    const resolved = resolveWebParts(style)
+    for (const key of Object.keys(resolved)) {
+      const value = resolved[key]
       if (value === undefined || value === null || value === false) continue
       const earlier = merged[key]
-      delete merged[key]
+      // Only a key that is there moves to the end; a delete of one that is not changes nothing, and is slow.
+      if (earlier !== undefined) delete merged[key]
       merged[key] = mergeValue(key, earlier, value)
     }
   }
@@ -487,7 +493,11 @@ function compileCondition(
   return guarded.length > 0 ? [...scoped, query] : scoped
 }
 
-/** The rules of the nested style `value` under `key`: a condition scopes them, an at-rule wraps them, any other key is a selector inside `selector`. */
+/**
+ * The rules of the nested style `value` under `key`: a condition scopes them, a state key is the
+ * selector of its state (`STATE_SELECTORS`), as if that selector were the key, an at-rule wraps them,
+ * any other key is a selector inside `selector`.
+ */
 function compileNested(
   selector: string,
   key: string,
@@ -496,8 +506,10 @@ function compileNested(
 ): string[] {
   const condition = readCondition(key)
   if (condition) return compileCondition(selector, condition, value, context)
-  if (!key.startsWith('@')) {
-    return compileStyle(resolveSelector(selector, key), value, context)
+  const stateName = readState(key)
+  const selectorKey = stateName === undefined ? key : STATE_SELECTORS[stateName]
+  if (!selectorKey.startsWith('@')) {
+    return compileStyle(resolveSelector(selector, selectorKey), value, context)
   }
   return compileStyle(selector, value, context).map((rule) => `${key}{${rule}}`)
 }
@@ -596,10 +608,12 @@ function compileStyle(selector: string, style: StyleObject, context: CompileCont
   let declarations = ''
   const nested: string[] = []
 
-  for (const [key, value] of Object.entries(style)) {
+  for (const key of Object.keys(style)) {
+    const value = style[key]
     if (key === 'label' || value === null || value === undefined || value === false) continue
-    if (isStyleObject(value)) nested.push(...compileNested(selector, key, value, context))
-    else declarations += toDeclarations(key, value, style, selector, context)
+    if (isStyleObject(value)) {
+      for (const rule of compileNested(selector, key, value, context)) nested.push(rule)
+    } else declarations += toDeclarations(key, value, style, selector, context)
   }
 
   return declarations ? [`${selector}{${declarations}}`, ...nested] : nested
@@ -608,7 +622,7 @@ function compileStyle(selector: string, style: StyleObject, context: CompileCont
 /**
  * The flat CSS rules of `style` for `selector`; without `hasColorFallbacks` an `alpha()` result is
  * written as its mix alone. A `when()` or `whenScheme()` key becomes a scoped rule, written as
- * `scoping` says. With `hasValueRepair` the string forms of token maths that are never valid CSS
+ * `scoping` says, and a `state()` key the rule of its selector. With `hasValueRepair` the string forms of token maths that are never valid CSS
  * (`var(--x)1F`, `-var(--x)`, `var(--x)ms`) are rewritten in each value.
  */
 export function compileRules(

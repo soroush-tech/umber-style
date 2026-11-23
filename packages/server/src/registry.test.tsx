@@ -152,7 +152,8 @@ describe('the registry of an app', () => {
       written.push(args[1].name)
       return prevInsert(...args)
     }
-    expect(cache.sheet.tags).toHaveLength(2)
+    // The element the server sent; the cache makes its own at its first rule, and writes none here.
+    expect(cache.sheet.tags).toHaveLength(1)
     insertedHtml = []
     const again = renderToString(
       <CacheProvider value={cache}>

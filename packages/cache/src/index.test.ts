@@ -6,7 +6,11 @@ import {
   type UmberCache as CoreUmberCache,
 } from '@umber-style/core'
 import { expectTypeOf } from 'vitest'
-import createCache, { type SerializedRule, type UmberCache } from './index'
+import createCache, {
+  createCache as namedCreateCache,
+  type SerializedRule,
+  type UmberCache,
+} from './index'
 
 afterEach(() => {
   document.head.innerHTML = ''
@@ -46,6 +50,11 @@ describe('createCache', () => {
   it('makes the UmberCache that the core declares and this package re-exports', () => {
     expectTypeOf<UmberCache>().toEqualTypeOf<CoreUmberCache>()
     expectTypeOf(createCache).returns.toEqualTypeOf<CoreUmberCache>()
+  })
+
+  it('is the named export too, with the same type', () => {
+    expect(namedCreateCache).toBe(createCache)
+    expectTypeOf(namedCreateCache).toEqualTypeOf(createCache)
   })
 
   it('is the engine cache keyed by `key`, and throws for a key the engine refuses', () => {
@@ -165,12 +174,30 @@ describe('a cache made in the browser', () => {
   it('lists its own style element and those of its key, and knows the names they carry', () => {
     const { box } = writeRegistryPage()
     const cache = createCache({ key: 'soroush', hasDevChecks: false })
+    // Its own element is made at its first rule: none before.
+    expect(cache.sheet.tags.map((tag) => tag.getAttribute('data-umber') ?? 'own')).toEqual([
+      expect.stringMatching(/^soroush soroush-layers /),
+    ])
+    expect(cache.inserted[box]).toBe(true)
+    expect(cache.inserted['soroush-layers']).toBe(true)
+    cache.css({ color: 'purple' })
     expect(cache.sheet.tags.map((tag) => tag.getAttribute('data-umber') ?? 'own')).toEqual([
       expect.stringMatching(/^soroush soroush-layers /),
       'own',
     ])
-    expect(cache.inserted[box]).toBe(true)
-    expect(cache.inserted['soroush-layers']).toBe(true)
+  })
+
+  it('lists an empty element of its key that the page placed, which names nothing, and writes into it', () => {
+    document.head.innerHTML = '<style data-style="placed"></style>'
+    const cache = createCache({ key: 'placed', hasDevChecks: false })
+    expect(cache.sheet.tags).toHaveLength(1)
+    expect(cache.inserted).toEqual({})
+    const name = cache.css({ color: 'teal' })
+    expect(cache.sheet.tags[0].textContent).toBe(
+      '@layer placed-theme,placed-global,placed-components,placed-overrides;'
+    )
+    expect(cache.sheet.tags.at(-1)?.textContent).toContain(`.${name}{color:teal;}`)
+    document.head.innerHTML = ''
   })
 
   it('writes none of the rules that arrived in data-umber elements: classes, globals, keyframes, themes', () => {
@@ -180,8 +207,8 @@ describe('a cache made in the browser', () => {
     const again = renderPage(cache)
     expect(again.box).toBe(made.box)
     expect(seen).toEqual([])
-    const own = document.querySelector<HTMLStyleElement>('style[data-style="soroush"]')
-    expect(own?.sheet?.cssRules).toHaveLength(0)
+    // It wrote no rule, so it made no element of its own.
+    expect(document.querySelector('style[data-style="soroush"]')).toBeNull()
   })
 
   it('reads the document of its sheet: the style elements of an iframe, and not those of the page', () => {
@@ -198,9 +225,17 @@ describe('a cache made in the browser', () => {
     })
     expect(cache.sheet.tags.map((tag) => tag.getAttribute('data-umber') ?? 'own')).toEqual([
       'soroush soroush-framed',
-      'own',
     ])
     expect(cache.inserted).toEqual({ 'soroush-framed': true })
+    // Its own elements are made in the iframe from its first rule: written by text, one for each rule
+    // (the layer order and the class).
+    cache.css({ color: 'purple' })
+    expect(cache.sheet.tags.map((tag) => tag.getAttribute('data-umber') ?? 'own')).toEqual([
+      'soroush soroush-framed',
+      'own',
+      'own',
+    ])
+    expect(document.querySelector('style[data-style="soroush"]')).toBeNull()
   })
 })
 

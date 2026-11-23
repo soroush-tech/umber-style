@@ -70,6 +70,12 @@ From the tests: `refs.palette.primary` is `var(--palette-primary)`; `refs.space[
 - A leaf with an entry deeper down is not kept even in a `raw` or `inline` parent: `hasDeeper` makes a
   deeper variable work inside an inline parent (`takes a deeper variable inside a parent that is inline`).
 - Patterns with `*` are matched only when at least one exists (a fast path of exact lookups otherwise).
+- With no entry in `modes` (or `registered`), `findByPath` returns at once, and `isKept` looks for a
+  deeper entry only when there are any: the paths were joined and looked up for nothing. A key made only
+  of lowercase letters, digits, `_` and `-` is its own segment, without the three rewrites of `toSegment`.
+  The names are the same (`names a variable from each key as it did`); the tokens of a theme, which every
+  engine of a fresh cache made again, took 30 to 40% less, a cold render of 48 fixed elements from 155 to
+  97 us (host).
 - `registered` is found like `modes`: the most specific path wins and a top-level key covers everything
   under it.
 - `inline` and `raw` differ only in documentation and intent; the code treats them the same in `isKept` and

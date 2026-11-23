@@ -14,6 +14,8 @@ import type {
   SchemeKey,
   SchemeName,
   SheetEntry,
+  StateKey,
+  StateName,
   StaticTemplateValue,
   ThemeKey,
   WebNested,
@@ -27,7 +29,7 @@ import type {
   Theme,
   ThemeProviderProps,
 } from '@umber-style/react'
-import type { NativeStyleObject } from '@umber-style/react-native'
+import type { NativeStyleObject, StateProps } from '@umber-style/react-native'
 
 /** The keys that the web style and the native style both have. */
 type SharedKeys = keyof WebProperties & keyof NativeStyleObject
@@ -83,10 +85,11 @@ export type SharedStyleProp =
   | undefined
   | readonly SharedStyleProp[]
 
-/** A component that `styled` made in shared code: the props of its tag and its own, with `as` and a shared `style`. */
+/** A component that `styled` made in shared code: the props of its tag and its own, the state props, with `as` and a shared `style`. */
 export type SharedStyledComponent<C extends ElementType, P extends object> = FunctionComponent<
   Omit<ComponentProps<C>, keyof P | 'as' | 'style'> &
-    P & { as?: ElementType; style?: SharedStyleProp }
+    P &
+    StateProps & { as?: ElementType; style?: SharedStyleProp }
 >
 
 /** `styled` in shared code: a tag or a component and its options, then the styles of the component. */
@@ -195,7 +198,18 @@ export type {
   StyleObject,
   StyleTypeOptions,
 } from '@umber-style/core'
-export type { NestedKey, SchemeKey, SchemeName, ThemeKey, WebNested, WebProperties, WebStyleObject }
+export type {
+  NestedKey,
+  SchemeKey,
+  SchemeName,
+  StateKey,
+  StateName,
+  StateProps,
+  ThemeKey,
+  WebNested,
+  WebProperties,
+  WebStyleObject,
+}
 
 export declare const configure: (options: DefaultStyleOptions) => void
 export declare const styled: SharedStyled<Theme>
@@ -215,6 +229,13 @@ export declare const Global: SharedStyleBase<Theme>['Global']
 export declare const alpha: (color: string, opacity: number) => string
 /** `{ [key]: style }` typed so that it spreads into a web style, for a key that is computed: `web: { ...at(`@media (width >= ${bp})`, { gap: 16 }) }`. */
 export declare function at<K extends NestedKey>(key: K, style: WebNested): Record<K, WebNested>
+/**
+ * The key of a style for "while the element is in the state `name`", for `at`:
+ * `...at(state('pressed'), { opacity: 0.7 })`. On the web it is the selector written by hand for it
+ * (`&:hover`, `&:active`, `&:focus-visible`, `&:disabled, &[aria-disabled="true"]`); on React Native the
+ * binding follows the state of the component.
+ */
+export declare function state(name: StateName): StateKey
 /** A percentage: `'50%'`. */
 export type SharedPercent = `${number}%`
 

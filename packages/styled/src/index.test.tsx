@@ -3,6 +3,7 @@ import { createCache, createMemorySheet } from '@umber-style/core'
 import * as react from '@umber-style/react'
 import { expectTypeOf } from 'vitest'
 import styled, {
+  styled as namedStyled,
   type CreateStyled,
   type CreateStyledComponent,
   type CSSObject,
@@ -55,6 +56,11 @@ describe('the default export', () => {
     expectTypeOf<ReturnType<typeof styled<'a'>>>().toEqualTypeOf<
       CreateStyledComponent<object, PropsOf<'a'>>
     >()
+  })
+
+  it('is the named export too, with the same type', () => {
+    expect(namedStyled).toBe(styled)
+    expectTypeOf(namedStyled).toEqualTypeOf(styled)
   })
 
   it('has its tag shorthands as own members, which Object.assign copies to a wrapper', () => {

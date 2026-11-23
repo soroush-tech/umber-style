@@ -1,23 +1,44 @@
 import { createElement, type ElementType } from 'react'
+import type { StateName } from '@umber-style/core'
+import type { InteractionState, NativeCondition } from './conditions'
+import {
+  createHeldHandlers,
+  isHeldName,
+  isStateProp,
+  readInteraction,
+  useHeldStates,
+  type HeldStates,
+} from './interaction'
 import type { NativeStyleInput, NativeStyleObject } from './nativeStyle'
-import { platformStyleSheet } from './platform'
-import type { NativeCondition } from './conditions'
+import { platformPressable, platformStyleSheet } from './platform'
 import type { WindowState } from './mediaQuery'
 import { collectKeys, toNativeStyle, type NativeSettings, type StyleKeys } from './toNativeStyle'
 import type { Styled, StyledOptions } from './types'
+import { warnAboutUnheldState } from './warnStyle'
 import { readWindowState, useMediaKey } from './windowState'
 
 type StyleResult = Record<string, never> | null | undefined | false
 type StyleFunction = (props: Record<string, unknown>) => StyleResult
 
+/** What `Pressable` gives a `style` that is a function. */
+interface PressState {
+  pressed: boolean
+}
+
+/** A `style` prop that is a function, as `Pressable` takes one. */
+type OwnStyle = (press: PressState) => unknown
+
 /**
  * What one style of a component is: a function, run on each render; an object that is fixed, registered
  * once; one that depends on the window only, registered once for each set of matching queries; or one
- * that depends on the providers, resolved on each render.
+ * that depends on the providers or on what the component is doing, resolved on each render.
  */
 type Kind = 'function' | 'fixed' | 'window' | 'conditional'
 
-const NO_KEYS: StyleKeys = { isConditional: false, hasScheme: false, queries: [] }
+const NO_KEYS: StyleKeys = { isConditional: false, hasScheme: false, queries: [], states: [] }
+
+/** The states, in the order of the part of the key of a resolved style that says which of them hold. */
+const STATE_ORDER: readonly StateName[] = ['hovered', 'pressed', 'focused', 'disabled']
 
 /** The name a component is known by: its `displayName`, else the name of its function; undefined when it has neither. */
 function readComponentName(component: Exclude<ElementType, string>): string | undefined {
@@ -26,7 +47,7 @@ function readComponentName(component: Exclude<ElementType, string>): string | un
 }
 
 /** `lists` joined, each item once, in order. */
-function joinQueries(lists: readonly (readonly string[])[]): string[] {
+function joinItems<T>(lists: readonly (readonly T[])[]): T[] {
   return [...new Set(lists.flat())]
 }
 
@@ -40,6 +61,11 @@ function joinQueries(lists: readonly (readonly string[])[]): string[] {
  * scheme, for a `whenScheme()` key that no provider decides); one without function styles, condition
  * keys or media keys reads no context and subscribes to nothing. A `rem` length is `remBase` times its
  * number. The development warnings name the component: its `name` option, else the wrapped component's.
+ *
+ * A style with a `state()` key is resolved on each render too, against what the component is doing: a
+ * `Pressable` that names `pressed` gets `style` as a function of its `{ pressed }`, so that it renders
+ * again on a press; `disabled` follows the props; `hovered` and `focused` are kept from the component's
+ * events when its object styles name them, and follow the props of those names otherwise.
  */
 export function createStyled<T>(
   useTheme: () => T,
@@ -53,18 +79,29 @@ export function createStyled<T>(
     const { shouldForwardProp: shouldForward } = options
     const settings: NativeSettings = { remBase, name: options.name ?? readComponentName(tag) }
 
+    /** Whether the prop `name` reaches the element; with `hasStates` the props that tell a state are the binding's unless `shouldForwardProp` asks for them. */
+    const isForwarded = (name: string, hasStates: boolean): boolean => {
+      if (hasStates && isStateProp(name)) return shouldForward?.(name) === true
+      const isOwn = name === 'as' || name === 'theme' || name === 'style'
+      return !isOwn && (!shouldForward || shouldForward(name))
+    }
+
     return (...styles: NativeStyleInput[]) => {
       const keys = styles.map((style) =>
         typeof style === 'function' || !style ? NO_KEYS : (collectKeys(style) ?? NO_KEYS)
       )
       const kinds = styles.map((style, index): Kind => {
         if (typeof style === 'function') return 'function'
-        if (keys[index].isConditional) return 'conditional'
-        return keys[index].queries.length > 0 ? 'window' : 'fixed'
+        const { isConditional, states: own, queries: ownQueries } = keys[index]
+        if (isConditional || own.length > 0) return 'conditional'
+        return ownQueries.length > 0 ? 'window' : 'fixed'
       })
       // The queries of the object styles come first, so that the key of a render starts with theirs.
-      const queries = joinQueries(keys.map((found) => found.queries))
+      const queries = joinItems(keys.map((found) => found.queries))
       const hasScheme = keys.some((found) => found.hasScheme)
+      // The states of the object styles; hover and focus among them are kept from the component's events.
+      const states = joinItems(keys.map((found) => found.states))
+      const heldNames = states.filter(isHeldName)
 
       /** The object styles of `kind`, resolved for `state` and registered with the platform. */
       const register = (kind: Kind, state?: WindowState): Record<string, NativeStyleObject> => {
@@ -94,46 +131,137 @@ export function createStyled<T>(
         return found
       }
 
-      const render = (
-        props: Record<string, unknown>,
-        key = '',
-        condition?: NativeCondition,
-        results?: StyleResult[],
-        state?: WindowState
-      ) => {
-        const resolved = styles.flatMap((style, index) => {
+      // The conditional object styles as they were resolved, by the theme of the condition (held weakly),
+      // then by the rest of what resolving them reads (see `readResolved`).
+      const resolvedByTheme = new WeakMap<object, Map<string, NativeStyleObject>>()
+      const resolvedWithoutTheme = new Map<string, NativeStyleObject>()
+
+      /**
+       * The object style at `index`, which has condition or state keys, resolved for the render: made once
+       * for each theme of the condition, color scheme of the provider, key of the window (the queries that
+       * match, and the system color scheme where it is read) and set of states, and the same object after.
+       * The style is fixed when the component is made, as the fixed styles are, and what resolves it reads
+       * nothing else, so the resolved style is the same.
+       */
+      const readResolved = (
+        index: number,
+        key: string,
+        condition: NativeCondition,
+        state: WindowState | undefined,
+        interaction: InteractionState | undefined
+      ): NativeStyleObject => {
+        const { theme, colorScheme = '' } = condition
+        let found = theme === undefined ? resolvedWithoutTheme : resolvedByTheme.get(theme)
+        if (found === undefined) {
+          found = new Map()
+          resolvedByTheme.set(theme as object, found)
+        }
+        const states = STATE_ORDER.map((name) => (interaction?.[name] === true ? '1' : '0')).join(
+          ''
+        )
+        const cacheKey = `${index}|${key}|${colorScheme}|${states}`
+        let resolved = found.get(cacheKey)
+        if (resolved === undefined) {
+          const style = styles[index] as Record<string, unknown>
+          resolved = toNativeStyle(style, condition, settings, state, interaction)
+          found.set(cacheKey, resolved)
+        }
+        return resolved
+      }
+
+      /** The styles of a render, in order, for the key of the render, the providers, the window and what the component is doing. */
+      const resolve = (
+        key: string,
+        condition: NativeCondition | undefined,
+        results: StyleResult[] | undefined,
+        state: WindowState | undefined,
+        interaction?: InteractionState
+      ) =>
+        styles.flatMap((_style, index) => {
           switch (kinds[index]) {
             case 'fixed':
               return [registered[`s${index}`]]
             case 'window':
               return [readWindowStyles(key)[`s${index}`]]
             case 'conditional':
-              return [toNativeStyle(style as Record<string, unknown>, condition, settings, state)]
+              // A conditional style is rendered by a component that reads the condition: there is one.
+              return [readResolved(index, key, condition as NativeCondition, state, interaction)]
             default: {
               const result = (results as StyleResult[])[index]
-              return result ? [toNativeStyle(result, condition, settings, state)] : []
+              return result ? [toNativeStyle(result, condition, settings, state, interaction)] : []
             }
           }
         })
 
+      /**
+       * The `style` of a component whose styles name `used`: for a `Pressable` that names `pressed` (or
+       * is given a function `style`), a function of what it reports, so that it renders again on a
+       * press; else the list for what the props and `held` say. A `style` prop that is a function is
+       * called with the same `{ pressed }`, and its result comes last.
+       */
+      const createStateStyle = (
+        props: Record<string, unknown>,
+        used: readonly StateName[],
+        styleOf: (interaction: InteractionState) => NativeStyleObject[],
+        held: HeldStates | undefined
+      ) => {
+        const base = readInteraction(props, held?.states)
+        const own = props.style
+        const build = (interaction: InteractionState, press: PressState) =>
+          [...styleOf(interaction), typeof own === 'function' ? (own as OwnStyle)(press) : own]
+            .flat(Infinity)
+            .filter(Boolean)
+        const component = (props.as as ElementType | undefined) ?? tag
+        const isPressDriven =
+          component === platformPressable && (used.includes('pressed') || typeof own === 'function')
+        if (!isPressDriven) return build(base, { pressed: base.pressed === true })
+        return ({ pressed }: PressState) =>
+          build({ ...base, pressed: pressed || base.pressed === true }, { pressed })
+      }
+
+      const render = (
+        props: Record<string, unknown>,
+        key = '',
+        condition?: NativeCondition,
+        results?: StyleResult[],
+        state?: WindowState,
+        found?: StyleKeys,
+        held?: HeldStates
+      ) => {
+        // The states of the function styles are known once they ran; they come after the others.
+        const used = found === undefined ? states : joinItems([states, found.states])
+        const hasStates = used.length > 0
         const forwarded: Record<string, unknown> = {}
         for (const [name, value] of Object.entries(props)) {
-          const isOwn = name === 'as' || name === 'theme' || name === 'style'
-          if (!isOwn && (!shouldForward || shouldForward(name))) forwarded[name] = value
+          if (isForwarded(name, hasStates)) forwarded[name] = value
         }
-        forwarded.style = [...resolved, props.style].flat(Infinity).filter(Boolean)
-        return createElement((props.as as ElementType | undefined) ?? tag, forwarded)
+        const component = (props.as as ElementType | undefined) ?? tag
+        if (!hasStates) {
+          forwarded.style = [...resolve(key, condition, results, state), props.style]
+            .flat(Infinity)
+            .filter(Boolean)
+          return createElement(component, forwarded)
+        }
+        for (const name of used) {
+          if (isHeldName(name) && !heldNames.includes(name))
+            warnAboutUnheldState(name, settings.name)
+        }
+        const styleOf = (interaction: InteractionState) =>
+          resolve(key, condition, results, state, interaction)
+        forwarded.style = createStateStyle(props, used, styleOf, held)
+        if (held) Object.assign(forwarded, createHeldHandlers(heldNames, props, held))
+        return createElement(component, forwarded)
       }
 
       const StaticStyled = (props: Record<string, unknown>) => render(props)
       const WindowStyled = (props: Record<string, unknown>) =>
         render(props, useMediaKey(queries, false, remBase))
-      const ConditionalStyled = (props: Record<string, unknown>) => {
+      const useConditionalElement = (props: Record<string, unknown>, held?: HeldStates) => {
         const condition = useCondition()
         const key = useMediaKey(queries, hasScheme && condition.colorScheme === undefined, remBase)
-        return render(props, key, condition, undefined, readStateFor(queries))
+        return render(props, key, condition, undefined, readStateFor(queries), undefined, held)
       }
-      const DynamicStyled = (props: Record<string, unknown>) => {
+      const useDynamicElement = (props: Record<string, unknown>, held?: HeldStates) => {
         const theme = useTheme()
         const condition = useCondition()
         // The queries of the function styles are known once they ran; they come after the others.
@@ -146,13 +274,22 @@ export function createStyled<T>(
           results[index] = result
           if (result) found = collectKeys(result, found)
         }
-        const all = found === undefined ? queries : joinQueries([queries, found.queries])
+        const all = found === undefined ? queries : joinItems([queries, found.queries])
         const shouldWatchScheme =
           (hasScheme || !!found?.hasScheme) && condition.colorScheme === undefined
         const key = useMediaKey(all, shouldWatchScheme, remBase)
-        return render(props, key, condition, results, readStateFor(all))
+        return render(props, key, condition, results, readStateFor(all), found, held)
       }
-      if (kinds.includes('function')) return DynamicStyled
+      const ConditionalStyled = (props: Record<string, unknown>) => useConditionalElement(props)
+      const DynamicStyled = (props: Record<string, unknown>) => useDynamicElement(props)
+      const hasFunction = kinds.includes('function')
+      if (heldNames.length > 0) {
+        // Hover and focus are kept as state: one hook more, in every render of this component.
+        const useElement = hasFunction ? useDynamicElement : useConditionalElement
+        const HeldStyled = (props: Record<string, unknown>) => useElement(props, useHeldStates())
+        return HeldStyled
+      }
+      if (hasFunction) return DynamicStyled
       if (kinds.includes('conditional')) return ConditionalStyled
       return queries.length > 0 ? WindowStyled : StaticStyled
     }

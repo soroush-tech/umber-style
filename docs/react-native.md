@@ -62,7 +62,7 @@ The components receive these `style` props:
 | -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `styled(tag)`                    | Needs a component. A string such as `'div'` throws a `TypeError`                                                                                                                                                                                                                                                                                                                                   |
 | `styled` options                 | `shouldForwardProp` is used (`@umber-style/is-prop-valid/react-native` is a filter of the props of the built-in components, opt-in: see [Prop filters](prop-filters.md#react-native)), and `name` names the component in the development warnings. `slot` is accepted and ignored: there are no class names                                                                                        |
-| Forwarded props                  | Every prop but `as`, `theme` and `style`. `style` is rebuilt: the styles, then yours                                                                                                                                                                                                                                                                                                               |
+| Forwarded props                  | Every prop but `as`, `theme` and `style`. `style` is rebuilt: the styles, then yours. Where the styles name a `state()` key, `pressed`, `hovered` and `focused` are read and not forwarded, unless `shouldForwardProp` returns true for them: see [Interaction states](#interaction-states)                                                                                                        |
 | Style functions                  | Receive the real theme, with its lengths as numbers: `theme.space[2]` is `8`, also when the theme says `'8px'`. They run on each render                                                                                                                                                                                                                                                            |
 | Object styles                    | Registered once with the platform `StyleSheet`, when the component is made; one with media query keys, once for each set of matching queries                                                                                                                                                                                                                                                       |
 | `StyleSheet`                     | The platform's `StyleSheet`, with a `create` that resolves a function of the theme and registers the styles                                                                                                                                                                                                                                                                                        |
@@ -77,6 +77,7 @@ The components receive these `style` props:
 | `ThemeContext`                   | The React context of the real theme, as on the web; `undefined` with no provider above                                                                                                                                                                                                                                                                                                             |
 | `themeClass(...)`                | Always `''`                                                                                                                                                                                                                                                                                                                                                                                        |
 | `when`, `whenScheme`             | Matched at render against the nearest provider: see [Theme conditions](theme-conditions.md)                                                                                                                                                                                                                                                                                                        |
+| `state`                          | Matched at render against what the component is doing: see [Interaction states](#interaction-states)                                                                                                                                                                                                                                                                                               |
 | `useTheme()`                     | The real theme values, merged over the providers above, with the lengths as numbers. With no provider, the base theme, or an empty object when there is none: a style function then gets an empty theme                                                                                                                                                                                            |
 | `createStyle` options            | Accepted so that one call runs on both platforms. `remBase` and `lengthKeys` are used (see [Values with CSS units](#values-with-css-units)); the others are not, and in development one warning names each of them that was given                                                                                                                                                                  |
 | `configure`                      | `theme`, `remBase` and `lengthKeys` are used. Throws after first use, as on the web                                                                                                                                                                                                                                                                                                                |
@@ -91,7 +92,7 @@ A style is a `NativeStyleObject`. When the binding turns a style into a native s
 - drops the keys that only the web has, each whole: `label`, selectors (a key with `&` or one that starts with `:`), at-rules other than `@media`, and custom properties;
 - keeps objects and arrays under any other key (`shadowOffset`, `transform`);
 - merges the `native` part of a shared style over the rest and drops the `web` part;
-- merges the parts of `when()` and `whenScheme()` keys that match, and the blocks of `@media` keys that match the window: see [Media queries](#media-queries);
+- merges the parts of `when()` and `whenScheme()` keys that match, the blocks of `@media` keys that match the window (see [Media queries](#media-queries)), and the parts of `state()` keys whose state holds (see [Interaction states](#interaction-states));
 - turns a length or a number written as text into a number (`padding: '8px'` is `8`): see [Values with CSS units](#values-with-css-units).
 
 In development it warns about what it drops by mistake and about values it cannot convert: see [Development warnings](#development-warnings) and [Typed styles](typed-styles.md).
@@ -257,13 +258,87 @@ const isWide = useMediaQuery('(min-width: 600px)', { defaultMatches: false })
 
 The React binding has the same hook, `useMediaQuery(query, { defaultMatches })`, on `window.matchMedia`. On the server, and in the first render of a hydration, it is `defaultMatches`, so that the HTML of the server and the hydration agree; the browser's answer follows at once. It uses a hook, so it is a client export only: the server-components build does not have it.
 
+## Interaction states
+
+A `state()` key ([Writing styles](writing-styles.md#interaction-states)) is a condition here, evaluated on each render of the component against what it is doing. Its part is merged over the plain keys in the order it is written, as a `when()` part or a media block is, and it nests in them, and they in it.
+
+```tsx
+import { Pressable } from 'react-native'
+import { at, createStyle, state } from '@umber-style/react-native'
+
+const { styled } = createStyle({ palette: { primary: '#0000ff' } })
+
+const Button = styled(Pressable)({
+  opacity: 1,
+  ...at(state('pressed'), { opacity: 0.7 }),
+  ...at(state('disabled'), { opacity: 0.4 }),
+})
+```
+
+`<Button />` gives `Pressable` a `style` function. The platform calls it with `{ pressed }`: it returns `[{ opacity: 1 }]`, `[{ opacity: 0.7 }]` while a finger is down, and `[{ opacity: 0.4 }]` for `<Button disabled />`, which the platform never presses (`packages/react-native/src/states.test.tsx`).
+
+### How each state is learned
+
+| State      | Learned from                                                                                                                                                                                                                                                         |
+| ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pressed`  | A `Pressable`: its own state. The binding gives it `style` as a function, `({ pressed }) => styles`, and the platform calls it. Any other component: the `pressed` prop                                                                                              |
+| `disabled` | The props: `disabled`, `aria-disabled` or `accessibilityState.disabled` is `true`, or `editable` is `false`. They are still forwarded. `editable={false}` is how a `TextInput` takes no input, and it does not set the accessibility state, so it is read on its own |
+| `hovered`  | `onHoverIn` and `onHoverOut`, kept as state by the binding, for a component whose object styles name `hovered`; and the `hovered` prop                                                                                                                               |
+| `focused`  | `onFocus` and `onBlur`, kept the same way, for a component whose object styles name `focused`; and the `focused` prop. It is any focus: the focus event says nothing of how focus arrived                                                                            |
+
+**`pressed` on a `Pressable`.** `Pressable` renders again on a press only when its `style` or its `children` is a function (`Pressable.js`, `shouldUpdatePressed`), so the binding passes a function only to a `Pressable` whose styles name `pressed`. One whose styles name no state, or only `disabled`, keeps getting an array, and a press does not render it: in the tests a pressable with a state key renders 3 times for mount, press in and press out, and one without renders once. A `style` prop of yours that is a function is called with the same `{ pressed }`, and its result comes after the styles.
+
+**Which component is a `Pressable`.** The platform's `Pressable` itself, given to `styled` or as `as`, and nothing else: the binding compares the component with it. A component that cannot read a function `style` is never given one. A component of your own that wraps `Pressable`, and `styled` of a styled `Pressable`, are not recognized: style the `Pressable` itself, or pass `pressed`.
+
+**A component that reports no state** (a `View`, a touchable, your own) is told it by its props:
+
+```tsx
+const Card = styled(View)({
+  opacity: 1,
+  ...at(state('pressed'), { opacity: 0.7 }),
+  ...at(state('focused'), { borderWidth: 2 }),
+})
+
+// <Card />          [{ opacity: 1 }]
+// <Card pressed />  [{ opacity: 0.7 }]
+// <Card focused />  [{ opacity: 1, borderWidth: 2 }]
+```
+
+Where the styles name a state, `pressed`, `hovered` and `focused` are the binding's: they do not reach the component, unless `shouldForwardProp` returns `true` for the name (a component that takes `pressed` itself). Where the styles name no state they are forwarded as any prop, as before. The props are typed on every styled component (`StateProps`). On the web the props are not read: the selectors decide.
+
+**Hover and focus kept as state.** A component whose object styles name `hovered` or `focused` keeps them in one React state and gives the component `onHoverIn` and `onHoverOut`, or `onFocus` and `onBlur`, for the states it names; your own handlers of those names are still called, with the event. A component that names neither keeps no state and adds no handler.
+
+**A state in a function style.** The binding chooses which hooks a component calls when the component is made, from the keys of its object styles; a key that a function style returns is known only after the function ran. `pressed` and `disabled` need no hook, so they work in a function style, also one that names a state on one render and not the next. `hovered` and `focused` need the state above: name the key in an object style of the component as well, an empty part is enough (`{ ...at(state('focused'), {}) }`). Without it, a function style's `hovered` or `focused` follows the prop of that name alone, with a development warning. So the hooks of every component that names no state stay as they were.
+
+### The timing of `pressed`
+
+`pressed` is what `Pressable` reports, and it differs from the web's `:active` in two ways:
+
+- `Pressable` keeps `pressed` for at least 130 milliseconds after a press in, so a quick tap shows the pressed look for that long (`Pressability.js`, `DEFAULT_MIN_PRESS_DURATION`).
+- `pressed` turns false when the finger leaves the press area (the view and its `pressRetentionOffset`) while it is still down; the web's `:active` holds until the button of the pointer is let go.
+
+### What it costs
+
+`packages/react-native/bench/states-pressables.bench.ts` renders 48 pressables of one look (every fourth disabled) with no state key, with the state keys, and with the same look written by hand as a `style` function on the platform `Pressable`, and calls the `style` function as a press does.
+
+| Case                                                                | Average  | Allocated |
+| ------------------------------------------------------------------- | -------- | --------- |
+| 48 pressables, no state key (a style array)                         | 46.37 us | 125.21 KB |
+| 48 pressables, state keys (a `style` function)                      | 59.94 us | 166 B     |
+| 48 pressables, the same look as an own `style` function, no binding | 12.41 us | 104 B     |
+| One press, state keys                                               | 441 ns   | 106 B     |
+| One press, the own `style` function                                 | 2 ns     | 0 B       |
+
+Measured with `pnpm bench react-native states --rounds 3` in the soroush-bench Docker sandbox (the median of three rounds): read the ratios, not the times, and an allocation under about 1 KB as noise. A pressable with state keys costs about 1.3 times one without on a render: its state parts are resolved once for each combination of the theme, the color scheme of the provider, the matching queries and the states, and the same object is given again after (resolved on each render, as they were first written, it was 2.5 times); a press looks up the style resolved for its states (441 ns), where a hand-written function over registered entries only picks one. The binding's cost against no binding at all (the third row) is that of `styled` itself, with or without state keys.
+
 ## Development warnings
 
 In development, once for each distinct message, the binding warns with `console.warn`. A message starts with `@umber-style/react-native:` and the name of the component when it is known: the `name` option of `styled`, else the display name or function name of the wrapped component; for a sheet, `sheet entry "card"`. Nothing is warned in production, or where there is no `process`.
 
 - **A key it drops by mistake:** a selector (`&:hover`, `:focus`), an at-rule (`@supports ...`), a media query with something the binding does not evaluate (the message names it: `React Native does not evaluate the media feature "hover"`), a custom property (`--accent`), and an `animation*` or `transition*` key (animations do not run on React Native yet), written outside the `web` part of a style. For example `Named: "&:hover" is dropped: React Native has no selectors. A key for the web only goes in the web part of a shared style.`
 - **A query `useMediaQuery` cannot evaluate:** `useMediaQuery("(hover: hover)") is false: React Native does not evaluate the media feature "hover".`
-- **Never warned:** `label`, anything inside the `web` part, a `when()` or `whenScheme()` key that does not match (a condition, not a web-only key), and a media query that is evaluated and does not match.
+- **A state that a function style names and the component does not keep:** `Card: state('focused') is named in a function style only, so the component keeps no focused state and follows the focused prop alone. Name it in an object style of the component as well (an empty part is enough) for the binding to follow onFocus and onBlur.`
+- **Never warned:** `label`, anything inside the `web` part, a `when()`, `whenScheme()` or `state()` key that does not match (a condition, not a web-only key), and a media query that is evaluated and does not match. A selector key for a state (`&:active`) is still warned about as a selector.
 - **A value it cannot convert:** a shorthand with several values (`padding: '10px 20px'`), `em`, a viewport unit (`vh`, `vw`, `vmin`, `vmax` and their `s`, `l` and `d` forms), a `calc(...)`, `currentColor` in any case, and another CSS unit where no number is taken. The value is passed as it is.
 
 ## Arithmetic and `alpha`
@@ -289,7 +364,14 @@ The package exports `add`, `subtract`, `multiply`, `divide`, `negate` and `alpha
 - `em` and the viewport units are not converted, and a literal `calc(...)` is not computed: each is passed as it is, with a warning.
 - A theme is converted once for each theme object: a `theme` object re-created on every render is converted every time. Only the keys of `lengthKeys` are converted; `NativeTheme<T>` types the default ones, so with another `lengthKeys` the types do not follow.
 - A unitless `lineHeight` is a factor on the web and a number of points on React Native; `lineHeight: '1.5'` becomes `1.5`, which is not what the web shows.
-- Interaction states and animations are not built on React Native yet; their keys are dropped with a warning. They are separate work: [#42](https://github.com/soroush-tech/umber-style/issues/42) and [#43](https://github.com/soroush-tech/umber-style/issues/43).
+- Animations are not built on React Native yet; their keys are dropped with a warning. They are separate work: [#43](https://github.com/soroush-tech/umber-style/issues/43).
+- **The state keys were not seen on a device.** The tests use a stand-in `Pressable` with the contract of `Pressable.js` of React Native 0.88.1 (its state, `shouldUpdatePressed`, the function `style`, `memo`), which does not model Pressability's timing (the 130 ms, the press area). The real `Pressable` was only bundled, in an Expo app (`expo export` for Android and iOS), and not run on a phone. Hover with the pointer-event flag on, focus with a hardware keyboard on Android, and full keyboard access on iOS were not observed.
+- `hovered` does nothing on a default iOS or Android build: React Native does not call `onHoverIn` there (`Pressability.js`: the mouse handlers are `null` on both, and the pointer-event path is behind a flag that is off by default). It applies where the platform reports hover: a desktop or web target, or an app that turns the flag on.
+- `focused` is any focus, keyboard or touch. A focus ring for keyboard users is the web's `outline`; on React Native there is no way to draw one for the keyboard only.
+- A state part is resolved on each render, and on each call of the `style` function by the platform; it is not registered with the platform `StyleSheet`.
+- A state key in a sheet entry (`StyleSheet.create`) or in `css()` never applies on React Native: an entry belongs to no component. It is dropped without a warning. On the web the same entry's state rules apply.
+- Hover and focus kept from events start false: a component focused before its first `onFocus` reaches the binding (`autoFocus`) is not seen as focused until the next event.
+- A `style` prop that is a function is composed only on a component whose styles name a state; on another it is put in the style list as it is, as before.
 - Media queries: only the subset in [What is evaluated](#what-is-evaluated); anything else never matches. A query with one part the binding does not evaluate is dropped whole, also when another query of its comma list would match on the web (`print, (min-width: 1px)`).
 - `prefers-reduced-motion` is `no-preference` until the platform answers, so a component that reads it may render once with motion before it renders without.
 - `em` in a query is `remBase` times its number, as `rem` is: on the web a media query's `em` is the browser's initial font size, which `remBase` stands for. A length with no unit is read as pixels; on the web a length with no unit other than `0` makes the query invalid.

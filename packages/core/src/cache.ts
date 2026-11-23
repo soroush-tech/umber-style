@@ -1,4 +1,5 @@
 import { registerCache } from './cacheRegistry'
+import { createContentMemo, readStableStyle, type ContentMemo } from './contentMemo'
 import { hashString } from './hash'
 import {
   createDevChecker,
@@ -106,6 +107,16 @@ export interface CacheOptions {
    * `development`) where there is a `document`, off otherwise; `true` turns them on in a test run too.
    */
   hasDevChecks?: boolean
+  /**
+   * Whether the cache remembers the class of a style by its contents, so that the same contents in a new
+   * object (a style function's result on each render) are not compiled and hashed again. The class, the
+   * rules and their order are the same with it or without it. It covers style objects alone whose values
+   * are strings and numbers, at any depth of nesting; anything else takes the full path, and so does
+   * every call with the development checks or value repair on. A style is remembered the second time its
+   * class is made; the memo holds at most `CONTENT_STEP_LIMIT` steps for each set of style options, and is
+   * emptied when full. Default false (`docs/options.md`).
+   */
+  hasStyleMemo?: boolean
   /** A short text that stands for the token options (modes, raw and length keys, registered tokens), for the stamp that the server writes and the browser compares. The engine gives it; '' when none. */
   tokenSignature?: string
   /**
@@ -471,6 +482,60 @@ interface WrittenAs extends Required<StyleOptions> {
   readonly reported: CompileContext
   /** Makes an entry of another cache one of this cache, written with these options. */
   readonly adopt: (entry: SheetEntry) => SheetEntry
+  /** The merges of class names alone made with these options, by `readMergeKey`, oldest first (see `MergeMemo`). */
+  readonly merges: Map<string, MergeMemo>
+  /**
+   * The class of each merged style made of style objects alone, by its layer, `after` and contents (see
+   * `contentMemo.ts`). None with the development checks, which check every call, or value repair, whose
+   * compile reads the values of the tokens too.
+   */
+  readonly contents: ContentMemo | undefined
+}
+
+/**
+ * A class that `cssWith` made of class names alone, and what it was made from: the names, and the style
+ * of each in `registered` at that time (undefined for a name that is not registered). While each name
+ * still has that same style and the class is written, the same names make the same class, so it is not
+ * merged, compiled and hashed again.
+ */
+interface MergeMemo {
+  readonly names: readonly string[]
+  readonly sources: readonly (StyleObject | undefined)[]
+  /** The merged style, which `registered` holds for the class. */
+  readonly merged: StyleObject
+  readonly className: string
+  /** What `cssWith` returned: the names that pass through, then the class. */
+  readonly result: string
+}
+
+/** How many merges of class names a cache remembers for each set of style options; the oldest leaves first. */
+const MERGE_LIMIT = 1000
+
+/** The style objects among `values` when every value is one or left out as falsy, else undefined (none: undefined). */
+function readPlainStyles(values: readonly ClassValue[]): StyleObject[] | undefined {
+  const styles: StyleObject[] = []
+  for (const value of values) {
+    if (!value) continue
+    if (typeof value !== 'object' || Array.isArray(value) || isSheetEntry(value)) return undefined
+    styles.push(value as StyleObject)
+  }
+  return styles.length > 0 ? styles : undefined
+}
+
+/** The key of a merge of `values` in `merges` when every value is a class string, else undefined. */
+function readMergeKey(
+  values: readonly ClassValue[],
+  layer: ClassLayer,
+  label: string | undefined,
+  after: string
+): string | undefined {
+  let names = ''
+  for (let index = 0; index < values.length; index++) {
+    const value = values[index]
+    if (typeof value !== 'string') return undefined
+    names += index === 0 ? value : ` ${value}`
+  }
+  return `${layer}\n${label ?? ''}\n${after}\n${names}`
 }
 
 /** A sheet that keeps its rules in memory, for a server render or a test. */
@@ -560,13 +625,14 @@ function createStyleElement(
 /**
  * A sheet that writes each rule as the text of a style element of its own, so that the document parses
  * that rule alone, and never again the rules written before it: the cost of a rule does not grow with the
- * sheet. The first rule goes into `first`; each later one into an element made right after the element of
- * the rule before it, so the rules of the sheet stay together and in order. Removing a rule removes its
+ * sheet. The first rule goes into the element that `claim` gives at that rule (no element is made or
+ * taken before a rule is written); each later one into an element made right after the element of the
+ * rule before it, so the rules of the sheet stay together and in order. Removing a rule removes its
  * element, but the last one left keeps its place, empty, for the next rule. It has no `replace`, as a
  * sheet of `insertRule` has none, so that a cache writes the same rules in both ways.
  */
 function createTextSheet(
-  first: HTMLStyleElement,
+  claim: () => HTMLStyleElement,
   owner: Document,
   key: string,
   nonce: string | undefined
@@ -574,13 +640,19 @@ function createTextSheet(
   const rules: string[] = []
   const elements: HTMLStyleElement[] = []
   // While the sheet holds no rule: the empty element that keeps the place of its rules.
-  let anchor: HTMLStyleElement | undefined = first
+  let anchor: HTMLStyleElement | undefined
+  // What gives the first element, until the first rule takes it.
+  let claimFirst: (() => HTMLStyleElement) | undefined = claim
   return {
     rules,
     document: owner,
     insert(rule) {
       const node = owner.createTextNode(rule)
       writtenText.add(node)
+      if (claimFirst) {
+        anchor = claimFirst()
+        claimFirst = undefined
+      }
       if (anchor === undefined) {
         const element = createStyleElement(owner, key, nonce)
         elementModes.set(element, 'text')
@@ -614,19 +686,25 @@ function readRuleSelector(rule: string): string {
   return (head.at(-2) ?? rule).trim()
 }
 
-/** A sheet that writes with `insertRule`: it keeps the browser's object of each rule, and removes a rule by finding where that object is at the time. */
+/**
+ * A sheet that writes with `insertRule` into the element that `claim` gives at the first rule (none is
+ * made or taken before): it keeps the browser's object of each rule, and removes a rule by finding where
+ * that object is at the time. The element stays when the last rule is removed, as the anchor of a text
+ * sheet does.
+ */
 function createRuleSheet(
-  element: HTMLStyleElement,
+  claim: () => HTMLStyleElement,
   owner: Document,
   onReject: DomSheetOptions['onReject']
 ): Sheet {
-  const sheet = element.sheet as CSSStyleSheet
+  let sheet: CSSStyleSheet | undefined
   const rules: string[] = []
   const objects: CSSRule[] = []
   return {
     rules,
     document: owner,
     insert(rule) {
+      sheet ??= claim().sheet as CSSStyleSheet
       try {
         const index = sheet.insertRule(rule, sheet.cssRules.length)
         objects.push(sheet.cssRules[index])
@@ -644,7 +722,8 @@ function createRuleSheet(
 }
 
 /**
- * A sheet in the style elements marked `data-style="<key>"` of the document of `container`. Without
+ * A sheet in the style elements marked `data-style="<key>"` of the document of `container`, found or
+ * made when its first rule is written: making the sheet adds nothing to the document. Without
  * `speedy` each rule is the text of an element of its own, kept as it is given (the browser drops a
  * rule it rejects when it parses the text): the first element is an empty one of the document that no
  * sheet uses, else one it creates in `container`, and the next ones follow it. With it, a rule goes in
@@ -663,15 +742,20 @@ export function createDomSheet(
   const { speedy = isProduction(), onReject, nonce } = options
   const mode = speedy ? 'rules' : 'text'
   const owner = container.ownerDocument as Document
-  let element = findSheetElement(owner, key, mode)
-  if (!element) {
-    element = createStyleElement(owner, key, nonce)
-    container.appendChild(element)
+  // The element is found or made when the first rule is written: a sheet that writes nothing adds
+  // nothing to the document, so a style made with no nonce leaves no element for a cache that has one.
+  const claim = (): HTMLStyleElement => {
+    let element = findSheetElement(owner, key, mode)
+    if (!element) {
+      element = createStyleElement(owner, key, nonce)
+      container.appendChild(element)
+    }
+    elementModes.set(element, mode)
+    return element
   }
-  elementModes.set(element, mode)
   return speedy
-    ? createRuleSheet(element, owner, onReject)
-    : createTextSheet(element, owner, key, nonce)
+    ? createRuleSheet(claim, owner, onReject)
+    : createTextSheet(claim, owner, key, nonce)
 }
 
 /**
@@ -873,6 +957,7 @@ export function createCache(options: CacheOptions = {}): Cache {
     hasVendorPrefixes = true,
     hasScope = true,
     hasBaseClass = true,
+    hasStyleMemo = false,
   } = options
   if (!PREFIX_PATTERN.test(prefix)) {
     throw new Error(`Invalid cache prefix "${prefix}": use lowercase letters, digits and hyphens.`)
@@ -965,6 +1050,9 @@ export function createCache(options: CacheOptions = {}): Cache {
       naming: { ...plain, hasVendorPrefixes: false },
       reported: { ...plain, report: reportRepair },
       adopt: (entry) => adoptEntry(entry, written),
+      merges: new Map(),
+      contents:
+        hasStyleMemo && !warnValue && !options.hasValueRepair ? createContentMemo() : undefined,
     }
     return written
   }
@@ -1431,8 +1519,94 @@ export function createCache(options: CacheOptions = {}): Cache {
     return compileStyleRules(`.${className}`, merged, written.reported)
   }
 
+  /** Registers the class `className` of the style `merged` for good, made after `after`, and writes it when it is not written. */
+  const registerClass = (
+    className: string,
+    merged: StyleObject,
+    layer: ClassLayer,
+    after: string,
+    written: WrittenAs
+  ): void => {
+    // A held class that is made here for good is held no more.
+    if (held.size > 0) held.delete(className)
+    registered.set(className, merged)
+    if (after !== '') afters.set(className, after)
+    // A class that is written already gets no rules: they are compiled only to be written, and
+    // `insertClass` writes nothing for it. With the development checks they still are, for the check.
+    if (warnValue || !insertedIds.has(className)) {
+      insertClass(className, compileClass(className, merged, written), layer, written)
+    }
+  }
+
+  /** The merge remembered under `key`, when each of its names still has the style it had then and its class is written. */
+  const findMerge = (written: WrittenAs, key: string | undefined): MergeMemo | undefined => {
+    if (key === undefined) return undefined
+    const memo = written.merges.get(key)
+    if (memo === undefined || !insertedIds.has(memo.className)) return undefined
+    const { names, sources } = memo
+    for (let index = 0; index < names.length; index++) {
+      if (registered.get(names[index]) !== sources[index]) return undefined
+    }
+    return memo
+  }
+
+  /** Remembers the merge of the class strings `values` under `key`, with the styles its names have now; the oldest leaves past `MERGE_LIMIT`. */
+  const rememberMerge = (
+    written: WrittenAs,
+    key: string,
+    values: readonly string[],
+    made: Omit<MergeMemo, 'names' | 'sources'>
+  ): void => {
+    const { merges } = written
+    merges.delete(key)
+    if (merges.size >= MERGE_LIMIT) merges.delete(merges.keys().next().value as string)
+    const names = values.flatMap((value) => splitClassNames(value))
+    merges.set(key, { ...made, names, sources: names.map((name) => registered.get(name)) })
+  }
+
+  /**
+   * The class of the style objects `styles`, as `cssWith` makes it: merged, then named from `contents`
+   * when equal contents were remembered, else compiled and named; then registered, as every call
+   * registers its class. A class that was registered before the call (the contents, or others of the
+   * same rules, came before) is remembered for these contents; one seen for the first time is not, so
+   * that a style that never comes again costs no remembering.
+   */
+  const cssContents = (
+    written: WrittenAs,
+    contents: ContentMemo,
+    { layer = 'components', label, after = '' }: ClassOptions,
+    styles: readonly StyleObject[]
+  ): string => {
+    const merged = mergeStyles(label ? [{ label }, ...styles] : styles)
+    let className = contents.find(layer, after, merged)
+    if (className === undefined) {
+      const rules = compileStyleRules('&', merged, written.naming)
+      className = rules.length === 0 ? '' : nameClass(layer, merged, rules, after)
+      // Read once more, as data (a getter is never called): what is remembered is what was compiled.
+      const stable =
+        className === '' || registered.has(className) ? readStableStyle(merged) : undefined
+      if (stable) contents.remember(layer, after, stable, className)
+    }
+    if (className !== '') registerClass(className, merged, layer, after, written)
+    return className
+  }
+
+  /** `cssWith` with the memo of contents: style objects alone take `cssContents`, the rest `cssWith`. */
+  const cssWithMemo = (written: WrittenAs, options: ClassOptions, values: ClassValue[]): string => {
+    const styles = readPlainStyles(values)
+    if (styles === undefined) return cssWith(written, options, values)
+    return cssContents(written, written.contents as ContentMemo, options, styles)
+  }
+
   const cssWith = (written: WrittenAs, options: ClassOptions, values: ClassValue[]): string => {
     const { layer = 'components', label, after = '' } = options
+    // With the development checks every call is checked, so no merge is taken as remembered.
+    const key = warnValue ? undefined : readMergeKey(values, layer, label, after)
+    const memo = findMerge(written, key)
+    if (memo) {
+      registerClass(memo.className, memo.merged, layer, after, written)
+      return memo.result
+    }
     const { adopt } = written
     const report = createLeftOutReporter(label)
     const { styles, rawClasses, sole } = sortClassValues(values, registered, adopt, report)
@@ -1440,12 +1614,12 @@ export function createCache(options: CacheOptions = {}): Cache {
     const prepared = prepareClass(layer, label, after, styles, written)
     if (prepared === undefined) return rawClasses.join(' ')
     const { merged, className } = prepared
-    // A held class that is made here for good is held no more.
-    if (held.size > 0) held.delete(className)
-    registered.set(className, merged)
-    if (after !== '') afters.set(className, after)
-    insertClass(className, compileClass(className, merged, written), layer, written)
-    return [...rawClasses, className].join(' ')
+    registerClass(className, merged, layer, after, written)
+    const result = [...rawClasses, className].join(' ')
+    if (key !== undefined) {
+      rememberMerge(written, key, values as string[], { merged, className, result })
+    }
+    return result
   }
 
   /**
@@ -1732,10 +1906,15 @@ export function createCache(options: CacheOptions = {}): Cache {
     } = pageOptions
     const wanted = new Set([...classNames, ...offered])
     const themeIds = [...wanted].filter((name) => themeNames.has(name)).sort(compareCodeUnits)
+    const classStart = `${prefix}-`
+    // The key of each class is made once, not in every comparison; the keys differ, so the order is
+    // the one a comparison of the keys gives.
     const classIds = [...wanted]
-      .filter((name) => name.startsWith(`${prefix}-`) && !themeNames.has(name))
+      .filter((name) => name.startsWith(classStart) && !themeNames.has(name))
       .filter((name) => insertedRules.has(name))
-      .sort((first, second) => (readSortKey(first) < readSortKey(second) ? -1 : 1))
+      .map((id): [string, string] => [readSortKey(id), id])
+      .sort(([first], [second]) => (first < second ? -1 : 1))
+      .map(([, id]) => id)
     // The global rules of this page: those of the app, and those of a component that the page rendered.
     const pageSets = [...globals].filter(
       ([id, entry]) => entry.appCount > 0 || rendered.has(id) || carried.has(id)
@@ -1793,20 +1972,24 @@ export function createCache(options: CacheOptions = {}): Cache {
   }
 
   /** The members of a cache that compile a style, written as `written` says (see `withStyleOptions`). */
-  const createCompilers = (written: WrittenAs) => ({
-    css: (...values: ClassValue[]) => cssWith(written, {}, values),
-    cssIn: (layer: ClassLayer, ...values: ClassValue[]) => cssWith(written, { layer }, values),
-    cssWith: (classOptions: ClassOptions, ...values: ClassValue[]) =>
-      cssWith(written, classOptions, values),
-    cssHeld: (classOptions: Omit<ClassOptions, 'after'>, ...values: ClassValue[]) =>
-      cssHeld(written, classOptions, values),
-    createEntry: (style: WebStyleObject) => createEntry(style, written),
-    adoptEntry: (entry: SheetEntry) => adoptEntry(entry, written),
-    compileGlobal: (styles: GlobalStyleObject) => compileGlobal(styles, written),
-    insertKeyframes: (name: string) => insertKeyframes(name, written),
-    insertGlobal: (global: GlobalRules, insertOptions?: GlobalInsertOptions) =>
-      insertGlobal(written, global, insertOptions),
-  })
+  const createCompilers = (written: WrittenAs) => {
+    // Without the memo the cache takes the path it always took: the choice is made here, once.
+    const makeClass = written.contents ? cssWithMemo : cssWith
+    return {
+      css: (...values: ClassValue[]) => makeClass(written, {}, values),
+      cssIn: (layer: ClassLayer, ...values: ClassValue[]) => makeClass(written, { layer }, values),
+      cssWith: (classOptions: ClassOptions, ...values: ClassValue[]) =>
+        makeClass(written, classOptions, values),
+      cssHeld: (classOptions: Omit<ClassOptions, 'after'>, ...values: ClassValue[]) =>
+        cssHeld(written, classOptions, values),
+      createEntry: (style: WebStyleObject) => createEntry(style, written),
+      adoptEntry: (entry: SheetEntry) => adoptEntry(entry, written),
+      compileGlobal: (styles: GlobalStyleObject) => compileGlobal(styles, written),
+      insertKeyframes: (name: string) => insertKeyframes(name, written),
+      insertGlobal: (global: GlobalRules, insertOptions?: GlobalInsertOptions) =>
+        insertGlobal(written, global, insertOptions),
+    }
+  }
 
   // The cache with other style options, by those options: made once each.
   const views = new Map<string, Cache>()

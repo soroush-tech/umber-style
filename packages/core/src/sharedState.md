@@ -67,6 +67,8 @@ entry. The list of copies is the entry `core.copies@1`, an array of version stri
 
 ## Decisions
 
+- The test for development is written out in front of `isDevelopment()` (see `devChecks.md`), so that a
+  production bundle leaves out `describeCopies` and its text.
 - The `Map` never changes shape; versioning is by key (comment at the top of the file), not by changing the
   registry.
 - A warning names both versions when they differ, and says the copies "share the state that both versions

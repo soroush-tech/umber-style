@@ -77,3 +77,7 @@ export default function createCache(options: UmberCacheOptions): UmberCache {
   })
   return cache
 }
+
+// Also by name: a CommonJS build of a library that imports this entry by default gets the whole
+// `module.exports` from its interop, not the function; one that imports it by name gets the function.
+export { createCache }

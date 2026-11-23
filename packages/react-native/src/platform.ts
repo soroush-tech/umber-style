@@ -3,5 +3,6 @@ export {
   AccessibilityInfo as platformAccessibility,
   Appearance as platformAppearance,
   Dimensions as platformDimensions,
+  Pressable as platformPressable,
   StyleSheet as platformStyleSheet,
 } from 'react-native'

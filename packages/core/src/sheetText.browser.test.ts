@@ -26,13 +26,15 @@ function createModeEngine(speedy: boolean) {
   const prefix = nextPrefix()
   const sheet = createDomSheet(prefix, document.head, { speedy })
   const engine = createEngine(light, { cache: createCache({ prefix, sheet }) })
-  const element = document.querySelector(`style[data-style="${prefix}"]`) as HTMLStyleElement
-  return { engine, element }
+  // The first element of the sheet, which it makes at its first rule.
+  const readElement = () =>
+    document.querySelector(`style[data-style="${prefix}"]`) as HTMLStyleElement
+  return { engine, readElement }
 }
 
 describe.each([true, false])('the cascade of a sheet with speedy %s', (speedy) => {
   it('orders the layers by the statement: a global rule, a component, then what is given from outside', () => {
-    const { engine, element } = createModeEngine(speedy)
+    const { engine, readElement } = createModeEngine(speedy)
     const release = engine.insertGlobal({ p: { color: 'rgb(0, 128, 0)', marginLeft: 3 } })
     const own = engine.css({ color: 'rgb(255, 0, 0)', padding: 2 })
     const outside = engine.cache.cssIn('overrides', { padding: 5 })
@@ -42,11 +44,11 @@ describe.each([true, false])('the cascade of a sheet with speedy %s', (speedy) =
     // Released, the global rule leaves the cascade.
     release()
     expect(getComputedStyle(target).marginLeft).toBe('0px')
-    expect(element.textContent === '').toBe(speedy)
+    expect(readElement().textContent === '').toBe(speedy)
   })
 
   it('gives the values of the root theme that was written last, after the rule is written anew', () => {
-    const { engine, element } = createModeEngine(speedy)
+    const { engine, readElement } = createModeEngine(speedy)
     const target = mount(
       engine.css({ color: engine.refs.palette.text, backgroundColor: engine.refs.palette.surface })
     )
@@ -60,7 +62,7 @@ describe.each([true, false])('the cascade of a sheet with speedy %s', (speedy) =
       'dark',
     ])
     // One root rule is live: the one of the dark theme.
-    const roots = readSheetRules(element.dataset.style as string).filter((rule) =>
+    const roots = readSheetRules(readElement().dataset.style as string).filter((rule) =>
       rule.cssText.includes(':root')
     )
     expect(roots).toHaveLength(1)

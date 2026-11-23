@@ -35,6 +35,46 @@ describe('withCache', () => {
     expect(base.sheet.rules).toEqual([])
   })
 
+  it('makes the tokens of the base theme once for a prefix, and writes for a fresh cache what it wrote before', () => {
+    // The engine of each fresh cache of one prefix reads the tokens that the family made for the base
+    // theme; the classes, rules and variables are those that tokens of its own gave.
+    const engine = createEngine(theme, { cache: createSheetCache('css').cache })
+    const write = (cache: ReturnType<typeof createSheetCache>) => {
+      const derived = engine.withCache(cache.cache)
+      const styler = derived.createStyler({ name: 'Box' }, [
+        ({ theme: view }: { theme: Theme }) => ({
+          color: view.palette.primary,
+          padding: view.space[2],
+        }),
+      ])
+      const className = styler.getClassName({}, undefined, derived.createThemeView(theme))
+      derived.declareRoot(theme)
+      return { derived, className, rules: [...cache.sheet.rules] }
+    }
+    const first = write(createSheetCache('fresh'))
+    const second = write(createSheetCache('fresh'))
+    expect(second.derived).not.toBe(first.derived)
+    expect(second.derived.refs).toBe(first.derived.refs)
+    expect(second.className).toBe(first.className)
+    expect(second.rules).toEqual(first.rules)
+    expect(first.rules).toEqual([
+      '@layer fresh-theme,fresh-global,fresh-components,fresh-overrides;',
+      '@layer fresh-components{.fresh-box-root-13m7lrk{color:var(--fresh-palette-primary);padding:var(--fresh-space-2);}}',
+      '@layer fresh-theme{:where(:root){--fresh-palette-primary:#0000ff;--fresh-space-2:8px;}}',
+    ])
+    // The same rules as 0.3.0 wrote for these calls. Another prefix has tokens of its own, and so does
+    // another base theme.
+    const firstRefs = first.derived.refs
+    const other = write(createSheetCache('else'))
+    expect(other.derived.refs).not.toBe(first.derived.refs)
+    expect(other.derived.refs.palette.primary).toBe('var(--else-palette-primary)')
+    const next = { palette: { primary: '#00ff00', accent: '#ff0000' }, space: [0, 2, 4] }
+    engine.setTheme(next)
+    const after = engine.withCache(createSheetCache('fresh').cache)
+    expect(after.refs).not.toBe(firstRefs)
+    expect(after.readThemeText(next).declarations).toContain('--fresh-space-2:4px;')
+  })
+
   it('shares the base theme: a theme given to either is the base of both', () => {
     const engine = createLazyEngine<Theme>({ cache: createSheetCache('css').cache })
     const derived = engine.withCache(createSheetCache('frame').cache)

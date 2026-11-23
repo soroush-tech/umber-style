@@ -146,8 +146,9 @@ describe('global rules in a browser sheet', () => {
   it('are deleted from the style element where they are at the time, written by insertRule', () => {
     const sheet = createDomSheet('u', undefined, { speedy: true })
     const { cache, insert } = setup({ hasLayers: false, sheet })
-    const element = document.querySelector('style[data-style="u"]') as HTMLStyleElement
     const releaseReset = insert(reset)
+    // The element of the sheet is made at its first rule.
+    const element = document.querySelector('style[data-style="u"]') as HTMLStyleElement
     const releaseApp = insert(app)
     cache.css({ color: 'blue' })
     // A rule that someone else puts in front does not move what the sheet removes.

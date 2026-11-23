@@ -9,7 +9,7 @@ The bindings render on a server without these two packages: see [Server renderin
 | `@umber-style/cache`                  | `createCache({ key })`: the engine's cache, keyed by `key`, with the members a set-up reads and wraps               |
 | `@umber-style/server/create-instance` | `createInstance(cache)`: the CSS that one page needs, as chunks, as `<style data-umber>` tags, or put into the HTML |
 
-Both are default exports, and both depend on `@umber-style/core` only.
+Both are default exports, and named ones too, the same function (`import { createCache } from '@umber-style/cache'`, `import { createInstance } from '@umber-style/server/create-instance'`): a library that ships a CommonJS build imports them by name, see [A library that ships a CommonJS build](react.md#a-library-that-ships-a-commonjs-build). Both depend on `@umber-style/core` only.
 
 ## `createCache`
 
@@ -266,6 +266,189 @@ The root layout is a server component that renders `<html lang="en"><body><Provi
 - Two requests rendered at the same time, with parts that have no class in common, each get the rules of their own part only.
 - The same `key` on the element of every flush is fine: each flush is rendered on its own, React printed no warning in the browser or the server log, and the two elements of a streamed page are both in the document.
 
+### With a nonce, under a strict policy
+
+The routes under `/csp` of the same fixture run this registry under `Content-Security-Policy: style-src 'nonce-<n>'; script-src 'self' 'nonce-<n>' 'strict-dynamic'`, with a new nonce for each request and no `'unsafe-inline'` for styles (`e2e/tests/next-app.csp.spec.ts` on the production build, the same scenarios in `e2e/dev-tests/csp.spec.ts` on the development server). Three files do it.
+
+The policy is made in `proxy.ts`, the file the framework runs before a route (the `middleware` file convention, which it renamed `proxy`), as its guide sets one up (`node_modules/next/dist/docs/01-app/02-guides/content-security-policy.md`). The nonce goes into the policy of the response, and into two headers of the request: `Content-Security-Policy`, from which the framework takes the nonce of its own scripts and the style nonce it gives React's render, and `x-nonce`, which the layout reads. The two `control` switches are the fixture's, for its tests:
+
+```ts
+import { NextResponse, type NextRequest } from 'next/server'
+
+// The routes under /csp are sent with a strict content security policy, as the framework's guide sets
+// one (node_modules/next/dist/docs/01-app/02-guides/content-security-policy.md): a new nonce for each
+// request, in the policy of the response and in the request headers that the render reads. The
+// framework takes the nonce of its own scripts, and the style nonce of React's render, from the
+// `Content-Security-Policy` header of the request; the layout reads `x-nonce`. Styles have no
+// 'unsafe-inline'. The development server needs 'unsafe-eval' for React's debugging.
+//
+// Two switches of the query, for the tests: `?control=no-policy` sends the same page with no policy and
+// no nonce (what the styles are compared with), and `?control=no-cache-nonce` keeps the policy and
+// leaves the nonce off the cache (the negative control).
+export function proxy(request: NextRequest) {
+  const control = request.nextUrl.searchParams.get('control')
+  const requestHeaders = new Headers(request.headers)
+  requestHeaders.delete('x-nonce')
+  requestHeaders.delete('x-csp-control')
+  if (control === 'no-policy') {
+    requestHeaders.delete('content-security-policy')
+    return NextResponse.next({ request: { headers: requestHeaders } })
+  }
+  const nonce = Buffer.from(crypto.randomUUID()).toString('base64')
+  const isDevelopment = process.env.NODE_ENV === 'development'
+  const evaluation = isDevelopment ? " 'unsafe-eval'" : ''
+  const policy = `style-src 'nonce-${nonce}'; script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${evaluation}`
+  requestHeaders.set('x-nonce', nonce)
+  requestHeaders.set('content-security-policy', policy)
+  if (control === 'no-cache-nonce') requestHeaders.set('x-csp-control', control)
+  const response = NextResponse.next({ request: { headers: requestHeaders } })
+  response.headers.set('content-security-policy', policy)
+  return response
+}
+
+export const config = { matcher: ['/csp', '/csp/:path*'] }
+```
+
+The root layout of those routes is a server component. It reads the nonce from the request and gives it to the providers file as a prop, the one way a value of the request reaches a client component; reading the headers also makes every page under it render for each request, which a nonce needs:
+
+```tsx
+import { Hydrated } from '@umber-fixtures/shared/interactive'
+import { headers } from 'next/headers'
+import type { ReactNode } from 'react'
+import Providers from './providers'
+
+export const metadata = { title: 'UmberStyle registry with a nonce', icons: { icon: 'data:,' } }
+
+// A root layout of its own for the routes under /csp, which proxy.ts sends with a strict policy. It is a
+// server component: it reads the nonce of the request from the `x-nonce` header that the proxy set and
+// gives it to the providers file as a prop, the one way a value of the request reaches a client
+// component. Reading the headers makes every page under it render for each request, which a nonce needs.
+export default async function CspLayout({ children }: { children: ReactNode }) {
+  const requestHeaders = await headers()
+  const nonce = requestHeaders.get('x-nonce') ?? undefined
+  // The negative control of the tests (`?control=no-cache-nonce`): the policy stays, the cache gets no nonce.
+  const isCacheWithout = requestHeaders.get('x-csp-control') === 'no-cache-nonce'
+  return (
+    <html lang="en">
+      <body>
+        <Providers nonce={isCacheWithout ? undefined : nonce}>{children}</Providers>
+        <Hydrated />
+      </body>
+    </html>
+  )
+}
+```
+
+The providers file is the registry above with two changes: the cache gets the nonce (`createCache({ key: 'umber', nonce })`), and the registry's element carries `nonce={cache.nonce}`. In the browser the same prop gives the browser's cache its nonce, so the rules it writes after hydration are let in too:
+
+```tsx
+'use client'
+
+import createCache from '@umber-style/cache'
+import { CacheProvider } from '@umber-style/react'
+import { Global, ThemeProvider } from '@umber-fixtures/shared/style'
+import { darkTheme, lightTheme } from '@umber-fixtures/shared/themes'
+import { useServerInsertedHTML } from 'next/navigation'
+import { useState, type ReactNode } from 'react'
+
+// The providers file of the registry (app/(registry)/providers.tsx) as an app writes it under a strict
+// content security policy: the cache gets the nonce of the response, and the registry's own style
+// element carries `nonce={cache.nonce}`. The nonce comes as a prop from the server layout, which read
+// it from the request; in the browser the same prop gives the browser's cache its nonce, so the rules
+// it writes after hydration are let in too. React's render takes its style nonce from the policy
+// header of the request, which the framework reads.
+function useStyleRegistry(nonce: string | undefined) {
+  const [{ cache, flush }] = useState(() => {
+    const cache = createCache({ key: 'umber', nonce })
+    cache.compat = true
+    const prevInsert = cache.insert
+    let inserted: string[] = []
+    cache.insert = (...args) => {
+      const serialized = args[1]
+      if (cache.inserted[serialized.name] === undefined) inserted.push(serialized.name)
+      return prevInsert(...args)
+    }
+    const flush = () => {
+      const prev = inserted
+      inserted = []
+      return prev
+    }
+    return { cache, flush }
+  })
+
+  useServerInsertedHTML(() => {
+    const names = flush()
+    if (names.length === 0) return null
+    let styles = ''
+    for (const name of names) styles += cache.inserted[name]
+    return (
+      <style
+        key={cache.key}
+        nonce={cache.nonce}
+        data-umber={`${cache.key} ${names.join(' ')}`}
+        dangerouslySetInnerHTML={{ __html: styles }}
+      />
+    )
+  })
+
+  return cache
+}
+
+// As in the registry, a button gives the outermost provider the dark theme: the browser's cache then
+// writes the rules of that theme, after hydration, under the policy.
+export default function Providers({
+  nonce,
+  children,
+}: Readonly<{ nonce?: string; children: ReactNode }>) {
+  const cache = useStyleRegistry(nonce)
+  const [theme, setTheme] = useState(lightTheme)
+  return (
+    <CacheProvider value={cache}>
+      <ThemeProvider theme={theme}>
+        <Global
+          styles={(theme) => ({
+            '*, *::before, *::after': { boxSizing: 'border-box' },
+            body: {
+              margin: 0,
+              backgroundColor: theme.palette.background,
+              color: theme.palette.text,
+              fontFamily: 'sans-serif',
+            },
+          })}
+        />
+        {children}
+        <button type="button" data-testid="csp-theme-switch" onClick={() => setTheme(darkTheme)}>
+          Dark
+        </button>
+      </ThemeProvider>
+    </CacheProvider>
+  )
+}
+```
+
+One more thing may be needed, and it is not in the providers file: the style that the components are made with. `createStyle` made at the top of a module has a cache of its own. In the browser that cache makes its style element when it writes its first rule, not when the style is made: a style whose components all render under the `CacheProvider` writes nothing into its own cache, adds no element, and needs no nonce (run in the fixture with the theme classes below made over a cache in memory in the browser: every scenario of the policy passed, with no violation). The fixture's style does write rules of its own: the theme classes of `themeClass`, at start-up. Its element is made then, and under the policy it needs the page's nonce too. When it has none, the browser refuses it, and the cache of the registry, which finds that element of its key and writes into it with `insertRule`, keeps the nonce the element has: with the style made without the nonce, the browser reported a `style-src-elem` violation, the one `data-style="umber"` element of the page had no sheet, the button had no padding, and four of the seven scenarios failed. So a style that writes rules of its own in the browser gets the page's nonce. The fixture's style reads the nonce of the page's scripts in the browser, which the framework puts there, and nothing on a server (`fixtures/shared/src/style.ts`):
+
+```ts
+const readPageNonce = (): string | undefined =>
+  typeof document === 'undefined'
+    ? undefined
+    : document.querySelector<HTMLScriptElement>('script[nonce]')?.nonce || undefined
+
+export const style = createStyle(lightTheme, { prefix: 'umber', nonce: readPageNonce() })
+```
+
+The nonce is in no rule, class name or stamp, so the server and the browser still make the same classes, and a page with no policy (no script has a nonce) is the same as before.
+
+What the suite checks, on the production build and on the development server:
+
+- A page rendered at once, a page that streams through `Suspense`, a client-side navigation to a page with classes of its own, and a theme switch in the browser (the root theme written by the browser's cache after hydration) each have the computed styles of the same page sent with no policy (`?control=no-policy`).
+- Every style element of the document carries the response's nonce, in the HTML as sent (the late chunk's element too) and after hydration, the navigation and the switch. The element that holds the dark root theme after the switch carries it: in production the browser's cache writes it with `insertRule` into its element, on the development server as the text of an element of its own.
+- No `securitypolicyviolation` event and no console error or warning: no violation and no hydration warning.
+- A second request gets another nonce.
+- The negative control: with the nonce left off the cache (`?control=no-cache-nonce`) the browser reports `style-src` violations and the page is not styled (the button has no padding).
+
+React hoisted no `<style href precedence>` element on these pages: under a `CacheProvider` the client build renders none, and the components are client components. The framework's scripts carry the nonce, which it read from the policy header of the request.
+
 The parts of the pages are client components. A server component cannot see `CacheProvider` (the server components build has no context), so a styled component rendered by a server component sends its own `<style href precedence>` element, outside the registry. A server component that calls `useTheme()` of a default style that nothing configured gets `{}` and warns once in development (the theme of the providers file is given to a provider of a client file, never to `configure`): the fixture's `/registry/server-theme` renders `{}`.
 
 The cache key may be the prefix of the style or another one. Under the provider, classes and variables take the key (`other-box-root-<hash>`, `var(--other-palette-primary)`), the root rule declares `--other-...` variables, and the options of a configured style that describe how styles are written still apply; outside the provider the style's prefix is used, so one subtree never has two sets of variables (`packages/server/src/cacheKey.test.tsx`). A default style that was never configured, under a cache of another key, warns once in development: see [A library that wraps the engine](react.md#a-library-that-wraps-the-engine).
@@ -418,6 +601,7 @@ The second element is the cache's own (`data-style="soroush"`). Rendering the sa
 - A style element is read when the cache is made, and later when it is added as a child of the `<head>` or the `<body>` of the cache's document (the cache watches the children of both, and the root element until there is a body). One added deeper, inside another element, is not read. The body was checked in jsdom, and in Chromium with the stream of the App Router fixture.
 - `registered[className]` is `true`, not the style text. The style object is `registered.get(className)`.
 - The global rules of a `Global` reach the chunks of a page through the marker in its HTML. HTML that leaves out the markup of a `Global` (a part extracted apart from the rest) leaves its rules out too. A registry does not read markers: it sends each rule once in the request that writes it.
-- A registry whose elements carry a nonce was not run: the App Router fixture sends no policy. The nonce of the tags of `createInstance` is tested at the unit tier.
+- The registry with a nonce runs in the App Router fixture under a strict policy, in Chromium only, on Next.js 16.4.6. On the development server the framework's own development tools write style elements with no nonce (in the head and in the shadow root of `<nextjs-portal>`), which the policy refuses: the suite tells their violations apart by their script (`next-devtools`) and checks the engine's elements and the page's styles. A strict policy on the development server therefore reports violations that are the framework's. The nonce of the tags of `createInstance` is tested at the unit tier only.
+- A style that the components are made with, and that writes rules into its own cache in the browser (`themeClass` at the top of a module), needs the page's nonce there (above): its element is made at its first rule, and the browser's cache of a registry writes with `insertRule` into the element of its key that it finds, which keeps the nonce it was made with. A style that writes rules with no nonce under a strict policy loses its rules and those of the registry. A style that writes none into its own cache makes no element. A cache that has a nonce does not yet refuse an element of its key that has another one.
 - There is no `container` option of the cache: give it `createDomSheet(key, container, { nonce })` as its sheet. The `nonce` of the cache is not read when a `sheet` is given.
 - With pruning (the default), the rule of a theme class or of the root theme grows as rules use more of its variables. Each addition is reported to `insert` again, under a new name (`app-theme-1u39y9v-beaiho` above). Code that collects names must take each one as a new group, as the registry does.

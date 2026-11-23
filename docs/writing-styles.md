@@ -115,7 +115,7 @@ const AlertIcon = styled('span', { label: 'AlertIcon' })({ color: 'red' })
 `styled(tag)(...styles)` takes any number of styles. Each is an object or a function:
 
 - An object is used as it is. A component made only of objects reads no context at run time, and its class is computed once.
-- A function receives the component's props and `theme`, and returns an object, `null`, `undefined` or `false` for nothing, or a list of them (below). A function that reads only `theme` is worked out once for each theme (it is part of the base, below). One that reads a prop runs on each render. Equal results give the same class, so nothing grows.
+- A function receives the component's props and `theme`, and returns an object, `null`, `undefined` or `false` for nothing, or a list of them (below). A function that reads only `theme` is worked out once for each theme (it is part of the base, below). One that reads a prop runs on each render. Equal results give the same class, so nothing grows. Each render still returns a new object, which the cache compiles and hashes before it finds the class it has; with `hasStyleMemo` it finds the class from the object's contents (see [The style memo](style-memo.md)).
 
 `theme` in a function style is the theme as references: a token is a `var(--name)` string, and everything that is not a token (breakpoints, your own functions) is its real value from the nearest provider. See [Themes](themes.md). A `theme` prop passed to the component is not forwarded to the element and does not replace this `theme`.
 
@@ -370,6 +370,55 @@ The rules are `.umber-button-root-... .icon{margin-right:4px;}` and `.umber-butt
 
 In an object style write the key with `at`: `at(`&:hover ${Icon}`, { opacity: 0.8 })`.
 
+## Interaction states
+
+Hover, press, focus and disabled styles are written with `state(name)` and `at`, once, for every platform:
+
+```tsx
+import { Pressable } from 'react-native'
+import { at, createStyle, state } from 'umber-style/react'
+
+const { styled } = createStyle({ palette: { primary: '#8a4b2a' } })
+
+const Button = styled(Pressable)({
+  opacity: 1,
+  ...at(state('pressed'), { opacity: 0.7 }),
+  ...at(state('disabled'), { opacity: 0.4 }),
+})
+```
+
+`state` is exported by `@umber-style/core`, by every binding and by every entry of `umber-style`, and it is the same function in each: the key it gives (`@state pressed`) is the same data wherever the style is made. The set is fixed: `hovered`, `pressed`, `focused`, `disabled`. Any other name is a type error, and in development, from plain JavaScript, a warning: `[umber-style] state("pressd") names no state: ...`.
+
+| Key                 | On the web, the selector it is written as | On React Native, it applies while                                                                                                                                         |
+| ------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `state('hovered')`  | `&:hover`                                 | the component reports a pointer over it (`onHoverIn` / `onHoverOut`): a desktop or web target, or an app that turns the pointer-event flag on. A phone build reports none |
+| `state('pressed')`  | `&:active`                                | a `Pressable` reports `{ pressed }`; another component gets the `pressed` prop                                                                                            |
+| `state('focused')`  | `&:focus-visible` (keyboard focus)        | the component has any focus (`onFocus` / `onBlur`): React Native cannot tell keyboard focus from touch focus                                                              |
+| `state('disabled')` | `&:disabled, &[aria-disabled="true"]`     | `disabled`, `aria-disabled` or `accessibilityState.disabled` is true, or `editable` is false (a `TextInput`)                                                              |
+
+**On the web** a state key is the selector key written by hand. The rules, the class name and their order are the same, byte for byte, as with `'&:active': { ... }` (`packages/core/src/state.test.ts`, and the tests of the React client and server builds and of Vue compare the two forms):
+
+```ts
+compileRules('.x', {
+  opacity: 1,
+  ...at(state('hovered'), { opacity: 0.9 }),
+  ...at(state('pressed'), { opacity: 0.7 }),
+  ...at(state('focused'), { outlineWidth: 2 }),
+  ...at(state('disabled'), { opacity: 0.4 }),
+})
+// '.x{opacity:1;}'
+// '.x:hover{opacity:0.9;}'
+// '.x:active{opacity:0.7;}'
+// '.x:focus-visible{outline-width:2px;}'
+// '.x:disabled,.x[aria-disabled="true"]{opacity:0.4;}'
+```
+
+No script runs for them, server rendering and extraction write the same CSS, and a state key nests and combines with `when()`, `whenScheme()`, media keys, selectors and other state keys as the selector would: `at(state('pressed'), { ...at(state('disabled'), { opacity: 0.2 }) })` is `:active:disabled, :active[aria-disabled="true"]`. In Chromium each key changes the computed style (`packages/react/src/states.browser.test.tsx`): hover, a pointer held down, keyboard focus and not the focus a click gives, the `disabled` attribute and `aria-disabled="true"`.
+
+**On React Native** each key is a condition that the binding evaluates when the component renders, as it does for `when()` and a media key. A `Pressable` needs nothing more; another component is told the state through the props `pressed`, `hovered` and `focused`. How each state is learned, and what it costs, is in [React Native](react-native.md#interaction-states).
+
+**When to use which.** Use a state key in a style that React Native renders too: a shared component, a design system. A selector key stays right for what has no state key, or exists on the web only: `&:hover:not(:disabled)`, `&:focus` (any focus on the web), `&:focus-within`, `&::placeholder`, `& svg`. Put such a key in the `web` part of a shared style; outside it React Native drops it with a development warning, as before. A state of the component itself (selected, expanded, checked, current) stays in a function style, which runs on both platforms already. A focus ring stays the web's `outline`: React Native cannot report keyboard focus, so `focused` there is any focus, and a ring drawn for it would show on every tap.
+
 ## Media keys on React Native
 
 A key that starts with `@media` is the same key on every platform. On the web it is a media rule, and the browser decides it. On React Native there is no style sheet to decide it, so the binding evaluates the query against the window and the system settings and merges the block of a query that matches:
@@ -472,6 +521,8 @@ Use a plain object in `style` for a value that changes now and then (a size from
 - `as` always replaces a string tag, also when a `shouldForwardProp` given for it returns `true` for `as`: there the one-line rule would forward `as` as an attribute and keep the tag.
 - `as` of a component that is not made by `styled` is that component's prop, unless the filter keeps it off: the styled component does not check it, and a component that ignores it renders what it always renders. A filter is asked about `as` once, when the styled component is made. React Native keeps its own rule: there `styled` takes components only, and `as` replaces the component (see [React Native](react-native.md)). In Vue, `shouldForwardProp` is used for a string tag only, so `as` always reaches such a component. With `hasLayers: false`, an element that is given something in `style` or an engine class in `className` has one merged class and not the component's class: use a `target`.
 - With the strict style types, a key built at run time (a media query made from a breakpoint, for example) written directly in a web style object is a type error: write it with `at(key, style)`. The default types take it directly. See [Typed styles](typed-styles.md).
+- A state key and a selector key for the same state in one style are two keys: both rules are written, for the same selector, and the later one wins in the cascade. Write one of them.
+- On the web `focused` is keyboard focus (`:focus-visible`) and on React Native any focus: one name, two meanings. `hovered` does nothing on a phone build of React Native, which reports no hover.
 - The default filter knows the attributes of HTML and SVG under their React names. A lowercase or hyphenated spelling (`tabindex`, `stroke-width`) and an attribute that is not in the specifications (a vendor attribute, a new one) do not reach the element unless `shouldForwardProp` lets them, and a prop of your own that has the name of an attribute (`color`, `size`, `label`, `width`) does reach it.
 - The shorthands are typed for the tags of React's JSX types (React) and Vue's (Vue). At run time any name that starts with a lowercase letter is made into a tag, except `then`.
 - A function style that reads props runs on every render of its component. Keep it cheap. One that reads only `theme` runs once for each theme object.

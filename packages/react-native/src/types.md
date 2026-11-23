@@ -35,7 +35,9 @@ flowchart TD
   `lengthKeys` are used; any other option is ignored with a development warning.
 - `StyledOptions` extends `StylerOptions` with `shouldForwardProp` (default: every prop but `as`, `theme`,
   `style`).
-- `StyledComponent<C, P>` takes the props of the tag, `P`, `as` and `style`.
+- `StyledComponent<C, P>` takes the props of the tag, `P`, the state props, `as` and `style`.
+- `StateProps` is `{ pressed?, hovered?, focused? }`, booleans: what tells a styled component a state its
+  `state()` keys name, for a component that does not report it itself (`styled.ts` reads them).
 - The `style` prop takes style objects, falsy values and nested arrays (`StyleProp`).
 - `NativeStyleSheet<T>` is the platform `StyleSheet` with `create` replaced by two overloads: an object sheet
   gives its styles at once, a function of the theme gives a `SheetDefinition` for `useStyle`.
@@ -51,4 +53,9 @@ flowchart TD
 
 - `ThemeProviderProps` accepts `className` and `isRoot` and never renders an element: the provider is
   invisible on the tree.
+- The state props are on every styled component, not only on one whose styles name a state: the type of a
+  component does not know its styles' keys. A component whose styles name no state forwards them as any
+  other prop, as before.
+- The `style` prop does not take a function: an author's own function `style` reaches the binding only by
+  a cast, and is composed only where the styles name a state (`styled.md`).
 - Types describing web-only features remain (`GlobalInput`, `KeyframesInput`) so that a web source typechecks.

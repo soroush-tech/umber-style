@@ -173,9 +173,26 @@ styled('div')(({ theme }) => ({
 }))
 ```
 
-`at(key, style)` returns `{ [key]: style }` typed so that it spreads into a style. The key keeps its template literal type, and `style` is checked as a style of its own. The key must be a selector with `&`, one that starts with `:`, or an at-rule (`NestedKey`). `at` is exported by `@umber-style/core`, by every binding and by `umber-style/react`, where it is for the `web` part of a shared style. It is the same function for the keys of `when()` and `whenScheme()`: see [Theme conditions](theme-conditions.md).
+`at(key, style)` returns `{ [key]: style }` typed so that it spreads into a style. The key keeps its template literal type, and `style` is checked as a style of its own. The key must be a selector with `&`, one that starts with `:`, or an at-rule (`NestedKey`). `at` is exported by `@umber-style/core`, by every binding and by `umber-style/react`, where it is for the `web` part of a shared style. It is the same function for the keys of `when()` and `whenScheme()`: see [Theme conditions](theme-conditions.md), and for the keys of `state()`.
 
 A key that TypeScript only knows as `string` (a variable of that type) is an error in `at()`, in both modes: by default write such a key directly. With the strict types, build the key in the call, or type it with a template literal; when that is not possible, cast the whole style: `({ gap: 8, [key]: { gap: 16 } }) as WebStyleObject`.
+
+### State keys
+
+`state(name)` takes `'hovered' | 'pressed' | 'focused' | 'disabled'` (`StateName`): any other name is a type error. It returns `StateKey`, typed as any `` `@state ${string}` `` key, as the key of `when()` is typed as any `@theme` key. So the key passes the style types of every platform: alone or next to other keys, written directly as a computed key or spread from `at`, in a web style, a native style and a shared one (`packages/react-native/src/states.test.tsx`, `packages/umber-style/src/sharedConditions.test.tsx`):
+
+```tsx
+const Button = styled(Host)({ ...at(state('pressed'), { opacity: 0.7 }) })
+const Card = styled(Host)(
+  { opacity: 1, ...at(state('disabled'), { opacity: 0.4 }), [state('hovered')]: { opacity: 0.9 } },
+  () => ({ web: { ...at(state('focused'), { outlineWidth: 2 }) } })
+)
+
+// @ts-expect-error not one of the four states
+state('active')
+```
+
+The style inside `at()` is checked as a web style (`WebNested`), as for any key of `at`. A styled component of React Native and of `umber-style/react` takes the props `pressed`, `hovered` and `focused` (`StateProps`, booleans), which tell the state to a component that does not report it itself: `<Button pressed />`. The `style` prop of a styled component does not take a function.
 
 ### The escape hatch
 
@@ -409,6 +426,7 @@ The number is a count of instantiations: how many times the checker made a gener
 ## Limits
 
 - The values of colours and lengths are not checked, on any platform.
+- `StateKey` is any `@state` key, so a key written by hand (`'@state pressd'`) type-checks: only the argument of `state()` is checked. The state props are typed on every styled component, also one whose styles name no state, where they are forwarded as any prop.
 - By default a misspelt key, a keyword that does not exist (`display: 'gird'`) and a selector without `&` compile, in a nested style as at the top: that is the price of the drop-in. The strict switch catches them again, for the whole program; it cannot be switched on for one file.
 - By default the extra keys of a style must hold a style or a value: an object typed with another key whose value is neither (a shared style with its `native` part, given to the `styled` of a web binding) is a type error where the strict types accepted it, because the strict types have no index signature for such a key.
 - By default a style typed by an interface, such as a variable of type `CSSProperties`, is not taken as an argument of `styled`, `css` or a sheet: an interface has no index signature. The `style` prop takes `CSSProperties`; elsewhere spread it, `{ ...inline }`.

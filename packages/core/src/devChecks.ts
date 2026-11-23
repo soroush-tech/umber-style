@@ -34,14 +34,23 @@ const renamedWarned = new WeakSet<object>()
  */
 export function warnRenamedOption(prefix: string, options: object): void {
   const { hasRuleText } = options as { hasRuleText?: unknown }
-  if (hasRuleText === undefined || renamedWarned.has(options) || !isDevelopment()) return
-  renamedWarned.add(options)
-  // The option was a boolean: what was given is read as one, and so is what to write instead.
-  const given = hasRuleText ? 'true' : 'false'
-  const instead = hasRuleText ? 'speedy: false' : 'speedy: true'
-  console.warn(
-    `[${prefix}] The option hasRuleText was renamed to speedy, with the opposite meaning: hasRuleText: ${given} is not read, and the default applies. Write ${instead} instead.`
-  )
+  if (hasRuleText === undefined || renamedWarned.has(options)) return
+  // What `isDevelopment()` reads is written out in front of it, so that a bundler that writes in
+  // production for `process.env.NODE_ENV` drops the branch and its text (see `devChecks.md`).
+  if (
+    typeof process === 'object' &&
+    process.env != null &&
+    process.env.NODE_ENV !== 'production' &&
+    isDevelopment()
+  ) {
+    renamedWarned.add(options)
+    // The option was a boolean: what was given is read as one, and so is what to write instead.
+    const given = hasRuleText ? 'true' : 'false'
+    const instead = hasRuleText ? 'speedy: false' : 'speedy: true'
+    console.warn(
+      `[${prefix}] The option hasRuleText was renamed to speedy, with the opposite meaning: hasRuleText: ${given} is not read, and the default applies. Write ${instead} instead.`
+    )
+  }
 }
 
 /** A function that warns `message` with the prefix in front, once for each `key`: the same problem is never warned about twice. */

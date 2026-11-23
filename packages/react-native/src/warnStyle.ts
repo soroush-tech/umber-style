@@ -1,4 +1,4 @@
-import { readCondition } from '@umber-style/core'
+import { readCondition, readState } from '@umber-style/core'
 import { isMediaKey, readMediaQuery } from './mediaQuery'
 
 /** A length or `auto`: one value of a CSS shorthand. */
@@ -72,9 +72,11 @@ export function warnAboutValues(style: Record<string, unknown>, name?: string): 
   }
 }
 
-/** Why the web-only key `key` is dropped, or undefined when dropping it is not a mistake (`label`, a condition key, a media query that is evaluated). */
+/** Why the web-only key `key` is dropped, or undefined when dropping it is not a mistake (`label`, a condition or state key, a media query that is evaluated). */
 function describeDropped(key: string): string | undefined {
-  if (key === 'label' || readCondition(key) !== undefined) return undefined
+  if (key === 'label' || readCondition(key) !== undefined || readState(key) !== undefined) {
+    return undefined
+  }
   if (isMediaKey(key)) {
     const { problem } = readMediaQuery(key)
     return problem === undefined ? undefined : `React Native does not evaluate ${problem}`
@@ -88,8 +90,9 @@ function describeDropped(key: string): string | undefined {
 /**
  * In development, warns (once for each distinct message) that the web-only key `key`, written outside
  * the `web` part of a style, is dropped: a selector, an at-rule, a custom property, or an `animation*` or
- * `transition*` key, or a media query with something the binding does not evaluate. `label`, a `when()` or
- * `whenScheme()` key that does not match, and a media query that does not match are not mistakes.
+ * `transition*` key, or a media query with something the binding does not evaluate. `label`, a `when()`,
+ * `whenScheme()` or `state()` key that does not match, and a media query that does not match are not
+ * mistakes.
  */
 export function warnAboutDroppedKey(key: string, name: string | undefined): void {
   if (!isDevelopment()) return
@@ -98,6 +101,25 @@ export function warnAboutDroppedKey(key: string, name: string | undefined): void
   warnOnce(
     `"${key}" is dropped: ${reason}. A key for the web only goes in the web part of a shared style.`,
     name
+  )
+}
+
+/** What the state `name` is learned from, when the component keeps it. */
+const HELD_EVENTS = { hovered: 'onHoverIn and onHoverOut', focused: 'onFocus and onBlur' }
+
+/**
+ * In development, warns (once for each component and state) that a function style names `hovered` or
+ * `focused` while no object style of the component does: the component was made without the state it
+ * would keep, so the state follows the prop of that name alone.
+ */
+export function warnAboutUnheldState(
+  name: 'hovered' | 'focused',
+  component: string | undefined
+): void {
+  if (!isDevelopment()) return
+  warnOnce(
+    `state('${name}') is named in a function style only, so the component keeps no ${name} state and follows the ${name} prop alone. Name it in an object style of the component as well (an empty part is enough) for the binding to follow ${HELD_EVENTS[name]}.`,
+    component
   )
 }
 

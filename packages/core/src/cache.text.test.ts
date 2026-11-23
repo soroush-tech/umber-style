@@ -80,36 +80,39 @@ describe('a cache over a sheet written by text', () => {
 
   it('writes each rule into a style element of its own, in order, and removes the element with its rule', () => {
     const sheet = createDomSheet('o', document.head, { speedy: false, nonce: 'n0nce' })
-    const after = document.createElement('meta')
-    document.head.append(after)
+    // The first element is made at the first rule, at the end of the container then: after an element
+    // that came in after the sheet was made.
+    const before = document.createElement('meta')
+    document.head.append(before)
+    expect(document.head.children).toHaveLength(1)
     for (const rule of ['.a{color:red;}', '.b{color:blue;}', '.c{color:green;}']) sheet.insert(rule)
     const elements = [...document.head.children]
     expect(elements.map((element) => element.textContent)).toEqual([
+      '',
       '.a{color:red;}',
       '.b{color:blue;}',
       '.c{color:green;}',
-      '',
     ])
     expect(elements.map((element) => element.getAttribute('data-style'))).toEqual([
-      'o',
-      'o',
-      'o',
       null,
+      'o',
+      'o',
+      'o',
     ])
     expect(elements.map((element) => element.getAttribute('nonce'))).toEqual([
-      'n0nce',
-      'n0nce',
-      'n0nce',
       null,
+      'n0nce',
+      'n0nce',
+      'n0nce',
     ])
-    expect(elements.slice(0, 3).map((element) => element.childNodes.length)).toEqual([1, 1, 1])
+    expect(elements.slice(1).map((element) => element.childNodes.length)).toEqual([1, 1, 1])
     sheet.remove?.(1)
     sheet.insert('.d{color:black;}')
     expect([...document.head.children].map((element) => element.textContent)).toEqual([
+      '',
       '.a{color:red;}',
       '.c{color:green;}',
       '.d{color:black;}',
-      '',
     ])
   })
 
@@ -124,19 +127,20 @@ describe('a cache over a sheet written by text', () => {
     sheet.remove?.(0)
     expect(sheet.rules).toEqual([])
     // The last element stays, empty, where the rules were.
+    // (made at the first rule, after the link that came in after the sheet was made).
     expect([...document.head.children].map((element) => element.tagName)).toEqual([
       'META',
-      'STYLE',
       'LINK',
+      'STYLE',
     ])
     expect(readText('o')).toBe('')
     sheet.insert('.c{color:green;}')
     sheet.insert('.d{color:black;}')
     expect([...document.head.children].map((element) => element.textContent)).toEqual([
       '',
+      '',
       '.c{color:green;}',
       '.d{color:black;}',
-      '',
     ])
   })
 

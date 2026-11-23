@@ -73,6 +73,12 @@ document. A class name in any other attribute is not read.
   nothing.
 - The scanner was chosen over a pattern; the doc comment says the pass "moves forward only" and has "no
   pattern to backtrack".
+- Written for speed, with the same tokens (issue 10): a tag or attribute name is compared with the names
+  the scan reads in place, its ASCII capitals lowered (`findWord`), instead of being cut out and lowered
+  (no other character lowers to a letter of those names); a class value read before adds nothing again (a
+  `Set` of the values of the scan, which goes with it); a value of printable ASCII is cut at its spaces,
+  and any other value is split on `\s+` as before. The scan of the tree of 500 took 158 us before and
+  98 us after (host), the CSS of that page 215 and 103 us.
 
 ## Limits
 

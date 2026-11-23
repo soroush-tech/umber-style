@@ -24,6 +24,9 @@ import type {
   WebThemeProviderProps,
 } from './types'
 
+/** `process` where there is one, as `devChecks.ts` of the core declares it: not every program of the package has the types of Node. */
+declare const process: { env: { NODE_ENV?: string } }
+
 /** Makes the default styling: one engine, made on first use, behind `styled`, `ThemeProvider` and the rest. */
 export function createDefaultStyle() {
   let pending: DefaultStyleOptions = {}
@@ -36,8 +39,18 @@ export function createDefaultStyle() {
     if (!bound) {
       const engine = pending.engine ?? createLazyEngine<Theme>(pending)
       // A style that was never configured, under a cache of another key, is the sign of a configure call
-      // that did not run in time: said once, in development.
-      if (!isConfigured && isDevelopment()) watchProvidedCaches(engine)
+      // that did not run in time: said once, in development. What `isDevelopment()` reads is written out
+      // in front of it, so that a bundler that writes in production for `process.env.NODE_ENV` leaves
+      // the watch and its text out of the bundle.
+      if (
+        !isConfigured &&
+        typeof process === 'object' &&
+        process.env != null &&
+        process.env.NODE_ENV !== 'production' &&
+        isDevelopment()
+      ) {
+        watchProvidedCaches(engine)
+      }
       if (pending.theme) engine.setTheme(pending.theme)
       bound = bindEngine(engine, pending, contexts)
     }

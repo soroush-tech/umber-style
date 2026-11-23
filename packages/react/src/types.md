@@ -9,7 +9,7 @@ It holds the public types of the binding: the options (`StyleOptions`, `DefaultS
 `StyledComponent`, `CreateStyledComponent`, `StyledStatics`, `StyleProp`, `PropsOf`), the props of the
 components (`ThemeProviderProps`, `WebThemeProviderProps`, `ThemeScopeProps`, `CacheProviderProps`,
 `GlobalProps`), the setter of `useStyleValue` (`StyleValueSetter`), and the shape of a whole style (`Style`, `WebStyle`, `ServerStyle`). It re-exports the style
-types of the core that an app annotates with.
+types of the core that an app annotates with, `StateName` and `StateKey` of the state keys among them.
 
 ## Why it exists
 

@@ -22,7 +22,7 @@ program use the same one and read each other's providers and caches.
 flowchart LR
   shared["readSharedState 'react.default-style@1'"] --> make["createDefaultStyle (first copy only)"]
   make --> names["destructured named exports"]
-  core["core: add, alpha, at, divide, multiply, negate, subtract"] --> out["public API"]
+  core["core: add, alpha, at, divide, multiply, negate, state, subtract"] --> out["public API"]
   names --> out
   cp["CacheProvider"] --> out
   mq["useMediaQuery, MediaQueryOptions"] --> out

@@ -6,7 +6,7 @@ Types only: the public types of the Vue binding. The main one is `Style<T>`, wha
 `bindEngine` return. It also holds `Theme` (the default style's theme, augmentable), the options
 (`StyleOptions`, `StyledOptions`, `FilteringStyledOptions`), the `styled` types (`Styled`, `StyledFactory`,
 `StyledTags`, `StyledComponent`, `StyledStatics`, `CreateStyled`), `CssFunction`, `Sheet`, and the props of
-`ThemeProvider` and `Global`. It re-exports many style types of the core.
+`ThemeProvider` and `Global`. It re-exports many style types of the core, `StateName` and `StateKey` of the state keys among them.
 
 ## Why it exists
 

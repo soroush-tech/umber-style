@@ -6,7 +6,8 @@
 or one it is given) and the functions bound to it. `css` turns style objects, class names, CSS text and
 tagged templates into one class; `cx` joins class names and merges those the cache made; `keyframes` and
 `injectGlobal` write rules at once; `flush`, `hydrate`, `getRegisteredStyles` and `merge` manage the
-cache. The `@umber-style/css/create-instance` subpath exports it as the default.
+cache. The `@umber-style/css/create-instance` subpath exports it as the default and by name. `src/index.ts`
+imports it and does not re-export it.
 
 ## Why it exists
 
@@ -44,7 +45,9 @@ flowchart TD
 
 The default sheet is the style elements of the document (`createDomSheet`, given `speedy` and `nonce`
 of the options, so that an element it makes carries the nonce of a content security policy), or a memory
-sheet when there is no `document`. `current` is a variable, so after `flush` the instance reads a new cache: the public
+sheet when there is no `document`. The sheet makes its element at its first rule, so an instance that
+writes nothing adds nothing to the page; after `flush` the element stays, empty, and the next rule goes
+into it. `current` is a variable, so after `flush` the instance reads a new cache: the public
 `cache` member is a proxy that reads `current` (or the given cache itself, which never changes).
 
 `cx` collects class names from strings and from objects whose values are truthy, joins them, and calls
@@ -71,6 +74,8 @@ each followed by a space.
 - `flush` removes every rule from the sheet (if the sheet can remove), forgets the hydrated ids and
   starts an empty cache; a style is written again when next used.
 - An instance given its cache never makes, replaces or empties one: `flush` throws a `TypeError`.
+- The named export `createInstance` is the default export, with the same type (the test "is the named
+  export too, with the same type").
 - Reading `document` happens inside a call, guarded by `typeof document`, never at module top level.
 
 ## Decisions
@@ -83,6 +88,13 @@ each followed by a space.
   name holds ':'").
 - The common call, one style object, goes straight to the cache without flattening.
 - When a cache is given, its own options are used and the other cache options are not read.
+- The function is the default export and also a named one, the same function. A library that is an ES
+  module package and ships a CommonJS build has its bundler compile `import createInstance from '@umber-style/css/create-instance'` as Node's
+  interop does, where the default is the whole `module.exports` (`{ __esModule: true, default, createInstance }`),
+  not the function, so it throws `is not a function`; `import { createInstance } from '@umber-style/css/create-instance'` gets the function.
+  The shape of the CommonJS file (`cjsDefault: false` in `tsdown.config.ts`) was left as it is: making the
+  function `module.exports` would change what every existing `require` of the entry gets.
+  `scripts/smoke-packed.mjs` runs that interop on the packed tarball.
 
 ## Limits
 

@@ -25,6 +25,33 @@ describe('createTokens', () => {
     expect(refs.lineHeights.body).toBe('var(--line-heights-body)')
   })
 
+  it('names a variable from each key as it did: a key that is a part of a name already is kept as it is', () => {
+    // How a key was made a part of a name before a key with nothing to rewrite was kept as it is.
+    const toSegment = (key: string) =>
+      key
+        .replace(/([a-z0-9])([A-Z])/g, '$1-$2')
+        .toLowerCase()
+        .replace(/[^a-z0-9_-]/g, '-')
+    const keys = [
+      'plain',
+      'with-hyphen',
+      'with_under',
+      'abc123',
+      '0',
+      '',
+      'camelCase',
+      'ALL',
+      'x.y',
+    ]
+    const more = ['sp ace', 'caf\u00e9', 'a\u{1f600}b', 'aZ9', '9Z', 'Z']
+    const source = Object.fromEntries([...keys, ...more].map((key) => [key, 1]))
+    const names = Object.keys(createTokens(source, { prefix: 'p' }).declare(source))
+    const expected = Object.keys(source).map(
+      (key) => `--${['p', toSegment(key)].filter(Boolean).join('-')}`
+    )
+    expect(names).toEqual([...new Set(expected)])
+  })
+
   it('keeps raw keys, functions, booleans, null and class instances as they are', () => {
     const { refs } = createTokens(theme)
     expect(refs.breakpoints).toEqual({ md: '600px' })
