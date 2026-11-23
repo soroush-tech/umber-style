@@ -117,7 +117,8 @@ cache.css({ width: '1' }) // other contents: a string is not a number, and gets 
 ```
 
 (`cache.memo.test.ts`.) The same option goes to `createEngine`, `createStyle` and `configure`, and
-`createInstance` of `@umber-style/css`.
+`createInstance` of `@umber-style/css`. Where it helps, what it costs, its risks and its known issues are on
+the full page: [The style memo](style-memo.md).
 
 What it covers, and what takes the full path as before:
 

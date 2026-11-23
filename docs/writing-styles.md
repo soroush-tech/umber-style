@@ -115,7 +115,7 @@ const AlertIcon = styled('span', { label: 'AlertIcon' })({ color: 'red' })
 `styled(tag)(...styles)` takes any number of styles. Each is an object or a function:
 
 - An object is used as it is. A component made only of objects reads no context at run time, and its class is computed once.
-- A function receives the component's props and `theme`, and returns an object, `null`, `undefined` or `false` for nothing, or a list of them (below). A function that reads only `theme` is worked out once for each theme (it is part of the base, below). One that reads a prop runs on each render. Equal results give the same class, so nothing grows.
+- A function receives the component's props and `theme`, and returns an object, `null`, `undefined` or `false` for nothing, or a list of them (below). A function that reads only `theme` is worked out once for each theme (it is part of the base, below). One that reads a prop runs on each render. Equal results give the same class, so nothing grows. Each render still returns a new object, which the cache compiles and hashes before it finds the class it has; with `hasStyleMemo` it finds the class from the object's contents (see [The style memo](style-memo.md)).
 
 `theme` in a function style is the theme as references: a token is a `var(--name)` string, and everything that is not a token (breakpoints, your own functions) is its real value from the nearest provider. See [Themes](themes.md). A `theme` prop passed to the component is not forwarded to the element and does not replace this `theme`.
 

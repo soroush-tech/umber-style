@@ -74,10 +74,12 @@ number). The compiler reads a number only as `String(value)` and `value !== 0`, 
 
 ## What it guarantees
 
-Each line is a case that would make the style not apply, with the test that fails if the memo got it
-wrong (each was run against a deliberately broken memo and failed; `cache.memo.test.ts`,
-`cache.memo.page.test.ts`, `contentMemo.test.ts`, the `createInstance.memo.test.ts` of the css package,
-and the `styleMemo` tests of the React binding):
+Each line is a case that would make the style not apply, with its tests (`cache.memo.test.ts`,
+`cache.memo.page.test.ts`, `contentMemo.test.ts`, and the `createInstance.memo.test.ts` of the css
+package). The memo was broken on purpose in 13 ways and the tests of the core and of the css package
+run against each: every break made at least one test fail. Not every test failed under some break, and
+the `styleMemo` tests of the React binding were not run against the breaks: `docs/style-memo.md`,
+"Known issues", names the tests that no break could make fail and says why.
 
 1. A memo answers for one cache, and one set of style options: two caches, two views over one cache,
    and a fresh cache all write their own rules (`answers for one cache only`, `answers for one view

@@ -1,5 +1,7 @@
 # Benchmarks
 
+For a reading of the results, how fast the engine is and where it is slow, see [Performance](performance.md).
+
 After this page you can run the benchmark suite on your machine, read the table it prints, run the gate that a pull request must pass, read the report that follows a release, and tell which figures are steady enough to rely on and which are not.
 
 The suite measures UmberStyle against itself: it has no other library in it. Its purpose is to notice that a change made something slower, and to show where the time of a render goes. Every benchmark is a file for [soroush-bench](https://soroush.tech/bench/) (the package `@soroush.tech/bench`), which runs it in a Docker sandbox pinned to one CPU and 512 MB.
