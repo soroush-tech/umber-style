@@ -2,7 +2,7 @@
 
 After this page you can use the React Native binding: styled native components, sheets, the real theme values, and the parts of the API that work differently because there are no classes.
 
-`@umber-style/react-native` needs `react` `^19.2.8` and `react-native` `>=0.76.0`; its animated entry needs react-native-reanimated 4.7 or 4.8, which need React Native 0.86 to 0.88 and 0.87 to 0.89 (see [Animations](#animations)). It has the same names as the React binding, over the real theme values. React Native has no CSS, so there are no variables, no classes, no cascade layers and no style element: a style is an object of the platform's own keys, and a theme value in a style function is the value itself.
+`@umber-style/react-native` needs `react` `^19.0.0` and `react-native` `>=0.76.0`; its animated entry needs react-native-reanimated 4.7 or 4.8, which need React Native 0.86 to 0.88 and 0.87 to 0.89 (see [Animations](#animations)). It has the same names as the React binding, over the real theme values. React Native has no CSS, so there are no variables, no classes, no cascade layers and no style element: a style is an object of the platform's own keys, and a theme value in a style function is the value itself.
 
 ## An example
 

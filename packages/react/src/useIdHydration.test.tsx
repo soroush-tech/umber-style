@@ -16,6 +16,10 @@ import type { StyleProp } from './types'
 
 const theme = { palette: { primary: '#0000ff' } }
 
+// An id of `useId` from a server render, in the form of each React 19 minor: `:R1:` on 19.0, `«R1»`
+// on 19.1, `_R_1_` from 19.2.
+const SERVER_ID = /^(:R|«R|_R_)/
+
 // The ids that `Labelled` made, in the order of its renders: the browser's are read here, because React
 // keeps the attribute of the server when the two differ.
 const made: string[] = []
@@ -111,7 +115,7 @@ describe('useId under a styled element, rendered on a server and hydrated', () =
     async (setup) => {
       const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
       const { server, browser, isKept } = await hydrateApp('uid', setup)
-      expect(server).toMatch(/^_R_/)
+      expect(server).toMatch(SERVER_ID)
       expect(error).not.toHaveBeenCalled()
       expect(isKept).toBe(true)
       expect(browser).toBe(server)
@@ -218,7 +222,7 @@ describe('the place of a styled element, by what is below it', () => {
         <parts.Box>{makeChild(parts)}</parts.Box>
       ))
       expect(hasError).toBe(false)
-      expect(server).toMatch(/^_R_/)
+      expect(server).toMatch(SERVER_ID)
       expect(browser).toBe(server)
     }
   )

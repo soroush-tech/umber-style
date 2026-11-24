@@ -27,6 +27,20 @@ pnpm typecheck            # the type tests of every package, and the budget of t
 
 Tiers 2 and 3 need Chromium, which Playwright installs once: `pnpm --filter @umber-style/core exec playwright install chromium`. The version of `playwright` in the packages and of `@playwright/test` in `e2e` is the same exact version, so one download serves both. Tier 2 has its own `vitest.browser.config.ts`: `pnpm test` and `pnpm test:coverage` never open a browser. In CI the `browser` job runs tier 2 for `core` and `react`, and the `e2e` job runs one matrix row for each folder of `fixtures/`; a new fixture appears in the matrix with no change to the workflow.
 
+### On each React 19 minor
+
+The packages declare `react` `^19.0.0`, and CI runs the suite on each minor: the `packages`, `build` (with the typecheck), `browser`, `e2e` and `e2e-dev` jobs have one row for each of 19.0, 19.1, 19.2 and 19.3, named with it (`packages (core, react 19.0)`). Each row pins the newest patch of its minor across the workspace before its install, and checks the installed copies after it. Coverage goes to Codecov from the rows on the newest minor only. A machine runs a row the same way:
+
+```sh
+node scripts/use-react.mjs 19.0      # or an exact version: 19.0.9
+pnpm install --no-frozen-lockfile
+node scripts/use-react.mjs --check
+# ... the commands above ...
+git checkout package.json pnpm-lock.yaml && pnpm install --frozen-lockfile
+```
+
+The pin is a root `pnpm.overrides` for `react` and `react-dom`, in the checkout only (`scripts/use-react.md`). `@types/react` stays at the lockfile's version. The App Router fixture runs the React that Next.js bundles whatever is pinned, and its rows say so in their names. A test whose truth depends on the React it runs on reads `version` of `react` and holds the assertions of the other versions as known failures (`nonce.ssr.test.tsx`: React writes a nonce on the style elements it hoists from 19.2 on). `pnpm test:scripts` runs the unit test of the pin's logic with Node's test runner, at 100%.
+
 ## Tier 2: real-browser tests
 
 The tests build their CSS with the engine and read `getComputedStyle`. They cover:
@@ -187,6 +201,7 @@ The tests change `fixtures/shared/src/components.tsx`, `fixtures/shared/src/page
 ## Limits
 
 - The fixtures hold the same few components. A defect that needs another shape of style may not show.
+- The React rows run the newest patch of each minor, resolved when the job runs: an older patch of a minor is not run, and a new patch can make a row fail on a pull request that changed nothing. The App Router fixture never runs the React an app installs, on any row.
 - Scenario G runs several times at once with the other scenarios on one machine. Its numbers are for comparison between fixtures on the same run, not absolute.
 - The text of a rule that a browser cache inserted after load is not seen by the rule usage tracking: scenario E does not apply to a client-only app.
 - The class on `<html>` is switched by script. A page with scripting disabled stays in the scheme that the server chose.

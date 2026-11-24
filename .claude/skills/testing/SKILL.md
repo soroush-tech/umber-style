@@ -33,19 +33,25 @@ Put a check in the lowest tier that can see the thing.
 - A test that documents behaviour the engine does not have yet is a known failure with a reason
   that starts with `KNOWN`: in the `known` map of its fixture in `e2e/fixtures.ts`, or `it.fails`
   in vitest. One that starts to pass fails the run, and the mark is removed.
+- The suite runs on each React 19 minor in CI. A test whose truth depends on the React it runs on
+  reads `version` from `react` and runs the other versions' assertions with `it.fails` and a name
+  that starts with `KNOWN` (`nonce.ssr.test.tsx`); it never skips. After a pin, restore with
+  `git checkout package.json pnpm-lock.yaml` and `pnpm install --frozen-lockfile`.
 
 ## Commands
 
-| Command                                                             | Runs                                                                                |
-| ------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| `pnpm test`                                                         | tier 1 in every workspace member with a `test` script (the pre-commit hook runs it) |
-| `pnpm test:coverage`                                                | the same with coverage; fails below 100%                                            |
-| `pnpm --filter <name> test:coverage`                                | one package, by its name (`@umber-style/core`, `umber-style`)                       |
-| `pnpm --filter @umber-style/react exec vitest run --project server` | one vitest project of react or styled                                               |
-| `pnpm test:browser`                                                 | tier 2, in `core` and `react` (their `vitest.browser.config.ts`)                    |
-| `pnpm test:e2e`                                                     | tier 3, every fixture, each built and served as in production                       |
-| `E2E_FIXTURE=next-app pnpm test:e2e`                                | one fixture (a comma-separated list works)                                          |
-| `pnpm test:e2e:dev`                                                 | tier 3 against the development servers of `vike-ssg`, `next-app` and `spa`          |
+| Command                                                                     | Runs                                                                                |
+| --------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| `pnpm test`                                                                 | tier 1 in every workspace member with a `test` script (the pre-commit hook runs it) |
+| `pnpm test:coverage`                                                        | the same with coverage; fails below 100%                                            |
+| `pnpm --filter <name> test:coverage`                                        | one package, by its name (`@umber-style/core`, `umber-style`)                       |
+| `pnpm --filter @umber-style/react exec vitest run --project server`         | one vitest project of react or styled                                               |
+| `pnpm test:browser`                                                         | tier 2, in `core` and `react` (their `vitest.browser.config.ts`)                    |
+| `pnpm test:e2e`                                                             | tier 3, every fixture, each built and served as in production                       |
+| `E2E_FIXTURE=next-app pnpm test:e2e`                                        | one fixture (a comma-separated list works)                                          |
+| `pnpm test:e2e:dev`                                                         | tier 3 against the development servers of `vike-ssg`, `next-app` and `spa`          |
+| `node scripts/use-react.mjs 19.0`, then `pnpm install --no-frozen-lockfile` | the workspace on another React 19 (CI's React axis); `--check` after the install    |
+| `pnpm test:scripts`                                                         | the unit tests of `scripts/` (Node's test runner), at 100%                          |
 
 Tiers 2 and 3 need Chromium once: `pnpm --filter @umber-style/core exec playwright install chromium`.
 `pnpm test` and `pnpm test:coverage` never open a browser. The development tier edits files of

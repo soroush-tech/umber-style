@@ -76,7 +76,7 @@
     "@umber-style/is-prop-valid": "workspace:^"
   },
   "peerDependencies": {
-    "react": "^19.2.8"
+    "react": "^19.0.0"
   },
   "devDependencies": {
     "@soroush.tech/bench": "^2.2.3",

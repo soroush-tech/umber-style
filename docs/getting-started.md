@@ -18,7 +18,7 @@ Every package has a stable release on the `latest` tag of npm, which the lines a
 
 `umber-style` re-exports the core at its root and each binding as `umber-style/react`, `umber-style/react-native` and `umber-style/vue`. The pages use the scoped packages for web code. `umber-style/react` is special: it is the entry for one source that runs on the web and on React Native, and its types are the intersection of both platforms. See [Typed styles](typed-styles.md) and [Style sheets and the style prop](style-sheets.md).
 
-The bindings declare these peer dependencies: `react` `^19.2.8`, `vue` `^3.5.0`, and `react-native` `>=0.76.0` (optional, because only the React Native binding uses it).
+The bindings declare these peer dependencies: `react` `^19.0.0`, `vue` `^3.5.0`, and `react-native` `>=0.76.0` (optional, because only the React Native binding uses it). The tests run on each React 19 minor, 19.0 to 19.3. A strict nonce policy on a page rendered on a server needs React 19.2 or later (see [Content security policy](server-rendering.md#content-security-policy)). An app on the Next.js App Router runs the React that Next.js bundles, not the one it installs.
 
 ## React
 

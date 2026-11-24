@@ -2,7 +2,7 @@
 
 After this page you can choose between the two ways of getting the React API, and you know what the React binding has that the other bindings do not.
 
-`@umber-style/react` needs `react` `^19.2.8`. Most of what you use is on other pages: [Writing styles](writing-styles.md), [Style sheets and the style prop](style-sheets.md), [Themes](themes.md).
+`@umber-style/react` needs `react` `^19.0.0`; a strict nonce policy on a page rendered on a server needs 19.2 or later (see [Content security policy](server-rendering.md#content-security-policy)). Most of what you use is on other pages: [Writing styles](writing-styles.md), [Style sheets and the style prop](style-sheets.md), [Themes](themes.md).
 
 ## Two ways to get the API
 

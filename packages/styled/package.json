@@ -58,7 +58,7 @@
     "@umber-style/react": "workspace:^"
   },
   "peerDependencies": {
-    "react": "^19.2.8"
+    "react": "^19.0.0"
   },
   "devDependencies": {
     "@testing-library/react": "^16.3.3",
