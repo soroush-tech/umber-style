@@ -1,6 +1,6 @@
 {
   "name": "umber-style",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "UmberStyle in one package: the engine at the root, and the React, React Native and Vue bindings as subpaths.",
   "keywords": [
     "styling",
@@ -41,6 +41,7 @@
       "default": "./src/react.ts"
     },
     "./react-native": "./src/react-native.ts",
+    "./react-native/animated": "./src/react-native-animated.ts",
     "./vue": "./src/vue.ts"
   },
   "publishConfig": {
@@ -94,6 +95,16 @@
         "require": {
           "types": "./dist/react-native.d.cts",
           "default": "./dist/react-native.cjs"
+        }
+      },
+      "./react-native/animated": {
+        "import": {
+          "types": "./dist/react-native-animated.d.mts",
+          "default": "./dist/react-native-animated.mjs"
+        },
+        "require": {
+          "types": "./dist/react-native-animated.d.cts",
+          "default": "./dist/react-native-animated.cjs"
         }
       },
       "./vue": {

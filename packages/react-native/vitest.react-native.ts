@@ -1,6 +1,9 @@
 import { createElement, memo, useState, type ReactNode } from 'react'
 import { vi } from 'vitest'
 
+// What the animation library reads from the platform, for the tests of the animated entry.
+export * from './vitest.library-platform'
+
 type Handler = (...args: never[]) => void
 
 /** The handlers of one stand-in event source, by event name, and a subscription that removes one. */

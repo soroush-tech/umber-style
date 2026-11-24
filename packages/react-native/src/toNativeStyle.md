@@ -4,7 +4,9 @@
 
 `toNativeStyle(style, condition?, settings?, state?, interaction?)` turns one style object, written for either
 platform, into a flat native style. `collectKeys(style, into?)` reports what a style depends on besides
-itself: condition keys, a scheme key, media queries and state keys.
+itself: condition keys, a scheme key, media queries and state keys. `hasMotion(style)` says whether a style has
+an animation or transition key (`isMotionKey`) anywhere a part is read, for `styled.ts` to know which
+components animate.
 
 ## Why it exists
 
@@ -21,14 +23,17 @@ flowchart TD
   s["style, condition, settings, state, interaction"] --> split["take out web, take native"]
   split --> merge["merge native over the rest"]
   merge --> web{"each key: web-only?"}
-  web -->|"yes"| drop["drop it, warn once in development"]
+  web -->|"yes, and not an animation key with motion"| drop["drop it, warn once in development"]
   web -->|"no"| keep["keep it"]
+  web -->|"an animation or transition key, with motion"| keep
+  keep --> translateNode["motion.translate: shorthands expanded, values read, at this level"]
+  translateNode --> conv
   merge --> part{"each key: a nested part that matches?"}
   part -->|"when or whenScheme key and condition matches"| apply["resolve the part, merge over the result"]
   part -->|"media key and the window matches"| apply
   part -->|"state key and its state is true in interaction"| apply
   part -->|"no"| skip["ignore the part"]
-  keep --> conv["convertValues: strings to numbers"]
+  conv["convertValues: strings to numbers"]
   apply --> conv
   conv --> warn["warnAboutValues"]
   warn --> out["native style"]
@@ -42,7 +47,8 @@ and the reverse.
 
 ## The data
 
-`NativeSettings` is `{ remBase, name? }` (`name` only feeds the warnings). `StyleKeys` is
+`NativeSettings` is `{ remBase, name?, motion? }` (`name` only feeds the warnings; `motion` is the `Motion` of
+the `animated` option, `types.ts`). `StyleKeys` is
 `{ isConditional, hasScheme, queries, states }`: `queries` holds each media key once and `states` each
 state name once, in the order met. `isConditional` stays for `when()` and `whenScheme()` only; a state key
 does not set it. A
@@ -59,11 +65,20 @@ no object.
   them after the base rule.
 - `collectKeys` looks inside `native` and inside every condition or media part, at any depth.
 - A `label` key is dropped without a warning; the other web-only keys warn in development.
+- Without `motion` the animation and transition keys are dropped with the warning they always had. With it
+  they are kept, and `motion.translate` turns the plain keys of each level into what the animation library
+  takes before the parts of that level are merged over them: a shorthand of a level is expanded there, and
+  a value that is not valid is dropped there, so the value of a lower level stays, as an earlier rule of
+  the web stays when a later one is not valid.
+- `hasMotion` reads the `native` part and the condition, state and media parts, never the `web` part, and
+  does not look into a nested value that is not a part (`shadowOffset`).
 
 ## Decisions
 
 - Web-only means: `label`, a key with `&`, a key starting with `:`, `@` or `--`, and keys starting with
-  `animation` or `transition`. The comment says running an animation on React Native "is not built yet".
+  `animation` or `transition`; the last two are kept when `settings.motion` is given (the `animated`
+  option). Without it they are dropped, and the warning says that the animated entry is not on and how to
+  turn it on (`warnStyle.ts`).
 - The style is resolved on each call. Callers choose when to call (once for fixed styles, per render for
   conditional ones); the file does no caching.
 

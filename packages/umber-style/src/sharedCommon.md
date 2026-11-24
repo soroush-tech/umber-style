@@ -42,6 +42,10 @@ flowchart TD
   `10px` are not), plus `web` (merged over the rest on the web, dropped on native) and `native` (the
   other way round).
 - `SharedEntry`: a class name on the web, a style object on React Native; pass it on, do not read it.
+- `MotionOptions`: `{ animated? }`, the option of `createStyle` and `configure` that React Native reads
+  (the `animated` of `umber-style/react-native/animated`) and the web accepts and ignores. The animation and
+  transition keys are in both platform types (`NativeMotionStyle` of the React Native binding), so a shared
+  style writes them in its shared part.
 - `SharedStyledComponent` takes the state props `pressed`, `hovered` and `focused` (`StateProps` of the React
   Native binding), so shared code can tell a component its state; React Native reads them, the web does not
   (its selectors decide). `state(name)` is declared with the core's `StateName` and `StateKey`.
@@ -61,6 +65,12 @@ flowchart TD
   overload (the comment: the compiler tries the object form first).
 - `css` puts the styles argument last in its overload list, so that a mistake in a style object is
   reported against a style.
+- One style module for both platforms passes `animated` to the shared `createStyle`: the type takes it on
+  every build, so the module type-checks once. The value comes from a file of the app that a bundler picks
+  for each platform (`motion.native.ts` exports the entry's `animated`, `motion.ts` exports `undefined`),
+  so the web never imports the animation library. Rejected: a web stub of the entry in the umbrella (logic
+  in a package that only re-exports), and leaving the option off the shared type (the one module would need
+  a cast or two calls).
 - `useTheme` is common to all three builds; in a server component it returns the base theme and a
   `'use client'` component gets the nearest provider's values with the code unchanged.
 

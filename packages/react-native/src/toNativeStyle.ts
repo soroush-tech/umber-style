@@ -2,6 +2,7 @@ import { readCondition, readState, type Condition, type StateName } from '@umber
 import { matchesCondition, type InteractionState, type NativeCondition } from './conditions'
 import { isMediaKey, readMediaQuery, type WindowState } from './mediaQuery'
 import type { NativeStyleObject } from './nativeStyle'
+import type { Motion } from './types'
 import { convertValues, DEFAULT_REM_BASE } from './units'
 import { warnAboutDroppedKey, warnAboutValues } from './warnStyle'
 
@@ -11,6 +12,8 @@ export interface NativeSettings {
   readonly remBase: number
   /** The component or sheet entry the style belongs to, for the development warnings; undefined when it is not known. */
   readonly name?: string
+  /** What runs the animation and transition keys, given with the `animated` option; without it they are dropped. */
+  readonly motion?: Motion
 }
 
 /** What a style depends on besides itself, at any depth of its `native` part and of its condition, state and media parts. */
@@ -46,6 +49,26 @@ function isNested(value: unknown): value is Record<string, unknown> {
  */
 function isWebOnlyKey(name: string): boolean {
   return name === 'label' || name.includes('&') || /^(?::|@|--|animation|transition)/.test(name)
+}
+
+/** Whether `key` is an animation or transition property, or one of their shorthands. */
+export function isMotionKey(key: string): boolean {
+  return key.startsWith('animation') || key.startsWith('transition')
+}
+
+/**
+ * Whether `style` has an animation or transition key, at any depth of its `native` part and of its
+ * condition, state and media parts (its `web` part is not read): the component it belongs to animates.
+ */
+export function hasMotion(style: Record<string, unknown>): boolean {
+  for (const key in style) {
+    if (isMotionKey(key)) return true
+    const value = style[key]
+    if (!isNested(value)) continue
+    const isPart = key === 'native' || readPartKey(key) !== undefined
+    if (isPart && hasMotion(value)) return true
+  }
+  return false
 }
 
 /**
@@ -99,7 +122,9 @@ function matchesMedia(key: string, state: WindowState | undefined, remBase: numb
 
 /**
  * `style` without the web-only keys: `label`, selectors (a key with `&` or one that starts with `:`),
- * at-rules, custom properties, and the `animation*` and `transition*` properties, each dropped whole. Objects and arrays under any other key are kept
+ * at-rules, custom properties, and the `animation*` and `transition*` properties, each dropped whole; with
+ * `settings.motion` (the `animated` option) those properties are kept and translated by it, one level at a
+ * time, before the parts of that level are merged over them. Objects and arrays under any other key are kept
  * (`shadowOffset`, `transform`). A style written for both platforms has a `native` part, which is merged
  * over the rest, and a `web` part, which is dropped. A `when()` or `whenScheme()` key is a part that
  * applies when it matches `condition` (the nearest provider), a media query key one that applies when
@@ -117,15 +142,18 @@ export function toNativeStyle(
   interaction?: InteractionState
 ): NativeStyleObject {
   const { web: _web, native, ...rest } = style
-  const { name, remBase } = settings
+  const { name, remBase, motion } = settings
   const merged = isNested(native) ? { ...rest, ...native } : rest
   const resolved = Object.fromEntries(
     Object.entries(merged).filter(([key]) => {
-      if (!isWebOnlyKey(key)) return true
+      if (!isWebOnlyKey(key) || (motion !== undefined && isMotionKey(key))) return true
       warnAboutDroppedKey(key, name)
       return false
     })
   )
+  // The keys of this level are translated before the parts are merged over them, as the web reads each
+  // rule apart: a shorthand here is expanded, and a value that is not valid is dropped, at this level.
+  motion?.translate(resolved, name)
   const matching = Object.entries(merged).filter(
     ([key, part]) =>
       isNested(part) &&

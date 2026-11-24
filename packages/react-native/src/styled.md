@@ -2,9 +2,12 @@
 
 ## What it does
 
-`createStyled(useTheme, useCondition, remBase)` returns `styled` for React Native. `styled(Component, options)`
-takes a component (never a string tag) and the styles, and returns a function component that renders the
-component with a `style` array, or, for a `Pressable` whose styles name `pressed`, with a `style` function.
+`createStyled(useTheme, useCondition, remBase, motion?)` returns `styled` for React Native. `styled(Component,
+options)` takes a component (never a string tag) and the styles, and returns a function component that renders
+the component with a `style` array, or, for a `Pressable` whose styles name `pressed`, with a `style` function.
+With `motion` (the `animated` option, `types.ts`), a component whose styles have an animation or transition key
+renders the animated form of its component (`motion.wrap`) with a `style` array that keeps those keys,
+translated by `toNativeStyle`.
 
 ## Why it exists
 
@@ -50,13 +53,37 @@ flowchart TD
   consume --> handlersNode["held states: hover and focus handlers composed with the author's"]
 ```
 
+With `motion`, three more decisions, the first when the component is made and the others on each render:
+
+```mermaid
+flowchart TD
+  made["styled(Component)(...styles), with motion"] --> objMotion{"an object style has an animation or transition key, at any depth but web?"}
+  objMotion -->|"yes"| animatedYes["isAnimated, isWrapped from the start; WindowStyled at least, so the media key watches reduced motion; pressed is kept as state when named"]
+  objMotion -->|"no"| animatedNo["the component of today: same shape, same hooks"]
+  animatedNo --> fnMotion{"on a render: a function style returns such a key?"}
+  fnMotion -->|"yes, the first time"| flip["isWrapped for every later render of the type; development warning"]
+  fnMotion -->|"no"| keep["isWrapped stays as it was"]
+  animatedYes --> renderNode["render"]
+  flip --> renderNode
+  keep --> renderNode
+  renderNode --> wrapQ{"isWrapped?"}
+  wrapQ -->|"yes"| wrapped["element: motion.wrap(as or Component), made once for each component"]
+  wrapQ -->|"no"| plain["element: as or Component"]
+  wrapped --> reducedQ{"the system asks for reduced motion?"}
+  reducedQ -->|"yes"| reduced["each entry of the list through motion.reduce"]
+  reducedQ -->|"no"| asIs["the list as it is"]
+```
+
 ## The data
 
 `Kind` is `'function' | 'fixed' | 'window' | 'conditional'`. Registered object styles get the names `s0`,
 `s1`, ... (the index of the style). `StyleKeys` of each style give the queries, the condition flags and the
 states; the queries of object styles come first in the key, so the key of a render starts with theirs, and
 the states of object styles come before the states that function styles return. `heldNames` are the
-states among the object styles' that are kept from events (`hovered`, `focused`). The interaction of a
+states among the object styles' that are kept from events (`hovered`, `focused`), and `pressed` too when the
+object styles animate and name it. `isAnimated` says whether an object style has an animation or transition
+key (only with `motion`); `isWrapped`, a variable of the closure of one component type, starts as
+`isAnimated` and turns true, for good, the first time a function style returns such a key. The interaction of a
 render is `InteractionState` (`interaction.ts`). The conditional object styles as resolved are kept in a
 `WeakMap` from the theme of the condition (held weakly; a `Map` without a theme) to a `Map` keyed by the index
 of the style, the media key of the render, the color scheme of the provider and the four states as bits: an
@@ -91,6 +118,17 @@ entry leaves with its theme object, and a component has at most 16 for each them
 - A component renders again when its set of matching queries changes (or the system scheme, for a
   `whenScheme()` key that no provider decides), not when the width changes inside the same set.
 - The development warnings name the component: the `name` option, else `displayName`, else the function name.
+- Without `motion` nothing here differs from the binding before the animated entry: `isMovingStyle` answers
+  false without reading the style, `isAnimated` and `isWrapped` stay false, and the media key is the same.
+- With `motion`, a component whose styles never animate is not wrapped and has the shape and the hooks it
+  has without `motion` (`animated.test.tsx` compares the component made with and without the option).
+- A component that animates renders `motion.wrap` of its component, the same object for every instance and
+  render (`motion` keeps one for each component), and its `useMediaKey` watches reduced motion, so that it
+  renders again when the setting changes; while the setting is on, each entry of its list goes through
+  `motion.reduce`.
+- A component whose object styles animate and name `pressed` keeps the press with `onPressIn` and
+  `onPressOut` (`interaction.ts`) and is never given a function `style`: the animated component of the
+  library reads the style of its props as a list, and a function there would hide the transition from it.
 
 ## Decisions
 
@@ -116,7 +154,23 @@ entry leaves with its theme object, and a component has at most 16 for each them
   the same combination gives the same object. In `bench/states-pressables.bench.ts` 48 pressables with
   state keys went from 113 to 60 us (48 without a state key: 46 us), a press from 1.65 us to 441 ns.
 
+- The animation of a component is decided as its states are: from its object styles when it is made, the
+  hooks fixed then. A function style that animates is learned only when it ran, so the type turns animated
+  then and stays so (an instance mounted before that mounts again once, because its element changes);
+  rejected: wrapping every component with a function style (it would change the element of every existing
+  one, and the library adds `collapsable: false` to what it wraps), and turning back to the plain component
+  when a later render does not animate (every such switch would mount the subtree again). A wrapped
+  component whose styles stop animating keeps the wrapper, and the library detaches the animation, as the
+  web removes an animation whose name goes away.
+
 ## Limits
+
+- A `Pressable` that animates only through a function style, or that is given a function `style` prop
+  while it animates, does not report its press to the binding: the press is kept as state only for a
+  component whose object styles animate and name `pressed`, and an animated component is never given a
+  function `style`. Its `pressed` follows the prop of that name.
+- A sheet entry or an object with animation keys given through the `style` prop does not make a component
+  animated: the component is wrapped only for its own styles.
 
 - A style that is a function is always run on each render; the result is not cached.
 - A function `style` prop on a component whose styles name no state is put in the list as it is, as before

@@ -3,7 +3,7 @@
 // same function. The React Native binding has no `readTheme` and no server build, so code that must run on
 // React Native uses `useTheme`. This file holds types and declarations only: it is never loaded.
 import type { DefaultStyleOptions, StyleOptions, Theme } from '@umber-style/react'
-import type { SharedStyleBase } from './sharedCommon'
+import type { MotionOptions, SharedStyleBase } from './sharedCommon'
 
 export * from './sharedCommon'
 
@@ -17,9 +17,9 @@ export declare const readTheme: SharedServerStyle<Theme>['readTheme']
 /** Makes the styling of one theme shape for server components, apart from the default one. */
 export declare function createStyle<T extends object>(
   theme: T,
-  options?: StyleOptions<T>
+  options?: StyleOptions<T> & MotionOptions
 ): SharedServerStyle<T>
 /** Makes one default style for server components, with `configure` for its options and base theme before first use. */
 export declare function createDefaultStyle(): SharedServerStyle<Theme> & {
-  configure: (options: DefaultStyleOptions) => void
+  configure: (options: DefaultStyleOptions & MotionOptions) => void
 }

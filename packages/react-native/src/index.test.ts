@@ -1,6 +1,18 @@
+import { existsSync, readFileSync } from 'node:fs'
+import { basename, dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { render } from '@testing-library/react'
 import { createElement } from 'react'
 import * as entry from './index'
+
+const SOURCE = dirname(fileURLToPath(import.meta.url))
+const IMPORT_PATTERN = /(?:from|import)\s+'([^']+)'/g
+
+/** The file a relative import points to. */
+function resolveImport(from: string, specifier: string): string {
+  const base = join(dirname(from), specifier)
+  return [`${base}.ts`, `${base}.tsx`].find((candidate) => existsSync(candidate)) as string
+}
 
 describe('the entry of @umber-style/react-native', () => {
   it('exports the default style, createStyle and alpha', () => {
@@ -46,6 +58,27 @@ describe('the entry of @umber-style/react-native', () => {
     entry.configure({ theme: { palette: { primary: 'red' }, space: [0, 4] } })
     expect(entry.themeClass({}, 'dark')).toBe('')
     expect(() => entry.configure({})).toThrow()
+  })
+
+  it('never loads the animated entry or the animation library: an app without the entry pays nothing for it', () => {
+    const files = new Set<string>()
+    const specifiers: string[] = []
+    const queue = [join(SOURCE, 'index.ts')]
+    while (queue.length > 0) {
+      const file = queue.pop() as string
+      if (files.has(file)) continue
+      files.add(file)
+      for (const [, specifier] of readFileSync(file, 'utf8').matchAll(IMPORT_PATTERN)) {
+        specifiers.push(specifier)
+        if (specifier.startsWith('.')) queue.push(resolveImport(file, specifier))
+      }
+    }
+    const names = [...files].map((file) => basename(file))
+    expect(names).toContain('styled.ts')
+    expect(
+      names.filter((name) => name.startsWith('animated') || name.startsWith('motion'))
+    ).toEqual([])
+    expect(specifiers.filter((specifier) => specifier.startsWith('react-native-'))).toEqual([])
   })
 
   it('has a Global that renders nothing', () => {

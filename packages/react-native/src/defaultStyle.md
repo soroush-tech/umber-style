@@ -9,7 +9,7 @@ Each one forwards to a style that is made on first use.
 
 ## Why it exists
 
-An app imports `styled` from the package and calls `configure({ theme, remBase, lengthKeys })`, possibly
+An app imports `styled` from the package and calls `configure({ theme, remBase, lengthKeys, animated })`, possibly
 after other modules already created sheets and styled components. The default style therefore cannot bind a
 holder when it is created: it binds on the first real use and, until then, only records `configure`'s
 options. `index.ts` is the only caller and pulls the members out of it.
@@ -56,4 +56,5 @@ it can be exported before the style exists.
 
 ## Limits
 
-- After the first use the options cannot change; there is no reset.
+- After the first use the options cannot change; there is no reset. `animated` is one of them: an app that
+  wants animations gives it to `configure` before any member is used.

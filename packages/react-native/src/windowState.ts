@@ -29,6 +29,11 @@ function setReducedMotion(value: boolean): void {
   notify()
 }
 
+/** Whether the system asks for reduced motion, as the platform last answered (false until it answers). */
+export function readReducedMotion(): boolean {
+  return isReducedMotion
+}
+
 /** The window and the system settings now: the size and the color scheme are read from the platform, reduced motion is the last answer. */
 export function readWindowState(): WindowState {
   const { width, height } = platformDimensions.get('window')
@@ -62,33 +67,39 @@ const readNothing = () => ''
 
 /**
  * The key of what `queries` give now: one character for each, `1` where it matches, then the system
- * color scheme when `hasScheme` (for a `whenScheme()` key that no provider decides). Two renders with
- * the same key resolve the same style.
+ * color scheme when `hasScheme` (for a `whenScheme()` key that no provider decides), then whether the
+ * system asks for reduced motion when `hasMotion` (for a component that animates). Two renders with the
+ * same key resolve the same style.
  */
 export function readMediaKey(
   queries: readonly string[],
   hasScheme: boolean,
-  remBase: number
+  remBase: number,
+  hasMotion = false
 ): string {
   let key = ''
   if (queries.length > 0) {
     const state = readWindowState()
     for (const query of queries) key += readMediaQuery(query).matches(state, remBase) ? '1' : '0'
   }
-  return hasScheme ? `${key}:${String(platformAppearance.getColorScheme())}` : key
+  if (hasScheme) key += `:${String(platformAppearance.getColorScheme())}`
+  return hasMotion ? `${key}|${isReducedMotion ? 'reduce' : 'motion'}` : key
 }
 
 /**
  * `readMediaKey` in a component, which renders again when the key changes, not when the width changes
- * inside the same set of matching queries. With no query and no scheme it subscribes to nothing.
+ * inside the same set of matching queries. With no query, no scheme and no motion it subscribes to nothing.
  */
 export function useMediaKey(
   queries: readonly string[],
   hasScheme: boolean,
-  remBase: number
+  remBase: number,
+  hasMotion = false
 ): string {
   const read =
-    queries.length > 0 || hasScheme ? createKeyReader(queries, hasScheme, remBase) : readNothing
+    queries.length > 0 || hasScheme || hasMotion
+      ? createKeyReader(queries, hasScheme, remBase, hasMotion)
+      : readNothing
   return useSyncExternalStore(
     read === readNothing ? subscribeToNothing : subscribeToWindow,
     read,
@@ -97,8 +108,13 @@ export function useMediaKey(
 }
 
 /** `readMediaKey` of these arguments; made apart, so that a component that watches nothing makes no function. */
-function createKeyReader(queries: readonly string[], hasScheme: boolean, remBase: number) {
-  return () => readMediaKey(queries, hasScheme, remBase)
+function createKeyReader(
+  queries: readonly string[],
+  hasScheme: boolean,
+  remBase: number,
+  hasMotion: boolean
+) {
+  return () => readMediaKey(queries, hasScheme, remBase, hasMotion)
 }
 
 /**

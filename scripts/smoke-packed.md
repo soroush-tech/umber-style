@@ -7,8 +7,9 @@ into a temporary folder outside the workspace with npm, and checks from there th
 npm hands them out. It checks the contents of the tarballs, that every entry loads with `import` and with
 `require` and gives the same names, that an entry with a default export has the same function by name and
 that a CommonJS file that loads it as a bundler's Node interop does gets the function by that name, a
-server render of a styled component, the export conditions, and that
-TypeScript resolves the declarations. It prints `ok` or `FAIL` for each check, exits 1 if any failed, and
+server render of a styled component, the animated entry of React Native (over a stand-in of the animation
+library: the entry and its subpath of the umbrella are one value, and it translates a shorthand), the export
+conditions, and that TypeScript resolves the declarations. It prints `ok` or `FAIL` for each check, exits 1 if any failed, and
 removes the folder unless `--keep` is given.
 
 ## Why it exists
@@ -27,7 +28,7 @@ flowchart TD
   s0["each sibling range in source is workspace:^"] --> dist{"every packages/dir/dist exists?"}
   dist -->|no| stop["say run pnpm build, exit 1"]
   dist -->|yes| s1["1: pnpm pack each, extract, inspect"]
-  s1 --> s2["2: consumer folder: tarballs, a react-native stand-in, npm install with overrides"]
+  s1 --> s2["2: consumer folder: tarballs, a react-native stand-in, a react-native-reanimated stand-in, npm install with overrides"]
   s2 --> one{"a nested copy of the core?"}
   one -->|yes| f1["FAIL"]
   one -->|no| s3["3: node check.mjs and check.cjs"]
@@ -107,7 +108,8 @@ that imports the default exports by name), `server.ts` (custom condition
 ## Limits
 
 - It needs the network (npm install) and a prior `pnpm build`.
-- The React Native binding runs only against the stand-in.
+- The React Native binding runs only against the stand-in, and the animated entry only against a stand-in of
+  the animation library with its four functions: what the library does with the style is not checked here.
 - It has no test file.
 - `tarballs` are matched to a package by "the first `.tgz` not yet used", which relies on `pnpm pack`
   writing one new file per call.

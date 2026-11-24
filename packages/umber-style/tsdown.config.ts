@@ -11,6 +11,7 @@ export default defineConfig({
     react: 'src/react.ts',
     'react.server': 'src/react.server.ts',
     'react-native': 'src/react-native.ts',
+    'react-native-animated': 'src/react-native-animated.ts',
     vue: 'src/vue.ts',
     shared: 'src/shared.ts',
     'shared.server': 'src/shared.server.ts',

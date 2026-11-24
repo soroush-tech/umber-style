@@ -18,6 +18,10 @@
 //     node16, with `skipLibCheck` off, including a styled component with a typed theme.
 // `react-native` cannot be loaded by Node, so a stand-in package with the values the binding
 // imports takes its place; the real types of `react-native` are covered by the workspace typecheck.
+// `react-native-reanimated`, which the animated entry imports, cannot be either (it needs its native
+// part), so a stand-in package with the four functions the entry calls takes its place too, at the
+// newest version inside the entry's peer range (4.8.0): the entry is loaded, its subpath of the
+// umbrella is the same value, and it translates an animation.
 // The temporary folder is removed at the end, unless `--keep` is given. Needs the network (npm).
 import { spawnSync } from 'node:child_process'
 import {
@@ -124,6 +128,8 @@ const ENTRIES = {
     'css',
   ],
   'umber-style/vue': ['createStyle', 'styled', 'ThemeProvider', 'useTheme', 'Global', 'css'],
+  '@umber-style/react-native/animated': ['animated'],
+  'umber-style/react-native/animated': ['animated'],
 }
 // Each entry with a default export, and the name it also exports that function by: a CommonJS build
 // of a library imports it by that name, since its interop takes the whole `module.exports` as the
@@ -319,6 +325,38 @@ try {
       '',
     ].join('\n')
   )
+  // The stand-in for `react-native-reanimated`, which Node cannot load either.
+  const reanimated = join(consumer, 'reanimated-stub')
+  mkdirSync(reanimated)
+  writeFileSync(
+    join(reanimated, 'package.json'),
+    JSON.stringify({
+      name: 'react-native-reanimated',
+      version: '4.8.0',
+      main: 'index.js',
+      types: 'index.d.ts',
+    })
+  )
+  writeFileSync(
+    join(reanimated, 'index.js'),
+    [
+      'exports.createAnimatedComponent = (component) => component',
+      'exports.css = { keyframes: (steps) => ({ cssRules: steps, cssText: JSON.stringify(steps), length: Object.keys(steps).length, name: "REA-CSS-0" }) }',
+      'exports.cubicBezier = (x1, y1, x2, y2) => ({ x1, y1, x2, y2 })',
+      'exports.steps = (stepsNumber, modifier) => ({ stepsNumber, modifier })',
+      '',
+    ].join('\n')
+  )
+  writeFileSync(
+    join(reanimated, 'index.d.ts'),
+    [
+      'export function createAnimatedComponent<C>(component: C): C',
+      'export const css: { keyframes(steps: object): { cssRules: object; cssText: string; length: number; name: string } }',
+      'export function cubicBezier(x1: number, y1: number, x2: number, y2: number): object',
+      "export function steps(stepsNumber: number, modifier?: 'jump-start' | 'start' | 'jump-end' | 'end' | 'jump-none' | 'jump-both'): object",
+      '',
+    ].join('\n')
+  )
   writeFileSync(
     join(consumer, 'package.json'),
     JSON.stringify(
@@ -331,6 +369,7 @@ try {
           'react-dom': readVersion('react', 'devDependencies', 'react-dom'),
           vue: readVersion('vue', 'devDependencies', 'vue'),
           'react-native': 'file:./react-native-stub',
+          'react-native-reanimated': 'file:./reanimated-stub',
           '@types/react': readVersion('react', 'devDependencies', '@types/react'),
           '@types/node': readVersion('react', 'devDependencies', '@types/node'),
           typescript: readVersion('react', 'devDependencies', 'typescript'),
@@ -384,6 +423,13 @@ same(mods['umber-style/react'].styled, mods['@umber-style/react'].styled, 'umber
 same(mods['@umber-style/styled'].default, mods['@umber-style/react'].styled, '@umber-style/styled and react')
 same(mods['umber-style/react-native'].styled, mods['@umber-style/react-native'].styled, 'umber-style/react-native')
 same(mods['umber-style/vue'].styled, mods['@umber-style/vue'].styled, 'umber-style/vue')
+same(mods['umber-style/react-native/animated'].animated, mods['@umber-style/react-native/animated'].animated, 'umber-style/react-native/animated')
+// The animated entry over the stand-in of the library: a shorthand with a name of keyframes, translated.
+const motion = mods['@umber-style/react-native/animated'].animated.bind({ remBase: 16, readTheme: () => ({}) })
+const pulse = mods['@umber-style/react-native'].keyframes({ to: { opacity: 0.4 } }, { label: 'pulse' })
+const moving = { animation: pulse + ' 1.5s ease-in-out infinite' }
+motion.translate(moving, 'Smoke')
+if (moving.animationDuration !== 1500 || moving.animationIterationCount !== 'infinite' || moving.animationName.cssRules['100%'].opacity !== 0.4) throw new Error('the animated entry did not translate: ' + JSON.stringify(moving))
 // The prop filters: one function for each platform, and no root entry.
 for (const [platform, prop] of [['react', 'tabIndex'], ['vue', 'tabindex'], ['react-native', 'testID']]) {
   const isPropValid = mods['@umber-style/is-prop-valid/' + platform].default
@@ -590,6 +636,8 @@ import isNativePropValid from '@umber-style/is-prop-valid/react-native'
 import { createStyle as createShared } from 'umber-style/react'
 import { createStyle as createUmbrellaNative } from 'umber-style/react-native'
 import { createStyle as createUmbrellaVue } from 'umber-style/vue'
+import { animated } from '@umber-style/react-native/animated'
+import { animated as umbrellaAnimated } from 'umber-style/react-native/animated'
 import type { ComponentProps, CSSProperties } from 'react'
 
 const theme = { palette: { primary: '#1b5fd1', onPrimary: '#ffffff' }, space: [0, 4, 8] }
@@ -644,6 +692,9 @@ export const sharedColor: string = shared.useTheme().palette.primary
 export const SharedBox = shared.styled('div')(({ theme: view }) => ({ padding: view.space[1] }))
 export const umbrellaNative = createUmbrellaNative(theme).useTheme().palette.primary
 export const umbrellaVue = createUmbrellaVue(theme).useTheme().value.palette.primary
+export const animatedNative = createNative(theme, { animated }).useTheme().palette.primary
+export const animatedUmbrella = createUmbrellaNative(theme, { animated: umbrellaAnimated })
+export const sharedWithMotion = createShared(theme, { animated: undefined }).useTheme().palette.primary
 `
   const server = `
 import * as web from '@umber-style/react'

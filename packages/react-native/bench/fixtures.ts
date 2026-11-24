@@ -1,6 +1,6 @@
 // What the React Native benchmarks share. The process is first made to run built code
-// (`prepareBuiltPackages`: production React, the built core, and `react-native` sent to the stand-in
-// in `platform.ts`), then React, `react-dom/server` and the built binding are loaded after it. A file
+// (`prepareBuiltPackages`: production React, the built core, `react-native` sent to the stand-in in
+// `platform.ts`, and `react-native-reanimated`, for the animated entry, to the one in `reanimated.ts`), then React, `react-dom/server` and the built binding are loaded after it. A file
 // imports this module before anything that loads React.
 import { createRequire } from 'node:module'
 import type * as React from 'react'
@@ -24,7 +24,10 @@ import type * as Binding from '../src/index'
 import type { NativeStyleObject } from '../src/nativeStyle'
 
 prepareBuiltPackages({
-  redirects: { 'react-native': new URL('./platform.ts', import.meta.url).href },
+  redirects: {
+    'react-native': new URL('./platform.ts', import.meta.url).href,
+    'react-native-reanimated': new URL('./reanimated.ts', import.meta.url).href,
+  },
 })
 const load = createRequire(import.meta.url)
 const { createElement: h } = load('react') as typeof React

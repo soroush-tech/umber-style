@@ -141,6 +141,15 @@ export function isKeyframesName(name: string): boolean {
 }
 
 /**
+ * The steps registered under `name`, as `keyframes` was given them (an object, or a function of the
+ * theme); undefined for a name that `keyframes` did not return. For a platform that runs an animation
+ * from its steps instead of writing a rule.
+ */
+export function readKeyframesSteps(name: string): KeyframesInput<unknown> | undefined {
+  return registry.get(name) as KeyframesInput<unknown> | undefined
+}
+
+/**
  * The `@keyframes` rule of the registered `name`, written as `context` says: steps given as a function are
  * resolved against the theme that `readTheme` gives, which is read only then.
  */

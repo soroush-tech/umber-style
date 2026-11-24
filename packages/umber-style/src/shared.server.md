@@ -21,7 +21,7 @@ types must say so: no `ThemeContext`, no `ThemeScope`, no `useThemeClass`, no `C
 flowchart TD
   common["sharedCommon.ts: names of every platform"] --> server["shared.server.ts"]
   server --> readTheme["adds readTheme(): the base theme, else an empty object"]
-  server --> create["createStyle, createDefaultStyle typed as SharedServerStyle"]
+  server --> create["createStyle, createDefaultStyle typed as SharedServerStyle, taking MotionOptions as shared.ts does"]
   cond["export condition: react-server"] --> server
   cond2["any other condition"] --> shared["shared.ts: adds the context, the portal helpers, CacheProvider, useMediaQuery"]
 ```

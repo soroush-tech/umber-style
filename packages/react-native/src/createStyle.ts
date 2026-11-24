@@ -3,6 +3,7 @@ import { createNativeThemeKey, type NativeCondition } from './conditions'
 import {
   createLazyRecord,
   createSchemeKey,
+  EMPTY_THEME,
   globalStyles,
   isThemedSheet,
   keyframes,
@@ -22,7 +23,7 @@ import type { NativeObjectSheet, NativeSheetStyles, NativeStyleObject } from './
 import { DEFAULT_LENGTH_KEYS, toNativeTheme, type NativeTheme } from './nativeTheme'
 import { createStyled } from './styled'
 import { platformStyleSheet } from './platform'
-import { collectKeys, toNativeStyle, type StyleKeys } from './toNativeStyle'
+import { collectKeys, toNativeStyle, type NativeSettings, type StyleKeys } from './toNativeStyle'
 import { DEFAULT_REM_BASE } from './units'
 import { readMediaKey, readWindowState, useMediaKey } from './windowState'
 import { warnAboutIgnoredOptions } from './warnStyle'
@@ -62,11 +63,20 @@ const NO_KEYS: StyleKeys = { isConditional: false, hasScheme: false, queries: []
 /** The name of the sheet entry `key` in the development warnings. */
 const toEntryName = (key: string) => `sheet entry "${key}"`
 
+/** What turning a sheet entry into a native style needs: the base of `rem` and the motion of the styling. */
+type SheetSettings = Omit<NativeSettings, 'name'>
+
+/** The settings of the sheet entry `key`: `base` with the name the development warnings give it. */
+const toEntrySettings = (base: SheetSettings, key: string): NativeSettings => ({
+  ...base,
+  name: toEntryName(key),
+})
+
 /** Registers `source` with the platform StyleSheet, without the keys that only the web has; a `rem` length is `remBase` times its number. */
-function register<S extends NativeSheetStyles>(source: S, remBase: number): RegisteredSheet<S> {
+function register<S extends NativeSheetStyles>(source: S, base: SheetSettings): RegisteredSheet<S> {
   const pairs = Object.entries(source).map(([key, style]) => [
     key,
-    toNativeStyle(style, undefined, { remBase, name: toEntryName(key) }),
+    toNativeStyle(style, undefined, toEntrySettings(base, key)),
   ])
   const entries = platformStyleSheet.create(Object.fromEntries(pairs)) as {
     [K in keyof S]: NativeStyleObject
@@ -90,7 +100,7 @@ function register<S extends NativeSheetStyles>(source: S, remBase: number): Regi
 function readWindowEntries<S extends NativeSheetStyles>(
   sheet: RegisteredSheet<S>,
   key: string,
-  remBase: number
+  base: SheetSettings
 ): { [K in keyof S]: NativeStyleObject } {
   const { entries, keys, queries, source } = sheet
   const windowKey = key.slice(0, queries.length)
@@ -100,7 +110,7 @@ function readWindowEntries<S extends NativeSheetStyles>(
     const state = readWindowState()
     const pairs = Object.entries(source).flatMap(([name, style]) =>
       keys[name].queries.length > 0 && !keys[name].isConditional
-        ? [[name, toNativeStyle(style, undefined, { remBase, name: toEntryName(name) }, state)]]
+        ? [[name, toNativeStyle(style, undefined, toEntrySettings(base, name), state)]]
         : []
     )
     found = { ...entries, ...platformStyleSheet.create(Object.fromEntries(pairs)) }
@@ -118,17 +128,17 @@ function resolveEntries<S extends NativeSheetStyles>(
   sheet: RegisteredSheet<S>,
   condition: NativeCondition | undefined,
   key: string,
-  remBase: number
+  base: SheetSettings
 ): { [K in keyof S]: NativeStyleObject } {
   const { isConditional, keys, queries, source } = sheet
   const hasQueries = queries.length > 0
-  const entries = hasQueries ? readWindowEntries(sheet, key, remBase) : sheet.entries
+  const entries = hasQueries ? readWindowEntries(sheet, key, base) : sheet.entries
   if (!isConditional) return entries
   const state = hasQueries ? readWindowState() : undefined
   const pairs = Object.entries(source).map(([name, style]) => [
     name,
     keys[name].isConditional
-      ? toNativeStyle(style, condition, { remBase, name: toEntryName(name) }, state)
+      ? toNativeStyle(style, condition, toEntrySettings(base, name), state)
       : entries[name],
   ])
   return Object.fromEntries(pairs) as { [K in keyof S]: NativeStyleObject }
@@ -139,12 +149,12 @@ function resolveEntries<S extends NativeSheetStyles>(
  * template read as CSS text, each turned into a native style as a sheet entry is, merged in order with
  * the last key winning. Throws a `TypeError` for a function and for anything else that is not a style.
  */
-function mergeNativeStyles(args: readonly unknown[], remBase: number): NativeStyleObject {
+function mergeNativeStyles(args: readonly unknown[], base: SheetSettings): NativeStyleObject {
   const template = readStaticTemplate(args, 'css')
   if (!template) rejectFunctions(args, 'css')
   const styles = template ? [template] : args.flat(Infinity).filter(Boolean)
   // The development warnings name `css()`.
-  const settings = { remBase, name: 'css()' }
+  const settings = { ...base, name: 'css()' }
   const merged: NativeStyleObject = {}
   for (const style of styles) {
     if (typeof style !== 'object') {
@@ -172,15 +182,19 @@ function useThemeClass(): string | undefined {
 
 /**
  * Makes the React Native styling over a holder of the base theme; the theme context is made here unless
- * given. Of `options`, `remBase` and `lengthKeys` are used: a theme is converted under `lengthKeys`.
+ * given. Of `options`, `remBase`, `lengthKeys` and `animated` are used: a theme is converted under
+ * `lengthKeys`, and with `animated` the animation and transition keys run (see `Motion`).
  */
 export function bindHolder<T extends object>(
   holder: ThemeHolder<T>,
   context?: Context<NativeTheme<T> | undefined>,
   options: StyleOptions<T> = {}
 ): NativeStyle<T> {
-  const { remBase = DEFAULT_REM_BASE, lengthKeys = DEFAULT_LENGTH_KEYS } = options
+  const { remBase = DEFAULT_REM_BASE, lengthKeys = DEFAULT_LENGTH_KEYS, animated } = options
   warnAboutIgnoredOptions(options)
+  // Steps that are a function of the theme are resolved against the base theme as it was given.
+  const motion = animated?.bind({ remBase, readTheme: () => holder.baseTheme ?? EMPTY_THEME })
+  const base: SheetSettings = { remBase, motion }
   const { ThemeContext, ThemeValueProvider, useTheme, useCondition } = createThemeValue(
     holder,
     (theme: T) => toNativeTheme(theme, lengthKeys, remBase),
@@ -206,7 +220,7 @@ export function bindHolder<T extends object>(
       // Registered with the platform when the first key is read, once. There is no theme and no condition.
       let registered: RegisteredSheet<NativeSheetStyles> | undefined
       return createLazyRecord(Object.keys(styles), (key) => {
-        registered ??= register(styles as NativeSheetStyles, remBase)
+        registered ??= register(styles as NativeSheetStyles, base)
         return registered.entries[key]
       })
     }
@@ -214,7 +228,7 @@ export function bindHolder<T extends object>(
     const prepare = (current: NativeTheme<T>) => {
       let sheet = byTheme.get(current)
       if (!sheet) {
-        sheet = register(styles(current), remBase)
+        sheet = register(styles(current), base)
         byTheme.set(current, sheet)
       }
       return sheet
@@ -223,12 +237,7 @@ export function bindHolder<T extends object>(
       prepare,
       resolve(current: NativeTheme<T>, condition?: NativeCondition) {
         const sheet = prepare(current)
-        return resolveEntries(
-          sheet,
-          condition,
-          readMediaKey(sheet.queries, false, remBase),
-          remBase
-        )
+        return resolveEntries(sheet, condition, readMediaKey(sheet.queries, false, remBase), base)
       },
     }
   }
@@ -243,15 +252,15 @@ export function bindHolder<T extends object>(
       : undefined
     const shouldWatchScheme = !!prepared?.hasScheme && condition.colorScheme === undefined
     const key = useMediaKey(prepared?.queries ?? NO_QUERIES, shouldWatchScheme, remBase)
-    return prepared === undefined ? sheet : resolveEntries(prepared, condition, key, remBase)
+    return prepared === undefined ? sheet : resolveEntries(prepared, condition, key, base)
   }) as NativeStyle<T>['useStyle']
 
   return {
-    styled: createStyled(useTheme, useCondition, remBase),
+    styled: createStyled(useTheme, useCondition, remBase, motion),
     StyleSheet: { ...platformStyleSheet, create },
     useStyle,
     apply: (...entries) => ({ style: entries.filter((entry) => !!entry) as NativeStyleObject[] }),
-    css: ((...args: unknown[]) => mergeNativeStyles(args, remBase)) as NativeStyle<T>['css'],
+    css: ((...args: unknown[]) => mergeNativeStyles(args, base)) as NativeStyle<T>['css'],
     ThemeProvider,
     ThemeScope,
     ThemeContext,
@@ -268,8 +277,8 @@ export function bindHolder<T extends object>(
 
 /**
  * Makes the styling of one theme shape for React Native, apart from the default one. The options are
- * those of the web, so that one call runs on both platforms, with `remBase` added; of them only
- * `remBase` and `lengthKeys` are used.
+ * those of the web, so that one call runs on both platforms, with `remBase` and `animated` added; of them
+ * only `remBase`, `lengthKeys` and `animated` are used.
  */
 export function createStyle<T extends object>(
   theme: T,

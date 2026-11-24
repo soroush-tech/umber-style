@@ -4,7 +4,7 @@
 
 The public entry of `@umber-style/core`. It re-exports the engine from the files of `src/`: the cache, the
 engine factory, the style and token types, the helpers (`alpha`, `calc`, `at`, `hash`, `mergeDeep`, lazy
-records), the state keys (`state`, `readState`, `STATE_SELECTORS`), the page extraction (and the escaped `nonce` attribute of a tag), `keyframes`, `globalStyles`, the
+records), the state keys (`state`, `readState`, `STATE_SELECTORS`), the page extraction (and the escaped `nonce` attribute of a tag), `keyframes` (and `readKeyframesSteps`, the steps of a name), `globalStyles`, the
 values of `useStyleValue` (`liveValue.ts`), the theme functions and the template readers.
 It holds no logic of its own.
 
@@ -19,7 +19,7 @@ that internal helpers stay private.
 ```mermaid
 flowchart LR
   whole["export * from alpha, at, cache, calc, createEngine, extractStyles, findMissingStyles, hash, lazyRecord, mergeDeep, scope, state, styleTypes, tagShorthands, themeInput, tokens, types, webStyle"]
-  named["named exports: findCache, css helpers, isDevelopment, globalStyles, keyframes, liveValue, serialize helpers, sheetEntry helpers, readSharedState, theme functions, template readers, createGlobalMarker"]
+  named["named exports: findCache, css helpers, isDevelopment, globalStyles, keyframes, readKeyframesSteps, liveValue, serialize helpers, sheetEntry helpers, readSharedState, theme functions, template readers, createGlobalMarker"]
   types["type-only: RegisteredSyntax, umberCache types"]
   whole --> entry["index.ts"]
   named --> entry

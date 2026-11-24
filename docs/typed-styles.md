@@ -152,7 +152,7 @@ keyframes({ middle: { opacity: 0 } })
 globalStyles({ body: { backgroudColor: 'red' } })
 ```
 
-In the shared types of `umber-style/react` an `animation` key is not in the shared part of a style, because React Native has none: put it in `web`.
+In the shared types of `umber-style/react` the `animation*` and `transition*` keys are in the shared part of a style: React Native runs them with its animated entry, and drops them, with a development warning, without it (see [Animations](react-native.md#animations)).
 
 ### Keys built at run time
 

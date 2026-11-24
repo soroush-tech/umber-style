@@ -52,6 +52,7 @@ Each local file sits next to what it measures, in `packages/<package>/bench/`, a
 | `vue`          | `render-trees.bench.ts`         | The tree of 500 and nested providers, server-rendered with Vue                                                                                                                                                                  |
 | `react-native` | `styles-elements.bench.ts`      | The same 48-element cases and the tree, resolved against a stand-in for the platform module                                                                                                                                     |
 | `react-native` | `styles-sheets.bench.ts`        | A function sheet resolved for a new theme and for the same one, and an entry of an object sheet                                                                                                                                 |
+| `react-native` | `animations.bench.ts`           | 48 views with no animation and with a skeleton animation, without and with the animated entry (over a stand-in of the animation library), and a function style that animates; see [Animations](react-native.md#animations)      |
 
 The inputs the files share (the small and the large theme, the styles, the 48 prop combinations) and the helper that lets a binding's file load built code are in `bench/src/`, a workspace package that is not under `packages/`, so the package matrix of the continuous integration does not see it. The files import them by relative path.
 
@@ -121,7 +122,7 @@ export const fixtures = createFixtures(
 )
 ```
 
-`prepareBuiltPackages` sets `NODE_ENV` to `production`, and registers a resolve hook (`module.registerHooks`) that sends `@umber-style/core` to the built core, sends any other specifier it is given to a file (React Native: `react-native` to the stand-in in `packages/react-native/bench/platform.ts`), and adds export conditions (the server components files: `react-server`). A static `import` of React would be resolved before the hook exists, which is why everything after it is loaded with `createRequire`, and why the files use `createElement` and no JSX.
+`prepareBuiltPackages` sets `NODE_ENV` to `production`, and registers a resolve hook (`module.registerHooks`) that sends `@umber-style/core` to the built core, sends any other specifier it is given to a file (React Native: `react-native` to the stand-in in `packages/react-native/bench/platform.ts`, and `react-native-reanimated` to the one in `packages/react-native/bench/reanimated.ts`), and adds export conditions (the server components files: `react-server`). A static `import` of React would be resolved before the hook exists, which is why everything after it is loaded with `createRequire`, and why the files use `createElement` and no JSX.
 
 A file that renders into a DOM makes a document of jsdom first and puts it on `globalThis` before React or Vue loads, because both read `document` as they start: `packages/react/bench/dom.ts`, `packages/vue/bench/dom.ts` and `packages/core/bench/dom.ts`.
 

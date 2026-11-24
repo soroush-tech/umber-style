@@ -19,6 +19,44 @@ type ValueOf<S, K extends PropertyKey> = S extends unknown
  */
 export type NativeStyleObject = {
   [K in KeyOf<ComponentStyle>]?: ValueOf<ComponentStyle, K>
+} & NativeMotionStyle
+
+/**
+ * The animation and transition keys of a native style, written as the web writes them (a time as `'1.5s'`,
+ * `'300ms'` or a number of milliseconds). They run with the `animated` option of `createStyle` and
+ * `configure`; without it they are dropped, with a development warning.
+ */
+export type NativeMotionStyle = {
+  /** The shorthand of the `animation*` keys: `${name} 1.5s ease-in-out infinite`. */
+  animation?: string
+  /** A name that `keyframes` returned, `none`, or a comma list of them. */
+  animationName?: string
+  /** How long one cycle takes. */
+  animationDuration?: string | number
+  /** A named easing, `cubic-bezier(...)` or `steps(...)`. */
+  animationTimingFunction?: string
+  /** How long before the animation starts. */
+  animationDelay?: string | number
+  /** A number of cycles, or `infinite`. */
+  animationIterationCount?: string | number
+  /** `normal`, `reverse`, `alternate` or `alternate-reverse`. */
+  animationDirection?: string
+  /** `none`, `forwards`, `backwards` or `both`. */
+  animationFillMode?: string
+  /** `running` or `paused`. */
+  animationPlayState?: string
+  /** The shorthand of the `transition*` keys: `opacity 200ms ease-out`. */
+  transition?: string
+  /** The properties that transition, in CSS form or as the platform names them: `background-color` or `backgroundColor`, `all`, `none`. */
+  transitionProperty?: string
+  /** How long a transition takes. */
+  transitionDuration?: string | number
+  /** A named easing, `cubic-bezier(...)` or `steps(...)`. */
+  transitionTimingFunction?: string
+  /** How long before a transition starts. */
+  transitionDelay?: string | number
+  /** `normal` or `allow-discrete`. */
+  transitionBehavior?: string
 }
 
 /** A set of named native styles. */

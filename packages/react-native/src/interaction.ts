@@ -2,8 +2,11 @@ import { useState } from 'react'
 import type { StateName } from '@umber-style/core'
 import type { InteractionState } from './conditions'
 
-/** The states that a component learns from its own events and keeps: hover and focus. */
-export type HeldName = Extract<StateName, 'hovered' | 'focused'>
+/**
+ * The states that a component learns from its own events and keeps: hover and focus, and the press of a
+ * component that animates (its `style` must stay a list the animation library reads, not a function).
+ */
+export type HeldName = Extract<StateName, 'hovered' | 'focused' | 'pressed'>
 
 /** The hover and focus that a component keeps, and how its handlers change them. */
 export interface HeldStates {
@@ -20,6 +23,7 @@ const STATE_PROPS: ReadonlySet<string> = new Set(['pressed', 'hovered', 'focused
 const HELD_EVENTS: Readonly<Record<HeldName, readonly [string, string]>> = {
   hovered: ['onHoverIn', 'onHoverOut'],
   focused: ['onFocus', 'onBlur'],
+  pressed: ['onPressIn', 'onPressOut'],
 }
 
 const NO_STATES: InteractionState = {}
@@ -29,8 +33,8 @@ export function isStateProp(name: string): boolean {
   return STATE_PROPS.has(name)
 }
 
-/** Whether `name` is a state that a component learns from its events and keeps. */
-export function isHeldName(name: StateName): name is HeldName {
+/** Whether `name` is a state that every component that names it learns from its events and keeps: hover and focus. */
+export function isHeldName(name: StateName): name is Exclude<HeldName, 'pressed'> {
   return name === 'hovered' || name === 'focused'
 }
 
@@ -50,7 +54,7 @@ export function readInteraction(
       props['aria-disabled'] === true ||
       accessibilityState?.disabled === true ||
       props.editable === false,
-    pressed: props.pressed === true,
+    pressed: props.pressed === true || held?.pressed === true,
     hovered: props.hovered === true || held?.hovered === true,
     focused: props.focused === true || held?.focused === true,
   }

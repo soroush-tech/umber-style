@@ -41,7 +41,7 @@ export function createDefaultStyle() {
     return bound
   }
 
-  /** Gives the default style a base theme and its options (`remBase`, `lengthKeys`). Throws once the default style was used. */
+  /** Gives the default style a base theme and its options (`remBase`, `lengthKeys`, `animated`). Throws once the default style was used. */
   function configure(options: DefaultStyleOptions): void {
     if (bound) throw new Error('configure must be called before the default style is used.')
     holder.baseTheme = options.theme

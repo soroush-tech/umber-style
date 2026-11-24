@@ -2,7 +2,8 @@
 
 ## What it does
 
-Makes the process run built code with `react-native` sent to `platform.ts`, then loads React,
+Makes the process run built code with `react-native` sent to `platform.ts` and `react-native-reanimated`
+sent to `reanimated.ts` (for the animated entry, `animations.bench.ts`), then loads React,
 `react-dom/server` and the built binding (`dist/index.cjs`). It exports the small `theme`, `createSetup()`
 (a fresh style object and the components `Fixed`, `Themed`, `Flex`, `Cell` and a sheet over it),
 `createFortyEight(setup, kind)`, `createTree(setup)` and `prepare(children)`.
@@ -19,7 +20,7 @@ points at source; `prepareBuiltPackages` fixes those, and everything that reads 
 
 ```mermaid
 flowchart TD
-  prep["prepareBuiltPackages: production, core to dist, react-native to platform.ts"] --> load["load react, react-dom/server, dist/index.cjs"]
+  prep["prepareBuiltPackages: production, core to dist, react-native to platform.ts, react-native-reanimated to reanimated.ts"] --> load["load react, react-dom/server, dist/index.cjs"]
   load --> cs["createSetup: createStyle(theme), four styled components, a sheet"]
   cs --> kind{"kind given to createFortyEight"}
   kind -->|fixed| a["Fixed"]

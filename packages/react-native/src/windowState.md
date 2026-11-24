@@ -3,8 +3,9 @@
 ## What it does
 
 Reads the window and the system settings, and lets components subscribe to their changes. It gives
-`readWindowState()`, `subscribeToWindow(listener)`, `readMediaKey(queries, hasScheme, remBase)`, the hook
-`useMediaKey` (the same key in a component) and `useMediaMatch` (the engine of `useMediaQuery`).
+`readWindowState()`, `readReducedMotion()`, `subscribeToWindow(listener)`, `readMediaKey(queries, hasScheme,
+remBase, hasMotion?)`, the hook `useMediaKey` (the same key in a component) and `useMediaMatch` (the engine
+of `useMediaQuery`).
 
 ## Why it exists
 
@@ -32,24 +33,31 @@ flowchart TD
   st --> loop["for each query: 1 if it matches, else 0"]
   loop --> sch{"hasScheme?"}
   sch -->|"yes"| add["append colon and the system scheme"]
-  sch -->|"no"| out["key string"]
-  add --> out
-  hook["useMediaKey"] --> need{"queries or scheme?"}
+  sch -->|"no"| motionQ{"hasMotion?"}
+  add --> motionQ
+  motionQ -->|"yes"| addMotion["append a bar and reduce or motion"]
+  motionQ -->|"no"| out["key string"]
+  addMotion --> out
+  hook["useMediaKey"] --> need{"queries, scheme or motion?"}
   need -->|"no"| none["subscribe to nothing, key is empty"]
   need -->|"yes"| uses["useSyncExternalStore with subscribeToWindow"]
 ```
 
 ## The data
 
-The key is one character for each query (`'1'` or `'0'`), then `:` and the system scheme when `hasScheme`:
-`'101'`, or `'10:dark'`. Module state: `isReducedMotion` (false until the platform answers), a `Set` of
+The key is one character for each query (`'1'` or `'0'`), then `:` and the system scheme when `hasScheme`,
+then `|reduce` or `|motion` when `hasMotion` (a component that animates): `'101'`, `'10:dark'`, or
+`'|motion'`. Module state: `isReducedMotion` (false until the platform answers), a `Set` of
 listeners, and the list of platform subscriptions.
 
 ## What it guarantees
 
 - The platform is listened to once for all subscribers, and the listeners are removed when the last one goes.
 - Two renders with the same key resolve the same style.
-- A component with no queries and no scheme subscribes to nothing and makes no key reader.
+- A component with no queries, no scheme and no motion subscribes to nothing and makes no key reader.
+- `hasMotion` defaults to false, so every key made before the animated entry is the same text.
+- A component that animates subscribes, and renders again when reduced motion changes; `useMediaKey` is the
+  same hook whatever it watches, so the hooks of a component do not change when what it watches does.
 - Reduced motion is `false` until the platform answers (the comment says this is the platform's default),
   and stays what it was when the platform's answer fails: no rejection is left unhandled.
 - `useMediaMatch` of a query with a `problem` warns (development) and subscribes to nothing; its server
