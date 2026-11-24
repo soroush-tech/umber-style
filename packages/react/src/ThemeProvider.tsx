@@ -36,6 +36,11 @@ export interface ThemeProviderParts<T> {
   engine: Engine<T>
   /** The contexts that the provider gives its theme and its view to. */
   contexts: ThemeContexts<T>
+  /**
+   * Whether the style sends style elements outside any cache provider: then a provider there has a place
+   * for them in front of its content, on a server and in the browser, where it stays empty.
+   */
+  hasServerStyleElements: boolean
   /** Read at each render: the parts of a render that sends style elements, or undefined where the build inserts into its sheet (the browser). */
   getServerStyle(): ServerStyleParts | undefined
 }
@@ -57,7 +62,9 @@ export interface ThemeProviderParts<T> {
  * - With `isRoot` it renders no element and makes no rule: the app puts `themeClass(theme)` on an ancestor
  *   of its own, usually `<html>`.
  *
- * On a server, where the build renders style elements, it sends those of its rules, and the stamp.
+ * On a server, where the build renders style elements, it sends those of its rules, and the stamp, in
+ * one place in front of its content. The browser renders that place empty, so that both render the same
+ * tree: React's `useId` reads its shape.
  *
  * Whether a provider is above is read from the marks that both builds write (`ProviderScope`), by the
  * prefix of the engine's cache: a provider of the server build above makes this one nested too. Its theme
@@ -72,6 +79,7 @@ export interface ThemeProviderParts<T> {
 export function createThemeProvider<T extends object>({
   engine: baseEngine,
   contexts: { ThemeContext, ViewContext },
+  hasServerStyleElements,
   getServerStyle,
 }: ThemeProviderParts<T>) {
   return function ThemeProvider({
@@ -133,17 +141,18 @@ export function createThemeProvider<T extends object>({
     )
     const element = wrapper ? createElement(as, { className: wrapper.className }, content) : content
     // Under a cache provider the app sends the rules of its cache itself.
-    const server = cache === undefined ? getServerStyle() : undefined
-    if (server === undefined) return element
+    if (cache !== undefined || !hasServerStyleElements) return element
+    const server = getServerStyle()
+    if (server === undefined) return createElement(Fragment, null, null, element)
     // The rules that this provider stands for: its wrapper's classes, its root theme, or for `isRoot` the
     // theme classes that the app already made for its theme.
     const styled = wrapper?.className ?? rootId ?? engine.findThemeIds(given).join(' ')
-    return createElement(
+    const sent = createElement(
       Fragment,
       null,
       server.createStamp(),
-      ...server.createStyleElements(styled),
-      element
+      ...server.createStyleElements(styled)
     )
+    return createElement(Fragment, null, sent, element)
   }
 }

@@ -6,8 +6,8 @@ Build: both (no hook, no context; the server guard lists it).
 
 `prepareStyled(engine, tag, options, styles)` does what both `styled` builds share. It makes the engine's
 `Styler` for a component, and returns `{ styler, resolve, statics }`. `resolve(props, theme, canHold, cache)`
-gives `{ element, forwarded, className, hold }` for one render: the element to render, the props that reach
-it, the class, and the hold of a class made from the `style` prop.
+gives `{ element, forwarded, className, isHeld, hold }` for one render: the element to render, the props that
+reach it, the class, whether the `style` prop holds a plain object, and the hold of the class made from it.
 
 ## Why it exists
 
@@ -31,7 +31,8 @@ flowchart TD
   own -->|no| main["the styler"]
   other --> cls["class from props and style prop entries"]
   main --> cls
-  cls --> hold{"canHold and props.style?"}
+  cls --> plain["isHeld: a plain object among the values of style"]
+  plain --> hold{"canHold and isHeld?"}
   hold -->|yes| held["getHeldClass: className + hold"]
   hold -->|no| get["getClassName"]
   held --> filter["element, filter, forward props"]
@@ -55,6 +56,11 @@ flowchart TD
   `style` attribute is ever rendered.
 - `target` classes of wrapped components and of this one are joined and added after the engine's classes.
 - `forwarded.className` is `undefined` when empty.
+- `isHeld` depends on the props only, so a server and the browser agree on it: `styled.ts` renders a place
+  after the element on both sides when it is true (the browser's `Hold`, `null` on a server). A plain object
+  is an object that is not a sheet entry, the same test as `getHeldClass` of the core.
+- `isStyledComponent` is exported for `styled.ts`, which reads the `_tag` of a styled element below an
+  element to know whether a component is below it.
 
 ## Decisions
 

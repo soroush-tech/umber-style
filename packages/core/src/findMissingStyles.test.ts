@@ -1,5 +1,8 @@
 import { findMissingStyles } from './findMissingStyles'
 
+/** What an escape stands for when its code point is not a character. */
+const REPLACEMENT = String.fromCodePoint(0xfffd)
+
 afterEach(() => {
   document.head.innerHTML = ''
   document.body.innerHTML = ''
@@ -180,5 +183,84 @@ describe('findMissingStyles', () => {
     document.head.appendChild(element)
     document.body.innerHTML = '<p class="u-a"></p>'
     expect(findMissingStyles().map((problem) => problem.name)).toEqual(['u-a'])
+  })
+})
+
+describe('the names that findMissingStyles reads', () => {
+  it('reads a class with the label of a component, upper-case letters too, in a selector and on the page', () => {
+    addStyle(
+      '.u-View-flex-140d3sc{display:flex;}' +
+        '.u-View-flex-Sidebar-1r44ujx.u-View-flex-Sidebar-1r44ujx a{color:red;}' +
+        '.u-Pressable-1lfbiv:disabled,.u-Pressable-1lfbiv[aria-disabled="true"]{opacity:0.5;}'
+    )
+    document.body.innerHTML =
+      '<div class="u-View-flex-140d3sc"><nav class="u-View-flex-Sidebar-1r44ujx"></nav>' +
+      '<div class="u-Pressable-1lfbiv"></div></div>'
+    expect(findMissingStyles()).toEqual([])
+  })
+
+  it('still finds a labelled class that no rule names, also one that a named class starts with', () => {
+    addStyle('.u-View-ab{display:flex;}.u-Text-é1{color:red;}')
+    document.body.innerHTML = '<p class="u-View-ab u-View-a u-Text-é1 u-Text-é"></p>'
+    expect(findMissingStyles().map((problem) => problem.name)).toEqual(['u-View-a', 'u-Text-é'])
+  })
+
+  it('reads the classes of selectors with combinators, pseudo-classes and escaped characters', () => {
+    addStyle(
+      String.raw`.u-A>.u-B~.u-C+.u-D .u-E:not(.u-F)::before{color:red;}` +
+        String.raw`.u-G[data-x="1"],.u-Été:hover{color:red;}` +
+        String.raw`.u-H\:md,.u-\49 cons,.u-\00004Aump,.u-\0 x{color:red;}`
+    )
+    const classes = ['u-A', 'u-B', 'u-C', 'u-D', 'u-E', 'u-F', 'u-G', 'u-Été']
+    const escaped = ['u-H:md', 'u-Icons', 'u-Jump', `u-${REPLACEMENT}x`]
+    document.body.innerHTML = [...classes, ...escaped]
+      .map((name) => `<i data-testid="${name}"></i>`)
+      .join('')
+    for (const name of [...classes, ...escaped]) {
+      document.querySelector(`[data-testid="${name}"]`)?.classList.add(name)
+    }
+    expect(findMissingStyles()).toEqual([])
+  })
+
+  it('reads the escapes that a browser keeps in the text of a rule, which jsdom reads itself', () => {
+    // A style rule as a browser gives it: the checker tells a style rule by the name of its class.
+    class CSSStyleRule {
+      constructor(
+        readonly selectorText: string,
+        readonly cssText: string
+      ) {}
+    }
+    // The last one ends with a backslash, which stands for nothing.
+    const selector =
+      String.raw`.u-H\:md,.u-\49 cons,.u-\00004Aump,.u-\0 x,.u-\110000y,.u-\d800 s,.u-\1f600 ,.u-z` +
+      '\\'
+    const element = document.createElement('style')
+    element.setAttribute('data-style', 'u')
+    document.head.appendChild(element)
+    const rules = [
+      new CSSStyleRule(selector, `${selector}{color:red;}`),
+      new CSSStyleRule(String.raw`.u-H\:md`, String.raw`.u-H\:md{color:var(--u-b\:c);}`),
+    ]
+    Object.defineProperty(element, 'sheet', { value: { cssRules: rules } })
+    const names = [
+      'u-H:md',
+      'u-Icons',
+      'u-Jump',
+      `u-${REPLACEMENT}x`,
+      `u-${REPLACEMENT}y`,
+      `u-${REPLACEMENT}s`,
+    ]
+    names.push('u-\u{1F600}', 'u-z')
+    document.body.innerHTML = '<p></p>'
+    document.querySelector('p')?.classList.add(...names)
+    expect(findMissingStyles().map((problem) => problem.name)).toEqual(['--u-b:c'])
+  })
+
+  it('reads a variable with upper-case letters, and one with an escaped character', () => {
+    addStyle(
+      String.raw`.u-a{color:var(--u-Brand-x);margin:var(--u-b\:c);padding:var(--u-Brand-x, 1px);}`
+    )
+    document.body.innerHTML = '<p class="u-a"></p>'
+    expect(findMissingStyles().map((problem) => problem.name)).toEqual(['--u-Brand-x', '--u-b:c'])
   })
 })

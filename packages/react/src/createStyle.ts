@@ -14,6 +14,7 @@ import {
   type SheetStyles,
   type WebStyleObject,
 } from '@umber-style/core'
+import type { ReactElement } from 'react'
 import { useProvidedCache } from './CacheProvider'
 import { createGlobal } from './Global'
 import { readPrefixStyle } from './ProviderScope'
@@ -30,6 +31,13 @@ import type { ServerStyleOptions, SheetDefinition, StyleOptions, WebStyle } from
 import { createUseStyleValue } from './useStyleValue'
 
 export type { StyleOptions } from './types'
+
+/**
+ * The place of the style elements of a styled element in the browser, the same list for every element
+ * and render: React only reads a list it is given, and keeps the fragment it made for this one without
+ * rendering it again (its props are the same object).
+ */
+const NO_STYLE_ELEMENTS: readonly ReactElement[] = Object.freeze([])
 
 /** A sheet on the web: it makes its class names on first use. */
 interface WebSheet<S extends SheetStyles> extends SheetDefinition<S, SheetEntry> {
@@ -54,8 +62,12 @@ export function bindEngine<T extends object>(
   // Where there is no document (a server render), the style of a class is sent as style elements; not
   // under a cache provider (`cache`), whose rules the app sends itself.
   const hasStyleElements = () => hasServerStyleElements && typeof document === 'undefined'
-  const renderStyleElements = (className: string, cache?: Cache) =>
-    cache === undefined && hasStyleElements() ? createStyleElements(engine.cache, className) : []
+  // Where they are sent, an element has a place for them in the browser too, an empty list there, so that
+  // both render the same tree; undefined where it has none.
+  const renderStyleElements = (className: string, cache?: Cache) => {
+    if (cache !== undefined || !hasServerStyleElements) return undefined
+    return hasStyleElements() ? createStyleElements(engine.cache, className) : NO_STYLE_ELEMENTS
+  }
 
   const themeClass = (partial: DeepPartial<T>, colorScheme?: ColorScheme) =>
     engine.themeClass(partial, colorScheme)
@@ -96,10 +108,11 @@ export function bindEngine<T extends object>(
     ThemeProvider: createThemeProvider({
       engine,
       contexts,
+      hasServerStyleElements,
       getServerStyle: () =>
         hasStyleElements()
           ? {
-              createStyleElements: renderStyleElements,
+              createStyleElements: (className) => createStyleElements(engine.cache, className),
               createStamp: () => createStampElement(engine.cache),
             }
           : undefined,

@@ -4,7 +4,8 @@ Build: client (`'use client'`).
 
 ## What it does
 
-`createThemeProvider({ engine, contexts, getServerStyle })` makes the web `ThemeProvider` of the client
+`createThemeProvider({ engine, contexts, hasServerStyleElements, getServerStyle })` makes the web
+`ThemeProvider` of the client
 build. It merges the theme it is given over the theme above, gives the merged theme and its view to the
 contexts, and either declares the theme on `:root` (outermost), renders a wrapper with theme classes
 (nested), or renders nothing of its own (`isRoot`).
@@ -34,15 +35,18 @@ flowchart TD
   nested --> classes["own theme class, class of the nested themes merged (when not the own one), scope class, className"]
   merged --> contexts["Marks, Theme, View context providers"]
   classes --> contexts
-  contexts --> server{"getServerStyle() and no CacheProvider?"}
-  server -->|no| out["element"]
-  server -->|yes| styled["Fragment: stamp, style elements of the classes, element"]
+  contexts --> place{"no CacheProvider, and hasServerStyleElements?"}
+  place -->|no| out["element"]
+  place -->|yes| server{"getServerStyle()?"}
+  server -->|undefined: the browser| empty["Fragment: null, element"]
+  server -->|parts: a server| styled["Fragment: one Fragment of the stamp and the style elements, element"]
 ```
 
 ## The data
 
-- `ThemeProviderParts<T>`: the engine, its contexts, and `getServerStyle()`, which is `undefined` in the
-  browser and `{ createStyleElements, createStamp }` for a server render of the client build.
+- `ThemeProviderParts<T>`: the engine, its contexts, `hasServerStyleElements` (the option of the style),
+  and `getServerStyle()`, which is `undefined` in the browser and `{ createStyleElements, createStamp }` for
+  a server render of the client build.
 - A wrapper is `{ as, className }`; the mark below is `{ scope: wrapper ?? above?.scope ?? null, nested }`.
 - `nested` is the themes of the nested providers from the one below the outermost provider down to this
   one, merged: undefined under the outermost provider, the theme given for a nested provider directly under
@@ -60,6 +64,10 @@ flowchart TD
 - Under a `CacheProvider` it uses the engine over that cache, sends no style element, and is outermost when
   no provider of that cache is above.
 - A provider of the server build above counts: the marks are the same.
+- A server and the browser render the same tree: outside a cache provider, with `hasServerStyleElements`,
+  the stamp and the style elements are one place in front of the content, which the browser renders as
+  `null`. React's `useId` makes an id from the place of a component in the tree, and the whole app is under
+  the outermost provider (`useIdHydration.test.tsx`). The HTML is the same as before the place was added.
 
 ## Decisions
 
