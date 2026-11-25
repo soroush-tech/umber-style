@@ -24,6 +24,10 @@ inputs:
     description: The registry setup-node writes into .npmrc - the release workflow passes npm's; every other job leaves it empty.
     required: false
     default: ''
+  react:
+    description: A React 19 minor (`19.0`) or version (`19.0.9`) to pin across the workspace before the install (scripts/use-react.mjs), in this checkout only - ci.yml's React axis passes it; every other job leaves it empty and installs the lockfile's React.
+    required: false
+    default: ''
 
 runs:
   using: composite
@@ -39,17 +43,35 @@ runs:
         cache: ${{ inputs.manager }}
         registry-url: ${{ inputs.registry_url }}
 
-    # Both inputs reach the shell through env and a fixed dispatch, never spliced into
+    # A root `pnpm.overrides` for react and react-dom, written into this checkout only and never
+    # committed. Node is set up by now, so the script runs on the repository's Node.
+    - name: Pin React
+      if: inputs.react != ''
+      shell: bash
+      env:
+        REACT: ${{ inputs.react }}
+      run: node scripts/use-react.mjs "$REACT"
+
+    # The inputs reach the shell through env and a fixed dispatch, never spliced into
     # the run body - zizmor: template-injection. `$COMMAND` is deliberately unquoted: it
     # is a flag list ("install --frozen-lockfile --ignore-scripts"), not a single word.
+    # With React pinned the lockfile no longer matches, so that install may update it.
     - name: Install dependencies
       shell: bash
       env:
         CI: true
         MANAGER: ${{ inputs.manager }}
         COMMAND: ${{ inputs.command }}
+        REACT: ${{ inputs.react }}
       run: |
+        if [ -n "$REACT" ]; then COMMAND="${COMMAND/--frozen-lockfile/--no-frozen-lockfile}"; fi
         case "$MANAGER" in
           pnpm|yarn|npm) "$MANAGER" $COMMAND ;;
           *) echo "Unsupported package manager: $MANAGER" >&2; exit 1 ;;
         esac
+
+    # Every workspace member that resolves react or react-dom has the pinned version.
+    - name: Check the installed React
+      if: inputs.react != ''
+      shell: bash
+      run: node scripts/use-react.mjs --check

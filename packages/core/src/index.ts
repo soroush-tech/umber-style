@@ -26,6 +26,7 @@ export {
 export * from './hash'
 export {
   keyframes,
+  readKeyframesSteps,
   type KeyframesInput,
   type KeyframesOptions,
   type KeyframesStep,

@@ -445,11 +445,11 @@ Setting `isFramed.value = false` removes the `border-top` rule after the next ti
 
 ## React Native
 
-React Native has no style sheet to write to and no CSS animation, so the names exist only for one source to compile and run on both platforms:
+React Native has no style sheet to write to and no CSS animation. Animations run there through react-native-reanimated, from the animated entry of the binding, which an app turns on with `createStyle(theme, { animated })` or `configure({ animated })`: see [Animations on React Native](react-native.md#animations).
 
-- `keyframes` returns the name, the same as on the web for the same steps, and registers nothing that is ever written.
+- `keyframes` returns the name, the same as on the web for the same steps. With the entry, the steps of the name are given to the library; without it, the name is all there is.
 - `globalStyles` returns a handle, and `Global` renders nothing and does nothing.
-- The `animation*` and `transition*` keys of a style are dropped, in the shared style and in its `native` part.
+- The `animation*` and `transition*` keys of a style run with the entry, in the shared style and in its `native` part; without it they are dropped, with a development warning.
 
 From the repository's test of one source on both platforms (`sharedAnimation.test.tsx`):
 
@@ -471,7 +471,7 @@ function createSource({
 }
 ```
 
-On the web the skeleton animates and `body` gets its rule. On React Native the component's style is `[{ opacity: 1 }]` and `Global` renders nothing. Put the animation in the `web` part of a shared style: an `animation` key in the shared part is not in the shared types.
+On the web the skeleton animates and `body` gets its rule. On React Native without the animated entry the component's style is `[{ opacity: 1 }]` and `Global` renders nothing. The animation keys are in the shared types: written in the shared part, as in the same test file's `createAnimatedSource`, the animation runs on the web as CSS and on React Native through the entry, which gives the component the steps of the name and the longhands of the shorthand (`animationDuration: 1500`, `animationIterationCount: 'infinite'`, ...).
 
 ## Limits
 
@@ -497,6 +497,6 @@ On the web the skeleton animates and `body` gets its rule. On React Native the c
 - Two caches of one prefix in one document read the same page; `findCache` gives the first, and a `Global` of a server component is released through it.
 - There is no development warning for an animation name that has the engine's form and is not registered: the engine's names cannot be told from ordinary names such as `fade-in`. `insertKeyframes` with an unknown name throws.
 - The types check the keys of a step (a misspelt property and a nested style are errors) and the style under a selector of global styles, but not a step key: `keyframes({ middle: { ... } })` compiles and throws when it runs.
-- React Native runs no animation yet: `keyframes` there is a name only, and `animation*` and `transition*` keys are dropped.
+- React Native runs an animation only with the animated entry. It was seen on an iPhone (a pulsing animation, a transition on a pressed state, and reduced motion stopping both), not on an Android device: see the limits of [React Native](react-native.md#limits). Without the entry, `keyframes` there is a name only, and `animation*` and `transition*` keys are dropped.
 - Rules that came from a server page and that the browser cannot match to the text it read (a style element whose rules the browser did not all keep) cannot be deleted: when their `Global` unmounts they stay.
 - A running animation was checked in Chromium only (`keyframes.browser.test.ts` and the fixture apps end to end); other browsers were not run.

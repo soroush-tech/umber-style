@@ -37,7 +37,16 @@ Pin every `uses:` by the action's origin, as the files do:
 
 - **`prepare` detects once** and the other jobs read `needs.prepare.outputs.*`: the Node version
   from `.nvmrc` (never hard-coded), the package manager and its install command, the package
-  matrix, the Playwright version (for the browser cache key), and the fixture matrix.
+  matrix, the Playwright version (for the browser cache key), the fixture matrix, and the React
+  axis (`react`, `react_newest`).
+- **The React axis**: `REACT_MINORS` in the `env` of `prepare` lists the React 19 minors, oldest
+  first (`19.0` to `19.3`); it is the one place to add a minor. `packages`, `build`, `browser`, `e2e`
+  and `e2e-dev` have one row for each, named with it (`packages (core, react 19.0)`); the package
+  and fixture matrices are crossed with it in `prepare`, the written-out ones take it as an axis.
+  Each of those jobs gives `react: ${{ matrix.react }}` to the setup action, which pins the newest
+  patch of the minor (`scripts/use-react.mjs`, a root `pnpm.overrides` in the checkout only), installs
+  with `--no-frozen-lockfile`, and checks the installed copies. `lint` and `bench` run the lockfile's
+  React. The rows of `next-app` say in their names that they run the React of Next.js.
 - **The package matrix is discovered from `packages/`**: one row per folder with a `package.json`,
   with `dir`, `filter` (the package name) and `flag` (the folder name). Adding a package needs no
   edit to `ci.yml`. The same holds for `e2e`: one row per folder of `fixtures/` except `shared`.
@@ -45,11 +54,13 @@ Pin every `uses:` by the action's origin, as the files do:
   (the packages with a `test:browser` script), and `e2e-dev` lists `vike-ssg`, `next-app` and
   `spa` (the fixtures with a `devPort` in `e2e/fixtures.ts`). A new package with browser tests or
   a new fixture with a development server is added there by hand.
-- **`lint`** runs `format:check`, `lint`, `typecheck`, `gen:publish-options --check`,
-  `check:typography` and `check:release-notes`, once for the whole workspace.
-- **`packages`** runs `test:coverage` for one package and uploads its lcov. **`build`** runs
-  `pnpm build` and `scripts/smoke-packed.mjs` (the packed tarballs, installed from outside the
-  workspace). **`browser`**, **`e2e`** and **`e2e-dev`** restore the Playwright binaries from the
+- **`lint`** runs `format:check`, `lint`, `typecheck`, `test:scripts` (Node's test runner on
+  `scripts/*.test.mjs`, at 100%), `gen:publish-options --check`, `check:typography` and
+  `check:release-notes`, once for the whole workspace.
+- **`packages`** runs one package's tests on one React: `test:coverage` and the lcov upload on the
+  newest minor, `test` on the others. **`build`** runs `pnpm typecheck` and `pnpm build` on each React,
+  and `scripts/smoke-packed.mjs` (the packed tarballs, installed from outside the workspace) on the
+  newest only, because its consumer installs React from npm whatever is pinned. **`browser`**, **`e2e`** and **`e2e-dev`** restore the Playwright binaries from the
   cache, install Chromium on a miss and its system libraries on a hit (three attempts of three
   minutes), and run `test:browser`, `test:e2e` or `test:e2e:dev`.
 - **Every job that installs uses `./.github/actions/setup`**, the composite action that holds
@@ -61,7 +72,8 @@ Pin every `uses:` by the action's origin, as the files do:
   packages build with tsdown, which needs none.
 - **Checkouts use `persist-credentials: false`**. A dispatch input or an action input reaches a
   `run:` script through `env:`, never spliced into it (`cd-packages.yml`, the setup action).
-- **`ci-ok`** is the one required check: `if: always()`, it fails when a needed job failed or was
+- **`ci-ok`** is the one required check (the matrix jobs' names carry their row, so none of them is
+  required by name): `if: always()`, it fails when a needed job failed or was
   cancelled. **Add every new job to its `needs`.**
 - Every job sets `timeout-minutes` and its `permissions`; matrices use `fail-fast: false`. CI
   cancels a superseded run; CD never does (`cancel-in-progress: false`).
@@ -97,6 +109,7 @@ to the end. CI never runs it.
 
 ## Coverage to Codecov
 
+- Only the rows on the newest React (`react_newest`) upload, so a flag gets one report per run.
 - Each `packages` row rewrites `SF:` in `packages/<dir>/coverage/lcov.info` to start with
   `packages/<dir>/` (a lone `src/index.ts` is ambiguous across the monorepo), then uploads it with
   `flags` and `name` set to the folder name and `slug: soroush-tech/umber-style`.

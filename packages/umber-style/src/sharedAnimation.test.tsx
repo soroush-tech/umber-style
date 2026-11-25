@@ -4,7 +4,8 @@ import { createApp, h } from 'vue'
 import { createCache, createMemorySheet } from './index'
 import { createStyle as createWebStyle } from './react'
 import { createStyle as createNativeStyle } from './react-native'
-import type { SharedStyle, SharedStyleObject } from './shared'
+import { animated } from './react-native-animated'
+import type { createStyle as createSharedStyle, SharedStyle, SharedStyleObject } from './shared'
 import { createStyle as createVueStyle } from './vue'
 
 const theme = { palette: { text: '#111111' } }
@@ -89,5 +90,73 @@ describe('one source with keyframes and Global', () => {
     )
     expect(container.innerHTML).toBe('<view></view>')
     expect(calls[0].style).toEqual([{ opacity: 1 }])
+  })
+})
+
+/** The one source of an animated component: the animation in the shared part, run by CSS on the web and by the animated entry on React Native. */
+function createAnimatedSource({ keyframes }: Pick<SharedStyle<AppTheme>, 'keyframes'>) {
+  const pulse = keyframes(
+    { '0%, 100%': { opacity: 1 }, '50%': { opacity: 0.4 } },
+    { label: 'pulse' }
+  )
+  const skeleton: SharedStyleObject = {
+    opacity: 1,
+    animation: `${pulse} 1.5s ease-in-out infinite`,
+  }
+  return { pulse, skeleton }
+}
+
+describe('one source with an animation in the shared part', () => {
+  it('runs on the web as CSS: the rule of the animation and the class that names it', () => {
+    const { sheet, cache } = createMemoryCache('a')
+    const web = createWebStyle(theme, { prefix: 'a', cache })
+    const { pulse, skeleton } = createAnimatedSource(web)
+    const Skeleton = web.styled('div')(skeleton)
+    const { container } = render(<Skeleton />)
+    expectRules(sheet.rules, [
+      `@keyframes ${pulse}{0%{opacity:1;}50%{opacity:0.4;}100%{opacity:1;}}`,
+      `.${container.firstElementChild?.className}{opacity:1;animation:${pulse} 1.5s ease-in-out infinite;}`,
+    ])
+  })
+
+  it('runs on React Native through the animated entry: the steps of the name, and the longhands', () => {
+    const native = createNativeStyle(theme, { animated })
+    const { skeleton } = createAnimatedSource(native)
+    const calls: Record<string, unknown>[] = []
+    const View = (props: Record<string, unknown>) => {
+      calls.push(props)
+      return createElement('view')
+    }
+    const Skeleton = native.styled(View)(skeleton as never)
+    render(<Skeleton />)
+    expect(calls[0].style).toEqual([
+      {
+        opacity: 1,
+        animationName: expect.objectContaining({
+          cssRules: { '0%': { opacity: 1 }, '100%': { opacity: 1 }, '50%': { opacity: 0.4 } },
+        }),
+        animationDuration: 1500,
+        animationTimingFunction: 'ease-in-out',
+        animationDelay: 0,
+        animationIterationCount: 'infinite',
+        animationDirection: 'normal',
+        animationFillMode: 'none',
+        animationPlayState: 'running',
+      },
+    ])
+  })
+})
+
+describe('the option of one style module for both platforms', () => {
+  it('is typed on the shared createStyle, and the web accepts it and ignores it', () => {
+    // On the web an app gives `undefined` (a platform file of its own picks the entry on React Native only).
+    const options: Parameters<typeof createSharedStyle>[1] = { prefix: 'o', animated: undefined }
+    const native: Parameters<typeof createSharedStyle>[1] = { animated }
+    const { sheet, cache } = createMemoryCache('o')
+    const web = createWebStyle(theme, { ...options, cache } as Parameters<typeof createWebStyle>[1])
+    const Box = web.styled('div')({ opacity: 1 })
+    const { container } = render(<Box />)
+    expect(sheet.rules).toEqual([`.${container.firstElementChild?.className}{opacity:1;}`])
+    expect(native.animated).toBe(animated)
   })
 })

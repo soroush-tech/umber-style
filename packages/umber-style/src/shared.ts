@@ -11,7 +11,7 @@ import type {
   Theme,
   ThemeScopeProps,
 } from '@umber-style/react'
-import type { SharedStyleBase } from './sharedCommon'
+import type { MotionOptions, SharedStyleBase } from './sharedCommon'
 
 export * from './sharedCommon'
 export type { CacheProviderProps, ThemeScopeProps }
@@ -42,9 +42,9 @@ export declare function useMediaQuery(query: string, options?: MediaQueryOptions
 /** Makes the styling of one theme shape, apart from the default one, on either platform. */
 export declare function createStyle<T extends object>(
   theme: T,
-  options?: StyleOptions<T>
+  options?: StyleOptions<T> & MotionOptions
 ): SharedStyle<T>
 /** Makes one default style, with `configure` for its options and base theme before first use. */
 export declare function createDefaultStyle(): SharedStyle<Theme> & {
-  configure: (options: DefaultStyleOptions) => void
+  configure: (options: DefaultStyleOptions & MotionOptions) => void
 }

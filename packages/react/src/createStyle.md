@@ -25,11 +25,14 @@ flowchart TD
   shared -->|no| prefix["readSharedContexts: contexts of the cache prefix, holder = engine"]
   shared -->|yes| value["createThemeValue(engine, contexts)"]
   prefix --> value
-  value --> hasEls{"no document and hasServerStyleElements?"}
-  hasEls -->|yes| els["style elements for classes, outside a CacheProvider"]
-  hasEls -->|no| none["none"]
+  value --> hasEls{"hasServerStyleElements, outside a CacheProvider?"}
+  hasEls -->|no| none["undefined: no place for style elements"]
+  hasEls -->|yes| doc{"no document?"}
+  doc -->|yes| els["the style elements of the class"]
+  doc -->|no| empty["the browser: an empty list, one for every element and render"]
   value --> use["useStyle: provided cache, view, resolve themed sheet, adoptSheet under a cache"]
   els --> parts["createStyled, createThemeProvider, createGlobal"]
+  empty --> parts
   none --> parts
   use --> parts
   parts --> out["WebStyle object"]
@@ -48,10 +51,18 @@ flowchart TD
 - Under a `CacheProvider` the entries of `useStyle` are adopted into that cache; `apply` makes its class in the
   cache of the entries (`findEntryCache`), else the engine's.
 - Style elements are rendered only where there is no document, outside a cache provider, and when
-  `hasServerStyleElements` is not false.
+  `hasServerStyleElements` is not false. Where they are, the browser gives `styled` an empty list in their
+  place (`NO_STYLE_ELEMENTS`, frozen, the same object for every element and render), and `ThemeProvider`
+  reads `hasServerStyleElements` to render a place, so that both sides render the same tree for React's
+  `useId`.
 - `createStyle` sets the theme only when the engine has none (`engine.givenTheme === undefined`).
 
 ## Decisions
+
+- The browser's empty list is one constant, not a new `[]` for each render: React reads a list it is given
+  and never writes to it (`reconcileChildrenArray` in `react-dom`), and the fragment it makes for the list
+  is skipped when its props are the same object as before, so a render of a styled element allocates
+  nothing for its place.
 
 - A server render of the client build can send style elements, so the first HTML is styled whichever build
   rendered a component; the option turns it off for set-ups that extract the CSS into one element (comment

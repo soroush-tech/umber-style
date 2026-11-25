@@ -7,15 +7,22 @@ import {
   isStateProp,
   readInteraction,
   useHeldStates,
+  type HeldName,
   type HeldStates,
 } from './interaction'
 import type { NativeStyleInput, NativeStyleObject } from './nativeStyle'
 import { platformPressable, platformStyleSheet } from './platform'
 import type { WindowState } from './mediaQuery'
-import { collectKeys, toNativeStyle, type NativeSettings, type StyleKeys } from './toNativeStyle'
-import type { Styled, StyledOptions } from './types'
-import { warnAboutUnheldState } from './warnStyle'
-import { readWindowState, useMediaKey } from './windowState'
+import {
+  collectKeys,
+  hasMotion,
+  toNativeStyle,
+  type NativeSettings,
+  type StyleKeys,
+} from './toNativeStyle'
+import type { Motion, Styled, StyledOptions } from './types'
+import { warnAboutLateMotion, warnAboutUnheldState } from './warnStyle'
+import { readReducedMotion, readWindowState, useMediaKey } from './windowState'
 
 type StyleResult = Record<string, never> | null | undefined | false
 type StyleFunction = (props: Record<string, unknown>) => StyleResult
@@ -46,6 +53,11 @@ function readComponentName(component: Exclude<ElementType, string>): string | un
   return displayName || name || undefined
 }
 
+/** Whether the style `style` has an animation or transition key, where `motion` runs them. */
+function isMovingStyle(style: unknown, motion: Motion | undefined): boolean {
+  return motion !== undefined && typeof style === 'object' && !!style && hasMotion(style as never)
+}
+
 /** `lists` joined, each item once, in order. */
 function joinItems<T>(lists: readonly (readonly T[])[]): T[] {
   return [...new Set(lists.flat())]
@@ -66,18 +78,31 @@ function joinItems<T>(lists: readonly (readonly T[])[]): T[] {
  * `Pressable` that names `pressed` gets `style` as a function of its `{ pressed }`, so that it renders
  * again on a press; `disabled` follows the props; `hovered` and `focused` are kept from the component's
  * events when its object styles name them, and follow the props of those names otherwise.
+ *
+ * With `motion` (the `animated` option), a component whose styles have an animation or transition key
+ * renders the animated form of its component that `motion` makes, and its styles keep those keys,
+ * translated. Whether it animates is known from its object styles when it is made, or from a function
+ * style the first time one returns such a key; from then on the component stays animated. A component
+ * that animates renders again when the system's reduced motion changes, and is given `motion.reduce` of
+ * its styles while it is on; one whose object styles name `pressed` keeps the press as state, so that
+ * its `style` stays a list the library reads.
  */
 export function createStyled<T>(
   useTheme: () => T,
   useCondition: () => NativeCondition,
-  remBase: number
+  remBase: number,
+  motion?: Motion
 ): Styled<T> {
   const styled = (tag: ElementType, options: StyledOptions = {}) => {
     if (typeof tag === 'string') {
       throw new TypeError(`styled needs a component on React Native, not the tag "${tag}".`)
     }
     const { shouldForwardProp: shouldForward } = options
-    const settings: NativeSettings = { remBase, name: options.name ?? readComponentName(tag) }
+    const settings: NativeSettings = {
+      remBase,
+      name: options.name ?? readComponentName(tag),
+      motion,
+    }
 
     /** Whether the prop `name` reaches the element; with `hasStates` the props that tell a state are the binding's unless `shouldForwardProp` asks for them. */
     const isForwarded = (name: string, hasStates: boolean): boolean => {
@@ -101,7 +126,13 @@ export function createStyled<T>(
       const hasScheme = keys.some((found) => found.hasScheme)
       // The states of the object styles; hover and focus among them are kept from the component's events.
       const states = joinItems(keys.map((found) => found.states))
-      const heldNames = states.filter(isHeldName)
+      // Whether the object styles animate: then the component renders the animated form of its component.
+      const isAnimated = styles.some((style) => isMovingStyle(style, motion))
+      // A component that animates keeps its press too, so that its style is a list and not a function.
+      const heldNames: HeldName[] = states.filter(isHeldName)
+      if (isAnimated && states.includes('pressed')) heldNames.push('pressed')
+      // Whether it renders the animated form: from the start, or from the first function style that animates.
+      let isWrapped = isAnimated
 
       /** The object styles of `kind`, resolved for `state` and registered with the platform. */
       const register = (kind: Kind, state?: WindowState): Record<string, NativeStyleObject> => {
@@ -193,11 +224,17 @@ export function createStyled<T>(
           }
         })
 
+      /** `list` as the component is given it: for reduced motion when it animates and the system asks for less. */
+      const finishList = (list: unknown[]) =>
+        isWrapped && readReducedMotion()
+          ? list.map((entry) => (motion as Motion).reduce(entry as NativeStyleObject))
+          : list
+
       /**
        * The `style` of a component whose styles name `used`: for a `Pressable` that names `pressed` (or
-       * is given a function `style`), a function of what it reports, so that it renders again on a
-       * press; else the list for what the props and `held` say. A `style` prop that is a function is
-       * called with the same `{ pressed }`, and its result comes last.
+       * is given a function `style`) and does not animate, a function of what it reports, so that it
+       * renders again on a press; else the list for what the props and `held` say. A `style` prop that is
+       * a function is called with the same `{ pressed }`, and its result comes last.
        */
       const createStateStyle = (
         props: Record<string, unknown>,
@@ -208,12 +245,17 @@ export function createStyled<T>(
         const base = readInteraction(props, held?.states)
         const own = props.style
         const build = (interaction: InteractionState, press: PressState) =>
-          [...styleOf(interaction), typeof own === 'function' ? (own as OwnStyle)(press) : own]
-            .flat(Infinity)
-            .filter(Boolean)
+          finishList(
+            [...styleOf(interaction), typeof own === 'function' ? (own as OwnStyle)(press) : own]
+              .flat(Infinity)
+              .filter(Boolean)
+          )
         const component = (props.as as ElementType | undefined) ?? tag
+        // The animated component reads a list: an animated Pressable is told its press by `held`.
         const isPressDriven =
-          component === platformPressable && (used.includes('pressed') || typeof own === 'function')
+          !isWrapped &&
+          component === platformPressable &&
+          (used.includes('pressed') || typeof own === 'function')
         if (!isPressDriven) return build(base, { pressed: base.pressed === true })
         return ({ pressed }: PressState) =>
           build({ ...base, pressed: pressed || base.pressed === true }, { pressed })
@@ -235,11 +277,12 @@ export function createStyled<T>(
         for (const [name, value] of Object.entries(props)) {
           if (isForwarded(name, hasStates)) forwarded[name] = value
         }
-        const component = (props.as as ElementType | undefined) ?? tag
+        const own = (props.as as ElementType | undefined) ?? tag
+        const component = isWrapped ? (motion as Motion).wrap(own) : own
         if (!hasStates) {
-          forwarded.style = [...resolve(key, condition, results, state), props.style]
-            .flat(Infinity)
-            .filter(Boolean)
+          forwarded.style = finishList(
+            [...resolve(key, condition, results, state), props.style].flat(Infinity).filter(Boolean)
+          )
           return createElement(component, forwarded)
         }
         for (const name of used) {
@@ -255,10 +298,11 @@ export function createStyled<T>(
 
       const StaticStyled = (props: Record<string, unknown>) => render(props)
       const WindowStyled = (props: Record<string, unknown>) =>
-        render(props, useMediaKey(queries, false, remBase))
+        render(props, useMediaKey(queries, false, remBase, isAnimated))
       const useConditionalElement = (props: Record<string, unknown>, held?: HeldStates) => {
         const condition = useCondition()
-        const key = useMediaKey(queries, hasScheme && condition.colorScheme === undefined, remBase)
+        const shouldWatchScheme = hasScheme && condition.colorScheme === undefined
+        const key = useMediaKey(queries, shouldWatchScheme, remBase, isAnimated)
         return render(props, key, condition, undefined, readStateFor(queries), undefined, held)
       }
       const useDynamicElement = (props: Record<string, unknown>, held?: HeldStates) => {
@@ -267,17 +311,24 @@ export function createStyled<T>(
         // The queries of the function styles are known once they ran; they come after the others.
         const results: StyleResult[] = []
         let found: StyleKeys | undefined
+        let isMoving = isAnimated
         for (let index = 0; index < styles.length; index++) {
           const style = styles[index]
           if (typeof style !== 'function') continue
           const result = (style as StyleFunction)({ ...props, theme })
           results[index] = result
           if (result) found = collectKeys(result, found)
+          isMoving ||= isMovingStyle(result, motion)
+        }
+        if (isMoving && !isWrapped) {
+          isWrapped = true
+          warnAboutLateMotion(settings.name)
         }
         const all = found === undefined ? queries : joinItems([queries, found.queries])
         const shouldWatchScheme =
           (hasScheme || !!found?.hasScheme) && condition.colorScheme === undefined
-        const key = useMediaKey(all, shouldWatchScheme, remBase)
+        // The same hook in every render: what it watches follows what the styles of this render name.
+        const key = useMediaKey(all, shouldWatchScheme, remBase, isMoving)
         return render(props, key, condition, results, readStateFor(all), found, held)
       }
       const ConditionalStyled = (props: Record<string, unknown>) => useConditionalElement(props)
@@ -291,7 +342,7 @@ export function createStyled<T>(
       }
       if (hasFunction) return DynamicStyled
       if (kinds.includes('conditional')) return ConditionalStyled
-      return queries.length > 0 ? WindowStyled : StaticStyled
+      return queries.length > 0 || isAnimated ? WindowStyled : StaticStyled
     }
   }
   return styled as unknown as Styled<T>

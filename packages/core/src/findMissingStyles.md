@@ -43,6 +43,33 @@ The rules are read from `style[data-style]`, `style[data-precedence]` (the ones 
 variables it uses without a fallback (`var(--prefix-x)`) and whether its selector is a state (`:hover`,
 `:focus`, `:active`, `:focus-visible`, `:focus-within`). Rules for states are never checked.
 
+### How a name is read
+
+The classes that a rule names, and the variables that it uses, are read from the text of the rule
+(`selectorText`, `cssText`), from the dot (or `var(`) to the first unit that a name of CSS cannot hold. A
+class of the engine is `<prefix>-<label>-<hash><suffix>`, and the label carries the names of components as
+they were given (`View`, `Sidebar-Item`), so upper-case letters are common; a label can hold any letter past
+ASCII too. The engine writes the name as it is, never escaped, but a browser escapes a character in the
+text of a rule that a name cannot hold as it is (`.a\:b`), and a rule written by hand can have escapes too.
+So the reader takes every unit that a name can hold, and reads each escape to the character it stands for,
+the form that `classList` holds.
+
+```mermaid
+flowchart TD
+  at["the unit at end"] --> slash{"a backslash?"}
+  slash -->|yes| hex{"hex digits after it?"}
+  hex -->|"1 to 6"| code["their code point, and one white space after them; 0, half of a pair or past U+10FFFF is U+FFFD"]
+  hex -->|none| next["the next unit as it is; past the end, nothing"]
+  code --> add["add the character"]
+  next --> add
+  slash -->|no| name{"a letter of either case, a digit, -, _, or past ASCII?"}
+  name -->|yes| add
+  name -->|no| stop["the name ends"]
+  add --> at
+```
+
+Each unit is tested with comparisons of its code, never with a regular expression.
+
 ## The data
 
 ```
@@ -60,6 +87,9 @@ variables it uses without a fallback (`var(--prefix-x)`) and whether its selecto
   by `instanceof`.
 - A selector the browser cannot parse matches nothing and does not throw.
 - A variable with a value from an ancestor is not a problem; only the computed value counts.
+- A class with upper-case letters, letters past ASCII, or escapes in the text of its rule is read whole,
+  so it is found when a rule names it and reported when none does (`findMissingStyles.test.ts`, and
+  `page.browser.test.ts` for the escapes that Chromium keeps in `selectorText`; jsdom reads them itself).
 - It reads, and never writes, the page.
 
 ## Decisions
@@ -73,3 +103,7 @@ variables it uses without a fallback (`var(--prefix-x)`) and whether its selecto
 
 - It reads the stylesheet through `element.sheet`; a style element with no sheet is ignored.
 - It cannot see a rule that the page never inserted for an element it does not hold in the DOM yet.
+- A name is found by looking for `.<prefix>-` in the text of a selector: a prefix that the browser writes
+  with an escape is not found, and a dot inside a string of an attribute selector is read as a class.
+- A rule that uses one variable twice gives the problem twice; they have the same `key`, so a warner shows
+  it once.

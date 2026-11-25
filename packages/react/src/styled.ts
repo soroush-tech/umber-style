@@ -1,13 +1,14 @@
 import {
   createElement,
-  Fragment,
+  isValidElement,
   useInsertionEffect,
   type ElementType,
   type ReactElement,
+  type ReactNode,
 } from 'react'
 import { readStyleArguments, withTagShorthands, type Cache, type Engine } from '@umber-style/core'
 import { useProvidedCache } from './CacheProvider'
-import { prepareStyled } from './styledParts'
+import { isStyledComponent, prepareStyled } from './styledParts'
 import type { Styled, StyledOptions } from './types'
 
 interface HoldProps {
@@ -26,31 +27,71 @@ function Hold({ hold }: HoldProps): null {
 }
 
 /**
+ * Whether `node`, rendered below an element, can hold a component, the only thing that calls `useId`. It
+ * holds none when it is text, nothing, a list of those, or an element of a tag, or of a styled component of
+ * a tag (with no component in `as`), whose children hold none: a styled component calls no `useId` itself.
+ * Anything else (another component, a fragment, a portal, a promise) is taken to hold one.
+ */
+function hasComponent(node: unknown): boolean {
+  if (typeof node !== 'object' || node === null) return false
+  if (Array.isArray(node)) return node.some(hasComponent)
+  if (!isValidElement<{ as?: unknown; children?: unknown }>(node)) return true
+  const { type, props } = node
+  const tag = isStyledComponent(type) ? type._tag : type
+  if (typeof tag !== 'string' || (props.as !== undefined && typeof props.as !== 'string'))
+    return true
+  return hasComponent(props.children)
+}
+
+/** What `resolve` of `styledParts.ts` gives for one render. */
+interface Resolved {
+  element: ElementType
+  forwarded: Record<string, unknown>
+  className: string
+  isHeld: boolean
+  hold?: () => () => void
+}
+
+/**
  * Makes `styled` over an engine. A component with a function style reads the theme of the nearest
  * provider through `useThemeView`; one with only object styles reads no context, until a `CacheProvider`
  * has rendered: from then on each component reads the cache of the nearest one, and makes its class with
  * the engine over that cache. `createStyleElements` gives the style elements of a class where the build
- * sends them (a server render outside any cache provider), and none in the browser.
+ * sends them (a server render outside any cache provider), an empty list made once in the browser, and
+ * undefined where an element has no place for them (under a cache provider, or where the style sends none).
  * In the browser, an element given a plain object in `style` holds the class that object made (`Hold`,
- * rendered after it only then), so that the class is removed when no element uses it.
+ * rendered after it), so that the class is removed when no element uses it.
+ *
+ * A server and the browser give the same ids of `useId`, which reads the shape of the tree: the list of the
+ * style elements and the place of the `Hold` are there on both sides, empty where they have nothing to do.
+ * An element of a tag with no component below it, which has no id below it, drops an empty list.
  */
 export function createStyled<T>(
   engine: Engine<T>,
   useThemeView: (cache?: Cache) => T,
-  createStyleElements: (className: string, cache?: Cache) => ReactElement[]
+  createStyleElements: (className: string, cache?: Cache) => readonly ReactElement[] | undefined
 ): Styled<T> {
-  /** The element, with the style elements of its class in front of it where there are any, and its `Hold` after it where it holds a class. */
+  /**
+   * The element, with the list of the style elements of its class in front of it where it has a place for
+   * them, and the place of its `Hold` after it where `style` holds a plain object.
+   */
   const render = (
-    element: ElementType,
-    forwarded: Record<string, unknown>,
-    className: string,
-    hold: (() => () => void) | undefined,
+    { element, forwarded, className, isHeld, hold }: Resolved,
     cache: Cache | undefined
-  ) => {
+  ): ReactNode => {
+    // React asks for a key in a list it is given. The same one with no list around the element, so that
+    // React keeps the element when the list comes and goes (its `Hold`, or its place).
+    forwarded.key = 'element'
     const rendered = createElement(element, forwarded)
-    if (hold) return createElement(Fragment, null, rendered, createElement(Hold, { hold }))
-    const styles = createStyleElements(className, cache)
-    return styles.length === 0 ? rendered : createElement(Fragment, null, ...styles, rendered)
+    let styles = createStyleElements(className, cache)
+    // An empty place matters only to a component below the element: a tag with none below it goes alone.
+    if (styles?.length === 0 && typeof element === 'string' && !hasComponent(forwarded.children)) {
+      styles = undefined
+    }
+    if (!isHeld) return styles === undefined ? rendered : [styles, rendered]
+    // A place for the `Hold`, empty where there is nothing to hold: on a server, or for a class that stays.
+    const after = hold === undefined ? null : createElement(Hold, { key: 'hold', hold })
+    return styles === undefined ? [rendered, after] : [styles, rendered, after]
   }
   // Only the browser has a lifecycle that can let a class go; a server render keeps every class.
   const canHold = () => typeof document !== 'undefined'
@@ -64,15 +105,13 @@ export function createStyled<T>(
 
       const StaticStyled = (props: Record<string, unknown>) => {
         const cache = useProvidedCache()
-        const { element, forwarded, className, hold } = resolve(props, undefined, canHold(), cache)
-        return render(element, forwarded, className, hold, cache)
+        return render(resolve(props, undefined, canHold(), cache), cache)
       }
 
       const DynamicStyled = (props: Record<string, unknown>) => {
         const cache = useProvidedCache()
         const view = useThemeView(cache)
-        const { element, forwarded, className, hold } = resolve(props, view, canHold(), cache)
-        return render(element, forwarded, className, hold, cache)
+        return render(resolve(props, view, canHold(), cache), cache)
       }
 
       return Object.assign(styler.isDynamic ? DynamicStyled : StaticStyled, statics)

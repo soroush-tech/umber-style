@@ -1,6 +1,6 @@
 {
   "name": "@umber-style/styled",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "UmberStyle's styled as a default export: the styled of the React binding, with its server build for server components.",
   "keywords": [
     "styling",
@@ -58,7 +58,7 @@
     "@umber-style/react": "workspace:^"
   },
   "peerDependencies": {
-    "react": "^19.2.8"
+    "react": "^19.0.0"
   },
   "devDependencies": {
     "@testing-library/react": "^16.3.3",

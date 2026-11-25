@@ -74,7 +74,7 @@ release of theirs; under 1.0.0 a new minor of a dependency needs a release of ea
 ### Packaging
 
 - Depends on `@umber-style/core`, which is not bundled, so every package shares one engine.
-- Peer dependency: `react` `^19.2.8`.
+- Peer dependency: `react` `^19.0.0`.
 ```
 
 Match the tone of the files already there (`packages/*/release-notes/0.1.0.md`): plain sentences

@@ -2,7 +2,7 @@
 
 After this page you can use the React Native binding: styled native components, sheets, the real theme values, and the parts of the API that work differently because there are no classes.
 
-`@umber-style/react-native` needs `react` `^19.2.8` and `react-native` `>=0.76.0`. It has the same names as the React binding, over the real theme values. React Native has no CSS, so there are no variables, no classes, no cascade layers and no style element: a style is an object of the platform's own keys, and a theme value in a style function is the value itself.
+`@umber-style/react-native` needs `react` `^19.0.0` and `react-native` `>=0.76.0`; its animated entry needs react-native-reanimated 4.7 or 4.8, which need React Native 0.86 to 0.88 and 0.87 to 0.89 (see [Animations](#animations)). It has the same names as the React binding, over the real theme values. React Native has no CSS, so there are no variables, no classes, no cascade layers and no style element: a style is an object of the platform's own keys, and a theme value in a style function is the value itself.
 
 ## An example
 
@@ -79,8 +79,8 @@ The components receive these `style` props:
 | `when`, `whenScheme`             | Matched at render against the nearest provider: see [Theme conditions](theme-conditions.md)                                                                                                                                                                                                                                                                                                        |
 | `state`                          | Matched at render against what the component is doing: see [Interaction states](#interaction-states)                                                                                                                                                                                                                                                                                               |
 | `useTheme()`                     | The real theme values, merged over the providers above, with the lengths as numbers. With no provider, the base theme, or an empty object when there is none: a style function then gets an empty theme                                                                                                                                                                                            |
-| `createStyle` options            | Accepted so that one call runs on both platforms. `remBase` and `lengthKeys` are used (see [Values with CSS units](#values-with-css-units)); the others are not, and in development one warning names each of them that was given                                                                                                                                                                  |
-| `configure`                      | `theme`, `remBase` and `lengthKeys` are used. Throws after first use, as on the web                                                                                                                                                                                                                                                                                                                |
+| `createStyle` options            | Accepted so that one call runs on both platforms. `remBase` and `lengthKeys` are used (see [Values with CSS units](#values-with-css-units)), and `animated` (see [Animations](#animations)); the others are not, and in development one warning names each of them that was given                                                                                                                  |
+| `configure`                      | `theme`, `remBase`, `lengthKeys` and `animated` are used. Throws after first use, as on the web                                                                                                                                                                                                                                                                                                    |
 | Engine                           | There is none: no `getEngine`, `engine` or `cache`                                                                                                                                                                                                                                                                                                                                                 |
 
 The base theme is the one you give with `configure({ theme })` or `createStyle(theme)`; a provider never sets it, so a tree with no provider above has that theme, or an empty object, also after a provider unmounted. A merge keeps the helper functions of a raw key (`breakpoints.up`), as on the web. The names of the web that have no meaning here (`ThemeScope`, `useThemeClass`) exist so that one source with a nested provider and portal or modal content compiles for both: see [Themes](themes.md).
@@ -331,11 +331,183 @@ Where the styles name a state, `pressed`, `hovered` and `focused` are the bindin
 
 Measured with `pnpm bench react-native states --rounds 3` in the soroush-bench Docker sandbox (the median of three rounds): read the ratios, not the times, and an allocation under about 1 KB as noise. A pressable with state keys costs about 1.3 times one without on a render: its state parts are resolved once for each combination of the theme, the color scheme of the provider, the matching queries and the states, and the same object is given again after (resolved on each render, as they were first written, it was 2.5 times); a press looks up the style resolved for its states (441 ns), where a hand-written function over registered entries only picks one. The binding's cost against no binding at all (the third row) is that of `styled` itself, with or without state keys.
 
+## Animations
+
+The `animation*` and `transition*` keys of a style run on React Native through react-native-reanimated, from an entry of their own: `@umber-style/react-native/animated` (`umber-style/react-native/animated`). Without that entry they are dropped, as they always were, with a development warning, and the app loads nothing of it.
+
+### Installing the library
+
+```sh
+npx expo install react-native-reanimated react-native-worklets   # in an Expo app
+npm install react-native-reanimated@~4.8.0 react-native-worklets@~0.14.0   # elsewhere (or ~4.7.0 and ~0.13.0)
+```
+
+The library and its worklets runtime are optional peer dependencies of `@umber-style/react-native`: `react-native-reanimated` `~4.7.0 || ~4.8.0` and `react-native-worklets` `~0.13.0 || ~0.14.0`. Each release of the library goes with one minor of the runtime and three minors of React Native, from its own `package.json`:
+
+| react-native-reanimated | react-native-worklets  | React Native |
+| ----------------------- | ---------------------- | ------------ |
+| 4.7.x (4.7.1 tested)    | 0.13.x (0.13.0 tested) | 0.86 to 0.88 |
+| 4.8.x (4.8.0 tested)    | 0.14.x (0.14.0 tested) | 0.87 to 0.89 |
+
+The binding without the entry keeps its own range, `react-native` `>=0.76.0`. Set up the library as its documentation says (the Babel plugin of the worklets runtime; Expo's preset adds it). Expo Go for SDK 58 carries 4.7.1 and 0.13.0, which is what `npx expo install` chooses there, inside the range. The whole test set of the binding passed against 4.7.1 and 0.13.0 as it does against 4.8.0 and 0.14.0; the repository's tests run against 4.8.0.
+
+### Turning it on
+
+The entry exports one value, `animated`. Give it to `createStyle` or to `configure`:
+
+```tsx
+import { createStyle } from '@umber-style/react-native'
+import { animated } from '@umber-style/react-native/animated'
+
+const { styled, keyframes } = createStyle(theme, { animated })
+// or, for the default style, before it is used: configure({ theme, animated })
+```
+
+It is a value given to a call, never an import done for its side effect: a bundler drops an import whose value is not used from a package marked `"sideEffects": false`.
+
+One style module for both platforms passes it through a file the bundler picks for each platform. The shared `createStyle` and `configure` of `umber-style/react` take `animated`, and the web accepts it and ignores it, so the module type-checks once. From the example app this was checked in (`host.native.tsx` is Metro's pick on iOS and Android, `host.tsx` on the web):
+
+```tsx
+// host.native.tsx
+import { animated } from 'umber-style/react-native/animated'
+export const styleOptions = { animated }
+
+// host.tsx
+export const styleOptions = { prefix: 'umber' }
+
+// style.ts
+import { createStyle } from 'umber-style/react'
+import { styleOptions } from './host'
+export const { styled, ThemeProvider, keyframes } = createStyle(lightTheme, styleOptions)
+```
+
+The web bundle of that app holds no module of the library or of the entry.
+
+### An example
+
+From the repository's test of one source on both platforms (`sharedAnimation.test.tsx`):
+
+```tsx
+const pulse = keyframes({ '0%, 100%': { opacity: 1 }, '50%': { opacity: 0.4 } }, { label: 'pulse' })
+const skeleton: SharedStyleObject = {
+  opacity: 1,
+  animation: `${pulse} 1.5s ease-in-out infinite`,
+}
+```
+
+A styled `View` with `skeleton`: on the web its class is `{opacity:1;animation:pulse-... 1.5s ease-in-out infinite;}` with its `@keyframes` rule. On React Native, with the entry, `View` is rendered as the library's animated form of it, and gets:
+
+```ts
+[
+  {
+    opacity: 1,
+    animationName: /* the rule of css.keyframes for { '0%': { opacity: 1 }, '100%': { opacity: 1 }, '50%': { opacity: 0.4 } } */,
+    animationDuration: 1500,
+    animationTimingFunction: 'ease-in-out',
+    animationDelay: 0,
+    animationIterationCount: 'infinite',
+    animationDirection: 'normal',
+    animationFillMode: 'none',
+    animationPlayState: 'running',
+  },
+]
+```
+
+The animation and transition keys are in `NativeStyleObject` and so in the shared style types: write them in the shared part of a style. The `web` part is still read on the web only.
+
+### What is translated
+
+The library takes the words of CSS in forms of its own. The entry turns what a style for the web writes into them, read in the source of 4.7.1 and of 4.8.0, which agree on every row but the transform:
+
+| A style writes                                                                                                                        | 4.7.1 and 4.8.0 take                                                                                                                                                                                       | The entry gives                                                                                                                                                                                                                                             |
+| ------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `animationName: pulse` (a name of `keyframes`)                                                                                        | the steps object, or a rule of `css.keyframes`; a string is left out without a word                                                                                                                        | the rule of `css.keyframes` for the steps of the name, the same object each time the name is used. `none` stops the animation; a name `keyframes` did not return runs nothing, with a warning                                                               |
+| `'1.5s'`, `'300ms'`, a number                                                                                                         | the three, text only in lower case and without an exponent                                                                                                                                                 | a number of milliseconds: `1500`, `300`; `'.5S'` and `'1e3ms'` are read too. A negative duration is dropped                                                                                                                                                 |
+| `'ease-in-out'` and the six other named easings                                                                                       | the same seven names                                                                                                                                                                                       | the name                                                                                                                                                                                                                                                    |
+| `'cubic-bezier(0.25, -0.5, 0.75, 1.5)'`, `'steps(4, jump-start)'`                                                                     | throws for the text in a longhand                                                                                                                                                                          | the library's `cubicBezier(...)` and `steps(...)`. Text CSS rejects (an x outside 0 to 1, a count that is not a whole number of 1 or more, `jump-none` with one step) is dropped, with a warning, and the library's default, `ease`, applies, as on the web |
+| `animationIterationCount: 'infinite'` or `'2'`, `animationDirection`, `animationFillMode`, `animationPlayState`, `transitionBehavior` | the keywords of CSS; another value throws                                                                                                                                                                  | the keyword in lower case, the count as a number; another value is dropped, with a warning                                                                                                                                                                  |
+| `transitionProperty: 'background-color, opacity'`                                                                                     | the names of style keys                                                                                                                                                                                    | `['backgroundColor', 'opacity']`; `all` and `none` (alone) as they are                                                                                                                                                                                      |
+| a list (`'1s, 2s'`)                                                                                                                   | a list                                                                                                                                                                                                     | a list, item by item                                                                                                                                                                                                                                        |
+| `transform: 'translateX(-8px) rotate(45deg)'` in a step                                                                               | text, each number read with `parseFloat`, so `px` is taken off by the library; an angle needs `deg` or `rad`. Text it cannot read throws in 4.7 and is ignored with a warning in 4.8; `none` throws in 4.7 | the text as it is when the library reads every function of it; `none` as no transform (`[]`); other text dropped from the step, with a warning                                                                                                              |
+| a step                                                                                                                                | a native style keyed by offset                                                                                                                                                                             | `from` and `to` as `0%` and `100%`, a comma list split, each step turned into a native style as a style is (`'1rem'` is `16`), a key the library does not animate dropped with a warning                                                                    |
+
+A value that is not valid is dropped where it is written, so the value of an earlier key, or of the level below a state or media part, stays: the web keeps an earlier rule when a later declaration is not valid. Each text is read once for each component and remembered.
+
+### The shorthands
+
+`animation` and `transition` are expanded into their longhands as CSS expands them: every longhand is set, the parts not given to their initial values (`0s`, `ease`, `1`, `normal`, `none`, `running`; for `transition`, `all`), and a later key of the same style wins over an earlier one, shorthand or longhand. In one item, the first time is the duration and the second the delay; a name that `keyframes` returned is the name; a keyword of a part already set is read as the name, as CSS reads it. A part that cannot be read (`pulse 1s 2s 3s`, `opacity color 1s`, `none` among several transitions) drops the whole shorthand, with a warning, as the web drops it.
+
+### Transitions and state keys
+
+A transition runs when a style changes: a state key, a theme, a prop. From the tests (`animated.test.tsx`):
+
+```tsx
+const { styled } = createStyle(theme, { animated })
+const Button = styled(Pressable)({
+  opacity: 1,
+  transitionProperty: 'opacity',
+  transitionDuration: '150ms',
+  ...at(state('pressed'), { opacity: 0.7 }),
+})
+```
+
+`<Button testID="save" />` gives the animated `Pressable` `[{ opacity: 1, transitionProperty: 'opacity', transitionDuration: 150 }]`; while a finger is down, `[{ opacity: 0.7, transitionProperty: 'opacity', transitionDuration: 150 }]`, and the library animates the opacity between them. The animated component reads its style as a list and cannot call a function `style`, so a component whose object styles animate and name `pressed` keeps the press itself, from `onPressIn` and `onPressOut` (your own handlers of those names are still called), instead of the function `style` that a `Pressable` gets without the entry.
+
+### Which components are wrapped
+
+A styled component is rendered as the library's animated form of its component (`createAnimatedComponent`, made once for each component, `as` included) only when its styles animate:
+
+- **An object style** with an animation or transition key, at any depth but the `web` part: from the start.
+- **A function style** that returns one: from the first render in which it does, and from then on for every instance of that component; an instance mounted before then mounts again once, because its element changes, and a development warning says so. Name an animation or transition key in an object style as well (`transitionProperty` is enough) to wrap it from the start. A wrapped component whose function style stops animating stays wrapped, and the library stops the animation.
+
+A component whose styles never animate is the component it is without the entry: the same hooks, the same element, no wrapper. The hooks of a component do not change between renders either way.
+
+### Reduced motion
+
+The library's CSS path does not ask the system for reduced motion. The entry does, through the binding's own state (`AccessibilityInfo`, as for `prefers-reduced-motion` in a media query): a component that animates renders again when the setting changes, and while the user asks for less motion:
+
+- **no animation starts**: the view shows its own style. An infinite animation stays at the style without the animation. A finite animation whose `animationFillMode` is `forwards` or `both` shows the step it would end on (the last step, or the first for a reversed or evenly alternating one), so that an entrance whose own style is the start (`opacity: 0`) is not left there; with `none` or `backwards` the view shows its own style;
+- **no transition runs**: a change of style jumps to its end.
+
+The setting is read asynchronously, so a component may render once with motion before the platform answers (see [Reduced motion on the first render](#reduced-motion-on-the-first-render)). To see it on a device: on iOS, Settings, Accessibility, Motion, Reduce Motion; on Android, Settings, Accessibility, Remove animations (the name varies by maker: Color and motion, Visibility enhancements).
+
+### What runs on both platforms
+
+With the entry, these run on the web and on React Native from one style: opacity, transforms (`translate`, `scale`, `rotate`, `skew`, `matrix`, `perspective`, in `px`, unitless, `deg` or `rad`), colours, sizes, margins and paddings, positions, borders and their widths, radii, shadows (`shadowColor`, `shadowOffset`, `shadowOpacity` and `shadowRadius` on iOS, `elevation` on Android, `boxShadow`), with keyframes, easing (the named easings, `cubic-bezier()`, `steps()`), duration, delay, direction, iteration count, fill mode and play state, and transitions of those properties.
+
+What stays web-only: `linear()` easings, `animation-timeline`, `animation-composition` and `animation-range`, a step or a transition of a property the platform does not have or the library does not animate (`background`, `boxSizing`), lengths in `em` or a viewport unit, `rotate(1turn)` and other units the library's transform parser does not read, and the global CSS of `Global`. A discrete property (`display`, `flexDirection`) changes at once rather than in between, as the library's documentation says.
+
+### What it costs
+
+`packages/react-native/bench/animations.bench.ts` renders 48 views of one look to a string, over a stand-in of the library whose `createAnimatedComponent` returns the component itself (as the library's mock does), so what the library does on a device is not in it.
+
+| Case                                                     | Average   | Allocated |
+| -------------------------------------------------------- | --------- | --------- |
+| 48 views, no animation                                   | 39.79 us  | 110 B     |
+| 48 views, no animation, with the entry                   | 37.02 us  | 116 B     |
+| 48 views, a skeleton animation, no entry (keys dropped)  | 37.80 us  | 117 B     |
+| 48 views, a skeleton animation, with the entry           | 41.83 us  | 116.99 KB |
+| 48 views, a function style that animates, no entry       | 94.66 us  | 186.81 KB |
+| 48 views, a function style that animates, with the entry | 149.28 us | 284.92 KB |
+
+Measured with `pnpm bench react-native animations --rounds 3` in the soroush-bench Docker sandbox (the median of three rounds): read the ratios, not the times. A component that does not animate costs the same with the entry as without it. One whose object style animates costs about as much as one that does not, its style translated once when the component is made; it watches reduced motion with the hook of the media keys. A function style that animates is resolved and translated on each render, about 1.6 times the same function style without the entry.
+
+### Development warnings of the entry
+
+Once for each distinct message, with the component's name, in development only:
+
+- a value that is not valid: `Pulse: "animationDuration: -1s" is not valid: it is dropped, as the web drops it. Write a time of 0 or more, such as 1.5s or 300ms.`;
+- a shorthand with a part it cannot read: `Pulse: "animation" cannot read "3s": the whole animation is dropped, as the web drops it.`;
+- a name that `keyframes` did not return: `Pulse: "animationName: spin" is not a name that keyframes returned, so no animation runs for it. Give the name keyframes returns.`;
+- a key the library does not run: `Pulse: "animationTimeline" is not run by the animation library on React Native; it is dropped.`;
+- a property in a step that the library does not animate: `Pulse: "boxSizing" in the step "100%" is not animated by the animation library on React Native; it is dropped from the step.`, and an animation key other than `animationTimingFunction` in a step;
+- a function style that starts an animation in a component whose object styles name none (see [Which components are wrapped](#which-components-are-wrapped)).
+
 ## Development warnings
 
 In development, once for each distinct message, the binding warns with `console.warn`. A message starts with `@umber-style/react-native:` and the name of the component when it is known: the `name` option of `styled`, else the display name or function name of the wrapped component; for a sheet, `sheet entry "card"`. Nothing is warned in production, or where there is no `process`.
 
-- **A key it drops by mistake:** a selector (`&:hover`, `:focus`), an at-rule (`@supports ...`), a media query with something the binding does not evaluate (the message names it: `React Native does not evaluate the media feature "hover"`), a custom property (`--accent`), and an `animation*` or `transition*` key (animations do not run on React Native yet), written outside the `web` part of a style. For example `Named: "&:hover" is dropped: React Native has no selectors. A key for the web only goes in the web part of a shared style.`
+- **A key it drops by mistake:** a selector (`&:hover`, `:focus`), an at-rule (`@supports ...`), a media query with something the binding does not evaluate (the message names it: `React Native does not evaluate the media feature "hover"`), a custom property (`--accent`), written outside the `web` part of a style. Without the animated entry, an `animation*` or `transition*` key is dropped too, with a message that says how to turn the entry on: `Pulse: "animation" is dropped: the animated entry is not on, so animations and transitions do not run. With react-native-reanimated installed, import { animated } from '@umber-style/react-native/animated' and pass it: createStyle(theme, { animated }) or configure({ animated }).` For example `Named: "&:hover" is dropped: React Native has no selectors. A key for the web only goes in the web part of a shared style.`
 - **A query `useMediaQuery` cannot evaluate:** `useMediaQuery("(hover: hover)") is false: React Native does not evaluate the media feature "hover".`
 - **A state that a function style names and the component does not keep:** `Card: state('focused') is named in a function style only, so the component keeps no focused state and follows the focused prop alone. Name it in an object style of the component as well (an empty part is enough) for the binding to follow onFocus and onBlur.`
 - **Never warned:** `label`, anything inside the `web` part, a `when()`, `whenScheme()` or `state()` key that does not match (a condition, not a web-only key), and a media query that is evaluated and does not match. A selector key for a state (`&:active`) is still warned about as a selector.
@@ -364,8 +536,15 @@ The package exports `add`, `subtract`, `multiply`, `divide`, `negate` and `alpha
 - `em` and the viewport units are not converted, and a literal `calc(...)` is not computed: each is passed as it is, with a warning.
 - A theme is converted once for each theme object: a `theme` object re-created on every render is converted every time. Only the keys of `lengthKeys` are converted; `NativeTheme<T>` types the default ones, so with another `lengthKeys` the types do not follow.
 - A unitless `lineHeight` is a factor on the web and a number of points on React Native; `lineHeight: '1.5'` becomes `1.5`, which is not what the web shows.
-- Animations are not built on React Native yet; their keys are dropped with a warning. They are separate work: [#43](https://github.com/soroush-tech/umber-style/issues/43).
-- **The state keys were not seen on a device.** The tests use a stand-in `Pressable` with the contract of `Pressable.js` of React Native 0.88.1 (its state, `shouldUpdatePressed`, the function `style`, `memo`), which does not model Pressability's timing (the 130 ms, the press area). The real `Pressable` was only bundled, in an Expo app (`expo export` for Android and iOS), and not run on a phone. Hover with the pointer-event flag on, focus with a hardware keyboard on Android, and full keyboard access on iOS were not observed.
+- **The animated entry was seen on an iPhone only.** In the example app (Expo SDK 58, in Expo Go, with react-native-reanimated 4.7.1 and react-native-worklets 0.13.0), two skeleton bars with `keyframes` and an infinite `animation` pulsed; a button with `state('pressed')` and a transition on opacity faded while held and came back on release; with the system's reduced motion on, nothing animated. Android was bundled (`npx expo export`, exit code 0), not run on a device. The tests run the entry over the library's official mock (`react-native-reanimated/mock`), whose `createAnimatedComponent` returns the component itself and which runs no animation, so they check what the entry gives the library, not what the library draws.
+- The repository's tests run against react-native-reanimated 4.8.0 and react-native-worklets 0.14.0; the run against 4.7.1 and 0.13.0 was made once, by installing them in place of the newer ones. 4.7 does not animate five properties that 4.8 does (`borderCurve`, `experimental_backgroundImage`, `verticalAlign`, `writingDirection`, `objectFit`): with 4.7 they are dropped from a step by the library without a warning.
+- Steps given to `keyframes` as a function of the theme are resolved against the base theme of the styling, once: a provider does not change them, as the raw values of steps on the web come from the base theme.
+- Only a styled component is wrapped and watches reduced motion. A sheet entry with animation keys (`useStyle`, `StyleSheet.create`) is translated, but it animates only on a component the library animates, and reduced motion is not applied to it.
+- A component that starts animating only through a function style mounts again once, when it starts; a `Pressable` that animates only through a function style, or that is given a function `style` prop while it animates, does not report its press to the binding (its `pressed` follows the prop).
+- `linear(...)` easings are not read (dropped with a warning). `none` in a list of animation names is left out, so the other lists no longer line up with the names after it.
+- The list of properties the library animates (`ANIMATED_KEYS` in `packages/react-native/src/motionSteps.ts`) is copied from 4.8.0; a property it adds later is dropped from a step until the list follows.
+- A transform written as text is checked in a step only: in the plain style of a component that animates it is passed as it is, and 4.7 throws for text it cannot read.
+- **The state keys were seen on an iPhone for `pressed` and `disabled` only.** In the example app in Expo Go, a button built on `Pressable` faded while held and a disabled one stayed faint. The tests use a stand-in `Pressable` with the contract of `Pressable.js` of React Native 0.88.1 (its state, `shouldUpdatePressed`, the function `style`, `memo`), which does not model Pressability's timing (the 130 ms, the press area). Android, hover with the pointer-event flag on, focus with a hardware keyboard on Android, and full keyboard access on iOS were not observed.
 - `hovered` does nothing on a default iOS or Android build: React Native does not call `onHoverIn` there (`Pressability.js`: the mouse handlers are `null` on both, and the pointer-event path is behind a flag that is off by default). It applies where the platform reports hover: a desktop or web target, or an app that turns the flag on.
 - `focused` is any focus, keyboard or touch. A focus ring for keyboard users is the web's `outline`; on React Native there is no way to draw one for the keyboard only.
 - A state part is resolved on each render, and on each call of the `style` function by the platform; it is not registered with the platform `StyleSheet`.

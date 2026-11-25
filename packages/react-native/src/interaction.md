@@ -4,8 +4,9 @@
 
 What a styled component knows of its own state, for the `state()` keys: `readInteraction(props, held?)`
 reads `disabled`, `pressed`, `hovered` and `focused` from the props and the states the component keeps;
-`useHeldStates()` keeps hover and focus as React state; `createHeldHandlers(names, props, held)` makes the
-`onHoverIn`/`onHoverOut` and `onFocus`/`onBlur` handlers that set them and then call the author's own;
+`useHeldStates()` keeps hover and focus (and the press of a component that animates) as React state;
+`createHeldHandlers(names, props, held)` makes the `onHoverIn`/`onHoverOut`, `onFocus`/`onBlur` and
+`onPressIn`/`onPressOut` handlers that set them and then call the author's own;
 `isStateProp` and `isHeldName` answer which names are the state props and which states are kept.
 
 ## Why it exists
@@ -28,7 +29,8 @@ flowchart TD
   told --> or1
   told --> or2["focused = prop or held"]
   heldNode --> or2
-  told --> p1["pressed = prop"]
+  told --> p1["pressed = prop or held (held only for a component that animates)"]
+  heldNode --> p1
   names["held names of the object styles"] --> handlers["createHeldHandlers"]
   handlers --> on["onHoverIn / onFocus: set true, then the author's handler"]
   handlers --> off["onHoverOut / onBlur: set false, then the author's handler"]
@@ -40,8 +42,10 @@ flowchart TD
 
 `InteractionState` (from `conditions.ts`) is `{ hovered?, pressed?, focused?, disabled? }`. `HeldStates` is
 `{ states, set }`: the hover and focus kept now, and the setter the handlers call. `HELD_EVENTS` maps
-`hovered` to `['onHoverIn', 'onHoverOut']` and `focused` to `['onFocus', 'onBlur']`, the names `Pressable`,
-`TextInput` and the touchables take.
+`hovered` to `['onHoverIn', 'onHoverOut']`, `focused` to `['onFocus', 'onBlur']` and `pressed` to
+`['onPressIn', 'onPressOut']`, the names `Pressable`, `TextInput` and the touchables take. `HeldName` is
+the three; `isHeldName` answers for hover and focus only, the states that every component naming them
+keeps.
 
 ## What it guarantees
 
@@ -58,9 +62,13 @@ flowchart TD
 - `editable={false}` counts as disabled: on a `TextInput` it is the platform's way to say the field takes no
   input, and it does not set the accessibility state (issue #42, the investigation of React Native 0.88.1),
   so `aria-disabled` alone would miss it. On another component `editable` means nothing and is not given.
-- `pressed` is not kept from `onPressIn`/`onPressOut`: a `Pressable` reports it through its style callback,
-  and for another component the author passes the prop. Keeping it from events would need a hook in every
-  pressable, which is what the function `style` avoids.
+- `pressed` is not kept from `onPressIn`/`onPressOut` in a component that does not animate: a `Pressable`
+  reports it through its style callback, and for another component the author passes the prop. Keeping it
+  from events would need a hook in every pressable, which is what the function `style` avoids. A component
+  that animates (the `animated` option, an animation or transition key in its object styles) and names
+  `pressed` keeps it from those events: the animated component of the library reads the style of its props
+  as a list, so it cannot be given the function. `styled.ts` decides it when the component is made, and
+  `Pressable` calls `onPressIn` and `onPressOut` with the timing of its own `pressed`.
 - Hover and focus are kept in one state object, so a component that keeps both has one hook.
 
 ## Limits

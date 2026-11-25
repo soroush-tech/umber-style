@@ -5,7 +5,9 @@
 `keyframes(steps, options?)` registers an animation and returns its name, `<label>-<hash>`, at once. Nothing
 is written to a sheet then. The rest of the file lets the cache use the registry: `isKeyframesName`,
 `createKeyframesRule` (the `@keyframes` text of a name) and `findAnimationNames` (which registered names the
-`animation` and `animation-name` declarations of some compiled rules use).
+`animation` and `animation-name` declarations of some compiled rules use). `readKeyframesSteps` gives the
+steps of a name as they were registered, for a platform that runs an animation from its steps and writes no
+rule: the animated entry of the React Native binding (`packages/react-native/src/motionSteps.ts`).
 
 ## Why it exists
 
@@ -75,6 +77,8 @@ default scoping, so a name does not change with the options of an engine.
 - Equal steps give the same name; `from`/`to`, a comma list and the order of keys are the same steps.
 - A function of the theme is named by the tokens it reads, not by their values (it sees a stand-in theme).
 - Nothing is read from the registry in `findAnimationNames` while no name is registered.
+- `readKeyframesSteps` returns the very object (or function) that was registered first under a name, never a
+  copy, and undefined for a name that `keyframes` did not return.
 - Matching is by whole identifier, in nested selectors and at-rules too.
 
 ## Decisions

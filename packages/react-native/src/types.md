@@ -5,7 +5,9 @@
 Types only: the public shapes of the React Native binding. The main one is `NativeStyle<T>`, what
 `createStyle` and the default style return. The rest are the options (`StyleOptions`, `StyledOptions`), the
 props of the components (`ThemeProviderProps`, `CacheProviderProps`, `ThemeScopeProps`, `GlobalProps`), the
-`styled` and `css` types, and `NativeStyleSheet`. There is no run-time code.
+`styled` and `css` types, and `NativeStyleSheet`. It also holds the contract between the binding and its
+animated entry: `AnimatedDriver` (the value `animated`), `MotionContext` and `Motion`. There is no run-time
+code.
 
 ## Why it exists
 
@@ -27,12 +29,18 @@ flowchart TD
   ns --> same["web members kept so one source runs on both"]
   same --> r3["Global, ThemeScope, themeClass, keyframes, globalStyles"]
   r3 --> inert["they do nothing, or return nothing, on React Native"]
+  opts["StyleOptions.animated: an AnimatedDriver"] --> bindNode["bind(MotionContext): one Motion for each styling"]
+  bindNode --> motionMembers["translate, reduce, wrap: called by toNativeStyle and styled"]
 ```
 
 ## The data
 
-- `StyleOptions<T>` extends the core's `BindingOptions<T>` with `remBase` (default 16). Only `remBase` and
-  `lengthKeys` are used; any other option is ignored with a development warning.
+- `StyleOptions<T>` extends the core's `BindingOptions<T>` with `remBase` (default 16) and `animated`.
+  Only `remBase`, `lengthKeys` and `animated` are used; any other option is ignored with a development
+  warning.
+- `AnimatedDriver` is `{ bind(context) }`; `MotionContext` is `{ remBase, readTheme }`; `Motion` is
+  `{ translate(style, name), reduce(style), wrap(component) }`. The binding calls them; an app only passes
+  `animated` along.
 - `StyledOptions` extends `StylerOptions` with `shouldForwardProp` (default: every prop but `as`, `theme`,
   `style`).
 - `StyledComponent<C, P>` takes the props of the tag, `P`, the state props, `as` and `style`.
@@ -59,3 +67,8 @@ flowchart TD
 - The `style` prop does not take a function: an author's own function `style` reaches the binding only by
   a cast, and is composed only where the styles name a state (`styled.md`).
 - Types describing web-only features remain (`GlobalInput`, `KeyframesInput`) so that a web source typechecks.
+- The binding names the entry only by these types: the binding never imports the entry, so that an app
+  without it never loads the animation library. `animated` is a value given to `createStyle` or
+  `configure`, never an import done for its side effect, which a bundler drops under `"sideEffects": false`.
+- The members of `Motion` are public types, because `AnimatedDriver` names them, and are documented as the
+  binding's, not an app's.

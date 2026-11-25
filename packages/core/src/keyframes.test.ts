@@ -1,7 +1,13 @@
 import { DEFAULT_SCOPING } from './scope'
 import { alpha } from './alpha'
 import { multiply } from './calc'
-import { createKeyframesRule, findAnimationNames, isKeyframesName, keyframes } from './keyframes'
+import {
+  createKeyframesRule,
+  findAnimationNames,
+  isKeyframesName,
+  keyframes,
+  readKeyframesSteps,
+} from './keyframes'
 
 interface StandInTheme {
   palette: { muted: string; other: string }
@@ -37,6 +43,16 @@ describe('keyframes', () => {
     expect(keyframes({ from: { opacity: 0 }, to: { opacity: 0.5 } })).not.toBe(name)
     expect(isKeyframesName(name)).toBe(true)
     expect(isKeyframesName('keyframes-unknown')).toBe(false)
+  })
+
+  it('reads the steps of a name as they were given, and nothing for a name it did not return', () => {
+    const steps = { from: { opacity: 0 }, '50%, 75%': { opacity: 0.5 } }
+    const themed = (theme: { palette: { muted: string } }) => ({
+      to: { color: theme.palette.muted },
+    })
+    expect(readKeyframesSteps(keyframes(steps, { label: 'read' }))).toBe(steps)
+    expect(readKeyframesSteps(keyframes(themed, { label: 'read' }))).toBe(themed)
+    expect(readKeyframesSteps('read-unknown')).toBeUndefined()
   })
 
   it('reads a tagged template as steps, and gives the name of the equal object', () => {

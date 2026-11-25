@@ -29,7 +29,7 @@ import type {
   Theme,
   ThemeProviderProps,
 } from '@umber-style/react'
-import type { NativeStyleObject, StateProps } from '@umber-style/react-native'
+import type { AnimatedDriver, NativeStyleObject, StateProps } from '@umber-style/react-native'
 
 /** The keys that the web style and the native style both have. */
 type SharedKeys = keyof WebProperties & keyof NativeStyleObject
@@ -186,6 +186,16 @@ export interface SharedStyleBase<T> {
   Global(props: GlobalProps<T>): ReactElement | null
 }
 
+/**
+ * The option of `createStyle` and `configure` that only React Native reads: `animated` of
+ * `umber-style/react-native/animated` runs the animation and transition keys there. The web accepts it
+ * and ignores it: its CSS runs them.
+ */
+export interface MotionOptions {
+  /** The animated entry on React Native; `undefined` on the web. */
+  animated?: AnimatedDriver
+}
+
 export type { DefaultStyleOptions, GlobalProps, StyledOptions, ThemeProviderProps }
 export type { StyleOptions } from '@umber-style/react'
 export type { SheetEntry, Theme }
@@ -211,7 +221,7 @@ export type {
   WebStyleObject,
 }
 
-export declare const configure: (options: DefaultStyleOptions) => void
+export declare const configure: (options: DefaultStyleOptions & MotionOptions) => void
 export declare const styled: SharedStyled<Theme>
 export declare const StyleSheet: SharedStyleSheet<Theme>
 export declare const useStyle: SharedStyleBase<Theme>['useStyle']

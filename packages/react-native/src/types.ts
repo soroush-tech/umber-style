@@ -40,6 +40,43 @@ import type {
 export interface StyleOptions<T = never> extends BindingOptions<T> {
   /** The font size, in density-independent pixels, that `1rem` is, in a theme and in a style. Default 16. */
   remBase?: number
+  /**
+   * `animated` of `@umber-style/react-native/animated`: the `animation*` and `transition*` keys of a style
+   * then run, through the animation library that entry drives. Without it they are dropped, with a
+   * development warning.
+   */
+  animated?: AnimatedDriver
+}
+
+/** What one styling needs to make its `Motion`: the base of `rem` and the base theme. */
+export interface MotionContext {
+  /** The font size that `1rem` is, for the lengths in the steps of an animation. */
+  readonly remBase: number
+  /** The base theme as it was given, for the steps of an animation that are a function of the theme. */
+  readonly readTheme: () => object
+}
+
+/** How one styling runs animations: what `AnimatedDriver.bind` makes. */
+export interface Motion {
+  /**
+   * Translates, in place, the animation and transition keys of one level of a style into what the
+   * animation library takes: the shorthands expanded, a name of `keyframes` turned into its steps, times
+   * and easings read. A value that cannot be read is dropped, with a development warning that names `name`.
+   */
+  translate(style: Record<string, unknown>, name: string | undefined): void
+  /** `style` for a user who asked for less motion: no animation and no transition (see the docs). */
+  reduce(style: NativeStyleObject): NativeStyleObject
+  /** The animated form of `component` that the library makes, made once for each component. */
+  wrap(component: ElementType): ElementType
+}
+
+/**
+ * The value `animated` of `@umber-style/react-native/animated`, which `createStyle(theme, { animated })`
+ * and `configure({ animated })` take. Its members are for the binding, not for an app.
+ */
+export interface AnimatedDriver {
+  /** Makes the `Motion` of one styling. */
+  bind(context: MotionContext): Motion
 }
 
 /** The options of `styled(tag, options)`: the label of the component, and which props reach the element. */
@@ -195,7 +232,7 @@ export interface NativeStyle<T> {
   when(theme: DeepPartial<T>, colorScheme?: ColorScheme): ThemeKey
   /** A style key for "the nearest provider's `colorScheme` is this one"; with none above, the platform's color scheme. */
   whenScheme(scheme: SchemeName): SchemeKey
-  /** The name of an animation, as on the web, so one source runs on both. Nothing runs it on React Native: the `animation*` and `transition*` keys are dropped from a style. */
+  /** The name of an animation, as on the web, so one source runs on both. It runs with the `animated` option; without it the `animation*` and `transition*` keys are dropped from a style. */
   keyframes(steps: KeyframesInput<T>, options?: KeyframesOptions): string
   /** A handle of global styles, as on the web; React Native has no global styles, and `Global` does nothing with it. */
   globalStyles(styles: GlobalStylesInput<T>): GlobalStyles<T>

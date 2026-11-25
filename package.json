@@ -15,6 +15,7 @@
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
     "test:coverage": "pnpm -r test:coverage",
+    "test:scripts": "node --test --experimental-test-coverage --test-coverage-include=scripts/*.mjs --test-coverage-exclude=scripts/*.test.mjs --test-coverage-lines=100 --test-coverage-branches=100 --test-coverage-functions=100 scripts/*.test.mjs",
     "format": "oxfmt",
     "format:check": "oxfmt --check",
     "check:typography": "aiwg --all",

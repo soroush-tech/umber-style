@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { Button, FrameStyles, HeaderOverride } from './components'
+import { useEffect, useId, useRef, useState } from 'react'
+import { Badge, Button, FrameStyles, HeaderOverride } from './components'
 import { darkClass, lightClass } from './style'
 import { STORAGE_KEY } from './themes'
 
@@ -57,4 +57,30 @@ export function Hydrated() {
     document.documentElement.dataset.hydrated = 'true'
   }, [])
   return null
+}
+
+/**
+ * An element named by an id of `useId`. After hydration it writes the id that the browser made into
+ * `data-browser-id`: React keeps the attribute that the server wrote when the two differ.
+ */
+function IdLabel() {
+  const id = useId()
+  const ref = useRef<HTMLSpanElement>(null)
+  useEffect(() => {
+    if (ref.current) ref.current.dataset.browserId = id
+  }, [id])
+  return (
+    <span ref={ref} id={id} data-testid="id-probe">
+      Labelled
+    </span>
+  )
+}
+
+/** `IdLabel` under a styled element given a plain object in `style`: the end-to-end tests compare the ids. */
+export function IdProbe() {
+  return (
+    <Badge style={{ marginInlineStart: 4 }} data-testid="id-holder">
+      <IdLabel />
+    </Badge>
+  )
 }

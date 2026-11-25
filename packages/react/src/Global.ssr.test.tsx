@@ -1,7 +1,8 @@
 // @vitest-environment node
 import { Suspense, use, type ReactNode } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { prerender } from 'react-dom/static'
+// The Web Streams build: the Node entry of `react-dom/static` has `prerender` from React 19.2 only.
+import { prerender } from 'react-dom/static.browser'
 import { extractPageStyles } from '@umber-style/core'
 import { createStyle } from './createStyle'
 

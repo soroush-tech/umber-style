@@ -1,6 +1,9 @@
 import { createElement, memo, useState, type ReactNode } from 'react'
 import { vi } from 'vitest'
 
+// What the animation library reads from the platform, for the tests of the animated entry.
+export * from '../react-native/vitest.library-platform'
+
 // A stand-in for the platform StyleSheet: `create` records its input and returns it.
 // A stand-in for the platform Appearance: the color scheme is whatever a test sets.
 export const Appearance = {

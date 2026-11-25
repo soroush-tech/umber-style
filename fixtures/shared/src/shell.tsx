@@ -1,6 +1,6 @@
 import type { ComponentType, ReactNode } from 'react'
 import { BaseStyles, NavBar } from './components'
-import { FrameSwitch, Hydrated, ThemeSwitch } from './interactive'
+import { FrameSwitch, Hydrated, IdProbe, ThemeSwitch } from './interactive'
 
 /** The component the shell renders its links with: a plain `<a>` by default, or the link of a fixture's router. */
 export type LinkComponent = ComponentType<{
@@ -16,8 +16,8 @@ const DefaultLink: LinkComponent = ({ href, children, ...rest }) => (
 )
 
 /**
- * The frame around every page: the global base styles, the bar with the links, the theme switch and the
- * frame switch. `links` are more links of a fixture, after the shared ones.
+ * The frame around every page: the global base styles, the bar with the links, the theme switch, the
+ * frame switch, and the probe of `useId`, which stays mounted from page to page. `links` are more links of a fixture, after the shared ones.
  */
 export function Shell({
   children,
@@ -48,6 +48,7 @@ export function Shell({
           {links}
           <ThemeSwitch />
           <FrameSwitch />
+          <IdProbe />
         </NavBar>
         {children}
         <Hydrated />

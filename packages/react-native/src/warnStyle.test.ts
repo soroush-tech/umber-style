@@ -2,6 +2,8 @@ import { afterEach, vi } from 'vitest'
 import {
   warnAboutDroppedKey,
   warnAboutIgnoredOptions,
+  warnAboutLateMotion,
+  warnAboutMotion,
   warnAboutQuery,
   warnAboutUnheldState,
   warnAboutValues,
@@ -158,6 +160,8 @@ describe('warnAboutDroppedKey', () => {
     }
     warnAboutDroppedKey('&:hover', undefined)
     const hint = 'A key for the web only goes in the web part of a shared style.'
+    const motionOff =
+      "the animated entry is not on, so animations and transitions do not run. With react-native-reanimated installed, import { animated } from '@umber-style/react-native/animated' and pass it: createStyle(theme, { animated }) or configure({ animated })."
     expect(warn.mock.calls.map(([text]) => text)).toEqual([
       `@umber-style/react-native: Button: "&:hover" is dropped: React Native has no selectors. ${hint}`,
       `@umber-style/react-native: Button: ":focus" is dropped: React Native has no selectors. ${hint}`,
@@ -166,8 +170,8 @@ describe('warnAboutDroppedKey', () => {
       `@umber-style/react-native: Button: "@media print" is dropped: React Native does not evaluate the media type "print". ${hint}`,
       `@umber-style/react-native: Button: "@supports (display: grid)" is dropped: React Native has no at-rules. ${hint}`,
       `@umber-style/react-native: Button: "--accent" is dropped: React Native has no custom properties. ${hint}`,
-      `@umber-style/react-native: Button: "animation" is dropped: animations do not run on React Native yet. ${hint}`,
-      `@umber-style/react-native: Button: "transitionDuration" is dropped: animations do not run on React Native yet. ${hint}`,
+      `@umber-style/react-native: Button: "animation" is dropped: ${motionOff}`,
+      `@umber-style/react-native: Button: "transitionDuration" is dropped: ${motionOff}`,
       `@umber-style/react-native: "&:hover" is dropped: React Native has no selectors. ${hint}`,
     ])
   })
@@ -188,18 +192,44 @@ describe('warnAboutDroppedKey', () => {
 describe('warnAboutIgnoredOptions', () => {
   it('names the web options given, once, and nothing for the options React Native reads or in production', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    warnAboutIgnoredOptions({ theme: {}, remBase: 10, lengthKeys: [], prefix: undefined })
+    warnAboutIgnoredOptions({
+      theme: {},
+      remBase: 10,
+      lengthKeys: [],
+      animated: { bind: () => ({}) },
+      prefix: undefined,
+    })
     expect(warn).not.toHaveBeenCalled()
     warnAboutIgnoredOptions({ prefix: 'app', hasValueRepair: true, remBase: 10 })
     warnAboutIgnoredOptions({ prefix: 'app', hasValueRepair: true })
     expect(warn.mock.calls).toEqual([
       [
-        '@umber-style/react-native: the options prefix, hasValueRepair are for the web, and React Native does not use them: they are ignored. Only theme, remBase and lengthKeys are read.',
+        '@umber-style/react-native: the options prefix, hasValueRepair are for the web, and React Native does not use them: they are ignored. Only theme, remBase, lengthKeys and animated are read.',
       ],
     ])
     process.env.NODE_ENV = 'production'
     warnAboutIgnoredOptions({ suffix: '-x' })
     expect(warn).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('warnAboutMotion and warnAboutLateMotion', () => {
+  it('warn once for each message and component, and not in production', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    warnAboutMotion('a value is dropped.', 'Pulse')
+    warnAboutMotion('a value is dropped.', 'Pulse')
+    warnAboutLateMotion('Late')
+    warnAboutLateMotion('Late')
+    expect(warn.mock.calls.map(([message]) => message)).toEqual([
+      '@umber-style/react-native: Pulse: a value is dropped.',
+      expect.stringContaining(
+        '@umber-style/react-native: Late: a function style returns an animation or transition key'
+      ),
+    ])
+    process.env.NODE_ENV = 'production'
+    warnAboutMotion('another value is dropped.', 'Pulse')
+    warnAboutLateMotion('Later')
+    expect(warn).toHaveBeenCalledTimes(2)
   })
 })
 

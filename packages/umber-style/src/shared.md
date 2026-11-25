@@ -26,7 +26,7 @@ flowchart TD
   shared --> cls["useThemeClass: web, the class of that wrapper, else undefined"]
   shared --> cache["CacheProvider: web, the subtree's cache; native, its children"]
   shared --> mq["useMediaQuery: web matchMedia or defaultMatches; native, the window"]
-  shared --> make["createStyle, createDefaultStyle with configure"]
+  shared --> make["createStyle, createDefaultStyle with configure, both taking MotionOptions"]
 ```
 
 ## The data

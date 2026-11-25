@@ -4,7 +4,8 @@
 
 Types only. It defines the style object of this binding (`NativeStyleObject`) and the types built from it:
 sheets (`NativeSheetStyles`, `NativeObjectSheet`, `NativeSheetInput`) and style functions
-(`NativeStyleFunction`, `NativeStyleResult`, `NativeStyleInput`). It has no run-time code.
+(`NativeStyleFunction`, `NativeStyleResult`, `NativeStyleInput`), and the animation and transition keys
+(`NativeMotionStyle`). It has no run-time code.
 
 ## Why it exists
 
@@ -23,6 +24,7 @@ flowchart TD
   u --> keys["KeyOf: every key of every member"]
   u --> vals["ValueOf: the type of a key in the members that have it"]
   keys --> nso["NativeStyleObject"]
+  motionKeys["NativeMotionStyle: animation and transition keys, as the web writes them"] --> nso
   vals --> nso
   nso --> sheet["NativeSheetStyles: Record of NativeStyleObject"]
   nso --> fn["NativeStyleFunction: props and theme -> style, null, undefined or false"]
@@ -30,8 +32,9 @@ flowchart TD
 
 ## The data
 
-`NativeStyleObject` is `{ [K in KeyOf<ComponentStyle>]?: ValueOf<ComponentStyle, K> }`: every key optional,
-nothing nested, no `label`. `NativeObjectSheet<K>` is `Record<K, NativeStyleObject> & { call?: never }`.
+`NativeStyleObject` is `{ [K in KeyOf<ComponentStyle>]?: ValueOf<ComponentStyle, K> } & NativeMotionStyle`:
+every key optional, nothing nested, no `label`. `NativeMotionStyle` has the `animation` and `transition`
+shorthands and their longhands, with text values (a time also as a number of milliseconds). `NativeObjectSheet<K>` is `Record<K, NativeStyleObject> & { call?: never }`.
 
 ## What it guarantees
 
@@ -44,6 +47,12 @@ nothing nested, no `label`. `NativeObjectSheet<K>` is `Record<K, NativeStyleObje
 ## Decisions
 
 - One union style, not one per component: a style made once may be used on a view, a text or an image.
+- The animation and transition keys are in the type for every app, with the entry or without: a shared
+  style writes them in its shared part, where the web runs them. Without the entry they are dropped at run
+  time with a development warning. `NativeMotionStyle` is an object type, not an interface, so that the
+  intersection keeps the index signature that `Record<string, unknown>` needs.
+- The keys of the platform alone are `Omit<NativeStyleObject, keyof NativeMotionStyle>`: the type test of
+  `units.test.ts` reads those.
 - The `native` and `web` parts of a shared style, and the condition and media keys, are not keys of this
   type, although `toNativeStyle` reads them at run time. The reason is not recorded in the code.
 

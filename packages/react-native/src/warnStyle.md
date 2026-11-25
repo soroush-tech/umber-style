@@ -5,15 +5,18 @@
 Development warnings for what the types cannot reject: `warnAboutValues` (a style value that was not
 converted and is wrong on React Native), `warnAboutDroppedKey` (a web-only key that is dropped by mistake),
 `warnAboutQuery` (a `useMediaQuery` text the binding cannot evaluate), `warnAboutIgnoredOptions` (options
-of `createStyle` or `configure` that are only for the web) and `warnAboutUnheldState` (a function style that
-names `hovered` or `focused` in a component that keeps no such state).
+of `createStyle` or `configure` that are only for the web), `warnAboutUnheldState` (a function style that
+names `hovered` or `focused` in a component that keeps no such state), `warnAboutMotion` (a message of the
+animated entry about a value it cannot read or the library would reject) and `warnAboutLateMotion` (a
+function style that starts an animation in a component whose object styles name none).
 
 ## Why it exists
 
 A shared source can carry values that mean something on the web and nothing on React Native: a shorthand
 `'8px 16px'`, `calc(...)`, `currentColor`, `em` or `vh` lengths, selectors, at-rules. Dropping or passing
 them silently hides the mistake. This file says what is wrong and what to write instead. `toNativeStyle.ts`
-calls the first two, `windowState.ts` the third, `createStyle.ts` the fourth, `styled.ts` the fifth.
+calls the first two, `windowState.ts` the third, `createStyle.ts` the fourth, `styled.ts` the fifth and the
+last, and the animated entry (`animatedDriver.ts`, `motionSteps.ts`) `warnAboutMotion`.
 
 ## The logic
 
@@ -24,10 +27,15 @@ flowchart TD
   dev -->|"yes"| desc["describe the problem"]
   desc --> kind{"which function?"}
   kind -->|"values"| val["shorthand, calc, currentColor, or a CSS unit"]
-  kind -->|"dropped key"| drop["label, condition and state keys and evaluated media: no problem"]
+  kind -->|"dropped key"| motionKeyQ{"an animation or transition key?"}
+  motionKeyQ -->|"yes"| motionOff["the entry is not on, and how to turn it on"]
+  motionOff --> once
+  motionKeyQ -->|"no"| drop["label, condition and state keys and evaluated media: no problem"]
   kind -->|"unheld state"| held["the state, and the events that would keep it"]
   held --> has
-  kind -->|"option names"| opt["names outside theme, remBase, lengthKeys"]
+  kind -->|"option names"| opt["names outside theme, remBase, lengthKeys, animated"]
+  kind -->|"motion"| motionNode["the text the entry gives, or that a function style starts an animation"]
+  motionNode --> has
   val --> has{"a message?"}
   drop --> has
   opt --> has
@@ -41,8 +49,9 @@ flowchart TD
 
 The set `warned` holds the full text of each message, with the component or sheet entry name in front when
 known (`sheet entry "card": ...`, `css(): ...`). A dropped-key reason is one of: unsupported media part,
-`React Native has no at-rules`, `no custom properties`, `animations do not run on React Native yet`,
-`no selectors`.
+`React Native has no at-rules`, `no custom properties`, `no selectors`. An animation or transition key has a
+message of its own (`MOTION_OFF`): the animated entry is not on, and how to turn it on, with no hint about
+the `web` part, since the key runs on React Native with the entry.
 
 ## What it guarantees
 
@@ -66,3 +75,5 @@ known (`sheet entry "card": ...`, `css(): ...`). A dropped-key reason is one of:
 
 - A number under a wrong key, or a string under an unknown key, is not checked.
 - The set of printed messages is never emptied.
+- The message about an animation key names the import and the two calls that turn the entry on; it cannot
+  tell whether the library is installed, so it says that the entry needs it.

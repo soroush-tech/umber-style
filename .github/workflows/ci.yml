@@ -18,6 +18,13 @@ jobs:
     permissions:
       contents: read
     timeout-minutes: 15
+    env:
+      # The React axis: the React 19 minors that the packages, build, browser, e2e and e2e-dev jobs each
+      # run on, oldest first. The packages declare `react` `^19.0.0`. Each job pins the newest patch of
+      # its minor when it runs (scripts/use-react.mjs through the setup action), so a patch needs no
+      # edit here; when React releases a new minor, add it at the end. The last is the newest React:
+      # its rows of `packages` upload coverage.
+      REACT_MINORS: '["19.0", "19.1", "19.2", "19.3"]'
     outputs:
       node_version: ${{ steps.node-version.outputs.version }}
       manager: ${{ steps.detect-package-manager.outputs.manager }}
@@ -26,6 +33,8 @@ jobs:
       packages: ${{ steps.discover.outputs.packages }}
       playwright_version: ${{ steps.detect-playwright.outputs.version }}
       fixtures: ${{ steps.discover-fixtures.outputs.fixtures }}
+      react: ${{ steps.react.outputs.minors }}
+      react_newest: ${{ steps.react.outputs.newest }}
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v7
@@ -61,14 +70,21 @@ jobs:
             exit 1
           fi
 
-      # One matrix row per package. The Codecov flag is the folder name, which is also what
-      # `pnpm gen:publish-options` writes into .codecov.yml. A new package appears here without
-      # this file being touched.
+      - name: Read the React axis
+        id: react
+        run: |
+          echo "minors=$REACT_MINORS" >> "$GITHUB_OUTPUT"
+          echo "newest=$(node -p 'JSON.parse(process.env.REACT_MINORS).at(-1)')" >> "$GITHUB_OUTPUT"
+
+      # One matrix row per package and React minor. The Codecov flag is the folder name, which is
+      # also what `pnpm gen:publish-options` writes into .codecov.yml. A new package appears here
+      # without this file being touched.
       - name: Discover package matrix
         id: discover
         run: |
           MATRIX=$(node -e '
             const { readdirSync, readFileSync, existsSync } = require("node:fs")
+            const minors = JSON.parse(process.env.REACT_MINORS)
             const rows = readdirSync("packages", { withFileTypes: true })
               .filter((entry) => entry.isDirectory())
               .map((entry) => entry.name)
@@ -78,6 +94,7 @@ jobs:
                 const pkg = JSON.parse(readFileSync(`packages/${dir}/package.json`, "utf8"))
                 return { dir, filter: pkg.name, flag: dir }
               })
+              .flatMap((row) => minors.map((react) => ({ ...row, react })))
             console.log(JSON.stringify({ include: rows }))
           ')
           echo "packages=$MATRIX" >> "$GITHUB_OUTPUT"
@@ -100,18 +117,21 @@ jobs:
           ')
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
-      # One e2e row per fixture app under fixtures/. `shared` holds the components every fixture
-      # renders, not an app. Fixtures live outside packages/, so they are not in the package matrix.
+      # One e2e row per fixture app under fixtures/ and React minor. `shared` holds the components
+      # every fixture renders, not an app. Fixtures live outside packages/, so they are not in the
+      # package matrix.
       - name: Discover fixture matrix
         id: discover-fixtures
         run: |
           MATRIX=$(node -e '
             const { readdirSync, existsSync } = require("node:fs")
+            const minors = JSON.parse(process.env.REACT_MINORS)
             const rows = readdirSync("fixtures", { withFileTypes: true })
               .filter((entry) => entry.isDirectory() && entry.name !== "shared")
               .filter((entry) => existsSync(`fixtures/${entry.name}/package.json`))
               .map((entry) => ({ fixture: entry.name }))
               .sort((a, b) => a.fixture.localeCompare(b.fixture))
+              .flatMap((row) => minors.map((react) => ({ ...row, react })))
             console.log(JSON.stringify({ include: rows }))
           ')
           echo "fixtures=$MATRIX" >> "$GITHUB_OUTPUT"
@@ -146,6 +166,10 @@ jobs:
       - name: Run Typecheck
         run: ${{ needs.prepare.outputs.runner }} run typecheck
 
+      # The unit test of the scripts' pure logic (scripts/*.test.mjs, Node's test runner), at 100%.
+      - name: Test the scripts
+        run: ${{ needs.prepare.outputs.runner }} run test:scripts
+
       # Fail the build if the generated package config (.codecov.yml, the issue forms'
       # "Affected area" lists, the label-area allowlist) has drifted from packages/.
       - name: Check generated package config
@@ -161,9 +185,12 @@ jobs:
       - name: Check release notes
         run: ${{ needs.prepare.outputs.runner }} run check:release-notes
 
-  # One row per package: install, run its `test:coverage`, upload its lcov under its
-  # own Codecov flag. Packages are alike, so they are a matrix rather than a job each.
+  # One row per package and React minor: install with that React pinned, run the package's tests.
+  # The rows on the newest React run `test:coverage` and upload the lcov under the package's own
+  # Codecov flag, so a flag gets one report per run. Packages are alike, so they are a matrix rather
+  # than a job each.
   packages:
+    name: packages (${{ matrix.dir }}, react ${{ matrix.react }})
     needs: [prepare, lint]
     runs-on: ubuntu-latest
     permissions:
@@ -185,20 +212,28 @@ jobs:
           node_version: ${{ needs.prepare.outputs.node_version }}
           manager: ${{ needs.prepare.outputs.manager }}
           command: ${{ needs.prepare.outputs.command }}
+          react: ${{ matrix.react }}
 
       - name: Run Tests with Coverage
+        if: matrix.react == needs.prepare.outputs.react_newest
         run: ${{ needs.prepare.outputs.runner }} --filter ${{ matrix.filter }} test:coverage
+
+      - name: Run Tests
+        if: matrix.react != needs.prepare.outputs.react_newest
+        run: ${{ needs.prepare.outputs.runner }} --filter ${{ matrix.filter }} test
 
       # vitest writes lcov paths relative to the member (e.g. SF:src/index.ts), which is
       # ambiguous across the monorepo - Codecov can't map a lone src/index.ts and silently
       # drops the flag's coverage. Prefix with the member's own directory so paths are
       # repo-relative and unique. Via env (never spliced into the shell).
       - name: Make lcov paths repo-relative for Codecov
+        if: matrix.react == needs.prepare.outputs.react_newest
         env:
           DIR: ${{ matrix.dir }}
         run: sed -i "s#^SF:#SF:packages/$DIR/#" "packages/$DIR/coverage/lcov.info"
 
       - name: Upload Coverage to Codecov
+        if: matrix.react == needs.prepare.outputs.react_newest
         uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         with:
           use_oidc: true
@@ -210,12 +245,18 @@ jobs:
   # What a pull request must prove about publishing: the packages build, and the packed
   # tarballs work together from outside the workspace (import, require, the export conditions, a
   # server render, the declarations under two module resolutions). The smoke test installs from npm.
+  # One row per React minor, each of which also typechecks the workspace on that React.
   build:
+    name: build (react ${{ matrix.react }})
     needs: [prepare, lint]
     runs-on: ubuntu-latest
     permissions:
       contents: read
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        react: ${{ fromJSON(needs.prepare.outputs.react) }}
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v7
@@ -228,16 +269,24 @@ jobs:
           node_version: ${{ needs.prepare.outputs.node_version }}
           manager: ${{ needs.prepare.outputs.manager }}
           command: ${{ needs.prepare.outputs.command }}
+          react: ${{ matrix.react }}
+
+      - name: Run Typecheck
+        run: ${{ needs.prepare.outputs.runner }} run typecheck
 
       - name: Build the packages
         run: ${{ needs.prepare.outputs.runner }} run build
 
+      # The consumer of the packed tarballs installs react from npm at the version the React binding
+      # develops against, whatever is pinned in this checkout, so one row is enough.
       - name: Smoke-test the packed packages
+        if: matrix.react == needs.prepare.outputs.react_newest
         run: node scripts/smoke-packed.mjs
 
   # Tier 2 of docs/testing.md: the engine's own output in real headless Chromium, in the packages that
   # have a `test:browser` script. The default test and coverage runs above need no browser.
   browser:
+    name: browser (${{ matrix.filter }}, react ${{ matrix.react }})
     needs: [prepare, lint]
     runs-on: ubuntu-latest
     permissions:
@@ -246,9 +295,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - filter: '@umber-style/core'
-          - filter: '@umber-style/react'
+        filter: ['@umber-style/core', '@umber-style/react']
+        react: ${{ fromJSON(needs.prepare.outputs.react) }}
     env:
       PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/ms-playwright
     steps:
@@ -263,6 +311,7 @@ jobs:
           node_version: ${{ needs.prepare.outputs.node_version }}
           manager: ${{ needs.prepare.outputs.manager }}
           command: ${{ needs.prepare.outputs.command }}
+          react: ${{ matrix.react }}
 
       # After the install, which touches nothing on this path.
       - name: Restore cache - Playwright binaries
@@ -309,8 +358,11 @@ jobs:
 
   # Tier 3 of docs/testing.md: one row per fixture app. Each is built, served as in production, and
   # driven by Playwright Test. A test marked as a known failure is an expected failure: it does not
-  # fail the run, but one that starts to pass does, so the mark gets removed.
+  # fail the run, but one that starts to pass does, so the mark gets removed. One row per fixture and
+  # React minor. The App Router fixture (next-app) runs the React that Next.js bundles, whatever is
+  # installed, and its rows say so in their names.
   e2e:
+    name: e2e (${{ matrix.fixture }}, react ${{ matrix.react }}${{ matrix.fixture == 'next-app' && ' installed, runs the React of Next.js' || '' }})
     needs: [prepare, lint]
     runs-on: ubuntu-latest
     permissions:
@@ -334,6 +386,7 @@ jobs:
           node_version: ${{ needs.prepare.outputs.node_version }}
           manager: ${{ needs.prepare.outputs.manager }}
           command: ${{ needs.prepare.outputs.command }}
+          react: ${{ matrix.react }}
 
       # Same pinned browser location and key as the browser job, so both tiers share one download.
       - name: Restore cache - Playwright binaries
@@ -375,8 +428,10 @@ jobs:
 
   # The development tier of docs/testing.md: the fixtures that have a development server, each started with
   # its own `dev` script and driven by Playwright Test (hydration, strict mode, hot replacement, the
-  # development checker, navigation). The rows are the fixtures with a `devPort` in e2e/fixtures.ts.
+  # development checker, navigation). The rows are the fixtures with a `devPort` in e2e/fixtures.ts,
+  # each on every React minor; next-app runs the React that Next.js bundles, as in e2e.
   e2e-dev:
+    name: e2e-dev (${{ matrix.fixture }}, react ${{ matrix.react }}${{ matrix.fixture == 'next-app' && ' installed, runs the React of Next.js' || '' }})
     needs: [prepare, lint]
     runs-on: ubuntu-latest
     permissions:
@@ -386,6 +441,7 @@ jobs:
       fail-fast: false
       matrix:
         fixture: [vike-ssg, next-app, spa]
+        react: ${{ fromJSON(needs.prepare.outputs.react) }}
     env:
       PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/ms-playwright
       E2E_FIXTURE: ${{ matrix.fixture }}
@@ -401,6 +457,7 @@ jobs:
           node_version: ${{ needs.prepare.outputs.node_version }}
           manager: ${{ needs.prepare.outputs.manager }}
           command: ${{ needs.prepare.outputs.command }}
+          react: ${{ matrix.react }}
 
       # Same pinned browser location and key as the browser job, so both tiers share one download.
       - name: Restore cache - Playwright binaries

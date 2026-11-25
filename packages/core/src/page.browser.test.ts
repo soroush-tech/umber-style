@@ -35,6 +35,21 @@ describe('the page that a cache reads, in a real browser', () => {
     expect(findMissingStyles().map((problem) => problem.name)).toEqual([`${prefix}-nothing`])
   })
 
+  it('reads a class with an upper-case label, and one that the browser writes with escapes', () => {
+    const prefix = nextPrefix()
+    const engine = createEngine(light, { prefix })
+    const own = engine.cache.css({ label: 'View-Sidebar', display: 'flex' })
+    expect(own).toMatch(/-View-Sidebar-/)
+    addHoisted(prefix, String.raw`.${prefix}-md\:flex,.${prefix}-\49 cons{display:flex;}`)
+    const rule = [...document.styleSheets].flatMap((sheet) => [...sheet.cssRules]).at(-1)
+    // The browser keeps an escape in the text of the selector.
+    expect((rule as CSSStyleRule).selectorText).toContain('\\')
+    document.body.innerHTML = `<p class="${own} ${prefix}-md:flex ${prefix}-Icons"></p>`
+    expect(findMissingStyles(document, { prefix })).toEqual([])
+    document.body.innerHTML = `<p class="${own} ${prefix}-View-Sidebar-x"></p>`
+    expect(findMissingStyles().map((problem) => problem.name)).toEqual([`${prefix}-View-Sidebar-x`])
+  })
+
   it('finds a variable that the theme of the page does not give', () => {
     const prefix = nextPrefix()
     const engine = createEngine(light, { prefix })

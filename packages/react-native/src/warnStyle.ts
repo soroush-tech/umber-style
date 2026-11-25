@@ -83,19 +83,27 @@ function describeDropped(key: string): string | undefined {
   }
   if (key.startsWith('@')) return 'React Native has no at-rules'
   if (key.startsWith('--')) return 'React Native has no custom properties'
-  if (ANIMATION_KEY.test(key)) return 'animations do not run on React Native yet'
   return 'React Native has no selectors'
 }
 
+/** What the warning about an animation or transition key says when the animated entry is not on, and how to turn it on. */
+const MOTION_OFF =
+  "the animated entry is not on, so animations and transitions do not run. With react-native-reanimated installed, import { animated } from '@umber-style/react-native/animated' and pass it: createStyle(theme, { animated }) or configure({ animated })."
+
 /**
  * In development, warns (once for each distinct message) that the web-only key `key`, written outside
- * the `web` part of a style, is dropped: a selector, an at-rule, a custom property, or an `animation*` or
- * `transition*` key, or a media query with something the binding does not evaluate. `label`, a `when()`,
+ * the `web` part of a style, is dropped: a selector, an at-rule, a custom property, or a media query with
+ * something the binding does not evaluate; or that an `animation*` or `transition*` key is dropped because
+ * the animated entry is not on, and how to turn it on. `label`, a `when()`,
  * `whenScheme()` or `state()` key that does not match, and a media query that does not match are not
  * mistakes.
  */
 export function warnAboutDroppedKey(key: string, name: string | undefined): void {
   if (!isDevelopment()) return
+  if (ANIMATION_KEY.test(key)) {
+    warnOnce(`"${key}" is dropped: ${MOTION_OFF}`, name)
+    return
+  }
   const reason = describeDropped(key)
   if (reason === undefined) return
   warnOnce(
@@ -132,8 +140,30 @@ export function warnAboutQuery(query: string, problem: string): void {
   )
 }
 
+/**
+ * In development, warns (once for each distinct message) about an animation or transition value that the
+ * animated entry cannot read or the animation library would reject, with the name of the component.
+ */
+export function warnAboutMotion(message: string, name: string | undefined): void {
+  if (!isDevelopment()) return
+  warnOnce(message, name)
+}
+
+/**
+ * In development, warns (once for each component) that a function style starts an animation or a
+ * transition in a component whose object styles name none: from then on the component is wrapped in the
+ * animated component of the library, and an instance that was mounted without it mounts again once.
+ */
+export function warnAboutLateMotion(component: string | undefined): void {
+  if (!isDevelopment()) return
+  warnOnce(
+    'a function style returns an animation or transition key, and no object style of the component names one: the component is wrapped in the animated component of the library from now on, and an instance that was already mounted mounts again once. Name an animation or transition key in an object style of the component as well (transitionProperty is enough) to wrap it from the start.',
+    component
+  )
+}
+
 /** The options of `createStyle` and `configure` that React Native uses; every other option is for the web. */
-const NATIVE_OPTIONS = new Set(['theme', 'remBase', 'lengthKeys'])
+const NATIVE_OPTIONS = new Set(['theme', 'remBase', 'lengthKeys', 'animated'])
 
 /** In development, warns (once) about the options of `createStyle` or `configure` that React Native does not use, by name. */
 export function warnAboutIgnoredOptions(options: object): void {
@@ -143,7 +173,7 @@ export function warnAboutIgnoredOptions(options: object): void {
     .map(([name]) => name)
   if (ignored.length === 0) return
   warnOnce(
-    `the options ${ignored.join(', ')} are for the web, and React Native does not use them: they are ignored. Only theme, remBase and lengthKeys are read.`,
+    `the options ${ignored.join(', ')} are for the web, and React Native does not use them: they are ignored. Only theme, remBase, lengthKeys and animated are read.`,
     undefined
   )
 }

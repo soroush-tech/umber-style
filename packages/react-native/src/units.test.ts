@@ -1,18 +1,21 @@
 // The type tests of the converted keys: `pnpm typecheck` compiles this file.
 import { expectTypeOf } from 'vitest'
-import type { NativeStyleObject } from './nativeStyle'
+import type { NativeMotionStyle, NativeStyleObject } from './nativeStyle'
 import { convertValues, LENGTH_KEYS, NUMBER_KEYS, readNumber, toLength } from './units'
 
-type Value<K extends keyof NativeStyleObject> = NonNullable<NativeStyleObject[K]>
+/** The keys of the platform's own style types: a native style without the animation and transition keys. */
+type PlatformStyle = Omit<NativeStyleObject, keyof NativeMotionStyle>
+
+type Value<K extends keyof PlatformStyle> = NonNullable<PlatformStyle[K]>
 
 /** The keys of a native style whose value type takes any number and is not a colour (a colour has a symbol member). */
 type NumericKey = {
-  [K in keyof NativeStyleObject]-?: number extends Value<K>
+  [K in keyof PlatformStyle]-?: number extends Value<K>
     ? [Extract<Value<K>, symbol>] extends [never]
       ? K
       : never
     : never
-}[keyof NativeStyleObject]
+}[keyof PlatformStyle]
 
 /** `style` with its lengths and numbers converted, as `toNativeStyle` does. */
 function converted(style: Record<string, unknown>, remBase = 16) {

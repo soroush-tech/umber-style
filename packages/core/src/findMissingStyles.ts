@@ -28,7 +28,8 @@ export interface FindMissingStylesOptions {
 }
 
 const STATE_PATTERN = /:(hover|focus|active|focus-visible|focus-within)\b/
-const NAME_CODES = /[a-z0-9_-]/
+/** What an escape whose code point is not a character stands for. */
+const REPLACEMENT = 0xfffd
 /** A selector that names the root element or the body: `html`, `body` or `:root` as a whole word. */
 const ROOT_PATTERN = /(?:^|[\s>+~(,])(?:html|body)(?![\w-])|:root(?![\w-])/
 /** The prefix named by the first style element of an engine in `page`, or undefined. */
@@ -51,14 +52,91 @@ function collectStyleRules(list: CSSRuleList, found: CSSStyleRule[]): CSSStyleRu
   return found
 }
 
+/**
+ * Whether the UTF-16 unit `code` can be in a name of CSS (an identifier) as it is: a letter of either
+ * case, a digit, `-`, `_`, or any unit past ASCII (each half of a pair is). The labels of the classes
+ * carry the names of components, so upper-case letters are common.
+ */
+function isNameCode(code: number): boolean {
+  return (
+    (code >= 0x61 && code <= 0x7a) ||
+    (code >= 0x41 && code <= 0x5a) ||
+    (code >= 0x30 && code <= 0x39) ||
+    code === 0x2d ||
+    code === 0x5f ||
+    code >= 0x80
+  )
+}
+
+/** Whether `code` is a hex digit. */
+function isHexCode(code: number): boolean {
+  return (
+    (code >= 0x30 && code <= 0x39) ||
+    (code >= 0x61 && code <= 0x66) ||
+    (code >= 0x41 && code <= 0x46)
+  )
+}
+
+/** Whether `code` is white space, which ends the hex digits of an escape. */
+function isWhiteSpace(code: number): boolean {
+  return code === 0x20 || code === 0x09 || code === 0x0a
+}
+
+/** Whether `code`, from the hex digits of an escape, is a character: not zero, not half of a pair, not past the last one. */
+function isCharacter(code: number): boolean {
+  return code !== 0 && code <= 0x10ffff && (code < 0xd800 || code > 0xdfff)
+}
+
+/**
+ * The code point at `at` of `text`; NaN past the end, so that every test of a code is false. Written
+ * here, not imported, because this file imports nothing at run time (see the top of the file).
+ */
+function readCode(text: string, at: number): number {
+  return text.codePointAt(at) ?? Number.NaN
+}
+
+/**
+ * The character of the escape whose backslash is right before `at` in `text`, and the index after the
+ * escape: up to six hex digits and one white space after them, else the next unit as it is.
+ */
+function readEscape(text: string, at: number): [character: string, end: number] {
+  let end = at
+  while (end < at + 6 && isHexCode(readCode(text, end))) end++
+  if (end === at) return [text.charAt(at), at + 1]
+  const code = Number.parseInt(text.slice(at, end), 16)
+  if (isWhiteSpace(readCode(text, end))) end++
+  return [String.fromCodePoint(isCharacter(code) ? code : REPLACEMENT), end]
+}
+
+/**
+ * The name (an identifier of CSS) that starts at `from` in `text`, with its escapes read, as the name
+ * of a class on an element or of a variable is written; and the index after it. A browser writes an
+ * escape in the text of a rule for a character that a name cannot hold as it is.
+ */
+function readName(text: string, from: number): [name: string, end: number] {
+  let name = ''
+  let end = from
+  while (end < text.length) {
+    const code = readCode(text, end)
+    if (code === 0x5c) {
+      const [character, after] = readEscape(text, end + 1)
+      name += character
+      end = after
+    } else if (isNameCode(code)) {
+      name += text[end]
+      end++
+    } else break
+  }
+  return [name, end]
+}
+
 /** The classes that start with `start` in `selector`. */
 function readClassNames(selector: string, start: string): string[] {
   const names: string[] = []
   let from = selector.indexOf(`.${start}`)
   while (from !== -1) {
-    let end = from + 1 + start.length
-    while (end < selector.length && NAME_CODES.test(selector[end])) end++
-    names.push(selector.slice(from + 1, end))
+    const [name, end] = readName(selector, from + 1)
+    names.push(name)
     from = selector.indexOf(`.${start}`, end)
   }
   return names
@@ -70,10 +148,9 @@ function readBareVariables(text: string, start: string): string[] {
   let from = text.indexOf('var(')
   while (from !== -1) {
     const begin = from + 4
-    let end = begin + start.length
     if (text.startsWith(start, begin)) {
-      while (end < text.length && NAME_CODES.test(text[end])) end++
-      if (text[end] === ')') names.push(text.slice(begin, end))
+      const [name, end] = readName(text, begin)
+      if (text[end] === ')') names.push(name)
     }
     from = text.indexOf('var(', begin)
   }

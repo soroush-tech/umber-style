@@ -69,7 +69,7 @@ describe('styled on React Native', () => {
     const pulse = keyframes((theme) => ({ '50%': { opacity: 0.4, color: theme.palette.primary } }))
     expect(pulse).toMatch(/^keyframes-[a-z0-9]+$/)
     const { View, calls } = createStandIn()
-    // The native style type has no animation key; a style that is not checked against it can hold one.
+    // A style written for the web, typed as an object, with its animation keys.
     const webStyle: object = {
       animation: `${pulse} 1.5s ease-in-out infinite`,
       transitionDuration: 200,
