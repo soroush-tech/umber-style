@@ -83,7 +83,8 @@ export function readMediaKey(
     for (const query of queries) key += readMediaQuery(query).matches(state, remBase) ? '1' : '0'
   }
   if (hasScheme) key += `:${String(platformAppearance.getColorScheme())}`
-  return hasMotion ? `${key}|${isReducedMotion ? 'reduce' : 'motion'}` : key
+  if (!hasMotion) return key
+  return `${key}|${isReducedMotion ? 'reduce' : 'motion'}`
 }
 
 /**

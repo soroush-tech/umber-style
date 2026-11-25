@@ -39,10 +39,8 @@ type Look = 'still' | 'skeleton' | 'function'
 function prepare(look: Look, hasEntry: boolean): () => string {
   const style = createStyle(theme, hasEntry ? { animated } : {})
   const { styled, ThemeProvider } = style
-  const Component =
-    look === 'function'
-      ? styled(View)(() => skeleton)
-      : styled(View)(look === 'still' ? still : skeleton)
+  const objectStyle = look === 'still' ? still : skeleton
+  const Component = look === 'function' ? styled(View)(() => skeleton) : styled(View)(objectStyle)
   const children = Array.from({ length: 48 }, (_, key) => h(Component, { key }))
   const element = h(ThemeProvider, { theme }, children)
   renderToString(element)

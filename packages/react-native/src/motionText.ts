@@ -26,7 +26,7 @@ const STEP_POSITIONS: ReadonlySet<string> = new Set([
 ])
 
 /** The characters a CSS number is written with. */
-const NUMBER_CHARACTERS: ReadonlySet<string> = new Set([...'0123456789.+-eE'])
+const NUMBER_CHARACTERS: ReadonlySet<string> = new Set('0123456789.+-eE')
 
 /** Whether `character` separates the words of a value: a space, a tab or a line break. */
 function isSpace(character: string): boolean {
@@ -96,7 +96,7 @@ function readArguments(text: string, name: string): string[] | undefined {
 /** `cubic-bezier(x1, y1, x2, y2)` read, with the x of both points from 0 to 1 as CSS requires. */
 function readCurve(parts: readonly string[]): EasingReading | undefined {
   const numbers = parts.map(readCssNumber)
-  if (numbers.length !== 4 || numbers.some((number) => number === undefined)) return undefined
+  if (numbers.length !== 4 || numbers.includes(undefined)) return undefined
   const [x1, y1, x2, y2] = numbers as [number, number, number, number]
   if (x1 < 0 || x1 > 1 || x2 < 0 || x2 > 1) return undefined
   return { kind: 'cubic-bezier', points: [x1, y1, x2, y2] }

@@ -197,7 +197,7 @@ export function createAnimatedDriver(library: AnimationLibrary): AnimatedDriver 
       const readLonghand = (key: string, value: unknown, styleName: string | undefined) => {
         if (key === 'animationName') return readNames(value, styleName)
         const items = readItems(value).map(READERS[key])
-        if (items.some((item) => item === undefined)) return undefined
+        if (items.includes(undefined)) return undefined
         if (key === 'transitionProperty' && items.length > 1 && items.includes('none')) {
           return undefined
         }

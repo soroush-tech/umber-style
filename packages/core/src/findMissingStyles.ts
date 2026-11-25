@@ -88,15 +88,23 @@ function isCharacter(code: number): boolean {
 }
 
 /**
+ * The code point at `at` of `text`; NaN past the end, so that every test of a code is false. Written
+ * here, not imported, because this file imports nothing at run time (see the top of the file).
+ */
+function readCode(text: string, at: number): number {
+  return text.codePointAt(at) ?? Number.NaN
+}
+
+/**
  * The character of the escape whose backslash is right before `at` in `text`, and the index after the
  * escape: up to six hex digits and one white space after them, else the next unit as it is.
  */
 function readEscape(text: string, at: number): [character: string, end: number] {
   let end = at
-  while (end < at + 6 && isHexCode(text.charCodeAt(end))) end++
+  while (end < at + 6 && isHexCode(readCode(text, end))) end++
   if (end === at) return [text.charAt(at), at + 1]
   const code = Number.parseInt(text.slice(at, end), 16)
-  if (isWhiteSpace(text.charCodeAt(end))) end++
+  if (isWhiteSpace(readCode(text, end))) end++
   return [String.fromCodePoint(isCharacter(code) ? code : REPLACEMENT), end]
 }
 
@@ -109,7 +117,7 @@ function readName(text: string, from: number): [name: string, end: number] {
   let name = ''
   let end = from
   while (end < text.length) {
-    const code = text.charCodeAt(end)
+    const code = readCode(text, end)
     if (code === 0x5c) {
       const [character, after] = readEscape(text, end + 1)
       name += character
