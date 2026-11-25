@@ -12,9 +12,11 @@ import { spawnSync } from 'node:child_process'
 import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { GATE_OPTIONS } from '../gate/baseline.ts'
+import { toCliArguments } from '../src/gateOptions.ts'
 
-/** What the `bench` job of ci.yml gives soroush-tech/bench-action: keep the two the same. */
-const JOB_OPTIONS = ['--baseline-case', 'previous', '--min-ratio', '80', '--rounds', '5']
+/** What the `bench` job of ci.yml gives soroush-tech/bench-action: both read GATE_OPTIONS. */
+const JOB_OPTIONS = toCliArguments(GATE_OPTIONS)
 
 /** The options of soroush-bench that take a value: the word after them is not a filter. */
 const VALUE_OPTIONS = new Set([
@@ -25,6 +27,7 @@ const VALUE_OPTIONS = new Set([
   '--tag',
   '--mount',
   '--md-file',
+  '--json-file',
   '--rounds',
   '--baseline-case',
   '--min-ratio',

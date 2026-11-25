@@ -15,7 +15,7 @@ A cache that starts in a browser, or hydrates a server-rendered page, finds styl
 It must know what they hold so that it does not write a rule twice and so that its bookkeeping (which
 classes exist, which variables are used, which themes declared what) matches the page. This file turns the
 text into that picture. `cache.ts` calls it on the text of each style element it adopts. It is its own
-file because it reads text only; it uses `scanVariables` from `variables.ts` for the references in a body.
+file because it reads text only; it uses `readName` from `cssName.ts` for the names of classes and `scanVariables` from `variables.ts` for the references in a body.
 
 ## The logic
 
@@ -76,5 +76,5 @@ theme classes, are not put in `classes`.
 ## Limits
 
 - CSS comments are not skipped; text with comments is outside what it reads.
-- A class name with an uppercase letter ends at that letter, since only lowercase letters, digits, `-` and
-  `_` are name characters.
+- A class name is read by `readName` of `cssName.ts`, so it is read whole when it has upper-case or non-ASCII
+  letters, and an escape in it is decoded: the recorded name is the one the cache keys the class by.

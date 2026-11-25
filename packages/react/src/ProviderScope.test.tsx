@@ -685,6 +685,22 @@ describe('one live root rule', () => {
     expect(liveRoots()).toEqual(['@layerps-theme{:where(:root){--a:1;}}', ':where(:root){--c:1;}'])
     expect(other.sheet?.cssRules).toHaveLength(1)
   })
+
+  it('passes over an element that a content security policy refused, which has no sheet', () => {
+    const refused = document.createElement('style')
+    refused.dataset.precedence = 'ps'
+    refused.dataset.href = 'ps-root-old'
+    document.head.append(refused)
+    // A refused element has no sheet, as in a browser under a policy that does not allow its nonce.
+    Object.defineProperty(refused, 'sheet', { value: null })
+    const mine = document.createElement('style')
+    mine.dataset.precedence = 'ps'
+    mine.dataset.href = 'ps-root-mine'
+    mine.textContent = '.y{color:blue}'
+    document.head.append(mine)
+    keepRootRule('ps', 'ps-root-mine', ':where(:root){--c:1;}', document)
+    expect(liveRoots()).toEqual([':where(:root){--c:1;}'])
+  })
 })
 
 describe('the first HTML and hydration', () => {

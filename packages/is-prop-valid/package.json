@@ -1,6 +1,6 @@
 {
   "name": "@umber-style/is-prop-valid",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Whether a prop is one that an element takes: the attributes of HTML and SVG under React's names or Vue's, and the props of React Native's built-in components.",
   "keywords": [
     "styling",

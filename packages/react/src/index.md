@@ -22,7 +22,7 @@ program use the same one and read each other's providers and caches.
 flowchart LR
   shared["readSharedState 'react.default-style@1'"] --> make["createDefaultStyle (first copy only)"]
   make --> names["destructured named exports"]
-  core["core: add, alpha, at, divide, multiply, negate, state, subtract"] --> out["public API"]
+  core["core: add, alpha, at, divide, multiply, negate, state, subtract, setNonceSource"] --> out["public API"]
   names --> out
   cp["CacheProvider"] --> out
   mq["useMediaQuery, MediaQueryOptions"] --> out
@@ -34,6 +34,7 @@ flowchart LR
 - Importing the package makes no engine: the default style binds on first use (see `defaultStyle.md`).
 - No browser global is touched at module top level.
 - Names match the other bindings (`styled`, `ThemeProvider`, `useTheme`, `StyleSheet`, `useStyle`, `apply`).
+- `setNonceSource` is the core's: in this build nothing reads it (a classic server render takes the nonce of a cache of the request); the server build reads it (`index.server.md`).
 
 ## Decisions
 

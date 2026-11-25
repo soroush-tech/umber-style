@@ -1,5 +1,11 @@
 import { createElement, type ReactElement } from 'react'
-import { createGlobalMarker, type Cache, type GlobalRules } from '@umber-style/core'
+import {
+  createGlobalMarker,
+  type Cache,
+  type Engine,
+  type GlobalInput,
+  type GlobalRules,
+} from '@umber-style/core'
 
 /** A `<style href precedence>` element, as data: what a server component can hand to a client component. */
 export interface StyleText {
@@ -10,15 +16,15 @@ export interface StyleText {
 }
 
 /**
- * The `<style href precedence>` element of `style`, in the precedence of the prefix of `cache`, with the
- * nonce of the cache when it has one: React keeps the rules of such an element only when its nonce is the
- * style nonce of the render (`nonce: { style }` of React's server render), and sets it on the element it
- * makes in the browser.
+ * The `<style href precedence>` element of `style`, in the precedence of the prefix of `cache`, with
+ * `nonce` (the nonce of the cache unless the server build gives the request's) when there is one: React
+ * keeps the rules of such an element only when its nonce is the style nonce of the render (`nonce: { style }`
+ * of React's server render), and sets it on the element it makes in the browser.
  */
 const toElement =
-  (cache: Cache) =>
+  (cache: Cache, nonce: string | undefined) =>
   ({ href, text }: StyleText): ReactElement =>
-    createElement('style', { key: href, href, precedence: cache.prefix, nonce: cache.nonce }, text)
+    createElement('style', { key: href, href, precedence: cache.prefix, nonce }, text)
 
 /**
  * The style elements of the animations in `names` that `sent` does not hold yet, which it adds them to:
@@ -40,6 +46,21 @@ function collectKeyframesTexts(
   return texts
 }
 
+// The text of the style element of a class, by the rules the cache gave for it (`getFullRules`): the
+// cache gives the same list while it holds the class, so a render after the first reuses the text, and
+// the text goes when the cache lets the list go.
+const classTexts = new WeakMap<readonly string[], string>()
+
+/** The text of the style element of a class whose rules are `rules`: the order statement of the layers of `cache`, then the rules. */
+function readClassText(cache: Cache, rules: readonly string[]): string {
+  let text = classTexts.get(rules)
+  if (text === undefined) {
+    text = [cache.layerOrder, ...rules].join('')
+    classTexts.set(rules, text)
+  }
+  return text
+}
+
 /**
  * The style elements, as data, of the classes in `className`: React 19 moves them to the head and renders
  * each `href` once. Each one starts with the order statement of the layers (none without layers), so
@@ -58,22 +79,30 @@ export function collectStyleTexts(cache: Cache, className: string | undefined): 
       if (rules.length === 0) return []
       return [
         ...collectKeyframesTexts(cache, cache.getAnimations(name), sent),
-        { href: name, text: [cache.layerOrder, ...rules].join('') },
+        { href: name, text: readClassText(cache, rules) },
       ]
     })
 }
 
-/** The `<style href precedence>` elements for the classes in `className` (see `collectStyleTexts`); the precedence is the prefix of the cache. */
-export function createStyleElements(cache: Cache, className: string | undefined): ReactElement[] {
-  return collectStyleTexts(cache, className).map(toElement(cache))
+/** The `<style href precedence>` elements for the classes in `className` (see `collectStyleTexts`); the precedence is the prefix of the cache, the nonce `nonce`, that of the cache by default. */
+export function createStyleElements(
+  cache: Cache,
+  className: string | undefined,
+  nonce = cache.nonce
+): ReactElement[] {
+  return collectStyleTexts(cache, className).map(toElement(cache, nonce))
 }
 
 /**
  * The `<style href precedence>` elements of global rules that the cache wrote (`insertGlobal`): for each set
  * with rules, the elements of the animations it uses, then its own, with its id as `href` and the order
- * statement of the layers first. Each `href` once.
+ * statement of the layers first. Each `href` once. The nonce is `nonce`, that of the cache by default.
  */
-export function createGlobalElements(cache: Cache, sets: readonly GlobalRules[]): ReactElement[] {
+export function createGlobalElements(
+  cache: Cache,
+  sets: readonly GlobalRules[],
+  nonce = cache.nonce
+): ReactElement[] {
   const sent = new Set<string>()
   const texts = sets.flatMap(({ id, rules, animations }) => {
     if (rules.length === 0 || sent.has(id)) return []
@@ -83,7 +112,40 @@ export function createGlobalElements(cache: Cache, sets: readonly GlobalRules[])
       { href: id, text: [cache.layerOrder, ...rules].join('') },
     ]
   })
-  return texts.map(toElement(cache))
+  return texts.map(toElement(cache, nonce))
+}
+
+// The sets of global styles resolved by each engine, by the styles (an object, a handle, a function or a
+// list) and the theme view: all three kept weakly, so the sets go with any of them.
+const resolved = new WeakMap<object, WeakMap<object, WeakMap<object, GlobalRules[]>>>()
+
+/** The map of `outer` under `key`, made empty when there is none. */
+function readInner<V>(outer: WeakMap<object, V>, key: object, create: () => V): V {
+  let inner = outer.get(key)
+  if (inner === undefined) {
+    inner = create()
+    outer.set(key, inner)
+  }
+  return inner
+}
+
+/**
+ * `engine.resolveGlobal(styles, view)`, kept for the same engine, styles and view: a server render that
+ * renders `Global` again with the styles and the view of the render before gets the same sets, and a
+ * function of the theme is not called again (nor the `css` template it returns read again). Styles that
+ * are no object or function (nothing, `false`) are resolved each time, which costs nothing.
+ */
+export function readGlobalSets<T>(
+  engine: Engine<T>,
+  styles: GlobalInput<T>,
+  view: T
+): GlobalRules[] {
+  if (styles === null || (typeof styles !== 'object' && typeof styles !== 'function')) {
+    return engine.resolveGlobal(styles, view)
+  }
+  const byStyles = readInner(resolved, engine, () => new WeakMap())
+  const byView = readInner(byStyles, styles, () => new WeakMap<object, GlobalRules[]>())
+  return readInner(byView, view as object, () => engine.resolveGlobal(styles, view))
 }
 
 /**

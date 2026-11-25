@@ -1,7 +1,8 @@
 import { createElement, Fragment, type ReactElement } from 'react'
 import type { Engine } from '@umber-style/core'
 import { GlobalRelease } from './GlobalRelease'
-import { createGlobalElements } from './styleElements'
+import { createGlobalElements, readGlobalSets } from './styleElements'
+import { withNonce, type RequestNonce } from './serverContext'
 import type { GlobalProps } from './types'
 
 /**
@@ -13,9 +14,13 @@ import type { GlobalProps } from './types'
  * (an import of a `'use client'` file is a reference to it here), with the sets as plain data: in the
  * browser it lets the cache take the rules over and release them when the page is left.
  */
-export function createGlobal<T>(engine: Engine<T>, readTheme: () => T) {
-  return function Global({ styles }: GlobalProps<T>): ReactElement {
-    const sets = engine.resolveGlobal(styles, engine.createThemeView(readTheme()))
+export function createGlobal<T>(
+  engine: Engine<T>,
+  readTheme: () => T,
+  readNonce: () => RequestNonce
+) {
+  return function Global({ styles }: GlobalProps<T>): ReactElement | Promise<ReactElement> {
+    const sets = readGlobalSets(engine, styles, engine.createThemeView(readTheme()))
     for (const set of sets) engine.cache.insertGlobal(set, { isRendered: true })
     const written = sets.filter(({ rules }) => rules.length > 0)
     const release =
@@ -28,6 +33,8 @@ export function createGlobal<T>(engine: Engine<T>, readTheme: () => T) {
               sets: JSON.stringify(written.map(({ id, rules }) => [id, rules])),
             }),
           ]
-    return createElement(Fragment, null, ...createGlobalElements(engine.cache, sets), ...release)
+    return withNonce(readNonce(), (nonce) =>
+      createElement(Fragment, null, ...createGlobalElements(engine.cache, sets, nonce), ...release)
+    )
   }
 }

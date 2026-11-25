@@ -262,6 +262,21 @@ In a style function a token is a reference, so code written for real values that
 
 For the warning the view is wrapped in a `Proxy` while the checks are on. Without them (in production) a style function gets the view itself: no wrapper is made, and the cost is nothing (`referenceKeys.test.ts` checks that the theme a style function gets is the very object of `engine.refs`). Only a read of the theme view is watched: a token used as the key of an object of your own (`sizes[theme.typography.h1.fontSize]`) is not seen.
 
+### A token whose value is a CSS-wide keyword
+
+A token in `variable` or `reference` mode becomes a custom property, and a custom property takes `inherit`, `initial`, `unset`, `revert` and `revert-layer` as itself, not as a value for the property that uses it. `--umber-text-inherit: inherit` gives the variable the value of `--umber-text-inherit` on the parent, which is usually nothing, so `background-color: var(--umber-text-inherit)` is `transparent`, and only an inherited property such as `color` seems to work.
+
+With the development checks the engine warns once for each such path, in any letter case and with white space around the keyword or not: `[umber] The token "text.inherit" is the CSS-wide keyword inherit, which a variable takes as itself: ...`. The two ways out: write the keyword in the style itself, or give the path the mode `raw`, so that a style gets the keyword as it is:
+
+```ts
+const theme = { text: { primary: '#1a1a1a', inherit: 'inherit' } }
+
+const engine = createEngine(theme, { prefix: 'umber', modes: { 'text.inherit': 'raw' } })
+engine.refs.text.inherit // 'inherit', and no warning
+```
+
+A token in `raw` or `inline` mode is never warned about: its value is not a custom property. From `createEngine.keywords.test.ts`.
+
 ## Only the variables in use
 
 A theme class does not declare every token. The engine scans each rule it inserts for `var(--name` (with or without a fallback, nested fallbacks included, in one pass over the text) and keeps the set of used names in the cache. A theme class declares the used names it has a value for, and nothing else.
@@ -355,5 +370,6 @@ What the tests do check: the rule text and where it is written. In jsdom, which 
 - The arithmetic helpers do not know a variable's value. `multiply('var(--x)', 2)` is a `calc()` that the browser computes, so it cannot be used where a plain number is needed (a `z-index`, for example).
 - On React Native, `alpha` cannot mix: a colour it cannot read as a literal (a named colour, `hsl()`) is returned at full opacity, whatever the opacity is.
 - `lengthKeys` and `rawKeys` take top-level keys only. For anything deeper use `modes`.
+- A token whose value is a CSS-wide keyword is warned about only with the development checks, and only for the whole value: a keyword inside a longer value (`inherit !important`, a fallback of `var()`) is not looked at.
 - `hasValueRepair` reads the text, and for a unit the value of the base theme, not the value the variable has in the page. A reference followed by two digits is valid in one contrived case, when the variable and the digits read as two items of a list (`flex: var(--grow)10`, where `--grow` is `1`, is `flex: 1 10`); the option rewrites it as alpha all the same. Parentheses inside a quoted string of a fallback are counted as any other. A token declared in one unit in the base theme and in another in a theme class is repaired for the base theme's unit; the other theme then gets a value the browser drops. Only the units listed above are read; another one after a reference (`fr`, `x`, `dpi`) is left as it is, with no warning.
 - Browser versions for `color-mix()` and `@property` are to be confirmed: see [Browser and platform support](browser-support.md).

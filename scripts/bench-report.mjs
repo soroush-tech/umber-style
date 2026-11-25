@@ -4,11 +4,11 @@
 // from npm, and one table says how long each version takes and how fast it is against the last stable.
 // cd-packages.yml runs it after a publish; it is a report, not a gate, and nothing here fails a release.
 //
-// Which versions are compared is planReport in bench/src/releases.ts. The times and the ratios are
-// soroush-bench's own: the median of `--rounds` rounds (5 by default) from the table it writes with
-// --md-file, and the ratio its gate prints for each case against --baseline-case. The gate is given a
-// target no case can reach, so that it prints the ratio of every case; its exit code is therefore not
-// read, and a file counts as run when its table and every ratio came back.
+// Which versions are compared is planReport in bench/src/releases.ts. The times are soroush-bench's own:
+// the median of `--rounds` rounds (5 by default) of each case, from the raw numbers it writes with
+// --json-file. The ratio is the one its gate checks, baseline.avg / version.avg, worked out from those
+// numbers by createReportRow (bench/src/reportTable.ts), which also lays out the table. No gate runs, so a
+// file counts as run when soroush-bench exits with 0 and its JSON has every version.
 //
 //   --summary <file>  also append the markdown to this file (the job summary)
 //   --release         also append each package's table to its GitHub Release `<name>@<version>`, after
@@ -31,6 +31,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { planReport } from '../bench/src/releases.ts'
+import { createColumns, createReportRow, formatReport } from '../bench/src/reportTable.ts'
 
 /** The packages that have report scenarios, and the folder of their report files. */
 const SCENARIOS = { '@umber-style/core': 'bench/report' }
@@ -38,10 +39,6 @@ const REGISTRY = 'https://registry.npmjs.org'
 /** How long to wait for the registry to list a version it was just given: 30 tries, 10 seconds apart. */
 const REGISTRY_TRIES = 30
 const REGISTRY_DELAY = 10_000
-/** A speed no case reaches, in percent: the gate then prints the ratio of every case. */
-const UNREACHABLE_RATIO = '1000000000'
-/** How the table of soroush-bench writes microseconds: with the micro sign, which the report writes as us. */
-const MICRO_SECONDS = `${String.fromCodePoint(0xb5)}s`
 /** Where a table is put in the notes of a Release, so that a run again replaces it. */
 const MARKER = '<!-- umber-style benchmark report -->'
 
@@ -91,82 +88,18 @@ async function waitForVersions(name, version) {
   return undefined
 }
 
-/** The markdown table that soroush-bench wrote: the name of the file's config, and the mean time of one operation by case key. */
-function readTable(file) {
-  let name = file
-  const times = new Map()
-  for (const line of readFileSync(file, 'utf8').split('\n')) {
-    const cells = line.split('|').map((cell) => cell.trim())
-    if (cells.length < 4 || !cells[1].includes('::')) continue
-    const split = cells[1].lastIndexOf('::')
-    name = cells[1].slice(0, split).trim()
-    times.set(cells[1].slice(split + 2).trim(), cells[2].replaceAll(MICRO_SECONDS, 'us'))
-  }
-  return { name, times }
-}
-
-/** The ratios that the gate of soroush-bench printed, by case key: `<label> - <n>% of baseline speed`. */
-function readRatios(text) {
-  const ratios = new Map()
-  for (const match of text.matchAll(/^\s+.*::\s*(.+?) - ([\d.]+)% of baseline speed\r?$/gm)) {
-    ratios.set(match[1], `${match[2]}%`)
-  }
-  return ratios
-}
-
-/** Runs one report file and returns its row, or undefined when it did not come back whole. */
-function runFile(file, plan, outDir) {
-  const tableFile = join(outDir, `${file.replace(/\W/g, '_')}.md`)
-  rmSync(tableFile, { force: true })
-  const result = spawnSync(
+/** Runs one report file and returns its row, or undefined when it did not run to the end or a version is missing from it. */
+function runFile(file, columns, outDir) {
+  const name = `${file.replace(/\W/g, '_')}.json`
+  const jsonFile = join(outDir, name)
+  rmSync(jsonFile, { force: true })
+  const { status } = spawnSync(
     process.execPath,
-    [
-      cli,
-      file,
-      '--rounds',
-      rounds,
-      '--mount',
-      `${outDir}:/out`,
-      '--md-file',
-      `/out/${file.replace(/\W/g, '_')}.md`,
-      '--baseline-case',
-      plan.baseline,
-      '--min-ratio',
-      UNREACHABLE_RATIO,
-    ],
-    {
-      cwd: root,
-      encoding: 'utf8',
-      stdio: ['ignore', 'inherit', 'pipe'],
-      maxBuffer: 64 * 1024 * 1024,
-    }
+    [cli, file, '--rounds', rounds, '--mount', `${outDir}:/out`, '--json-file', `/out/${name}`],
+    { cwd: root, stdio: 'inherit' }
   )
-  process.stderr.write(result.stderr ?? '')
-  if (!existsSync(tableFile)) return undefined
-  const { name, times } = readTable(tableFile)
-  const ratios = readRatios(result.stderr ?? '')
-  const cells = plan.versions.map(({ version }) => {
-    const time = times.get(version)
-    if (version === plan.baseline) return time
-    const ratio = ratios.get(version)
-    return time === undefined || ratio === undefined ? undefined : `${time} (${ratio})`
-  })
-  if (cells.includes(undefined)) return undefined
-  return { name, cells }
-}
-
-/** The markdown of one package's report. */
-function formatReport(spec, plan, rows) {
-  const head = plan.versions.map(({ version, role }) => `${version} (${role})`)
-  return [
-    `### Benchmarks: \`${spec}\``,
-    '',
-    `Each row is one scenario of \`bench/report/\`, the median of ${rounds} rounds in the soroush-bench sandbox (one CPU, 512 MB), every version installed from npm. A cell is the mean time of one operation and, in brackets, the speed against ${plan.baseline}: above 100% is faster.`,
-    '',
-    `| Scenario | ${head.join(' | ')} |`,
-    `| --- | ${head.map(() => '---:').join(' | ')} |`,
-    ...rows.map(({ name, cells }) => `| ${name} | ${cells.join(' | ')} |`),
-  ].join('\n')
+  if (status !== 0 || !existsSync(jsonFile)) return undefined
+  return createReportRow(JSON.parse(readFileSync(jsonFile, 'utf8')), columns)
 }
 
 /** Puts `table` after the notes of the GitHub Release `tag`, in place of the table a run before put there. */
@@ -209,16 +142,15 @@ for (const spec of specs) {
     isFailed = true
     continue
   }
-  const { published, compared, baseline } = planReport(available, version)
-  if (baseline === undefined) {
+  // The columns of the table: the versions compared, oldest first, then the one just published.
+  const columns = createColumns(planReport(available, version))
+  if (columns === undefined) {
     say(`\`${spec}\`: no earlier release to compare with (a first release), so there is no report.`)
     continue
   }
-  // The columns of the table: the versions compared, oldest first, then the one just published.
-  const plan = { baseline, versions: [...compared, { version: published, role: 'published' }] }
   writeFileSync(
     join(root, folder, 'versions.json'),
-    `${JSON.stringify({ package: name, versions: plan.versions.map(({ version: each }) => each) })}\n`
+    `${JSON.stringify({ package: name, versions: columns.versions.map(({ version: each }) => each) })}\n`
   )
   // Writable by the sandbox's own user, whose id is not the runner's.
   const outDir = mkdtempSync(join(tmpdir(), 'bench-report-'))
@@ -231,12 +163,12 @@ for (const spec of specs) {
   const missing = []
   for (const file of files) {
     console.log(`\n=== ${file} ===`)
-    const row = runFile(file, plan, outDir)
+    const row = runFile(file, columns, outDir)
     if (row === undefined) missing.push(file)
     else rows.push(row)
   }
   rmSync(outDir, { recursive: true, force: true })
-  const table = formatReport(spec, plan, rows)
+  const table = formatReport(spec, columns, rows, rounds)
   say(`\n${table}`)
   if (missing.length > 0) {
     say(`\nThese files did not run to the end, so they have no row: ${missing.join(', ')}.`)

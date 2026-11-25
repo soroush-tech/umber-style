@@ -1,6 +1,6 @@
 {
   "name": "@umber-style/vue",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "UmberStyle for Vue: the same names as the React binding, with a reactive useTheme.",
   "keywords": [
     "styling",
@@ -63,7 +63,7 @@
     "vue": "^3.5.0"
   },
   "devDependencies": {
-    "@soroush.tech/bench": "^2.2.3",
+    "@soroush.tech/bench": "^2.3.0",
     "@types/node": "^26.6.6",
     "@umber-style/eslint-config": "workspace:*",
     "@umber-style/is-prop-valid": "workspace:*",

@@ -1,4 +1,4 @@
-import { codeAt } from './codeAt'
+import { readName } from './cssName'
 import { ROOT_SELECTOR } from './theme'
 import { scanVariables } from './variables'
 
@@ -54,19 +54,13 @@ const LAYER_AT_RULE = '@layer'
 const PROPERTY_AT_RULE = '@property'
 const KEYFRAMES_AT_RULE = '@keyframes'
 
-/** Whether `code` is a character of a class name: a lowercase letter, a digit, '-' or '_'. */
-function isNameCode(code: number): boolean {
-  return (code >= 97 && code <= 122) || (code >= 48 && code <= 57) || code === 45 || code === 95
-}
-
-/** The classes in `selector` whose name starts with `start` (`<prefix>-`), without the dot. */
+/** The classes in `selector` whose name starts with `start` (`<prefix>-`), without the dot, as `readName` reads them: the name the cache keys a class by. */
 function readClasses(selector: string, start: string): string[] {
   const names: string[] = []
   let from = selector.indexOf(`.${start}`)
   while (from !== -1) {
-    let end = from + 1 + start.length
-    while (isNameCode(codeAt(selector, end))) end++
-    names.push(selector.slice(from + 1, end))
+    const [name, end] = readName(selector, from + 1)
+    names.push(name)
     from = selector.indexOf(`.${start}`, end)
   }
   return names

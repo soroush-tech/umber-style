@@ -15,6 +15,9 @@ makes the engine, gives it the theme as base theme, and binds it. There is no `T
 A server component reads no context, so the theme must come from somewhere else: the base theme the app
 gave, else the theme of the first provider of the request. This file builds that reading (`readViewTheme`)
 and passes it to the server `styled` and `Global`, and passes the request slot to the server `ThemeProvider`.
+It also makes the reader of the nonce of a request (`createNonceReader`, `serverContext.ts`), with the
+nonce of the cache as its fallback, and gives it to all three, so that every style element of a request
+carries the nonce that a source registered with `setNonceSource` gave it.
 `defaultStyle.server.ts` and `index.server.ts` use it.
 
 ## The logic
@@ -31,7 +34,10 @@ flowchart TD
   useBase --> parts["createStyled, createGlobal, useStyle"]
   useFirst --> parts
   empty --> parts
-  slot --> provider["createThemeProvider(engine, readFirstSlot, readBaseTheme)"]
+  slot --> provider["createThemeProvider(engine, readFirstSlot, readBaseTheme, readNonce)"]
+  engine --> nonce["createNonceReader: the nonce of the cache, or of the source, once a request"]
+  nonce --> parts
+  nonce --> provider
   engine --> useTheme["useTheme: warn once in development if no base theme, return base theme"]
 ```
 

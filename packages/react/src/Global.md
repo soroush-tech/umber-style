@@ -25,11 +25,15 @@ flowchart TD
   local -->|no| own["engine"]
   over --> view["useThemeView(cache)"]
   own --> view
-  view --> sets["useMemo: resolveGlobal(styles, view)"]
-  sets --> effect["insertion effect"]
+  view --> sets{"useMemo: document defined?"}
+  sets -->|"yes: the browser"| resolveNow["resolveGlobal(styles, view)"]
+  sets -->|"no: a server render"| keptSets["readGlobalSets: the sets of the same styles and view, else resolveGlobal"]
+  resolveNow --> effect
+  keptSets --> effect
+  effect["insertion effect"]
   effect --> write["insertSets: write the new sets"]
   write --> drop["release the previous sets"]
-  sets --> doc{"document defined?"}
+  effect --> doc{"document defined?"}
   doc -->|yes| null["return null"]
   doc -->|no| forever["insertSets during render, never released"]
   forever --> elems["createServerElements(sets, cache)"]
@@ -56,6 +60,12 @@ set the component wrote.
 - Insertion effects, not layout effects, so the rules are in the sheet before the page changes.
 - Two insertion effects: one for write-then-release on a change, one that releases only on unmount.
 - The server branch writes during render because no effect runs there (a comment in the code says so).
+- Where there is no document, the sets come from `readGlobalSets` (`styleElements.ts`): a server renders
+  each request from nothing, so the memo of the component never sees the render before, and a function of
+  the theme was called (and the `css` template it returns read) in every render. Now a render with the
+  styles and the view of a render before takes the sets made then, as the memo does across renders in the
+  browser. In the browser nothing changes: the memo of the component decides, as before. On a design
+  system's home page, `Global` with a function of the theme was 15% of a server render.
 
 ## Limits
 

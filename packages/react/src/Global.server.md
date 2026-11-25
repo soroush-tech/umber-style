@@ -20,13 +20,13 @@ renders with the sets as plain JSON text. `createStyle.server.ts` is the importe
 ```mermaid
 flowchart TD
   styles["props.styles"] --> view["createThemeView(readTheme())"]
-  view --> resolve["engine.resolveGlobal"]
+  view --> resolve["readGlobalSets: the sets of the same styles and view, else engine.resolveGlobal"]
   resolve --> each["insertGlobal(set, isRendered) for each set"]
   each --> filter["keep sets with rules"]
   filter --> any{"any set with rules?"}
   any -->|no| noRelease["no release element"]
   any -->|yes| release["GlobalRelease: prefix, sets as JSON text"]
-  filter --> els["createGlobalElements(cache, sets)"]
+  filter --> els["createGlobalElements(cache, sets, the nonce of the request)"]
   els --> frag["Fragment: style elements, then release"]
   noRelease --> frag
   release --> frag
@@ -42,12 +42,17 @@ The props of `GlobalRelease`: `prefix` (the cache prefix) and `sets`, the `JSON.
 - `GlobalRelease` is imported from a `'use client'` file, so in a bundler of server components the import is
   a reference to it; it is never run on the server (`vitest.clientReferences.ts` mocks it the same way).
 - React sends each `href` once, however many components render the same set.
+- The style elements carry the nonce of the request (`readNonce`): the cache's, or the answer of the
+  source registered with `setNonceSource`; it returns a Promise of its elements while that has not come.
 
 ## Decisions
 
 - The sets are sent as text, not as an object, so the same sets in a new payload are equal (comment in
   `GlobalRelease.ts`).
 - The view of the theme comes from `readTheme`: base theme, else the first provider of the request, else empty.
+- The sets are those of `readGlobalSets` (`styleElements.ts`): a render with the styles and the view of a
+  render before gets the sets resolved then, so a function of the theme is not called again (nor the `css`
+  template it returns read again).
 
 ## Limits
 

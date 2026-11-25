@@ -47,11 +47,28 @@ Everything that depends on the base theme calls `readTokens()` first.
 
 Theme classes and root rules are made once for each theme object and colour scheme (a `WeakMap` of
 `Map`s): `themeId` adopts the theme as base if there is none, declares its variables, and calls
-`createThemeClass`; `declareRoot` also calls `cache.insertRoot` on every call, so the last theme wins.
+`createThemeClass`; `declareRoot` also calls `cache.insertRoot` on every call, so the last theme wins. A
+theme object that `declareRoot` has not seen shares the `Map` of the first object seen with the same
+contents (`family.findSameTheme`, `sameTheme.ts`): the same declarations and the same id, without
+declaring the tokens again.
 
 `createThemeView(realTheme)` makes the view where each token is a `var(--name)` reference; a view equal to
 one of the last 8 (`isSameView`) is that one, so a component does not render again when only variable
-values changed.
+values changed. A theme object it has not seen first takes the view of the first object seen with the same
+contents, when that view is still one of the last 8: the view that making it again would find. Otherwise
+the view is made as before.
+
+```mermaid
+flowchart TD
+  ask["createThemeView(realTheme) or declareRoot(theme)"] --> own{"this object seen?"}
+  own -->|yes| kept["its view, its root rules"]
+  own -->|no| sameContents["findSameTheme: the first object seen with these contents"]
+  sameContents --> root{"declareRoot?"}
+  root -->|yes| shared["the root rules of that object, shared with this one, made when it has none"]
+  root -->|no| view{"that object has a view, still one of the last 8?"}
+  view -->|yes| reuse["that view"]
+  view -->|no| make["made as before: createView, the same recent view, or the new one"]
+```
 
 `createStyler` builds, for one component: its label (`name-slot`, or the given `label`), the style list
 (inherited, own label, styles), and the labels of the whole chain. A function style is called with the
@@ -60,8 +77,11 @@ passes, a number, `true` or a function warns once and becomes `undefined`).
 
 ## The data
 
-- `EngineFamily`: `{ theme, givenTheme, engines: WeakMap<Cache, Engine>, tokens }`, shared by the engines
-  made with `withCache`, so `setTheme` of either is the base of both. `givenTheme` is only what was given on
+- `EngineFamily`: `{ theme, givenTheme, engines: WeakMap<Cache, Engine>, tokens, findSameTheme }`, shared
+  by the engines made with `withCache`, so `setTheme` of either is the base of both, and the engine of a
+  fresh cache finds the themes of the same contents that the others saw. `findSameTheme` keeps, weakly, what
+  each theme object was found to be, and the last 4 themes of distinct contents for the life of the family
+  (`sameTheme.ts`). `givenTheme` is only what was given on
   purpose, never one adopted from a provider. `tokens` holds, for each prefix, the tokens last made with
   the theme object and the token options they were made from: one entry for each prefix, replaced when
   the base theme is another object, whatever the number of styles or caches.
@@ -104,6 +124,16 @@ passes, a number, `true` or a function warns once and becomes `undefined`).
   172 us, of nested providers from 377 to 316 us (sandbox, five rounds); `refs` is one object for those
   engines.
 - Warning about unmatched `modes`, `registered` and `alwaysDeclare` paths happens in `sync()`, with checks on.
+- With checks on, the tokens are made with `reportKeyword`: a token declared with a CSS-wide keyword as its
+  value is warned about once for each path (the warner keys it `keyword:<path>`), naming the path, the
+  keyword and the variable, and saying to write the keyword in the style or to give the path the mode
+  `raw`. The tokens of a family are made once for each prefix, so the first engine of that prefix tells.
+- A theme is recognised by its contents for the root rule and the view only, the work of every render of a
+  provider. `themeId` and `findThemeIds` stay by object: `findThemeIds` answers which classes were made for
+  that very object, and sharing them between objects of the same contents would change what it answers.
+  On a design system's home page, whose provider made its theme in each render, the root rule and the view
+  were made in every render (about half of its time on a server); now a new object of the same contents
+  costs a comparison (`sameTheme.md`).
 
 ## Limits
 

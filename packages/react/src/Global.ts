@@ -8,6 +8,7 @@ import {
 } from 'react'
 import type { Cache, Engine, GlobalRules } from '@umber-style/core'
 import { useProvidedCache } from './CacheProvider'
+import { readGlobalSets } from './styleElements'
 import type { GlobalProps } from './types'
 
 /** What is released while nothing is written. */
@@ -45,7 +46,15 @@ export function createGlobal<T>(
     const cache = useProvidedCache()
     const local = cache === undefined ? engine : engine.withCache(cache)
     const view = useThemeView(cache)
-    const sets = useMemo(() => local.resolveGlobal(styles, view), [local, styles, view])
+    // Where there is no document (a server render) the sets of the render before are taken again for
+    // the same styles and view; in the browser the memo of the component keeps them.
+    const sets = useMemo(
+      () =>
+        typeof document === 'undefined'
+          ? readGlobalSets(local, styles, view)
+          : local.resolveGlobal(styles, view),
+      [local, styles, view]
+    )
     // The release of the rules in the page: the new ones are written before the old ones are released.
     const held = useRef(releaseNothing)
     useInsertionEffect(() => {

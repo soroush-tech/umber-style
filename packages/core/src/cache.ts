@@ -1,4 +1,4 @@
-import { registerCache } from './cacheRegistry'
+import { joinPageCheck, registerCache } from './cacheRegistry'
 import { createContentMemo, readStableStyle, type ContentMemo } from './contentMemo'
 import { hashString } from './hash'
 import {
@@ -13,6 +13,7 @@ import { describeClass } from './findUnsupportedDeclarations'
 import { createFingerprint, describeFingerprintDifferences } from './fingerprint'
 import { compileGlobalRules, type GlobalStyleObject } from './globalStyles'
 import { createKeyframesRule, findAnimationNames, isKeyframesName } from './keyframes'
+import { toLabelPart } from './cssName'
 import { scanStyleText, type StyleFindings } from './scanStyleText'
 import { readSharedState } from './sharedState'
 import {
@@ -944,6 +945,21 @@ function createOwnSheet(
   return page ? createDomSheet(prefix, page.head, { speedy, onReject, nonce }) : createMemorySheet()
 }
 
+/**
+ * What asks for the development check of `page`: the check that every cache of `prefix` writing into
+ * `page` shares, for a cache whose sheet is a style element of `page`; else a check of its own.
+ */
+function createCheckLater(
+  prefix: string,
+  page: Document,
+  sheet: Sheet,
+  readLabel: (className: string) => string
+): (rules?: readonly string[]) => void {
+  return sheet.document === page
+    ? joinPageCheck(prefix, page, readLabel)
+    : createDevChecker(prefix, undefined, page, readLabel)
+}
+
 /** Makes a cache: it turns styles into classes and inserts each class's rules once. */
 export function createCache(options: CacheOptions = {}): Cache {
   const {
@@ -981,9 +997,6 @@ export function createCache(options: CacheOptions = {}): Cache {
   const { hasDevChecks = page !== undefined && isDevelopment() } = options
   // The label of a class, for a message: the label of the style it was made from.
   const readClassLabel = (className: string): string => readLabel(registered.get(className) ?? {})
-  // The page is checked where there is one; a value is checked without one too (a test, a server).
-  const checkLater =
-    hasDevChecks && page ? createDevChecker(prefix, undefined, page, readClassLabel) : undefined
   const warnValue = hasDevChecks ? createWarner(prefix) : undefined
   /** Warns about each value of `style` that no CSS property takes, and each `@scheme` key that names no scheme, named by `owner`. */
   const reportValues = (owner: string, style: StyleObject): void => {
@@ -1019,6 +1032,10 @@ export function createCache(options: CacheOptions = {}): Cache {
   // The class a props class was made after (its base class), by class name.
   const afters = new Map<string, string>()
   const sheet = options.sheet ?? createOwnSheet(prefix, page, options, warnValue)
+  // The page is checked where there is one; a value is checked without one too (a test, a server). The
+  // caches of one prefix that write into the page share its check, so that each problem is told once.
+  const checkLater =
+    hasDevChecks && page ? createCheckLater(prefix, page, sheet, readClassLabel) : undefined
   const registered = new Map<string, StyleObject>()
   const entries = new Map<string, SheetEntry>()
   const scoping = { prefix, hasScope }
@@ -1060,6 +1077,8 @@ export function createCache(options: CacheOptions = {}): Cache {
   // The `@property` rule of each registered variable, and the variables of each theme class.
   let propertyRules: Readonly<Record<string, string>> = {}
   const themeNames = new Map<string, readonly string[]>()
+  // The full rules of each theme class and root theme asked for (`getFullRules`), by id.
+  const fullThemeRules = new Map<string, readonly string[]>()
 
   const layerNames = RULE_LAYERS.map((layer) => `${prefix}-${layer}`).join(',')
   const layerOrder = hasLayers ? `@layer ${layerNames};` : ''
@@ -1158,6 +1177,7 @@ export function createCache(options: CacheOptions = {}): Cache {
 
   const registerProperties = (rules: Readonly<Record<string, string>>): void => {
     propertyRules = rules
+    fullThemeRules.clear()
     for (const name of Object.keys(rules)) {
       if (!hasPruning || used.has(name)) writeProperty(name)
     }
@@ -1468,9 +1488,10 @@ export function createCache(options: CacheOptions = {}): Cache {
     }
   }
 
-  const getFullRules = (id: string): readonly string[] => {
+  /** The full rules of the theme class or root theme `id`, which declares the variables `names`. */
+  const createFullThemeRules = (id: string, names: readonly string[]): readonly string[] => {
     const entry = themes.get(id)
-    const properties = (themeNames.get(id) ?? []).flatMap((name) => propertyRules[name] ?? [])
+    const properties = names.flatMap((name) => propertyRules[name] ?? [])
     const rootTheme = roots.get(id)
     if (rootTheme) {
       return [...properties, ...createRootRules(rootTheme, Object.keys(rootTheme.declarations))]
@@ -1480,6 +1501,20 @@ export function createCache(options: CacheOptions = {}): Cache {
     return [...properties, ...(body ? [createThemeRule(prefix, hasLayers, `.${id}`, body)] : [])]
   }
 
+  const getFullRules = (id: string): readonly string[] => {
+    const names = themeNames.get(id)
+    // A class: the rules it was written with, kept as they are while the cache holds the class.
+    if (names === undefined) return insertedRules.get(id) ?? []
+    // A theme class or a root theme is named by what it declares: its rules are made once, and again
+    // only when the `@property` rules change (`registerProperties`).
+    let rules = fullThemeRules.get(id)
+    if (rules === undefined) {
+      rules = createFullThemeRules(id, names)
+      fullThemeRules.set(id, rules)
+    }
+    return rules
+  }
+
   /** The name of a class: the layer and `after` are part of the hash, so that the same styles in two layers, or after two classes, are two classes. */
   const nameClass = (
     layer: ClassLayer,
@@ -1487,7 +1522,12 @@ export function createCache(options: CacheOptions = {}): Cache {
     rules: readonly string[],
     after: string
   ): string => {
-    const label = hasLabels ? readLabel(merged) : ''
+    const written = hasLabels ? readLabel(merged) : ''
+    const label = toLabelPart(written)
+    if (warnValue && label !== written) {
+      const message = `The label "${written}" is "${label}" in the class name: a label may hold a-z, A-Z, 0-9, "_" and "-", so white space at its ends is trimmed and every other character becomes "-".`
+      warnValue(message, message)
+    }
     const hash = hashString(
       (hasLayers && layer === 'overrides' ? layer : '') + after + rules.join('')
     )

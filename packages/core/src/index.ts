@@ -42,6 +42,7 @@ export {
   type LiveValue,
 } from './liveValue'
 export * from './mergeDeep'
+export * from './nonceSource'
 export type { RegisteredSyntax } from './registered'
 export { createGlobalMarker, type GlobalMarker } from './scanHtml'
 export * from './scope'

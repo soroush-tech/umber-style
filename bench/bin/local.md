@@ -49,7 +49,7 @@ script. The files are sorted by path, and a file never runs at the same time as 
 ## The data
 
 - `VALUE_OPTIONS`: the soroush-bench options that take a value (`--rounds`, `--cpus`, `--cpu`,
-  `--cpuset`, `--memory`, `--tag`, `--mount`, `--md-file`, `--baseline-case`, `--min-ratio`). The word
+  `--cpuset`, `--memory`, `--tag`, `--mount`, `--md-file`, `--json-file`, `--baseline-case`, `--min-ratio`). The word
   after one of them is kept with it and is not read as a filter.
 - The mount: `<root>:<linked>:ro`. On Windows `linked` is `/mnt/host/<drive letter>/<rest of the path>`
   (Docker Desktop's view of the drive); elsewhere it is the root itself.

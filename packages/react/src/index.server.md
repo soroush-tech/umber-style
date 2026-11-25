@@ -23,7 +23,7 @@ files of the server build, so the bundle of server components holds none of the 
 flowchart LR
   shared["readSharedState 'react.server-default-style@1'"] --> make["createDefaultStyle of defaultStyle.server"]
   make --> names["destructured named exports"]
-  core["core: add, alpha, at, divide, multiply, negate, state, subtract"] --> out["public API"]
+  core["core: add, alpha, at, divide, multiply, negate, state, subtract, setNonceSource"] --> out["public API"]
   names --> out
   cs["createStyle.server.ts, defaultStyle.server.ts, types.ts"] --> out
 ```
@@ -35,6 +35,7 @@ flowchart LR
   `styled.server.ts`, `styledParts.ts` and `types.ts`; it reaches two client components only by reference,
   `GlobalRelease.ts` and `ProviderScope.tsx` (`serverGuard.test.ts`).
 - It calls no hook, makes no context and imports nothing of the client build.
+- `setNonceSource` is the core's: the style elements of this build carry the nonce that the source it registers gives each request (`serverContext.ts`).
 
 ## Decisions
 

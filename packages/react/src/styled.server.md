@@ -21,24 +21,40 @@ flowchart TD
   call["styled(tag, options)(...styles)"] --> prep["prepareStyled: styler, resolve, statics"]
   prep --> render["Styled(props)"]
   render --> dyn{"styler.isDynamic?"}
-  dyn -->|yes| view["engine.createThemeView(readTheme())"]
+  dyn -->|yes| empty{"readTheme() is the empty theme, development, not warned for this component?"}
+  empty -->|yes| warnOnce["warn once: no base theme, and the two ways to give one"]
+  empty -->|no| view["engine.createThemeView(readTheme())"]
+  warnOnce --> view
   dyn -->|no| noview["no view"]
   view --> res["resolve(props, view)"]
   noview --> res
-  res --> els["createStyleElements(engine.cache, className)"]
+  res --> nonce{"readNonce(): the nonce of the request known?"}
+  nonce -->|yes| els["createStyleElements(engine.cache, className, nonce)"]
+  nonce -->|"no: a Promise"| later["a Promise of the same, once it settles"]
   els --> out["Fragment: style elements, element"]
 ```
 
 ## What it guarantees
 
 - No hook, no context: `serverGuard.test.ts` checks it.
-- Every element is sent with the `<style>` of its class; React sends each `href` once.
+- Every element is sent with the `<style>` of its class; React sends each `href` once. Its nonce is that of
+  the request (`readNonce`, `serverContext.ts`): the cache's, or what the source the app registered with
+  `setNonceSource` gave for this request. While a source has not answered, the component returns a Promise
+  of its element, which the render awaits.
 - Nothing is held or released: no `Hold`, and `resolve` is called without `canHold`.
 - The statics are those of `styled.ts`, so a component of this build can be wrapped by `styled`.
+- In development, a component whose style function would read the empty theme (no base theme given, and no
+  provider of the request has rendered yet) is warned about once, before the function runs, so the warning
+  is printed before the error the function throws when it reads a token of the empty theme. It names the
+  component (its `label`, its `name`, the tag, or the `displayName` or name of the component it wraps) and
+  the ways to give a base theme: `createStyle(theme)` or `configure({ theme })` before the first `styled`
+  call, or `getEngine().setTheme(theme)` when the theme is known only later. In production nothing is said.
 
 ## Decisions
 
 - One component for static and dynamic styles; there is no hook order to protect.
+- The warning is for the empty theme, not for the lack of a base theme alone: with no base theme, the theme
+  of the first provider of the request gives the view its shape, and a style function works.
 
 ## Limits
 

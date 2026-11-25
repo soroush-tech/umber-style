@@ -549,15 +549,20 @@ jobs:
           # permission the app installation has.
           permission-pull-requests: write
 
+      # How the gate judges a run is GATE_OPTIONS of bench/gate/baseline.ts, which `pnpm bench:gate` reads
+      # too: the baseline case, the minimum ratio, and the rounds whose median is compared.
+      - name: Read the options of the gate
+        id: gate
+        run: node bench/bin/gate-options.mjs >> "$GITHUB_OUTPUT"
+
       - name: Run benchmark gate
         # Our own action, pinned like any other: `v1` is a tag, and a tag moves.
-        uses: soroush-tech/bench-action@b527ad437545189516e36ee3c29f6aeb09c3557e # v1.1.1
+        uses: soroush-tech/bench-action@a162a94a10b461d217dac16bbb3d6d87fd5c3ea6 # v1.2.0
         with:
           bench-dir: bench/gate
-          baseline-case: previous
-          min-ratio: '80'
-          # Median of 5 rounds per file: the README's recommendation for shared runners.
-          rounds: '5'
+          baseline-case: ${{ steps.gate.outputs.baseline-case }}
+          min-ratio: ${{ steps.gate.outputs.min-ratio }}
+          rounds: ${{ steps.gate.outputs.rounds }}
           github-token: ${{ steps.bot-token.outputs.token || secrets.GITHUB_TOKEN }}
 
   ci-ok:

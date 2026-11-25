@@ -37,6 +37,7 @@ flowchart LR
 - `NativeLength`, `NativeTheme`, `MediaQueryOptions`, `StateName` and `StateKey` are exported as types only.
 - `state` is the core's function, the same object as in every other entry, so a style made with any of them
   holds the same key.
+- `setNonceSource` is the core's, exported so that every binding has the name: React Native has no style elements and no server components, and nothing here reads it.
 
 ## Decisions
 

@@ -17,6 +17,8 @@ export interface CspScenario {
   title: string
   /** Drives the page or the requests through the scenario and makes its assertions. */
   run(page: Page, tools: RegistryTools, tier: CspTier): Promise<void>
+  /** Why the scenario fails today, starting with KNOWN: it is then run as a known failure, and one that passes fails the run. */
+  known?: string
 }
 
 /** One `securitypolicyviolation` event of a page. */
@@ -40,7 +42,7 @@ interface Reports {
  * elements of their own, with no nonce, in the head and in the shadow root of `<nextjs-portal>`: the
  * policy refuses them. They are the framework's, not the engine's, and only that tier has them.
  */
-const DEVELOPMENT_TOOLS = 'next-devtools'
+export const DEVELOPMENT_TOOLS = 'next-devtools'
 
 /** The console message that Chromium writes for each refused style element. */
 const REFUSED =
@@ -53,7 +55,7 @@ const DARK_BACKGROUND = 'rgb(16, 17, 20)'
 const PAGES = { home: '/csp', other: '/csp/other', stream: '/csp/stream' } as const
 
 /** A page of its own context, which the policy test watches from before its first script. */
-async function openWatched(tools: RegistryTools): Promise<{ page: Page; reports: Reports }> {
+export async function openWatched(tools: RegistryTools): Promise<{ page: Page; reports: Reports }> {
   const context = await tools.browser.newContext({
     baseURL: `http://localhost:${tools.fixture.port}`,
   })
@@ -79,7 +81,7 @@ async function openWatched(tools: RegistryTools): Promise<{ page: Page; reports:
 }
 
 /** Loads `path`, waits for its page, for hydration and for the network to rest; returns the policy sent. */
-async function load(page: Page, path: string, testId: string): Promise<string> {
+export async function load(page: Page, path: string, testId: string): Promise<string> {
   const response = await page.goto(path)
   await page.getByTestId(testId).waitFor()
   await waitForHydrated(page)
@@ -88,20 +90,20 @@ async function load(page: Page, path: string, testId: string): Promise<string> {
 }
 
 /** The nonce that `policy` gives styles. */
-function readNonce(policy: string): string {
+export function readNonce(policy: string): string {
   const nonce = /style-src 'nonce-([^']+)'/.exec(policy)?.[1]
   expect(nonce, `a style nonce in "${policy}"`).toBeDefined()
   return nonce as string
 }
 
 /** The style elements of the engine and of the registry: those of the cache, and the `data-umber` ones. */
-const ENGINE_STYLES = 'style[data-style], style[data-umber]'
+export const ENGINE_STYLES = 'style[data-style], style[data-umber]'
 
 /**
  * The nonce of each style element of the document that `selector` matches, as the browser holds it (the
  * attribute is hidden).
  */
-const readStyleNonces = (page: Page, selector = 'style') =>
+export const readStyleNonces = (page: Page, selector = 'style') =>
   page.evaluate(
     (matching) =>
       [...document.querySelectorAll<HTMLStyleElement>(matching)].map(
@@ -145,7 +147,7 @@ const readDarkHolders = (page: Page) =>
  * The computed styles of the whole body, with every animation held at its start so that two pages
  * compare, and without the scripts and what the framework renders in them (its development tools).
  */
-async function readBody(page: Page): Promise<ComputedStyles> {
+export async function readBody(page: Page): Promise<ComputedStyles> {
   await page.evaluate(() => {
     for (const animation of document.getAnimations()) {
       animation.pause()
@@ -157,7 +159,7 @@ async function readBody(page: Page): Promise<ComputedStyles> {
 }
 
 /** The styles of `path` with no policy (`?control=no-policy`), after `then` when it is given. */
-async function readPlain(
+export async function readPlain(
   tools: RegistryTools,
   path: string,
   testId: string,
@@ -200,7 +202,7 @@ async function switchTheme(page: Page): Promise<void> {
  * development server the refusals of the framework's development tools are told apart by their script,
  * and as many of Chromium's messages about a refused element are left out; any other is a failure.
  */
-function expectQuiet(reports: Reports, where: string, tier: CspTier): void {
+export function expectQuiet(reports: Reports, where: string, tier: CspTier): void {
   const isTools = (violation: Violation) =>
     tier === 'development' && violation.source.includes(DEVELOPMENT_TOOLS)
   const tools = reports.violations.filter(isTools)

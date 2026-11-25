@@ -50,7 +50,7 @@ The examples in these pages are that text, one rule on a line. What a browser gi
 A cache turns a style into a class name and inserts the rules once. The class name is `<prefix>-<label>-<hash>`:
 
 - `prefix` is the cache's prefix (`css` by default).
-- `label` is the style's `label`, which `styled` sets from `name` and `slot` (`umber-button-root-15gvy7r`). It is left out without a name, or with `hasLabels: false`. The labels of merged styles are joined in order (`umber-Typography-Link-3n5swy`): see [Writing styles](writing-styles.md#the-labels-of-merged-styles).
+- `label` is the style's `label`, which `styled` sets from `name` and `slot` (`umber-button-root-15gvy7r`). It is left out without a name, or with `hasLabels: false`. The labels of merged styles are joined in order (`umber-Typography-Link-3n5swy`): see [Writing styles](writing-styles.md#the-labels-of-merged-styles). In the class name a label keeps `a-z`, `A-Z`, `0-9`, `_` and `-`: white space at its ends is trimmed and every other character, one code point at a time, becomes `-`, so the labels `card.title` and `Card Header` are `card-title` and `Card-Header` in the class name, and a class name never needs an escape; with the development checks each such label is warned about once. The label as you wrote it is what the development messages show.
 - `hash` is a hash of the compiled rules. The same style always gives the same class, in the same or another process, so a server and a browser agree on names.
 
 Several styles merge into one class: later keys win, nested objects merge key by key. `cache.css(a, b)` is one class for both.

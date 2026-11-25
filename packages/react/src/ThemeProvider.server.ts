@@ -12,7 +12,7 @@ import {
 } from '@umber-style/core'
 import { toPlainTheme } from './plainTheme'
 import { ProviderScope, type ScopeBase, type ScopeTheme, type SentTokens } from './ProviderScope'
-import type { ServerSlot } from './serverContext'
+import { withNonce, type RequestNonce, type ServerSlot } from './serverContext'
 import { collectStyleTexts, createStampElement, createStyleElements } from './styleElements'
 import type { WebThemeProviderProps } from './types'
 
@@ -22,6 +22,16 @@ export interface ServerProviderParts<T> {
   readFirstSlot(): ServerSlot<DeepPartial<T> | undefined>
   /** The base theme of the style, or an empty object when it has none. */
   readBaseTheme(): T
+  /** The nonce of the request for its style elements: the cache's, or the answer of the source the app registered. */
+  readNonce(): RequestNonce
+}
+
+/**
+ * `theme` with `nonce` for its style elements: itself when that is its nonce already (the cache's, which is
+ * also what the request has when its source gives none), else a copy with the nonce of the request.
+ */
+function withThemeNonce(theme: ScopeTheme, nonce: string | undefined): ScopeTheme {
+  return nonce === theme.nonce ? theme : { ...theme, nonce }
 }
 
 /**
@@ -47,7 +57,7 @@ export interface ServerProviderParts<T> {
  */
 export function createThemeProvider<T extends object>(
   engine: Engine<T>,
-  { readFirstSlot, readBaseTheme }: ServerProviderParts<T>
+  { readFirstSlot, readBaseTheme, readNonce }: ServerProviderParts<T>
 ) {
   const prefix = engine.cache.prefix
   // The token options as plain data, one object for the engine.
@@ -139,7 +149,9 @@ export function createThemeProvider<T extends object>(
     return made.theme
   }
 
-  return function ThemeProvider(props: WebThemeProviderProps<T>): ReactElement {
+  return function ThemeProvider(
+    props: WebThemeProviderProps<T>
+  ): ReactElement | Promise<ReactElement> {
     const { theme, isRoot, children } = props
     const given = resolveThemeInput(theme as ThemeInput<T>, readBaseTheme())
     // The first provider of the request sends the stamp, and its theme gives the shape of the view of
@@ -154,15 +166,21 @@ export function createThemeProvider<T extends object>(
     const plain = readPlain(given)
     // A root provider renders no element: the app puts the class on an ancestor, and the rules it made are sent.
     if (isRoot) {
-      const made = createStyleElements(engine.cache, engine.findThemeIds(given).join(' '))
-      const scope = createElement(ProviderScope, { prefix, given: plain }, children)
-      return createElement(Fragment, null, ...stamped, ...made, scope)
+      const ids = engine.findThemeIds(given).join(' ')
+      return withNonce(readNonce(), (nonce) => {
+        const made = createStyleElements(engine.cache, ids, nonce)
+        const scope = createElement(ProviderScope, { prefix, given: plain }, children)
+        return createElement(Fragment, null, ...stamped, ...made, scope)
+      })
     }
-    const scope = createElement(
-      ProviderScope,
-      { prefix, given: plain, theme: readDescription(given, props, isFirst) },
-      children
-    )
-    return createElement(Fragment, null, ...stamped, scope)
+    const description = readDescription(given, props, isFirst)
+    return withNonce(readNonce(), (nonce) => {
+      const scope = createElement(
+        ProviderScope,
+        { prefix, given: plain, theme: withThemeNonce(description, nonce) },
+        children
+      )
+      return createElement(Fragment, null, ...stamped, scope)
+    })
   }
 }

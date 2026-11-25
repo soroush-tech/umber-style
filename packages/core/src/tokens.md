@@ -7,7 +7,8 @@ give them values. It returns `refs` (the theme's shape with `var(--name)` in pla
 `declare(partialTheme)` (the custom property declarations of a theme or a part of one), `createView(real)`
 (the shape of another theme like `refs`), `findNames(paths)` (variable names under dotted paths) and
 `registrations` (the `@property` rule of each registered variable). `findMissingPaths` reports option
-paths that a theme does not have. It also defines `TokenMode`, `TokenOptions`, `DeepPartial` and `Tokens`.
+paths that a theme does not have. `createTokens(theme, options, reportKeyword)` tells `reportKeyword` (the
+development check of an engine) about each variable or reference token declared with a CSS-wide keyword. It also defines `TokenMode`, `TokenOptions`, `DeepPartial` and `Tokens`.
 
 ## Why it exists
 
@@ -31,7 +32,10 @@ flowchart TD
   shape -->|"plain object"| objn["each key, path + key"]
   shape -->|"string or number"| leaf["readMode(path)"]
   leaf --> md{"mode"}
-  md -->|"variable or reference"| decl["declare: name, path, value, source, isLength"]
+  md -->|"variable or reference"| kw{"reportKeyword given, and the value a CSS-wide keyword?"}
+  kw -->|yes| told["reportKeyword(path, keyword, name)"]
+  kw -->|no| decl["declare: name, path, value, source, isLength"]
+  told --> decl
   md -->|"raw or inline"| none["no declaration"]
   base --> reg["for each base token: registered syntax by longest path"]
   reg --> prule["registrations[name] = createPropertyRule(token, syntax)"]
@@ -63,6 +67,11 @@ From the tests: `refs.palette.primary` is `var(--palette-primary)`; `refs.space[
 - `declare` of a partial theme writes only the variable and reference tokens it has.
 - A `reference` fallback is the base theme's declared value, and none when the base has no such token.
 - Only variable and reference tokens are registered; never inline or raw ones.
+- A variable or reference token whose value is `inherit`, `initial`, `unset`, `revert` or `revert-layer`
+  (any letter case, white space around it or not) is told to `reportKeyword`, with its dotted path, the
+  keyword in lowercase and its variable, each time it is declared: in the base theme when the tokens are
+  made, and in any theme given to `declare`. A raw or inline token is never told: it has no variable.
+  Without `reportKeyword` nothing is looked at.
 - An entry of `modes` is not taken from the prototype of the options object.
 
 ## Decisions
@@ -76,6 +85,11 @@ From the tests: `refs.palette.primary` is `var(--palette-primary)`; `refs.space[
   The names are the same (`names a variable from each key as it did`); the tokens of a theme, which every
   engine of a fresh cache made again, took 30 to 40% less, a cold render of 48 fixed elements from 155 to
   97 us (host).
+- **The check of a CSS-wide keyword is here, in `collect`,** the one place every declaration of every
+  theme passes, so a keyword in a dark theme is found as well as one in the base theme. A custom property
+  takes such a keyword as itself (`--x: inherit` takes the parent's value of `--x`), not as a value that
+  `var(--x)` puts in a property, so the token does not do what it says. The engine warns (once for each
+  path) and says what to write instead.
 - `registered` is found like `modes`: the most specific path wins and a top-level key covers everything
   under it.
 - `inline` and `raw` differ only in documentation and intent; the code treats them the same in `isKept` and
