@@ -50,7 +50,7 @@ export interface Tokens<T> {
 }
 
 /** The keywords that every CSS property takes, which a custom property takes as itself rather than as a value. */
-const CSS_WIDE_KEYWORDS = ['inherit', 'initial', 'unset', 'revert', 'revert-layer']
+const CSS_WIDE_KEYWORDS = new Set(['inherit', 'initial', 'unset', 'revert', 'revert-layer'])
 
 /** What is told about a token whose value is a CSS-wide keyword: its dotted path, the keyword, and its variable. */
 export type KeywordReport = (path: string, keyword: string, name: string) => void
@@ -177,7 +177,7 @@ export function findMissingPaths(theme: object, paths: Iterable<string>): string
 /** The CSS-wide keyword that `value` is, in lowercase, white space around it left out; undefined for any other value. */
 function readCssWideKeyword(value: string): string | undefined {
   const word = value.trim().toLowerCase()
-  return CSS_WIDE_KEYWORDS.includes(word) ? word : undefined
+  return CSS_WIDE_KEYWORDS.has(word) ? word : undefined
 }
 
 /** Tells `reportKeyword` about the token at `path` when its value is a CSS-wide keyword. */
