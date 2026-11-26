@@ -524,7 +524,7 @@ The two differences from `useState`:
 
 **Vue.** `useStyleValue(initial, unit?)` in `setup` gives the value in the shape of a ref: `${left}` in a style, `left.value = 40` to change it with no render, `left.value` and `left.get()` to read it (`packages/vue/src/useStyleValue.test.ts`).
 
-Use a plain object in `style` for a value that changes now and then (a size from a prop, a measured width): it is the default, and costs a class per value. Use `useStyleValue` for one that changes on every frame. Measured by `packages/react/bench/values-setter.bench.ts` in jsdom (50 changes, then one macrotask): 1.40 ms through the setter, 9.19 ms through a render with a plain object in `style`.
+Use a plain object in `style` for a value that changes now and then (a size from a prop, a measured width): it is the default, and costs a class per value. Use `useStyleValue` for one that changes on every frame. Measured on 0.8.0 by `packages/react/bench/values-setter.bench.ts` in jsdom (50 changes, then one macrotask; `pnpm bench react values-setter --rounds 3`, the median of three rounds): 1.23 ms through the setter, 6.66 ms through a render with a plain object in `style`.
 
 ## Limits
 
