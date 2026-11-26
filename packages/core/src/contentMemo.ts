@@ -93,6 +93,8 @@ export interface ContentMemo {
   find(layer: string, after: string, style: StyleObject): string | undefined
   /** Remembers `className` for `style`, which `readStableStyle` gave; the memo is emptied first when it is full. */
   remember(layer: string, after: string, style: StyleObject, className: string): void
+  /** Forgets every class it holds, as when it is full: the cache calls it when what a compile reads has changed. */
+  clear(): void
   /** How many steps it holds now: never more than `CONTENT_STEP_LIMIT` and the steps of one style. */
   readonly size: number
 }
@@ -148,6 +150,11 @@ export function createContentMemo(): ContentMemo {
     return step(holder, layer, after, isMade)
   }
 
+  const clear = (): void => {
+    roots = new Map()
+    steps = 0
+  }
+
   return {
     get size() {
       return steps
@@ -157,12 +164,10 @@ export function createContentMemo(): ContentMemo {
       return root && walk(root, style, false)?.className
     },
     remember(layer, after, style, className) {
-      if (steps >= CONTENT_STEP_LIMIT) {
-        roots = new Map()
-        steps = 0
-      }
+      if (steps >= CONTENT_STEP_LIMIT) clear()
       const end = walk(readRoot(layer, after, true) as Node, style, true) as Node
       end.className = className
     },
+    clear,
   }
 }

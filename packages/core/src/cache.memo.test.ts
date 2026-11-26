@@ -435,11 +435,154 @@ describe('the memo of contents (hasStyleMemo)', () => {
     expect(contentMemo.createContentMemo).not.toHaveBeenCalled()
   })
 
-  it('is not used with value repair, whose compile reads the values of the tokens', () => {
-    vi.mocked(contentMemo.createContentMemo).mockClear()
-    const cache = createCache({ prefix: 'm', sheet: createMemorySheet(), hasStyleMemo: true })
-    cache.withStyleOptions({ hasValueRepair: true }).css({ width: 'var(--x)px' })
-    createCache({ prefix: 'm', hasValueRepair: true, hasStyleMemo: true }).css({ width: 1 })
-    expect(contentMemo.createContentMemo).toHaveBeenCalledTimes(1)
+  describe('with value repair, whose compile reads the declared values of the tokens', () => {
+    /** The cache `make` gives, and a spy on `find` of the last memo of contents it made. */
+    const spyMemo = (make: () => Cache) => {
+      vi.mocked(contentMemo.createContentMemo).mockClear()
+      const cache = make()
+      const { results } = vi.mocked(contentMemo.createContentMemo).mock
+      const memo = results[results.length - 1].value as contentMemo.ContentMemo
+      return { cache, find: vi.spyOn(memo, 'find') }
+    }
+    /** The class `find` gave the last time it was called. */
+    const lastFound = (find: ReturnType<typeof spyMemo>['find']) => find.mock.results.at(-1)?.value
+
+    it('is used, on a cache made with it and on a view, and is emptied when the declared values change', () => {
+      const repairing = [
+        () =>
+          createCache({
+            prefix: 'm',
+            sheet: createMemorySheet(),
+            hasValueRepair: true,
+            hasStyleMemo: true,
+          }),
+        () =>
+          createCache({
+            prefix: 'm',
+            sheet: createMemorySheet(),
+            hasStyleMemo: true,
+          }).withStyleOptions({
+            hasValueRepair: true,
+          }),
+      ]
+      for (const make of repairing) {
+        const { cache, find } = spyMemo(make)
+        const classes = [1, 2, 3].map(() => cache.css({ width: 'var(--n)px' }))
+        // Compiled, remembered at the second call, found at the third.
+        expect(find.mock.results.map(({ value }) => value as unknown)).toEqual([
+          undefined,
+          undefined,
+          classes[0],
+        ])
+        cache.registerValues(() => ({ '--n': '4px' }))
+        const after = cache.css({ width: 'var(--n)px' })
+        expect(lastFound(find)).toBeUndefined()
+        expect(after).not.toBe(classes[0])
+        expect(cache.getRules(after)).toEqual([`@layer m-components{.${after}{width:var(--n);}}`])
+      }
+    })
+
+    it('keeps what the memo of style options without value repair holds', () => {
+      const { cache, find } = spyMemo(() =>
+        createCache({ prefix: 'm', sheet: createMemorySheet(), hasStyleMemo: true })
+      )
+      const className = [1, 2].map(() => cache.css({ width: 'var(--n)px' }))[0]
+      cache.registerValues(() => ({ '--n': '4px' }))
+      cache.css({ width: 'var(--n)px' })
+      expect(lastFound(find)).toBe(className)
+    })
+
+    it('names after a change of theme what it names without the memo (the unit of a token changed)', () => {
+      const run = (hasStyleMemo: boolean) => {
+        const engine = createEngine(
+          { space: { a: '4' } },
+          { prefix: 'p', hasValueRepair: true, hasStyleMemo, hasDevChecks: false }
+        )
+        const make = () =>
+          engine.cache.css({ margin: `${engine.refs.space.a}px`, color: 'var(--p-c)1F' })
+        const classes = [make(), make(), make()]
+        engine.setTheme({ space: { a: '4px' } })
+        classes.push(make(), make(), make())
+        return { classes, rules: classes.map((className) => engine.cache.getRules(className)) }
+      }
+      const withMemo = run(true)
+      expect(withMemo).toEqual(run(false))
+      expect(withMemo.classes[3]).not.toBe(withMemo.classes[0])
+      expect(withMemo.rules[0][0]).toContain('margin:calc(var(--p-space-a) * 1px)')
+      expect(withMemo.rules[3][0]).toContain('margin:var(--p-space-a);')
+    })
+
+    /**
+     * Each style of `styles` three times (the third is found), under each set of declared values of
+     * `values` in turn and then the first again, on a cache with the memo and one without: each call
+     * names the same class on both, and both end alike.
+     */
+    const expectRepairedSame = (styles: object[], values: Record<string, string>[]) => {
+      const pair = createPair({ hasValueRepair: true })
+      const calls = [...values, values[0]].flatMap((declared) => [
+        (cache: Cache) => cache.registerValues(() => declared),
+        ...callsOf(styles),
+      ])
+      expectSame(pair, calls)
+    }
+
+    it('gives what the full path gives: a reference followed by two hex digits', () => {
+      const styles = [
+        { color: 'var(--x)1F' },
+        { border: '1px solid var(--x)80' },
+        { color: 'var(--x, var(--y)1F)' },
+      ]
+      expectRepairedSame(styles, [{ '--x': '#fff' }, { '--x': '#000', '--y': '#111' }])
+    })
+
+    it('gives what the full path gives: a minus before a reference', () => {
+      const styles = [
+        { marginLeft: '-var(--n)' },
+        { margin: '0 -var(--n)' },
+        { top: '-var(--n)px' },
+      ]
+      expectRepairedSame(styles, [{ '--n': '2' }, { '--n': '4px' }])
+    })
+
+    it('gives what the full path gives: a reference followed by a time unit', () => {
+      const styles = [
+        { transitionDuration: 'var(--d)ms' },
+        { animationDelay: 'var(--d)s' },
+        { transition: 'opacity var(--d)ms ease' },
+      ]
+      expectRepairedSame(styles, [{ '--d': '150' }, { '--d': '150ms' }, {}])
+    })
+
+    it('gives what the full path gives: a reference followed by a length or another unit', () => {
+      const styles = [
+        { width: 'var(--n)px' },
+        { height: 'var(--n)rem', margin: '0 var(--n)rem' },
+        { width: 'var(--gap, 8px)px', left: 'var(--other)px' },
+      ]
+      const values: Record<string, string>[] = [
+        { '--n': '2' },
+        { '--n': '4px' },
+        { '--n': '1.5rem', '--other': '#fff' },
+        {},
+      ]
+      expectRepairedSame(styles, values)
+      // The values decide: the same style is three classes under the first three.
+      const { on } = createPair({ hasValueRepair: true })
+      const classes = values.slice(0, 3).map((declared) => {
+        on.cache.registerValues(() => declared)
+        return [1, 2, 3].map(() => on.cache.css({ width: 'var(--n)px' }))[2]
+      })
+      expect(new Set(classes).size).toBe(3)
+    })
+
+    it('gives what the full path gives: nested styles, lists and custom properties', () => {
+      const styles = [
+        { '&:hover': { width: 'var(--n)px' } },
+        { '@media print': { margin: '-var(--n)px' } },
+        { color: ['var(--x)1F', 'red'] },
+        { '--gap': 'var(--n)px', width: 'var(--n)px' },
+      ]
+      expectRepairedSame(styles, [{ '--n': '2' }, { '--n': '4px' }])
+    })
   })
 })
