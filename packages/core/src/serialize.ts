@@ -95,6 +95,8 @@ function toPropertyName(key: string): string {
 }
 
 const REFERENCE = 'var('
+/** How many values the memo of repaired values holds before it is emptied: a bound on its memory. */
+export const REPAIR_MEMO_LIMIT = 10_000
 const HEX_PAIR = /^[0-9a-f]{2}$/i
 /** The units that make a reference a time: `var(--x)ms` is `calc(var(--x) * 1ms)` when the value of `--x` is not known. */
 const TIME_UNITS = new Set(['ms', 's'])
@@ -186,6 +188,16 @@ function isNameCode(code: number): boolean {
   )
 }
 
+/** Whether the character code `code` can start what follows a reference: a letter or a digit (two hex digits, or a unit) or `%`. NaN (past the end of the text) cannot. */
+function isSuffixStart(code: number): boolean {
+  return (
+    (code >= 48 && code <= 57) ||
+    (code >= 65 && code <= 90) ||
+    (code >= 97 && code <= 122) ||
+    code === 37
+  )
+}
+
 /** Whether the character at `index` is a minus that stands alone before a reference: at the start of the value, or after a space, a comma or `(`. */
 function isLoneMinus(value: string, index: number): boolean {
   return value[index] === '-' && (index === 0 || ' ,('.includes(value[index - 1]))
@@ -207,8 +219,8 @@ interface RepairContext {
   readValue?: (name: string) => string | undefined
   /** Told, in a sentence, about a reference followed by a unit that is left as it is. */
   report?: (message: string) => void
-  /** The text a report starts with: the selector and the declaration. */
-  owner: string
+  /** Gives the text a report starts with, the selector and the declaration: called only when a report is told. */
+  owner: () => string
 }
 
 /** The unit at `index` of `value` (lowercase) that ends there, or undefined. */
@@ -245,7 +257,9 @@ function repairUnit(
   const valueUnit = declared === undefined ? undefined : readNumberUnit(declared)
   if (valueUnit === unit) return reference
   if (valueUnit === '') return `calc(${reference} * 1${unit})`
-  const start = `${context.owner}, which puts "${unit}" after ${reference}, whose value`
+  // The text of a report is made only when there is a report to give it to.
+  if (context.report === undefined) return undefined
+  const start = `${context.owner()}, which puts "${unit}" after ${reference}, whose value`
   const end = 'it is left as it is, and the browser drops it.'
   let problem = `${declared} has another unit: ${end} Write the value in ${unit}, or the reference alone.`
   if (declared === undefined) {
@@ -253,7 +267,7 @@ function repairUnit(
   } else if (valueUnit === undefined) {
     problem = `${declared} is not a number: ${end} Write the reference alone.`
   }
-  context.report?.(`${start} ${problem}`)
+  context.report(`${start} ${problem}`)
   return undefined
 }
 
@@ -269,6 +283,8 @@ function repairSuffix(
   inner: string,
   context: RepairContext
 ): [string, number] {
+  // A suffix starts with a hex digit, a letter or `%`: any other character leaves the reference alone.
+  if (!isSuffixStart(codeAt(value, index))) return [reference, index]
   const pair = value.slice(index, index + 2)
   if (HEX_PAIR.test(pair) && !isNameCode(codeAt(value, index + 2))) {
     return [String(alpha(reference, Number.parseInt(pair, 16) / 255)), index + 2]
@@ -324,8 +340,20 @@ function toValue(
 ): string {
   if (typeof value === 'string') {
     if (!context.hasValueRepair || !value.includes(REFERENCE) || key.startsWith('--')) return value
-    const { readValue, report } = context
-    return repairValue(value, { readValue, report, owner: `${selector} declares ${name}:${value}` })
+    const { readValue, report, repairMemo } = context
+    const owner = () => `${selector} declares ${name}:${value}`
+    if (report !== undefined || repairMemo === undefined) {
+      return repairValue(value, { readValue, report, owner })
+    }
+    // With no report to give, what a value is repaired to depends on the declared values of the tokens
+    // alone, and the cache empties the memo when they change (`registerValues`).
+    let repaired = repairMemo.get(value)
+    if (repaired === undefined) {
+      repaired = repairValue(value, { readValue, owner })
+      if (repairMemo.size >= REPAIR_MEMO_LIMIT) repairMemo.clear()
+      repairMemo.set(value, repaired)
+    }
+    return repaired
   }
   if (TIMES.has(key)) return `${value}ms`
   const hasUnit = value !== 0 && !key.startsWith('--') && !UNITLESS.has(key)
@@ -435,6 +463,12 @@ export interface CompileContext {
   readValue?: (name: string) => string | undefined
   /** Told about each reference followed by a unit that value repair leaves as it is. */
   report?: (message: string) => void
+  /**
+   * The repaired text of each value that value repair was given, by the value: the cache's, which it
+   * empties when the declared values of its tokens change. It is read and written only when `report` is
+   * none, and emptied when it holds `REPAIR_MEMO_LIMIT` values.
+   */
+  repairMemo?: Map<string, string>
   /** Whether a declaration that a supported browser needs in a prefixed form gets that form first (`PREFIXED_FORMS`). Default false. */
   hasVendorPrefixes?: boolean
 }

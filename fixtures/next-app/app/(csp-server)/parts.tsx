@@ -61,6 +61,30 @@ const pulse = keyframes(
   { label: 'csp-server-pulse' }
 )
 
+/**
+ * A chip of the streaming page, outside its `Suspense` boundary and inside it: a base class whose
+ * `paddingLeft` its props class overrides, which holds only while the base rule comes first.
+ */
+export const Chip = styled('span', { name: 'CspServerChip' })<{ tone: 'calm' | 'loud' }>(
+  ({ theme }) => ({
+    display: 'inline-block',
+    paddingLeft: 8,
+    borderWidth: 1,
+    borderStyle: 'solid',
+    borderColor: theme.palette.border,
+  }),
+  ({ tone }) => ({ paddingLeft: tone === 'loud' ? 20 : 12 })
+)
+
+/** The card that streams late on the streaming page: a class that only the late chunk has. */
+export const LateCard = styled('section', { name: 'CspServerLateCard' })(({ theme }) => ({
+  marginTop: theme.space[2],
+  paddingLeft: 28,
+  borderLeftWidth: 4,
+  borderLeftStyle: 'solid',
+  borderLeftColor: theme.palette.primary,
+}))
+
 /** The card of the other page: classes of its own, and an animation, that the home page does not have. */
 export const OtherCard = styled('section', { name: 'CspServerOtherCard' })(({ theme }) => ({
   paddingLeft: 24,

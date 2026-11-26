@@ -2,6 +2,7 @@
 // `ProviderScope` is a reference to a client component (see `vitest.clientReferences.ts`), which
 // `resolveTree` leaves as an element with its props: this plays it from those props, with the functions
 // of the real module, in a full render (every provider above is in the tree).
+import { NonceStyles } from './NonceStyles'
 import type * as Scope from './ProviderScope'
 import type { ResolvedElement, ResolvedNode } from './vitest.resolveTree'
 
@@ -26,11 +27,20 @@ export function playScopes(
     const isNested = above.has(prefix) || (!theme.isWhole && theme.base === undefined)
     const root = createRootStyle(prefix, given, theme)
     const styles = isNested ? createNestedStyles(prefix, given, theme) : root ? [root.style] : []
-    const elements = styles.map(({ href, text }): ResolvedNode => ({
-      type: 'style',
-      props: { href, precedence: prefix, nonce: theme.nonce },
-      children: [text],
-    }))
+    // In inline mode the real component renders `NonceStyles` with the texts: here its reference, with them.
+    const elements: ResolvedNode[] = theme.isInline
+      ? [
+          {
+            type: NonceStyles as unknown as string,
+            props: { prefix, texts: styles, nonce: theme.nonce },
+            children: [],
+          },
+        ]
+      : styles.map(({ href, text }): ResolvedNode => ({
+          type: 'style',
+          props: { href, precedence: prefix, nonce: theme.nonce },
+          children: [text],
+        }))
     if (!isNested) return [...elements, ...children]
     return [...elements, { type: theme.as, props: { className: theme.className }, children }]
   })

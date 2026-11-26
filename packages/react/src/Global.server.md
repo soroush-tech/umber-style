@@ -4,9 +4,10 @@ Build: server (components build, no hook and no context). The client counterpart
 
 ## What it does
 
-`createGlobal(engine, readTheme)` makes the `Global` for server components. It resolves the global styles
-against the view of `readTheme()`, writes every set into the cache for good, and returns the style elements
-of the sets and of the animations they use, followed by a `GlobalRelease` element when any set has rules.
+`createGlobal(engine, readTheme, readNonce, sendStyles)` makes the `Global` for server components. It resolves
+the global styles against the view of `readTheme()`, writes every set into the cache for good, and returns the
+style of the sets and of the animations they use (`sendStyles` of the texts of `collectGlobalTexts`),
+followed by a `GlobalRelease` element when any set has rules.
 
 ## Why it exists
 
@@ -26,9 +27,13 @@ flowchart TD
   filter --> any{"any set with rules?"}
   any -->|no| noRelease["no release element"]
   any -->|yes| release["GlobalRelease: prefix, sets as JSON text"]
-  filter --> els["createGlobalElements(cache, sets, the nonce of the request)"]
-  els --> frag["Fragment: style elements, then release"]
-  noRelease --> frag
+  filter --> els["sendStyles(collectGlobalTexts(cache, sets), the nonce of the request)"]
+  els --> inline{"inline mode: a nonce in the request?"}
+  inline -->|no| hoisted["style href precedence nonce elements, as in 0.6.0"]
+  inline -->|yes| nonceStyles["one NonceStyles with the texts"]
+  hoisted --> frag
+  nonceStyles --> frag
+  noRelease --> frag["Fragment: the style, then release"]
   release --> frag
 ```
 
@@ -41,9 +46,11 @@ The props of `GlobalRelease`: `prefix` (the cache prefix) and `sets`, the `JSON.
 - No hook, no context. `serverGuard.test.ts` checks that the files of the server build call none.
 - `GlobalRelease` is imported from a `'use client'` file, so in a bundler of server components the import is
   a reference to it; it is never run on the server (`vitest.clientReferences.ts` mocks it the same way).
-- React sends each `href` once, however many components render the same set.
-- The style elements carry the nonce of the request (`readNonce`): the cache's, or the answer of the
-  source registered with `setNonceSource`; it returns a Promise of its elements while that has not come.
+- Each `href` is sent once, however many components render the same set: React sends a hoisted element
+  once, and in inline mode (a request with a nonce, from a source or the cache) `NonceStyles` shows a text in place once
+  in the request (`inlineStyles.server.ts`).
+- The style carries the nonce of the request (`readNonce`): the cache's, or the answer of the source
+  registered with `setNonceSource`; it returns a Promise of its elements while that has not come.
 
 ## Decisions
 

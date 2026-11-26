@@ -166,3 +166,56 @@ describe('hasValueRepair in an engine: a reference followed by a unit', () => {
     expect(sheet.rules).toContain(`@keyframes ${grow}{100%{font-size:var(--u-font-sizes-1);}}`)
   })
 })
+
+describe('the repaired values of a cache', () => {
+  /** A cache with value repair, whose sheet holds what it writes. */
+  const setupCache = (options: Parameters<typeof createCache>[0] = {}) => {
+    const sheet = createMemorySheet()
+    const cache = createCache({
+      prefix: 'm',
+      sheet,
+      hasLayers: false,
+      hasValueRepair: true,
+      ...options,
+    })
+    return { cache, sheet }
+  }
+
+  it('repairs a value again after the declared values change', () => {
+    const { cache, sheet } = setupCache()
+    cache.registerValues(() => ({ '--n': '2' }))
+    const first = cache.css({ width: 'var(--n)px' })
+    expect(sheet.rules).toEqual([`.${first}{width:calc(var(--n) * 1px);}`])
+    // The same text is not repaired from memory: what the token declares has changed.
+    cache.registerValues(() => ({ '--n': '4px' }))
+    const second = cache.css({ width: 'var(--n)px' })
+    expect(second).not.toBe(first)
+    expect(sheet.rules).toEqual([
+      `.${first}{width:calc(var(--n) * 1px);}`,
+      `.${second}{width:var(--n);}`,
+    ])
+  })
+
+  it('writes the same rules with the development checks as without, a memo or none', () => {
+    const rulesOf = (options: Parameters<typeof createCache>[0]) => {
+      const { cache, sheet } = setupCache(options)
+      cache.registerValues(() => ({ '--n': '2' }))
+      for (let time = 0; time < 2; time++) {
+        cache.css({ width: 'var(--n)px', color: 'var(--c)1F' })
+        cache.css({ width: 'var(--n)px', margin: 0 })
+      }
+      return sheet.rules.map((rule) => rule.replace(/\.m-[a-z0-9]+/, '.m'))
+    }
+    expect(rulesOf({ hasDevChecks: false })).toEqual(rulesOf({ hasDevChecks: true }))
+  })
+
+  it('tells what it leaves as it is each time with the development checks, as it does without a memo', () => {
+    const { cache } = setupCache({ hasDevChecks: true })
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    cache.registerValues(() => ({ '--s': '1.5rem' }))
+    cache.css({ width: 'var(--s)px' })
+    cache.css({ width: 'var(--s)px', color: 'red' })
+    expect(warn).toHaveBeenCalledTimes(2)
+    warn.mockRestore()
+  })
+})

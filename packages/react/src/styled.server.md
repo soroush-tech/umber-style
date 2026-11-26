@@ -4,9 +4,10 @@ Build: server (components build: no hook, no context). The client counterpart is
 
 ## What it does
 
-`createStyled(engine, readTheme)` makes `styled` for server components. The component it returns resolves its
-class from its props with `prepareStyled`, and renders the style elements of that class followed by the
-element. A function style reads the view of `readTheme()`.
+`createStyled(engine, readTheme, readNonce, sendStyles)` makes `styled` for server components. The component
+it returns resolves its class from its props with `prepareStyled`, and renders the style of that class
+(`sendStyles` of the texts of `collectStyleTexts`, with the nonce of the request) followed by the element.
+A function style reads the view of `readTheme()`.
 
 ## Why it exists
 
@@ -18,7 +19,7 @@ engine's own cache. `createStyle.server.ts` is the importer.
 
 ```mermaid
 flowchart TD
-  call["styled(tag, options)(...styles)"] --> prep["prepareStyled: styler, resolve, statics"]
+  made["styled(tag, options)(...styles)"] --> prep["prepareStyled: styler, resolve, statics"]
   prep --> render["Styled(props)"]
   render --> dyn{"styler.isDynamic?"}
   dyn -->|yes| empty{"readTheme() is the empty theme, development, not warned for this component?"}
@@ -29,18 +30,24 @@ flowchart TD
   view --> res["resolve(props, view)"]
   noview --> res
   res --> nonce{"readNonce(): the nonce of the request known?"}
-  nonce -->|yes| els["createStyleElements(engine.cache, className, nonce)"]
+  nonce -->|yes| els["sendStyles(collectStyleTexts(engine.cache, className), nonce)"]
   nonce -->|"no: a Promise"| later["a Promise of the same, once it settles"]
-  els --> out["Fragment: style elements, element"]
+  els --> inline{"inline mode: a nonce in the request?"}
+  inline -->|no| hoisted["style href precedence nonce elements, as in 0.6.0"]
+  inline -->|yes| nonceStyles["one NonceStyles with the texts"]
+  hoisted --> out["Fragment: the style, the element"]
+  nonceStyles --> out
 ```
 
 ## What it guarantees
 
 - No hook, no context: `serverGuard.test.ts` checks it.
-- Every element is sent with the `<style>` of its class; React sends each `href` once. Its nonce is that of
-  the request (`readNonce`, `serverContext.ts`): the cache's, or what the source the app registered with
-  `setNonceSource` gave for this request. While a source has not answered, the component returns a Promise
-  of its element, which the render awaits.
+- Every element is sent with the style of its class, with the nonce of the request (`readNonce`,
+  `serverContext.ts`): the cache's, or what the source the app registered with `setNonceSource` gave for
+  this request. Outside inline mode that is a `<style href precedence>` element for each text, which React
+  sends once for each `href`; in a request with a nonce (from a source or the cache) it is one `NonceStyles`, which
+  shows a text in place once in the request (`inlineStyles.server.ts`). While a source has not
+  answered, the component returns a Promise of its element, which the render awaits.
 - Nothing is held or released: no `Hold`, and `resolve` is called without `canHold`.
 - The statics are those of `styled.ts`, so a component of this build can be wrapped by `styled`.
 - In development, a component whose style function would read the empty theme (no base theme given, and no

@@ -49,6 +49,8 @@ flowchart TD
 
 - `as` always replaces a string tag. For a component it replaces only when `shouldForwardProp('as')` is
   false (the comment in the file); otherwise the component gets `as` as a prop.
+- The props are read with `Object.keys` and each value by its key, in the order of `Object.entries`, so that
+  a render makes no array of pairs.
 - `theme`, `className` and `style` are never forwarded; `as` is not when it replaces the element.
 - The filter is: the one given; else, for a string tag, `isPropValid` of `@umber-style/is-prop-valid/react`
   (a tag with a hyphen forwards every prop); none for a component.

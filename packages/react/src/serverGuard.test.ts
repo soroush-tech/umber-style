@@ -55,6 +55,7 @@ describe('the server build', () => {
       'createStyle.server.ts',
       'defaultStyle.server.ts',
       'index.server.ts',
+      'inlineStyles.server.ts',
       'plainTheme.ts',
       'serverContext.ts',
       'styleElements.ts',
@@ -65,9 +66,10 @@ describe('the server build', () => {
     ])
   })
 
-  it('reaches two client components, by reference: the browser parts of Global and of ThemeProvider', () => {
+  it('reaches three client components, by reference: the browser parts of Global, of ThemeProvider and of the styles of a request under a nonce source', () => {
     expect([...references.keys()].map(nameOf).sort()).toEqual([
       'GlobalRelease.ts',
+      'NonceStyles.tsx',
       'ProviderScope.tsx',
     ])
   })

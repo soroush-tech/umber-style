@@ -14,6 +14,7 @@ import {
   type ColorScheme,
   type TokenOptions,
 } from '@umber-style/core'
+import { NonceStyles } from './NonceStyles'
 import type { StyleText } from './styleElements'
 
 /** The wrapper of a nested provider: its element and its class string, which `ThemeScope` repeats. */
@@ -160,6 +161,8 @@ export interface ScopeTheme {
   readonly styles: readonly StyleText[]
   /** The nonce of the cache (`CacheOptions.nonce`), which every style element of the provider carries. */
   readonly nonce?: string
+  /** Whether its style texts go to `NonceStyles` instead of `<style href precedence>` elements: the request had a nonce, from a nonce source or the cache (`isInlineMode`). */
+  readonly isInline?: boolean
 }
 
 /** The props of `ProviderScope`: what a provider of the server build hands to its browser part. */
@@ -260,6 +263,9 @@ export function keepRootRule(prefix: string, rootId: string, rule: string, page:
  *   provider that has no base theme for that rule (see `ScopeTheme.base`) is nested instead.
  * - With no rules (`isRoot`): no element, no rule.
  *
+ * Its style elements are `<style href precedence>` elements, or, when the request had a nonce under a nonce
+ * source (`ScopeTheme.isInline`), one `NonceStyles` with their texts.
+ *
  * In each case it marks its prefix for the providers below, of both builds, and gives the contexts of
  * its prefix the theme merged over the theme of the provider above it in the page, of either build, else
  * over the base theme of the client build: `useTheme()` of a client component below reads it.
@@ -324,13 +330,20 @@ export function ProviderScope({
   return React.createElement(
     React.Fragment,
     null,
-    styles.list.map(({ href, text }) =>
-      React.createElement(
-        'style',
-        { key: href, href, precedence: prefix, nonce: theme?.nonce },
-        text
-      )
-    ),
+    theme?.isInline
+      ? React.createElement(NonceStyles, {
+          key: 'nonce-styles',
+          prefix,
+          texts: styles.list,
+          nonce: theme.nonce,
+        })
+      : styles.list.map(({ href, text }) =>
+          React.createElement(
+            'style',
+            { key: href, href, precedence: prefix, nonce: theme?.nonce },
+            text
+          )
+        ),
     wrapper === undefined
       ? content
       : React.createElement(wrapper.as, { className: wrapper.className }, content)

@@ -1,6 +1,6 @@
 {
   "name": "@umber-style/css",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "UmberStyle's plain layer: a style goes to a cache and comes back as a class name. No framework, no theme.",
   "keywords": [
     "styling",

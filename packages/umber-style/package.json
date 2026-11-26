@@ -1,6 +1,6 @@
 {
   "name": "umber-style",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "UmberStyle in one package: the engine at the root, and the React, React Native and Vue bindings as subpaths.",
   "keywords": [
     "styling",

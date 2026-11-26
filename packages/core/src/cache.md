@@ -141,6 +141,10 @@ The rest of the closure, in the order of the file:
   development checks and value repair): the class of each merged style made of style objects alone, by
   its layer, `after` and contents (`contentMemo.md`). At most `CONTENT_STEP_LIMIT` (10,000) steps, then
   emptied.
+- `repairMemo` (one for the cache, shared by every set of style options through `plain`): the repaired text of each
+  value that value repair was given, by the value, read and written only when nothing is told (`serialize.md`).
+  `registerValues`, the one way the declared values of the tokens change, empties it. At most
+  `REPAIR_MEMO_LIMIT` (10,000) values, then emptied.
 - `registered`: class name -> merged `StyleObject`. `insertedIds`: what is written or found on the page.
   `insertedRules`: id -> the rules written for it. `animations`: class -> names it uses. `afters`: props
   class -> its base class.

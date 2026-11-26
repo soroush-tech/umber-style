@@ -17,7 +17,10 @@ gave, else the theme of the first provider of the request. This file builds that
 and passes it to the server `styled` and `Global`, and passes the request slot to the server `ThemeProvider`.
 It also makes the reader of the nonce of a request (`createNonceReader`, `serverContext.ts`), with the
 nonce of the cache as its fallback, and gives it to all three, so that every style element of a request
-carries the nonce that a source registered with `setNonceSource` gave it.
+carries the nonce that a source registered with `setNonceSource` gave it. And it makes what the three
+send their style texts with (`createStyleSender`, `inlineStyles.server.ts`): the `<style href precedence>`
+elements of React, or, in a request with a nonce (from a source or the cache), `NonceStyles`, with the slot of the
+request that keeps what that request has shown in place.
 `defaultStyle.server.ts` and `index.server.ts` use it.
 
 ## The logic
@@ -34,10 +37,13 @@ flowchart TD
   useBase --> parts["createStyled, createGlobal, useStyle"]
   useFirst --> parts
   empty --> parts
-  slot --> provider["createThemeProvider(engine, readFirstSlot, readBaseTheme, readNonce)"]
+  slot --> provider["createThemeProvider(engine, readFirstSlot, readBaseTheme, readNonce, sendStyles)"]
   engine --> nonce["createNonceReader: the nonce of the cache, or of the source, once a request"]
   nonce --> parts
   nonce --> provider
+  engine --> sender["createStyleSender(engine.cache, cache): hoisted elements, or NonceStyles"]
+  sender --> parts
+  sender --> provider
   engine --> useTheme["useTheme: warn once in development if no base theme, return base theme"]
 ```
 

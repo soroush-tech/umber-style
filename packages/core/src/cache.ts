@@ -1045,8 +1045,12 @@ export function createCache(options: CacheOptions = {}): Cache {
   // They are read when value repair first needs one: a cache that repairs nothing never makes them.
   const tokenValues = new Map<string, string>()
   const pendingValues: (() => Readonly<Record<string, string>>)[] = []
+  // The repaired text of each value, for value repair when nothing reports (see `CompileContext.repairMemo`):
+  // what a value is repaired to depends on the declared values, so a new source of them empties it.
+  const repairMemo = new Map<string, string>()
   const registerValues = (read: () => Readonly<Record<string, string>>): void => {
     pendingValues.push(read)
+    repairMemo.clear()
   }
   const readValue = (name: string): string | undefined => {
     for (const read of pendingValues.splice(0)) {
@@ -1060,7 +1064,7 @@ export function createCache(options: CacheOptions = {}): Cache {
     : undefined
   /** The style options `options` with what the compiler is given for them, made once. */
   const toWrittenAs = (options: Required<StyleOptions>): WrittenAs => {
-    const plain: CompileContext = { ...options, scoping, readValue }
+    const plain: CompileContext = { ...options, scoping, readValue, repairMemo }
     const written: WrittenAs = {
       ...options,
       plain,

@@ -35,7 +35,11 @@ flowchart TD
   mark --> merge["merged = mergeTheme(outer theme, given)"]
   merge --> ctx["ThemeContext = merged, ViewContext = undefined"]
   rootOut --> keep["layout effect: keepRootRule"]
-  ctx --> out["Fragment: style elements, then wrapper or content"]
+  ctx --> inline{"ScopeTheme.isInline?"}
+  inline -->|no| hoisted["style href precedence elements of the list"]
+  inline -->|yes| nonceStyles["one NonceStyles with the list"]
+  hoisted --> out["Fragment: the style, then wrapper or content"]
+  nonceStyles --> out
 ```
 
 `outer` is the `ThemeContext` of the prefix, else the base theme of the `holder` (the engine of the client
@@ -51,8 +55,10 @@ build, once one exists).
   provider of the client build below reads it for the class of the nested themes merged.
 - `PrefixStyle`: `{ contexts, holder? }`, one for each prefix, in `readPrefixStyle`'s map.
 - `ScopeTheme`: everything the server build computed for either outcome: `as`, `className`, `classId`,
-  `rootId`, `layerOrder`, `tokens`, `properties`, `isWhole`, optional `base`, `styles`, and the optional
-  `nonce` of the cache, which every style element rendered here carries as its `nonce` prop.
+  `rootId`, `layerOrder`, `tokens`, `properties`, `isWhole`, optional `base`, `styles`, the optional `nonce`
+  (the cache's, or the request's in inline mode), which every style element rendered here carries as its
+  `nonce` prop, and `isInline`: the request had a nonce (from a source or the cache), so the style texts go to
+  `NonceStyles`.
 - A style element as data is a `StyleText`: `{ href, text }`.
 
 ## What it guarantees
@@ -70,6 +76,10 @@ build, once one exists).
 - The server and the browser write the same text from the same props, with the core's tokens and no engine.
 - Every style element it renders has the `nonce` of `ScopeTheme`, so under a policy that allows style
   elements by nonce React keeps their rules on the server and the browser lets in the ones it adds.
+- With `isInline` it renders no `<style href precedence>` element: one `NonceStyles` with its list (the root
+  rule, or the theme class and the other classes), which is a `<style nonce>` in place in the first HTML and
+  writes into the head with the document's nonce in the browser (`NonceStyles.md`). `keepRootRule` then
+  finds the element of `rootId` that `NonceStyles` wrote, as it has `data-precedence` and `data-href`.
 
 ## Decisions
 

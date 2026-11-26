@@ -1,6 +1,6 @@
 {
   "name": "@umber-style/styled",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "UmberStyle's styled as a default export: the styled of the React binding, with its server build for server components.",
   "keywords": [
     "styling",

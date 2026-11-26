@@ -6,8 +6,9 @@ import {
   withTagShorthands,
   type Engine,
 } from '@umber-style/core'
+import type { StyleSender } from './inlineStyles.server'
 import { withNonce, type RequestNonce } from './serverContext'
-import { createStyleElements } from './styleElements'
+import { collectStyleTexts } from './styleElements'
 import { prepareStyled } from './styledParts'
 import type { Styled, StyledOptions } from './types'
 
@@ -21,12 +22,14 @@ function readComponentName(tag: ElementType, { label, name }: StyledOptions): st
 /**
  * Makes `styled` for server components: no hook, no context. A function style reads the view of the
  * theme that `readTheme` gives: the base theme (tokens as references, its real values for the rest), else
- * the theme of the first provider of the request, else an empty theme. Each element comes with the `<style>` of its class.
+ * the theme of the first provider of the request, else an empty theme. Each element comes with the style
+ * of its class, which `sendStyles` makes with the nonce of the request that `readNonce` gives.
  */
 export function createStyled<T>(
   engine: Engine<T>,
   readTheme: () => T,
-  readNonce: () => RequestNonce
+  readNonce: () => RequestNonce,
+  sendStyles: StyleSender
 ): Styled<T> {
   const styled =
     (tag: ElementType, options: StyledOptions = {}) =>
@@ -57,7 +60,7 @@ export function createStyled<T>(
           createElement(
             Fragment,
             null,
-            ...createStyleElements(engine.cache, className, nonce),
+            ...sendStyles(collectStyleTexts(engine.cache, className), nonce),
             createElement(element, forwarded)
           )
         )

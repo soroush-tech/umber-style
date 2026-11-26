@@ -24,6 +24,7 @@ const core = load('../../core/dist/index.cjs') as typeof Core
 for (const [file, name] of [
   ['../dist/ProviderScope.cjs', 'ProviderScope'],
   ['../dist/GlobalRelease.cjs', 'GlobalRelease'],
+  ['../dist/NonceStyles.cjs', 'NonceStyles'],
 ]) {
   const id = load.resolve(file)
   const reference = { $$typeof: Symbol.for('react.client.reference'), $$id: name }

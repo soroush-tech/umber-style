@@ -77,10 +77,10 @@ export function prepareStyled<T>(
     const filter = readFilter(element, shouldForward)
 
     const forwarded: Record<string, unknown> = {}
-    for (const [key, value] of Object.entries(props)) {
+    for (const key of Object.keys(props)) {
       const isOwn =
         (isReplaced && key === 'as') || key === 'theme' || key === 'className' || key === 'style'
-      if (!isOwn && (!filter || filter(key))) forwarded[key] = value
+      if (!isOwn && (!filter || filter(key))) forwarded[key] = props[key]
     }
     forwarded.className = className || undefined
     return { element, forwarded, className, isHeld, hold: held?.hold }

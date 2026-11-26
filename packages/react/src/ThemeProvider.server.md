@@ -28,7 +28,7 @@ flowchart TD
   mark --> plain["toPlainTheme(given), warn once in development if members dropped"]
   later --> plain
   plain --> root{"isRoot?"}
-  root -->|yes| rootOut["style elements of the theme classes the app made, ProviderScope with no theme data"]
+  root -->|yes| rootOut["sendStyles: the style of the theme classes the app made; ProviderScope with no theme data"]
   root -->|no| describe["readDescription: describe(given, props, isFirst)"]
   describe --> scope["ProviderScope with prefix, plain theme, ScopeTheme"]
   rootOut --> frag["Fragment: stamp, styles, scope"]
@@ -41,7 +41,8 @@ request and a partial theme, the base theme as plain data (`readBase`, one objec
 
 ## The data
 
-- `ServerProviderParts<T>`: `readFirstSlot()`, `readBaseTheme()` and `readNonce()`.
+- `ServerProviderParts<T>`: `readFirstSlot()`, `readBaseTheme()`, `readNonce()` and `sendStyles`, which makes the
+  style of a root provider (`createStyleSender`, `inlineStyles.server.ts`).
 - `ScopeTheme` (defined in `ProviderScope.tsx`): the data sent to the browser part, with the `nonce` of the
   engine's cache when it has one (left out otherwise, so that a payload holds nothing for it).
 - A cache of descriptions: `WeakMap` from a theme object to a `Map` keyed by `colorScheme|className|as|isFirst`,
@@ -57,20 +58,23 @@ request and a partial theme, the base theme as plain data (`readBase`, one objec
 
 ## The nonce of a request
 
-The style elements it sends (those of `isRoot`, and the ones `ProviderScope` renders from `ScopeTheme`) carry
-the nonce of the request, `readNonce()` of `createStyle.server.ts`: the cache's, or what the source
-registered with `setNonceSource` gave this request. `ScopeTheme` is kept for each theme and set of props
-(`readDescription`) with the nonce of the cache; a request whose nonce is another gets a copy with its own
-(`withThemeNonce`), so the description kept is never one request's. While the source has not answered,
-the provider returns a Promise of its elements, which a render of server components awaits; its type stays
-that of the client build.
+The style it sends (that of `isRoot`, and the one `ProviderScope` renders from `ScopeTheme`) carries the
+nonce of the request, `readNonce()` of `createStyle.server.ts`: the cache's, or what the source registered
+with `setNonceSource` gave this request. `ScopeTheme` is kept for each theme and set of props
+(`readDescription`) with the nonce of the cache. Outside inline mode the request has no nonce (the
+cache has none either), so the description kept is sent as it is. In inline mode (a request with a nonce,
+from a source or the cache, `isInlineMode`) the request gets a copy with its own nonce and `isInline` (`withThemeNonce`), so the
+description kept is never one request's, and `ProviderScope` gives its texts to `NonceStyles` instead of
+rendering `<style href precedence>` elements; a root provider sends its texts with `sendStyles`, which
+makes a `NonceStyles` too. While the source has not answered, the provider returns a Promise of its
+elements, which a render of server components awaits; its type stays that of the client build.
 
 ```mermaid
 flowchart LR
   provider["ThemeProvider(props)"] --> describe["readDescription: ScopeTheme with the nonce of the cache"]
-  describe --> nonce{"readNonce(): the same nonce?"}
-  nonce -->|yes| same["that ScopeTheme"]
-  nonce -->|no| copy["a copy with the nonce of the request"]
+  describe --> nonce{"readNonce(): inline mode for this request?"}
+  nonce -->|no| same["that ScopeTheme: the nonce of the cache"]
+  nonce -->|yes| copy["a copy with the nonce of the request and isInline"]
   nonce -->|"not known yet"| wait["a Promise of the elements"]
 ```
 

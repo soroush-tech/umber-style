@@ -10,10 +10,11 @@ import {
   type ThemeInput,
   type ThemeText,
 } from '@umber-style/core'
+import { isInlineMode, type StyleSender } from './inlineStyles.server'
 import { toPlainTheme } from './plainTheme'
 import { ProviderScope, type ScopeBase, type ScopeTheme, type SentTokens } from './ProviderScope'
 import { withNonce, type RequestNonce, type ServerSlot } from './serverContext'
-import { collectStyleTexts, createStampElement, createStyleElements } from './styleElements'
+import { collectStyleTexts, createStampElement } from './styleElements'
 import type { WebThemeProviderProps } from './types'
 
 /** What the provider of the server build reads of the request and of the style. */
@@ -24,14 +25,17 @@ export interface ServerProviderParts<T> {
   readBaseTheme(): T
   /** The nonce of the request for its style elements: the cache's, or the answer of the source the app registered. */
   readNonce(): RequestNonce
+  /** What the style texts of a root provider are sent with, in the current request (`createStyleSender`). */
+  sendStyles: StyleSender
 }
 
 /**
- * `theme` with `nonce` for its style elements: itself when that is its nonce already (the cache's, which is
- * also what the request has when its source gives none), else a copy with the nonce of the request.
+ * `theme` for a request whose nonce is `nonce`. Outside inline mode (`isInlineMode`) that nonce is the
+ * cache's, which `theme` holds already: itself. In inline mode a copy with the nonce of the request, which
+ * says so, whose texts `ProviderScope` gives to `NonceStyles`.
  */
 function withThemeNonce(theme: ScopeTheme, nonce: string | undefined): ScopeTheme {
-  return nonce === theme.nonce ? theme : { ...theme, nonce }
+  return isInlineMode(nonce) ? { ...theme, nonce, isInline: true } : theme
 }
 
 /**
@@ -57,7 +61,7 @@ function withThemeNonce(theme: ScopeTheme, nonce: string | undefined): ScopeThem
  */
 export function createThemeProvider<T extends object>(
   engine: Engine<T>,
-  { readFirstSlot, readBaseTheme, readNonce }: ServerProviderParts<T>
+  { readFirstSlot, readBaseTheme, readNonce, sendStyles }: ServerProviderParts<T>
 ) {
   const prefix = engine.cache.prefix
   // The token options as plain data, one object for the engine.
@@ -168,7 +172,7 @@ export function createThemeProvider<T extends object>(
     if (isRoot) {
       const ids = engine.findThemeIds(given).join(' ')
       return withNonce(readNonce(), (nonce) => {
-        const made = createStyleElements(engine.cache, ids, nonce)
+        const made = sendStyles(collectStyleTexts(engine.cache, ids), nonce)
         const scope = createElement(ProviderScope, { prefix, given: plain }, children)
         return createElement(Fragment, null, ...stamped, ...made, scope)
       })

@@ -15,6 +15,7 @@ import {
   type WebStyleObject,
 } from '@umber-style/core'
 import { createGlobal } from './Global.server'
+import { createStyleSender } from './inlineStyles.server'
 import { createNonceReader, createRequestSlot, type CacheFunction } from './serverContext'
 import { createStyled } from './styled.server'
 import { createThemeProvider } from './ThemeProvider.server'
@@ -37,6 +38,8 @@ export function bindEngine<T extends object>(
   const readFirstSlot = createRequestSlot<DeepPartial<T> | undefined>(undefined, cache)
   // The nonce of the request's style elements: the cache's, or the answer of the source the app registered.
   const readNonce = createNonceReader(() => engine.cache.nonce, cache)
+  // What every component sends its style texts with: hoisted elements, or `NonceStyles` in inline mode.
+  const sendStyles = createStyleSender(engine.cache, cache)
   let hasWarned = false
 
   const readBaseTheme = (): T => engine.givenTheme ?? (EMPTY_THEME as T)
@@ -84,7 +87,7 @@ export function bindEngine<T extends object>(
   return {
     engine,
     cache: engine.cache,
-    styled: createStyled(engine, readViewTheme, readNonce),
+    styled: createStyled(engine, readViewTheme, readNonce, sendStyles),
     StyleSheet: { create },
     useStyle,
     useStyleValue: createServerStyleValue(engine.cache),
@@ -96,6 +99,7 @@ export function bindEngine<T extends object>(
       readFirstSlot,
       readBaseTheme,
       readNonce,
+      sendStyles,
     }) as ServerStyle<T>['ThemeProvider'],
     useTheme,
     readTheme: useTheme,
@@ -104,7 +108,7 @@ export function bindEngine<T extends object>(
     whenScheme: engine.whenScheme,
     keyframes: engine.keyframes,
     globalStyles,
-    Global: createGlobal(engine, readViewTheme, readNonce) as ServerStyle<T>['Global'],
+    Global: createGlobal(engine, readViewTheme, readNonce, sendStyles) as ServerStyle<T>['Global'],
   }
 }
 
