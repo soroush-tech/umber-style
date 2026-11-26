@@ -1,6 +1,6 @@
 {
   "name": "@umber-style/server",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "description": "Server rendering over an UmberStyle cache: the CSS of one page as chunks and as style tags.",
   "keywords": [
     "styling",
