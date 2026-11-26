@@ -79,7 +79,7 @@ which grew with the square of N):
 ```mermaid
 flowchart TD
   create["createDomSheet(key, container, speedy): its nonce option"] --> openSheet["openDomSheet(key, container, options, readNonce, onRefuse?)"]
-  own["createOwnSheet of a cache with a page"] -->|"readNonce: nonce of the cache, else readPageNonce(page); onRefuse with the checks"| openSheet
+  own["createOwnSheet of a cache with a page"] -->|"readNonce: nonce of the cache, else findPageNonce(page), noting whether it is a script's; onRefuse with the checks"| openSheet
   openSheet --> renamed["warnRenamedOption: hasRuleText in development"]
   renamed --> nothing["nothing is added to the document; the element is claimed at the first rule"]
   nothing --> mode{"speedy?"}
@@ -98,7 +98,7 @@ flowchart TD
   ruleEl --> watched{"onRefuse given? (the checks of a cache)"}
   firstEl --> watched
   watched -->|"yes, after the first rule"| refused{"the element the sheet made has no sheet?"}
-  refused -->|yes| warnOnce["onRefuse(nonce): the cache warns once, no nonce found or the nonce of the cache refused"]
+  refused -->|yes| warnOnce["onRefuse(nonce): the cache warns once: no nonce found, the nonce of the cache refused, or the nonce of a script refused"]
   refused -->|no| quiet["nothing said, never looked at again"]
 ```
 
@@ -135,14 +135,16 @@ The rest of the closure, in the order of the file:
   fingerprint: it is for the elements, and the tags of `extractStyles.ts`, `@umber-style/server` and the
   bindings read it from the cache.
 - The nonce of the page. The sheet a cache makes for itself (`createOwnSheet`, over `openDomSheet`)
-  gives its elements the nonce of the cache, else the nonce of the page (`readPageNonce` of
-  `documentNonce.ts`), read once, when the sheet makes its first element. `cache.nonce` stays what was
+  gives its elements the nonce of the cache, else the nonce of the page (`findPageNonce` of
+  `documentNonce.ts`, which also says whether it is a style's or a script's), read once, when the sheet
+  makes its first element. `cache.nonce` stays what was
   given. A sheet of `createDomSheet` reads only its own option.
 - The refusal of the policy. With the development checks the sheet a cache makes for itself looks, once,
   at the element it made, right after its first rule: no sheet means a content security policy refused
   it (`watchRefusal`). The cache then warns once (key `refused`): with no nonce given and none found on
-  the page, that no nonce was found; with a nonce given, that it is not the page's. An element made with
-  the nonce of the page is not warned about: the page allowed that nonce elsewhere.
+  the page, that no nonce was found; with a nonce given, that it is not the page's; with the nonce of a
+  script of the page, that a page may give its scripts and its styles different nonces. An element made
+  with the nonce of a style of the page is not warned about: the page allowed that nonce elsewhere.
 
 ## The data
 
@@ -280,7 +282,7 @@ The rest of the closure, in the order of the file:
   `options.nonce` is not read when a `sheet` is given, nor the nonce of the page.
 - The nonce of the page is read once, at the first element: a page that gets its nonce later (no applied
   style element or script with one yet) gives the elements of that sheet none.
-- A refused element made with the nonce of the page is not warned about, and only the first element of a
+- A refused element made with the nonce of a style of the page is not warned about, and only the first element of a
   sheet is looked at. Written with `insertRule` into a refused element, each rule is also reported as
   rejected by the browser (the element has no sheet to insert into).
 - A text sheet puts a new element after the element of its last rule. If other code removed that element

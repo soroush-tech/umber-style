@@ -8,7 +8,7 @@ import {
   isProduction,
   warnRenamedOption,
 } from './devChecks'
-import { readPageNonce } from './documentNonce'
+import { findPageNonce } from './documentNonce'
 import { findInvalidValues, findUnknownSchemeKeys } from './findInvalidValues'
 import { describeClass } from './findUnsupportedDeclarations'
 import { createFingerprint, describeFingerprintDifferences } from './fingerprint'
@@ -987,10 +987,11 @@ function assertServerStamp(page: Document, prefix: string, fingerprint: string):
 
 /**
  * The sheet a cache makes for itself: in the head of its page, else in memory; a rule the browser rejects
- * is told to `warn`. Its elements carry `nonce`, else the nonce of the page (`readPageNonce`), read when
+ * is told to `warn`. Its elements carry `nonce`, else the nonce of the page (`findPageNonce`), read when
  * the first one is made: a policy with a nonce for each request refuses an element without it, and that
  * nonce cannot be given to a bundle made once for every request. When the policy refused the first one,
- * `warn` is told why: no nonce anywhere, or a nonce given to the cache that the page does not allow.
+ * `warn` is told why: no nonce anywhere, a nonce given to the cache that the page does not allow, or the
+ * nonce of a script of the page, which a page may not share with its styles.
  */
 function createOwnSheet(
   prefix: string,
@@ -1005,30 +1006,41 @@ function createOwnSheet(
       }
     : undefined
   if (!page) return createMemorySheet()
+  let isFromScript = false
   const onRefuse = warn
     ? (elementNonce: string | undefined) => {
-        const message = readRefusal(nonce, elementNonce)
+        const message = readRefusal(nonce, elementNonce, isFromScript)
         if (message !== undefined) warn('refused', message)
       }
     : undefined
-  const readNonce = () => nonce ?? readPageNonce(page)
+  const readNonce = () => {
+    if (nonce !== undefined) return nonce
+    const found = findPageNonce(page)
+    isFromScript = found?.from === 'script'
+    return found?.nonce
+  }
   return openDomSheet(prefix, page.head, { speedy, onReject }, readNonce, onRefuse)
 }
 
 /**
  * Why the policy of the page refused the style element of a cache given `nonce`, made with
- * `elementNonce`: no nonce at all, or the one given to the cache. Undefined for one made with the nonce of
- * the page, which the page itself allowed elsewhere.
+ * `elementNonce`: no nonce at all, the one given to the cache, or the one of a script of the page
+ * (`isFromScript`). Undefined for one made with the nonce of a style of the page, which the page itself
+ * allowed elsewhere.
  */
 function readRefusal(
   nonce: string | undefined,
-  elementNonce: string | undefined
+  elementNonce: string | undefined,
+  isFromScript: boolean
 ): string | undefined {
   if (nonce !== undefined) {
     return 'The policy of this page refused a style element with the nonce given to the cache: it is not the nonce of this page. Give the cache the nonce of the request that sent the page.'
   }
   if (elementNonce === undefined) {
     return 'The policy of this page refused a style element: no nonce was found on the page. Give one with createCache({ nonce }), or with setNonceSource for server components.'
+  }
+  if (isFromScript) {
+    return 'The policy of this page refused a style element with the nonce of a script of the page: the page may give its scripts and its styles different nonces. Give the style nonce with createCache({ nonce }), or with setNonceSource for server components.'
   }
   return undefined
 }

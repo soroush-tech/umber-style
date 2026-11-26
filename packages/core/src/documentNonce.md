@@ -7,7 +7,9 @@ policy let in (it has a sheet), else the `.nonce` of the first script that carri
 The cache gives it to the style elements it makes for itself when it was given no nonce
 (`createOwnSheet` of `cache.ts`), and the element of the live values does the same (`liveValue.ts`). The
 React binding reads it after the nonce it recorded at hydration (`readDocumentNonce` of `NonceStyles.tsx`,
-through `@umber-style/core/internal`), so both read the page by one definition.
+through `@umber-style/core/internal`), so both read the page by one definition. `findPageNonce(page)` is
+the same read that also says where the nonce came from (`from: 'style'` or `'script'`); `readPageNonce`
+is its `nonce`. Only `cache.ts` uses `findPageNonce`, and it is not exported by `internal.ts`.
 
 ## Why it exists
 
@@ -21,11 +23,11 @@ refused, and the class unstyled (#71). The page itself carries the nonce, on wha
 
 ```mermaid
 flowchart TD
-  read["readPageNonce(page)"] --> styles["each style[nonce] of the page, in document order"]
+  read["findPageNonce(page)"] --> styles["each style[nonce] of the page, in document order"]
   styles --> applied{"it has a sheet, and a .nonce?"}
-  applied -->|"yes, the first one"| fromStyle["its .nonce"]
+  applied -->|"yes, the first one"| fromStyle["its .nonce, from: style"]
   applied -->|"no for every one"| script{"the first script[nonce] has a .nonce?"}
-  script -->|yes| fromScript["its .nonce"]
+  script -->|yes| fromScript["its .nonce, from: script"]
   script -->|no| none["undefined: the element gets no nonce"]
 ```
 
@@ -44,7 +46,9 @@ flowchart TD
   script is taken as it is: under a policy with a nonce the page's scripts carry it, and a wrong one can
   only make the element refused.
 - **Style elements before scripts.** A style element that the policy applied proves the nonce is the one
-  of styles; a script's is the one of scripts, the same in the policies of the frameworks.
+  of styles; a script's is the one of scripts, the same in the policies of the frameworks. A page may
+  give them different nonces (`script-src 'nonce-AAA'; style-src 'nonce-BBB'`), so the reader says which
+  it found, and the cache warns, in development, when an element made with a script's nonce is refused.
 - **Only the engine's own rules go into an element made with it**, so a nonce read from the page lets in
   nothing that the policy did not allow already.
 - **In the core, beside the sheet.** The sheet of the cache is the core's; the React binding adds the

@@ -210,7 +210,23 @@ describe('the development warning when the policy refuses the element of a cache
     ])
   })
 
-  it('says nothing for an element made with the nonce of the page, for one allowed, or without the checks', () => {
+  it('says once that the nonce is the one of a script of the page, which may not be the one of styles', () => {
+    const script = document.createElement('script')
+    script.setAttribute('nonce', 'scripts')
+    document.head.append(script)
+    refuseNewStyles()
+    const cache = createCache({ prefix: 'rj', hasDevChecks: true })
+    const warnings = readPolicyWarnings(() => {
+      cache.css({ color: 'red' })
+      cache.css({ color: 'blue' })
+    })
+    expect(warnings).toEqual([
+      '[rj] The policy of this page refused a style element with the nonce of a script of the page: the page may give its scripts and its styles different nonces. Give the style nonce with createCache({ nonce }), or with setNonceSource for server components.',
+    ])
+    script.remove()
+  })
+
+  it('says nothing for an element made with the nonce of a style of the page, for one allowed, or without the checks', () => {
     const script = document.createElement('script')
     script.setAttribute('nonce', 'page')
     document.head.append(script)
@@ -219,18 +235,22 @@ describe('the development warning when the policy refuses the element of a cache
         createCache({ prefix: 'ok', hasDevChecks: true }).css({ color: 'red' })
       )
     ).toEqual([])
+    const applied = document.createElement('style')
+    applied.setAttribute('nonce', 'styles')
+    document.head.append(applied)
     refuseNewStyles()
     expect(
       readPolicyWarnings(() =>
         createCache({ prefix: 'rh', hasDevChecks: true }).css({ color: 'red' })
       )
     ).toEqual([])
-    script.remove()
+    applied.remove()
     expect(
       readPolicyWarnings(() =>
         createCache({ prefix: 'ri', hasDevChecks: false }).css({ color: 'red' })
       )
     ).toEqual([])
+    script.remove()
   })
 
   it('says nothing for an element the page had, which the cache did not make', () => {

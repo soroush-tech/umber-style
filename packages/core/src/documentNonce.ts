@@ -7,8 +7,20 @@
  * when it is wrong: it never lets in what the policy refuses.
  */
 export function readPageNonce(page: Document): string | undefined {
+  return findPageNonce(page)?.nonce
+}
+
+/** A nonce read from a page, and the kind of element it came from: a script's is not always the one of styles. */
+export interface PageNonce {
+  nonce: string
+  from: 'style' | 'script'
+}
+
+/** `readPageNonce`, with where the nonce came from. Undefined when none is found. */
+export function findPageNonce(page: Document): PageNonce | undefined {
   for (const element of page.querySelectorAll<HTMLStyleElement>('style[nonce]')) {
-    if (element.sheet !== null && element.nonce) return element.nonce
+    if (element.sheet !== null && element.nonce) return { nonce: element.nonce, from: 'style' }
   }
-  return page.querySelector<HTMLScriptElement>('script[nonce]')?.nonce || undefined
+  const nonce = page.querySelector<HTMLScriptElement>('script[nonce]')?.nonce
+  return nonce ? { nonce, from: 'script' } : undefined
 }

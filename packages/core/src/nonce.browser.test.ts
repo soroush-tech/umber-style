@@ -2,19 +2,21 @@ import { createCache } from './cache'
 
 // A real content security policy in Chromium: the page of this file is given `style-src 'nonce-allowed'`
 // once (a policy cannot be taken back), so every style element made after it without that nonce is
-// refused, and has no sheet as soon as it is in the document.
+// refused, and has no sheet as soon as it is in the document. Its scripts have a nonce of their own
+// (`script-src 'nonce-AAA'`), as a page that gives scripts and styles different nonces.
 
 const NONCE = 'allowed'
+const SCRIPT_NONCE = 'AAA'
 
 beforeAll(() => {
   const meta = document.createElement('meta')
   meta.httpEquiv = 'Content-Security-Policy'
-  meta.content = `style-src 'nonce-${NONCE}'`
+  meta.content = `script-src 'self' 'nonce-${SCRIPT_NONCE}'; style-src 'nonce-${NONCE}'`
   document.head.append(meta)
 })
 
 afterEach(() => {
-  for (const element of document.head.querySelectorAll('style')) element.remove()
+  for (const element of document.head.querySelectorAll('style, script[nonce]')) element.remove()
   vi.restoreAllMocks()
 })
 
@@ -85,6 +87,35 @@ describe('the element of a cache under a policy with a nonce', () => {
       readElements('pd').map(() => ({ nonce: NONCE, isApplied: true }))
     )
     expect([...given, ...read]).toEqual([])
+  })
+
+  it('is refused with the nonce of a script of the page when it gives its scripts and styles different nonces, and the checks say so once', () => {
+    const script = document.createElement('script')
+    script.setAttribute('nonce', SCRIPT_NONCE)
+    document.head.append(script)
+    const cache = createCache({ prefix: 'pf', hasDevChecks: true })
+    const warnings = readPolicyWarnings(() => {
+      cache.css({ color: 'red' })
+      cache.css({ color: 'blue' })
+    })
+    expect(readElements('pf')[0]).toEqual({ nonce: SCRIPT_NONCE, isApplied: false })
+    expect(warnings).toEqual([
+      '[pf] The policy of this page refused a style element with the nonce of a script of the page: the page may give its scripts and its styles different nonces. Give the style nonce with createCache({ nonce }), or with setNonceSource for server components.',
+    ])
+  })
+
+  it('takes the nonce of a style element the page let in over that of a script, and nothing is said', () => {
+    const script = document.createElement('script')
+    script.setAttribute('nonce', SCRIPT_NONCE)
+    document.head.append(script)
+    const applied = document.createElement('style')
+    applied.setAttribute('nonce', NONCE)
+    document.head.append(applied)
+    const warnings = readPolicyWarnings(() =>
+      createCache({ prefix: 'pg', hasDevChecks: true }).css({ color: 'red' })
+    )
+    expect(readElements('pg')[0]).toEqual({ nonce: NONCE, isApplied: true })
+    expect(warnings).toEqual([])
   })
 
   it('is refused in silence without the development checks, as in production', () => {
