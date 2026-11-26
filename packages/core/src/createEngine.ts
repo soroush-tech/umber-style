@@ -20,7 +20,7 @@ import {
 } from './keyframes'
 import { joinLabels } from './serialize'
 import { readSharedState } from './sharedState'
-import { isStyleFunction, splitLeading } from './styleBase'
+import { callCheckedStyle, createStyleArgument, isStyleFunction, splitLeading } from './styleBase'
 import { createReferenceGuard } from './referenceKeys'
 import { isSameView } from './sameView'
 import { createThemeMemo } from './sameTheme'
@@ -209,6 +209,13 @@ export interface Engine<T> {
    */
   createSheet<K extends string>(styles: ObjectSheet<K>): SheetEntries<K>
   createSheet<K extends string>(styles: (theme: T) => Record<K, WebStyleObject>): ThemedSheet<K, T>
+  /**
+   * `theme` as a function of app code that is given it sees it, for the function named `label`: with the
+   * development checks a wrapper that throws on a write at any level (and warns about a read with a token
+   * reference as the key), the same wrapper for the same object and label; without them `theme` itself.
+   * What a binding gives the function of a theme provider.
+   */
+  guardTheme<V extends object>(theme: V, label: string): V
   /** The logic that every web `styled` shares: the label, the style list, function styles and the class memo. */
   createStyler(
     options: StylerOptions,
@@ -293,6 +300,10 @@ function isPlainStyle(value: ClassValue): boolean {
 
 /** The `{ label }` styles that `createStyler` puts before the styles of each component: a wrapper finds the labels of the components it wraps among their styles, also those of a component made by another copy of the core. */
 const labelStyles = readSharedState('core.label-styles@1', () => new WeakSet<object>())
+
+/** What the development guard of the theme names a function of a sheet and of global styles by. */
+const SHEET_LABEL = 'StyleSheet'
+const GLOBAL_LABEL = 'Global'
 
 /** The label of a styled component: `label` as it is, else `name-slot`, or '' with neither. */
 function createLabel({ name, slot = 'root', label }: StylerOptions): string {
@@ -409,9 +420,10 @@ function selectCache(options: EngineOptions, prefix: string): Cache {
 
 /**
  * The development checks of an engine over `cache`: whether they are on (the option, else those of the
- * cache, or a development build), the warner, what wraps the theme view that a style function gets (with
- * the checks, it warns about a read with a token reference as the key; without them it is the view
- * itself, and no wrapper is made), and what is told about a declaration that global styles leave out.
+ * cache, or a development build), the warner, what wraps the theme that a function of app code gets
+ * (with the checks, it warns about a read with a token reference as the key and throws on a write at any
+ * level; without them it is the theme itself, and no wrapper is made), and what is told about a
+ * declaration that global styles leave out.
  * With the checks, the options that only a cache takes (`CACHE_OPTIONS`), given together with a `cache`,
  * are warned about at once.
  */
@@ -506,8 +518,13 @@ function createFamilyEngine<T extends object>(
     if (!tokens) throw new Error(NO_THEME_MESSAGE)
     return tokens
   }
-  // Steps written as a function of the theme are resolved against the references when a rule is written.
-  cache.setKeyframesTheme(() => readTokens().refs)
+  // Steps written as a function of the theme are resolved against the references when a rule is written;
+  // with the checks the function gets them guarded, under the name of the animation.
+  cache.setKeyframesTheme(
+    isChecked
+      ? (name) => guardView(readTokens().refs as object, `keyframes ${name}`)
+      : () => readTokens().refs
+  )
 
   const setTheme = (theme: T) => {
     family.theme = theme
@@ -616,6 +633,8 @@ function createFamilyEngine<T extends object>(
     return scopeName
   }
 
+  const guardTheme = <V extends object>(theme: V, label: string): V => guardView(theme, label) as V
+
   /** The entries of `source`, each made on first access; nothing is written until an entry is used. */
   const createEntries = <K extends string>(source: Record<K, WebStyleObject>): SheetEntries<K> =>
     createLazyRecord(Object.keys(source) as K[], (key) => cache.createEntry(source[key]))
@@ -632,7 +651,7 @@ function createFamilyEngine<T extends object>(
         if (theme !== undefined) {
           let entries = viewEntries.get(theme)
           if (entries === undefined) {
-            entries = createEntries(styles(theme))
+            entries = createEntries(styles(guardTheme(theme, SHEET_LABEL)))
             viewEntries.set(theme, entries)
           }
           return entries
@@ -640,7 +659,7 @@ function createFamilyEngine<T extends object>(
         // Reading the tokens first makes them again for a new base theme, which counts a new version.
         const { refs } = readTokens()
         if (baseEntries === undefined || madeAt !== version) {
-          baseEntries = createEntries(styles(refs))
+          baseEntries = createEntries(styles(guardTheme(refs, SHEET_LABEL)))
           madeAt = version
         }
         return baseEntries
@@ -675,23 +694,42 @@ function createFamilyEngine<T extends object>(
     // cache, or a development build); a list needs no work of its own here, because the cache reads lists
     // in order.
     const isResultChecked = hasFunction && isChecked
+    // With the checks, what a write into the frozen argument of a style function is thrown again with.
+    const owner = isChecked
+      ? `[${cache.prefix}] A style function${label ? ` of "${label}"` : ''}`
+      : ''
     const resolveStyle = (
-      style: StyleInput,
-      props: Record<string, unknown>,
-      theme: unknown
+      style: StyleFunction<unknown, Record<string, unknown>>,
+      argument: Record<string, unknown>
     ): StyleResult => {
-      if (typeof style !== 'function') return style
-      const result = (style as StyleFunction<unknown, Record<string, unknown>>)({
-        ...props,
-        theme: guardView((theme ?? readTokens().refs) as object, label),
-      })
-      return isResultChecked ? checkStyleResult(cache.prefix, label, result) : result
+      if (!isChecked) return style(argument as never)
+      return checkStyleResult(
+        cache.prefix,
+        label,
+        callCheckedStyle(style, argument as never, owner)
+      )
     }
+    /**
+     * The results of `source` for one render: a function is called with the one argument of the render,
+     * made when the first function is met (frozen with the checks), so every function of the element gets
+     * the same object and no other render ever does.
+     */
     const resolveAll = (
       source: readonly StyleInput[],
       props: Record<string, unknown>,
       theme: unknown
-    ): StyleResult[] => source.map((style) => resolveStyle(style, props, theme))
+    ): StyleResult[] => {
+      let argument: Record<string, unknown> | undefined
+      return source.map((style) => {
+        if (typeof style !== 'function') return style
+        argument ??= createStyleArgument(
+          props,
+          guardView((theme ?? readTokens().refs) as object, label),
+          isChecked
+        )
+        return resolveStyle(style as StyleFunction<unknown, Record<string, unknown>>, argument)
+      })
+    }
 
     /**
      * The base class (written first), the classes in front of the props class (the base, after the class
@@ -740,7 +778,7 @@ function createFamilyEngine<T extends object>(
     // takes the same path for every later call with that view.
     const plans = new WeakMap<object, Plan>()
     const makePlan = (props: Record<string, unknown>, view: object): Plan => {
-      const split = splitLeading(list, props, guardView(view, label))
+      const split = splitLeading(list, props, guardView(view, label), isChecked ? owner : undefined)
       const { propsFrom } = split
       const base = isResultChecked
         ? (checkStyleResult(cache.prefix, label, split.base) as StyleResult[])
@@ -818,7 +856,7 @@ function createFamilyEngine<T extends object>(
   }
 
   const resolveGlobal = (input: GlobalInput<T>, theme?: T): GlobalRules[] => {
-    const readTheme = () => theme ?? readTokens().refs
+    const readTheme = () => guardTheme(theme ?? readTokens().refs, GLOBAL_LABEL)
     return readGlobalInput<T>(input, readTheme, reportGlobal).map(cache.compileGlobal)
   }
 
@@ -873,6 +911,7 @@ function createFamilyEngine<T extends object>(
     when,
     whenScheme: createSchemeKey,
     createSheet,
+    guardTheme,
     createStyler,
     // The engine of another cache keeps the options of the style (the token options, how its styles are
     // written, its checks); its prefix and everything the cache holds are that cache's.

@@ -381,8 +381,8 @@ export interface Cache {
    * value repair needs a value, and only then.
    */
   registerValues(read: () => Readonly<Record<string, string>>): void
-  /** Gives the cache the theme that steps written as a function of the theme are resolved against, read when a `@keyframes` rule is first written (the engine gives its references). */
-  setKeyframesTheme(read: () => unknown): void
+  /** Gives the cache the theme that steps written as a function of the theme are resolved against, read for the name of the animation when its `@keyframes` rule is first written (the engine gives its references). */
+  setKeyframesTheme(read: (name: string) => unknown): void
   /**
    * Writes the `@keyframes` rule of `name` (a `keyframes` result) now, once, outside every layer: for a
    * use that the cache cannot see in a class. A rule that is written, or that the page has, is not written
@@ -1189,7 +1189,7 @@ export function createCache(options: CacheOptions = {}): Cache {
 
   // The animation names that the rules of each class use, and the theme that steps of a function are resolved against.
   const animations = new Map<string, readonly string[]>()
-  let readKeyframesTheme = (): unknown => {
+  let readKeyframesTheme = (_name: string): unknown => {
     throw new Error(
       'keyframes(): these steps are a function of the theme, and this cache has no theme: make the cache through an engine.'
     )

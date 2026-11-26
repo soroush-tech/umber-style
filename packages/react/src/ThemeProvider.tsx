@@ -101,7 +101,12 @@ export function createThemeProvider<T extends object>({
     const isOutermost = above === undefined && !isRoot
     const isNested = above !== undefined && !isRoot
     const given = useMemo(
-      () => resolveThemeInput(theme as ThemeInput<T>, outer ?? (EMPTY_THEME as T)),
+      () =>
+        resolveThemeInput(
+          theme as ThemeInput<T>,
+          outer ?? (EMPTY_THEME as T),
+          baseEngine.guardTheme
+        ),
       [theme, outer]
     )
     // The first provider gives the engine the shape of its tokens, before its children render. It is not

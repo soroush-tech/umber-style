@@ -56,6 +56,7 @@ const PACKAGES = [
 // The names every entry of the package must export, and that the ESM and CJS builds must agree on.
 const ENTRIES = {
   '@umber-style/core': ['createEngine', 'createCache', 'extractPageStyles', 'at'],
+  '@umber-style/core/internal': ['createThemeGuard', 'callCheckedStyle'],
   '@umber-style/cache': ['default', 'createCache'],
   '@umber-style/server/create-instance': ['default', 'createInstance'],
   '@umber-style/css': [
@@ -618,6 +619,8 @@ if (expected === 'server') {
   const typed = `
 import { createEngine } from '@umber-style/core'
 import type { Theme } from '@umber-style/core'
+import { callCheckedStyle, createThemeGuard } from '@umber-style/core/internal'
+import type { ThemeGuard } from '@umber-style/core/internal'
 import { css, cx } from '@umber-style/css'
 import createCssInstance from '@umber-style/css/create-instance'
 import { createStyle } from '@umber-style/react'
@@ -643,6 +646,8 @@ import type { ComponentProps, CSSProperties } from 'react'
 const theme = { palette: { primary: '#1b5fd1', onPrimary: '#ffffff' }, space: [0, 4, 8] }
 
 export const engine = createEngine(theme)
+export const guard: ThemeGuard = createThemeGuard('smoke')
+export const checked: unknown = callCheckedStyle
 export const umbrellaEngine = createUmbrellaEngine(theme)
 export const umberCache: UmberCache = createCache({ key: 'smoke' })
 export const tags: string = createInstance(umberCache).constructStyleTagsFromChunks(

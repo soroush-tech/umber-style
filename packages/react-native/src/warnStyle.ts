@@ -17,7 +17,7 @@ const ANIMATION_KEY = /^(?:animation|transition)/
 const warned = new Set<string>()
 
 /** Whether this is a development build: `process` may not exist, and then nothing is warned. */
-function isDevelopment(): boolean {
+export function isDevelopment(): boolean {
   return typeof process !== 'undefined' && process.env.NODE_ENV !== 'production'
 }
 

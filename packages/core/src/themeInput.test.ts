@@ -68,3 +68,20 @@ describe('EMPTY_THEME', () => {
     expect(Object.isFrozen(EMPTY_THEME)).toBe(true)
   })
 })
+
+describe('resolveThemeInput with a guard', () => {
+  it('gives a function the theme above through the guard, and an object as it is', () => {
+    const outer = { a: 1 }
+    const calls: unknown[][] = []
+    const guard = <V extends object>(theme: V, label: string): V => {
+      calls.push([theme, label])
+      return { ...theme, a: 2 }
+    }
+    expect(resolveThemeInput((above: typeof outer) => ({ a: above.a + 1 }), outer, guard)).toEqual({
+      a: 3,
+    })
+    const given = { a: 5 }
+    expect(resolveThemeInput(given, outer, guard)).toBe(given)
+    expect(calls).toEqual([[outer, 'ThemeProvider']])
+  })
+})

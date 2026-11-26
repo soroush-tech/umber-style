@@ -1,5 +1,7 @@
 import { createElement, type ElementType } from 'react'
-import type { StateName } from '@umber-style/core'
+import { type StateName } from '@umber-style/core'
+import { callCheckedStyle } from '@umber-style/core/internal'
+import { guardTheme, readStyleOwner } from './devGuard'
 import type { InteractionState, NativeCondition } from './conditions'
 import {
   createHeldHandlers,
@@ -103,6 +105,8 @@ export function createStyled<T>(
       name: options.name ?? readComponentName(tag),
       motion,
     }
+    // In development, what a write into the frozen argument of a style function is thrown again with.
+    const owner = readStyleOwner(settings.name)
 
     /** Whether the prop `name` reaches the element; with `hasStates` the props that tell a state are the binding's unless `shouldForwardProp` asks for them. */
     const isForwarded = (name: string, hasStates: boolean): boolean => {
@@ -312,10 +316,18 @@ export function createStyled<T>(
         const results: StyleResult[] = []
         let found: StyleKeys | undefined
         let isMoving = isAnimated
+        // One argument for every function of the element in this render, frozen in development.
+        const argument =
+          owner === undefined
+            ? { ...props, theme }
+            : Object.freeze({ ...props, theme: guardTheme(theme as object, settings.name ?? '') })
         for (let index = 0; index < styles.length; index++) {
           const style = styles[index]
           if (typeof style !== 'function') continue
-          const result = (style as StyleFunction)({ ...props, theme })
+          const result =
+            owner === undefined
+              ? (style as StyleFunction)(argument)
+              : callCheckedStyle(style as StyleFunction, argument, owner)
           results[index] = result
           if (result) found = collectKeys(result, found)
           isMoving ||= isMovingStyle(result, motion)

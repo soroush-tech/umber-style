@@ -20,7 +20,7 @@ answer and lets `ProviderScope` choose. `createStyle.server.ts` is the importer;
 
 ```mermaid
 flowchart TD
-  props["theme, isRoot, children"] --> resolve["resolveThemeInput(theme, base theme)"]
+  props["theme, isRoot, children"] --> resolve["resolveThemeInput(theme, base theme, engine.guardTheme): a function gets the base theme, shared by every request, guarded with the checks"]
   resolve --> slot["readFirstSlot()"]
   slot --> first{"slot.isSet?"}
   first -->|no| mark["isFirst: set slot to given, add stamp"]

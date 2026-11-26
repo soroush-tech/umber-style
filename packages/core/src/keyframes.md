@@ -42,7 +42,8 @@ flowchart TD
 offset must be a percentage from 0% to 100%, steps of one offset are merged with the later winning, and the
 result is sorted. A stand-in value is turned into its path, and a nested style in a step throws a
 `TypeError`. Later, `createKeyframesRule(name, readTheme, context)` compiles the registered steps again with
-the cache's own context, reading the real theme only for a function.
+the cache's own context, reading the real theme only for a function: `readTheme(name)`, so that the engine
+can give the function its theme under the name of the animation (guarded, in development).
 
 ```mermaid
 flowchart TD

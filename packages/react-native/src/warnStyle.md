@@ -16,7 +16,9 @@ A shared source can carry values that mean something on the web and nothing on R
 `'8px 16px'`, `calc(...)`, `currentColor`, `em` or `vh` lengths, selectors, at-rules. Dropping or passing
 them silently hides the mistake. This file says what is wrong and what to write instead. `toNativeStyle.ts`
 calls the first two, `windowState.ts` the third, `createStyle.ts` the fourth, `styled.ts` the fifth and the
-last, and the animated entry (`animatedDriver.ts`, `motionSteps.ts`) `warnAboutMotion`.
+last, and the animated entry (`animatedDriver.ts`, `motionSteps.ts`) `warnAboutMotion`. Its switch,
+`isDevelopment` (`NODE_ENV` is not `production`), is exported for `devGuard.ts`, whose checks of the
+functions an app gives the binding turn on where its warnings do.
 
 ## The logic
 

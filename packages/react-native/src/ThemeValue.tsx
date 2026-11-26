@@ -9,6 +9,7 @@ import {
   type ThemeInput,
 } from '@umber-style/core'
 import { readSchemeName, type NativeCondition } from './conditions'
+import { guardTheme } from './devGuard'
 import type { NativeTheme } from './nativeTheme'
 
 /** The props of the provider that `createThemeValue` makes, which `ThemeProvider` renders. */
@@ -65,7 +66,7 @@ export function createThemeValue<T extends object>(
       above === undefined ? holder.baseTheme : (themeByNative.get(above) ?? (above as T))
     const outerScheme = useContext(ConditionContext)?.colorScheme
     const given = useMemo(
-      () => resolveThemeInput(theme, outer ?? (EMPTY_THEME as T)),
+      () => resolveThemeInput(theme, outer ?? (EMPTY_THEME as T), guardTheme),
       [theme, outer]
     )
     const value = useMemo(() => toNative(mergeTheme(outer, given)), [outer, given])

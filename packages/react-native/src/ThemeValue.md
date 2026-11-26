@@ -23,7 +23,7 @@ flowchart TD
   render["ThemeValueProvider renders"] --> above{"theme context above?"}
   above -->|"no"| base["outer = holder.baseTheme"]
   above -->|"yes"| orig["outer = original of the native theme above, else the value itself"]
-  base --> given["given = resolveThemeInput(theme, outer or empty theme)"]
+  base --> given["given = resolveThemeInput(theme, outer or empty theme, guardTheme): a function gets the theme above guarded in development"]
   orig --> given
   given --> merged["mergeTheme(outer, given)"]
   merged --> conv["toNative: convert once per theme object"]

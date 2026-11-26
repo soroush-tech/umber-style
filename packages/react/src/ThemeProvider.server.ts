@@ -157,7 +157,7 @@ export function createThemeProvider<T extends object>(
     props: WebThemeProviderProps<T>
   ): ReactElement | Promise<ReactElement> {
     const { theme, isRoot, children } = props
-    const given = resolveThemeInput(theme as ThemeInput<T>, readBaseTheme())
+    const given = resolveThemeInput(theme as ThemeInput<T>, readBaseTheme(), engine.guardTheme)
     // The first provider of the request sends the stamp, and its theme gives the shape of the view of
     // function styles where the style has no base theme.
     const slot = readFirstSlot()

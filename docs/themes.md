@@ -154,6 +154,27 @@ A function style (and a function sheet) gets the theme as a view of the nearest 
 
 By default `breakpoints` and `components` are raw, and everything else is a variable. `modes` changes that for any path: see [Tokens](tokens.md). Real values are why a nested theme with another breakpoint gets its own class, as above. A function in the theme (a helper, a mixin) is a real value too.
 
+### The theme a function gets is shared: never change it
+
+The theme given to a function of your code is one object, shared by every render and, on a server, by every request of the process: the base theme, a view the engine keeps, or the theme of a provider above. That holds for a style function, a function sheet (`StyleSheet.create(theme => ...)`), a function of `keyframes` and of `globalStyles` (and of their template forms), and the function given to `ThemeProvider` as its `theme`, on every platform. A change to it reaches every later render and request. Never write into it: build a new object instead.
+
+In development (the development checks of the engine on the web, `NODE_ENV` other than `production` on React Native) it cannot be written: an assignment, a `delete` or an `Object.defineProperty` at any level throws a `TypeError` that names the path and the function (the label of the component, or `Global`, `keyframes <name>`, `StyleSheet`, `ThemeProvider`):
+
+```
+[umber] theme.space.3 is set by a function of "card-root". The theme is one object, shared by every render and every request, so a change to it reaches all of them: never change it. Build a new object instead, such as [...theme.space].
+```
+
+is what this component throws in development (and in production it changes the theme of every request):
+
+```tsx
+const Card = styled('div', { name: 'Card' })(({ theme }) => {
+  theme.space.push(16)
+  return null
+})
+```
+
+What it reads is unchanged: the same values, and the same object for the same part read by the same function, render after render. In production nothing of this runs: the function gets the theme itself.
+
 ## Reading values in JavaScript: `useTheme`
 
 `useTheme()` returns the real values of the nearest provider, merged over the providers above: `theme.palette.primary` is `'#0b7a4b'` in `Swatch`, not a reference. Use it when JavaScript needs a number or a name (a chart colour, a measured size). Do not write it into a style: a style function already receives `theme` for that, and a real value in a style makes the class depend on the theme.
@@ -256,4 +277,5 @@ The same works with `@umber-style/vue` and `@umber-style/react-native`. The decl
 - A theme change of the outermost provider renders no styled component when only token values change. A change of a value that is not a token (a breakpoint, an `inline` token, a function in the theme) makes a new view of the theme, and every styled component with a function style renders again, as it must. What reads `useTheme()` renders again on every change.
 - The `:root` rule is written in an insertion effect in the browser, after the render. Of two React roots, the one that commits last decides, and an unmounted root leaves its theme there until another provider declares one.
 - In both React builds the outermost provider is the one with no provider of its engine above it in the page, of either build. The server components build cannot see the page, so its provider renders a client component that decides where the tree is whole (see [Server rendering](server-rendering.md#server-components)). A nested provider of the server build declares only the theme it was given: it cannot know the providers between it and the root. A provider of the client build below one of the server build merges over that provider's theme, which the browser part of the server provider puts into the context; its second theme class declares the themes of the nested providers above it of either build, and its own, as usual; a member of the server provider's theme that is not plain data (a function) does not reach it, and the theme above gives that member instead.
+- The theme a function gets cannot be written in development only: in production a write is not stopped, and reaches every later render and request. `useTheme()` gives the theme itself, not guarded. A part copied out of the theme (`{ ...theme.palette }`) is a new object the function may change, and a write into a function, a `Date` or a `Map` of the theme is not seen. In development a provider function that returns parts of the theme above as they are (`(outer) => ({ ...outer, mode: 'dark' })`) passes on the guarded parts, which read the same and refuse a write; and each function gets its own wrapper of a part it reads, so a cache of yours keyed by a part of the theme (`theme.breakpoints`) is made once for each component there, where production makes it once.
 - `isRoot` keeps working as before: no element, no class, no rule, and the class on `<html>` is yours. See [The root theme and switching](root-theme.md).

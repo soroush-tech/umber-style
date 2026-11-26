@@ -151,15 +151,15 @@ export function readKeyframesSteps(name: string): KeyframesInput<unknown> | unde
 
 /**
  * The `@keyframes` rule of the registered `name`, written as `context` says: steps given as a function are
- * resolved against the theme that `readTheme` gives, which is read only then.
+ * resolved against the theme that `readTheme` gives for `name`, which is read only then.
  */
 export function createKeyframesRule(
   name: string,
-  readTheme: () => unknown,
+  readTheme: (name: string) => unknown,
   context: CompileContext
 ): string {
   const steps = registry.get(name) as KeyframesInput<unknown>
-  const resolved = typeof steps === 'function' ? steps(readTheme()) : steps
+  const resolved = typeof steps === 'function' ? steps(readTheme(name)) : steps
   return `@keyframes ${name}{${compileSteps(resolved, context)}}`
 }
 

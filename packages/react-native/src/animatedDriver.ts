@@ -1,5 +1,6 @@
 import type { ElementType } from 'react'
 import { readKeyframesSteps, type KeyframesSteps } from '@umber-style/core'
+import { guardTheme } from './devGuard'
 import type { NativeStyleObject } from './nativeStyle'
 import {
   BEHAVIORS,
@@ -147,7 +148,7 @@ export function createAnimatedDriver(library: AnimationLibrary): AnimatedDriver 
         }
         let rule = byName.get(name)
         if (rule === undefined) {
-          const steps = isThemed ? input(theme) : input
+          const steps = isThemed ? input(guardTheme(theme as object, `keyframes ${name}`)) : input
           const settings = { remBase, name: styleName, readEasing: readEasingItem }
           const translated = translateSteps(steps as KeyframesSteps, settings)
           rule = library.keyframes(translated)

@@ -80,6 +80,8 @@ conversion), `keys` (a `StyleKeys` for each entry), `isConditional`, `queries`, 
 
 - Only `remBase`, `lengthKeys` and `animated` of the options are used; the rest warn in development.
 - Steps that are a function of the theme follow the base theme, not the theme of a provider.
+- A function sheet is called with the theme guarded in development (`guardTheme`, label `StyleSheet`); its
+  registered entries stay kept by the theme itself.
 - A sheet entry is not a component: `useStyle` does not watch reduced motion for it, and nothing wraps the
   component it is given to (see `styled.md`).
 - A `state()` key in a sheet entry or in `css()` never applies here: an entry belongs to no component, so
