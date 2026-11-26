@@ -1,4 +1,5 @@
-import { mergeTheme, type DeepPartial } from '@umber-style/core'
+import { type DeepPartial } from '@umber-style/core'
+import { mergeTheme } from '@umber-style/core/internal'
 import { mergeCrossed, type Crossing } from './crossedTheme'
 
 /** Breakpoints of `sizes` with `up(key)`, a helper that is not enumerable and closes over the sizes, as a design system makes it. */

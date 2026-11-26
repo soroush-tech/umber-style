@@ -10,15 +10,8 @@ import {
   type InjectionKey,
   type PropType,
 } from 'vue'
-import {
-  type ColorScheme,
-  type DeepPartial,
-  EMPTY_THEME,
-  type Engine,
-  mergeTheme,
-  resolveThemeInput,
-  type ThemeInput,
-} from '@umber-style/core'
+import { type ColorScheme, type DeepPartial, type Engine, type ThemeInput } from '@umber-style/core'
+import { EMPTY_THEME, mergeTheme, resolveThemeInput } from '@umber-style/core/internal'
 import { injectCache } from './CacheProvider'
 
 /** The wrapper of a nested provider: its element and its class string, which `ThemeScope` repeats. */

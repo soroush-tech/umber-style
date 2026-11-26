@@ -15,7 +15,7 @@ process holds the rules of every page it ever rendered, so taking all of it leak
 and depends on render order. `extractPageStyles` reads the class names out of the HTML and asks the cache for
 only those rules, so the result depends on the page alone. The element carries the stamp of the cache's
 options (`data-options`) for the browser to compare (see `fingerprint.ts`). It is used by `index.ts` (the
-public export), `packages/server/src/createInstance.ts`, `packages/react/src/styleElements.ts` and
+public export; `createNonceAttribute` is exported by `internal.ts`), `packages/server/src/createInstance.ts`, `packages/react/src/styleElements.ts` and
 `packages/vue/src/Global.ts`.
 
 ## The logic

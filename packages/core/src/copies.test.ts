@@ -1,10 +1,10 @@
 // Two copies of the core in one program, as an app has them when one package is bundled into a build
 // and another is left external: each copy has its own module state, and both see one `globalThis`.
 
-/** A copy of the whole core, with module state of its own. */
+/** A copy of the whole core, both entries, with module state of its own. */
 async function loadCopy() {
   vi.resetModules()
-  return import('./index')
+  return { ...(await import('./index')), ...(await import('./internal')) }
 }
 
 afterEach(() => {

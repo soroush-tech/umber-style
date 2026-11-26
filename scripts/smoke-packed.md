@@ -33,7 +33,9 @@ flowchart TD
   s2 --> one{"a nested copy of the core?"}
   one -->|yes| f1["FAIL"]
   one -->|no| s3["3: node check.mjs and check.cjs"]
-  s3 --> keys["both write the exported names: compare them"]
+  s3 --> exact{"the core's two entries export exactly their lists, umber-style the main one?"}
+  exact -->|no| f2["FAIL"]
+  exact -->|yes| keys["both write the exported names: compare them"]
   keys --> s3a["3a: node next.cjs: StyleRegistry from require renders its children"]
   s3a --> s3b["3b: node interop.cjs for each entry of NAMED_DEFAULTS"]
   s3b --> s4["4: conditions.mjs and conditions.cjs under none, react-server, react-native"]
@@ -69,8 +71,12 @@ imported from an ES module, which Node cannot do for `next/navigation` (the pack
 
 - `PACKAGES`: dir and name, in publish order (core, cache, server, css, is-prop-valid, react, styled,
   react-native, vue, umber-style).
-- `ENTRIES`: specifier -> the names that entry must export (`'@umber-style/core': ['createEngine',
-  'createCache', 'extractPageStyles', 'at']`, `'@umber-style/css/create-instance': []`).
+- `ENTRIES`: specifier -> the names that entry must export (`'@umber-style/react': ['createStyle',
+  'styled', ...]`, `'@umber-style/css/create-instance': []`). For the two entries of the core the names
+  are the full lists, `CORE_EXPORTS` (what apps use) and `CORE_INTERNAL_EXPORTS` (what the family
+  shares): step 3 fails when either exports a name more, and when the root of `umber-style` exports
+  other names than `@umber-style/core`. Step 5 imports from the internal entry a helper and a type, and
+  expects an error for each from the main entry.
 - `NAMED_DEFAULTS`: specifier -> the name its default export also has (`'@umber-style/cache':
   'createCache'`): `styled`, `cache`, the two `create-instance` subpaths and the three subpaths of
   `is-prop-valid`.

@@ -1,7 +1,8 @@
 'use client'
 
 import { createElement, Fragment, use, useContext } from 'react'
-import { EMPTY_THEME, type Cache, type Engine } from '@umber-style/core'
+import { type Cache, type Engine } from '@umber-style/core'
+import { EMPTY_THEME } from '@umber-style/core/internal'
 import { useProvidedCache } from './CacheProvider'
 import {
   completeTheme,

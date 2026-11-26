@@ -2,7 +2,8 @@
 // loads the server build of this package with no bundler still loads the client modules that import this
 // one. So nothing here calls React when the module loads.
 import * as React from 'react'
-import { readSharedState, type UmberCache } from '@umber-style/core'
+import { type UmberCache } from '@umber-style/core'
+import { readSharedState } from '@umber-style/core/internal'
 import type { StyleText } from './styleElements'
 
 /** One style text that a request registered: the prefix of its engine, and the nonce it came with. */

@@ -1,14 +1,16 @@
 import type { ElementType } from 'react'
 import {
-  createDeferredObject,
-  createDeferredRecord,
   createLazyEngine,
   globalStyles,
   isDevelopment,
   keyframes,
-  withTagShorthands,
   type WebStyleObject,
 } from '@umber-style/core'
+import {
+  createDeferredObject,
+  createDeferredRecord,
+  withTagShorthands,
+} from '@umber-style/core/internal'
 import { bindEngine } from './createStyle'
 import { claimPrefixStyle } from './ProviderScope'
 import { createThemeContexts } from './ThemeValue'

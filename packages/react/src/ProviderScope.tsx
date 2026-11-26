@@ -5,16 +5,18 @@
 // still loads this module. So nothing here calls React when the module loads.
 import * as React from 'react'
 import {
-  createThemeRule,
   createTokens,
-  mergeTheme,
-  readSharedState,
-  ROOT_SELECTOR,
-  toDeclarationText,
   type ColorScheme,
   type DeepPartial,
   type TokenOptions,
 } from '@umber-style/core'
+import {
+  createThemeRule,
+  mergeTheme,
+  readSharedState,
+  ROOT_SELECTOR,
+  toDeclarationText,
+} from '@umber-style/core/internal'
 import { mergeCrossed } from './crossedTheme'
 import { NonceStyles } from './NonceStyles'
 import type { StyleText } from './styleElements'

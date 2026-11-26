@@ -1,7 +1,5 @@
 import {
-  createCssEntry,
   createEngine,
-  EMPTY_THEME,
   isDevelopment,
   type ColorScheme,
   type DeepPartial,
@@ -14,6 +12,7 @@ import {
   type SheetStyles,
   type WebStyleObject,
 } from '@umber-style/core'
+import { createCssEntry, EMPTY_THEME } from '@umber-style/core/internal'
 import { createGlobal } from './Global.server'
 import { createStyleSender } from './inlineStyles.server'
 import { createNonceReader, createRequestSlot, type CacheFunction } from './serverContext'

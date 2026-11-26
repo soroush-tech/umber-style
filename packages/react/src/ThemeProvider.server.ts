@@ -1,15 +1,17 @@
 import { createElement, Fragment, type ReactElement } from 'react'
 import {
-  createThemeClassName,
-  createThemeId,
-  hashString,
   isDevelopment,
-  resolveThemeInput,
   type DeepPartial,
   type Engine,
   type ThemeInput,
   type ThemeText,
 } from '@umber-style/core'
+import {
+  createThemeClassName,
+  createThemeId,
+  hashString,
+  resolveThemeInput,
+} from '@umber-style/core/internal'
 import { isInlineMode, type StyleSender } from './inlineStyles.server'
 import { toPlainTheme } from './plainTheme'
 import { ProviderScope, type ScopeBase, type ScopeTheme, type SentTokens } from './ProviderScope'

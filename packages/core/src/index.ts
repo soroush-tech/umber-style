@@ -1,18 +1,37 @@
-export * from './alpha'
+export { alpha, isAlphaColor, type AlphaColor } from './alpha'
 export * from './at'
-export * from './cache'
-export { findCache } from './cacheRegistry'
+export {
+  createCache,
+  createDomSheet,
+  createMemorySheet,
+  RULE_LAYERS,
+  type Cache,
+  type CacheOptions,
+  type ClassLayer,
+  type ClassOptions,
+  type ClassValue,
+  type DomSheetOptions,
+  type GlobalInsertOptions,
+  type GlobalRules,
+  type HeldClass,
+  type PageExtractOptions,
+  type PagePart,
+  type PageParts,
+  type RuleLayer,
+  type Sheet,
+  type StyleOptions,
+} from './cache'
 export * from './calc'
 export * from './createEngine'
-export {
-  createComponentSelector,
-  createCssEntry,
-  readStaticTemplate,
-  readStyleArguments,
-  rejectFunctions,
-} from './css'
 export { isDevelopment } from './devChecks'
-export * from './extractStyles'
+export {
+  createStyleTag,
+  extractPageStyleParts,
+  extractPageStyles,
+  type PageStyleOptions,
+  type PageStyles,
+  type StyleTagOptions,
+} from './extractStyles'
 export * from './findMissingStyles'
 export {
   globalStyles,
@@ -23,29 +42,24 @@ export {
   type GlobalStylesInput,
   type GlobalStyleValue,
 } from './globalStyles'
-export * from './hash'
 export {
   keyframes,
-  readKeyframesSteps,
   type KeyframesInput,
   type KeyframesOptions,
   type KeyframesStep,
   type KeyframesSteps,
 } from './keyframes'
-export * from './lazyRecord'
-export {
-  createLiveValue,
-  declareLiveValue,
-  isLiveValue,
-  writeLiveValue,
-  type LiveRule,
-  type LiveValue,
-} from './liveValue'
+export { isLiveValue, type LiveValue } from './liveValue'
 export * from './mergeDeep'
-export * from './nonceSource'
+export { setNonceSource, type NonceSource } from './nonceSource'
 export type { RegisteredSyntax } from './registered'
-export { createGlobalMarker, type GlobalMarker } from './scanHtml'
-export * from './scope'
+export {
+  DEFAULT_SCOPING,
+  type SchemeKey,
+  type SchemeName,
+  type Scoping,
+  type ThemeKey,
+} from './scope'
 export {
   compileRules,
   mergeStyles,
@@ -53,30 +67,10 @@ export {
   type StyleObject,
   type StyleValue,
 } from './serialize'
-export {
-  createSheetEntry,
-  findEntryCache,
-  flattenStyle,
-  isSheetEntry,
-  readEntrySource,
-  type EntryRole,
-  type EntrySource,
-  type SheetEntry,
-} from './sheetEntry'
-export { readSharedState } from './sharedState'
+export { findEntryCache, isSheetEntry, type SheetEntry } from './sheetEntry'
 export * from './state'
 export * from './styleTypes'
-export * from './tagShorthands'
-export { isTemplateStrings, parseKeyframesTemplate, parseStyleTemplate } from './templateStyle'
-export {
-  createThemeClass,
-  createThemeId,
-  createThemeRule,
-  ROOT_SELECTOR,
-  toDeclarationText,
-  type ThemeRuleOptions,
-} from './theme'
-export * from './themeInput'
+export type { ThemeInput } from './themeInput'
 export * from './tokens'
 export * from './types'
 export type * from './umberCache'

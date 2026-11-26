@@ -1,15 +1,13 @@
 import { createElement, Fragment, type Context, type ReactElement } from 'react'
 import { createNativeThemeKey, type NativeCondition } from './conditions'
+import { globalStyles, isThemedSheet, keyframes } from '@umber-style/core'
 import {
   createLazyRecord,
   createSchemeKey,
   EMPTY_THEME,
-  globalStyles,
-  isThemedSheet,
-  keyframes,
   readStaticTemplate,
   rejectFunctions,
-} from '@umber-style/core'
+} from '@umber-style/core/internal'
 import { guardTheme } from './devGuard'
 import { createThemeValue, type ThemeHolder } from './ThemeValue'
 import type {

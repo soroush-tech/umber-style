@@ -1,4 +1,4 @@
-import { readSharedState } from '@umber-style/core'
+import { readSharedState } from '@umber-style/core/internal'
 import { createDefaultStyle } from './defaultStyle'
 
 // One default style for every copy of the binding in the program, so that a component of one copy reads

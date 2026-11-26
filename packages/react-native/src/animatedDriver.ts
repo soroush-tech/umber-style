@@ -1,5 +1,6 @@
 import type { ElementType } from 'react'
-import { readKeyframesSteps, type KeyframesSteps } from '@umber-style/core'
+import { type KeyframesSteps } from '@umber-style/core'
+import { readKeyframesSteps } from '@umber-style/core/internal'
 import { guardTheme } from './devGuard'
 import type { NativeStyleObject } from './nativeStyle'
 import {

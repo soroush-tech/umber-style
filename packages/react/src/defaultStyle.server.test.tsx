@@ -1,4 +1,5 @@
-import { createCache, createMemorySheet, EMPTY_THEME } from '@umber-style/core'
+import { createCache, createMemorySheet } from '@umber-style/core'
+import { EMPTY_THEME } from '@umber-style/core/internal'
 import { createDefaultStyle } from './defaultStyle.server'
 import { findAll, resolveTree } from './vitest.resolveTree'
 import { playScopes } from './vitest.providerScope'

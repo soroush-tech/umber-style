@@ -1,6 +1,7 @@
 import { createApp, createSSRApp, h, type Component } from 'vue'
 import { renderToString } from 'vue/server-renderer'
-import { createCache, createMemorySheet, createSheetEntry } from '@umber-style/core'
+import { createCache, createMemorySheet } from '@umber-style/core'
+import { createSheetEntry } from '@umber-style/core/internal'
 import { createStyle } from './createStyle'
 
 function mount(component: Component) {

@@ -6,7 +6,8 @@ import {
   type ReactElement,
   type ReactNode,
 } from 'react'
-import { readStyleArguments, withTagShorthands, type Cache, type Engine } from '@umber-style/core'
+import { type Cache, type Engine } from '@umber-style/core'
+import { readStyleArguments, withTagShorthands } from '@umber-style/core/internal'
 import { useProvidedCache } from './CacheProvider'
 import { isStyledComponent, prepareStyled } from './styledParts'
 import { useStyleRegistry, type StyleRegistryStore } from './styleRegistry'

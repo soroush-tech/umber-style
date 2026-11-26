@@ -1,12 +1,11 @@
 import { useId, useInsertionEffect, useState } from 'react'
+import { type Cache, type LiveValue } from '@umber-style/core'
 import {
   createLiveValue,
   declareLiveValue,
   hashString,
   writeLiveValue,
-  type Cache,
-  type LiveValue,
-} from '@umber-style/core'
+} from '@umber-style/core/internal'
 import { useProvidedCache } from './CacheProvider'
 import type { StyleValueSetter } from './types'
 

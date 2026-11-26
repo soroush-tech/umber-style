@@ -1,5 +1,5 @@
 import { cache as reactCache } from 'react'
-import { readNonceSource } from '@umber-style/core'
+import { readNonceSource } from '@umber-style/core/internal'
 
 /** The state of one request: the value, and whether a provider has written it. */
 export interface ServerSlot<T> {

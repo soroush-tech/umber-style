@@ -9,14 +9,8 @@ import {
   useMemo,
   type ReactElement,
 } from 'react'
-import {
-  EMPTY_THEME,
-  mergeTheme,
-  resolveThemeInput,
-  type DeepPartial,
-  type Engine,
-  type ThemeInput,
-} from '@umber-style/core'
+import { type DeepPartial, type Engine, type ThemeInput } from '@umber-style/core'
+import { EMPTY_THEME, mergeTheme, resolveThemeInput } from '@umber-style/core/internal'
 import { useProvidedCache } from './CacheProvider'
 import { addMark, completeTheme, getMarksContext, type ThemeScopeValue } from './ProviderScope'
 import { useStyleRegistry, type StyleRegistryStore } from './styleRegistry'

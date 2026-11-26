@@ -1,10 +1,5 @@
-import {
-  createTokens,
-  isDevelopment,
-  mergeTheme,
-  type DeepPartial,
-  type TokenOptions,
-} from '@umber-style/core'
+import { createTokens, isDevelopment, type DeepPartial, type TokenOptions } from '@umber-style/core'
+import { mergeTheme } from '@umber-style/core/internal'
 
 /** What the merge of a theme that crossed from a provider of the server build reads besides the two themes. */
 export interface Crossing {

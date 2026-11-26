@@ -1,13 +1,11 @@
 import { h, normalizeClass, type Component } from 'vue'
+import { type Cache, type Engine, type Styler } from '@umber-style/core'
 import {
   createComponentSelector,
   flattenStyle,
   readStyleArguments,
   withTagShorthands,
-  type Cache,
-  type Engine,
-  type Styler,
-} from '@umber-style/core'
+} from '@umber-style/core/internal'
 import { injectCache } from './CacheProvider'
 import type { Styled, StyledComponent, StyledOptions, StyledStatics } from './types'
 

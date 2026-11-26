@@ -15,7 +15,8 @@ nest. That needs a limit: the rule must stop at the next theme boundary. The nam
 format of the keys and the shape of the `@scope` rule must be the same in the writer (`serialize.ts`), in
 the cache and in the bindings that put the classes on elements. They live here so that there is one
 definition. Importers: `serialize.ts` (compiles a condition key), `createEngine.ts`, `globalStyles.ts`,
-`keyframes.ts` and `findInvalidValues.ts`, and `index.ts` re-exports for the bindings.
+`keyframes.ts` and `findInvalidValues.ts`, `index.ts` re-exports the types of the keys and `DEFAULT_SCOPING` (the default scoping of
+`compileRules`), and `internal.ts` the rest, for the bindings.
 
 ## The logic
 

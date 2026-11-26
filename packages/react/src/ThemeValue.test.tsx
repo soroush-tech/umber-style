@@ -1,5 +1,6 @@
 import { render } from '@testing-library/react'
-import { createEngine, createLazyEngine, EMPTY_THEME } from '@umber-style/core'
+import { createEngine, createLazyEngine } from '@umber-style/core'
+import { EMPTY_THEME } from '@umber-style/core/internal'
 import { createThemeContexts, createThemeValue } from './ThemeValue'
 
 const base = { a: { b: 1, c: 2 } }

@@ -1,4 +1,4 @@
-import { assertAlphaInput, toRgba } from '@umber-style/core'
+import { assertAlphaInput, toRgba } from '@umber-style/core/internal'
 
 /**
  * `color` at `opacity` (0 to 1), as one color string: `rgba(r, g, b, a)` for a literal the core can

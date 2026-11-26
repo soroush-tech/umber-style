@@ -14,7 +14,7 @@ go through the one serializer: the text becomes the same object that an object s
 class name follows (`parseStyleTemplate compiles as the equal object style`). It is a single-pass reader
 rather than a pattern, so hostile text cannot make it backtrack, and the split of the text is cached by the
 strings array, so a call site pays for it once. Importers: `css.ts`, `globalStyles.ts`, `keyframes.ts`
-(and `packages/css/src/createInstance.ts` and the bindings through `index.ts`).
+(and `packages/css/src/createInstance.ts` and the bindings through `internal.ts`).
 
 ## The logic
 

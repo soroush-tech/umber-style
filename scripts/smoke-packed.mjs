@@ -57,10 +57,100 @@ const PACKAGES = [
   { dir: 'vue', name: '@umber-style/vue' },
   { dir: 'umber-style', name: 'umber-style' },
 ]
+// Every value the main entry of the core exports: what an app uses (the table of docs/plain-javascript.md).
+const CORE_EXPORTS = [
+  'DEFAULT_SCOPING',
+  'NO_THEME_MESSAGE',
+  'RULE_LAYERS',
+  'STATE_SELECTORS',
+  'add',
+  'alpha',
+  'at',
+  'compileRules',
+  'createCache',
+  'createDomSheet',
+  'createEngine',
+  'createLazyEngine',
+  'createMemorySheet',
+  'createStyleTag',
+  'createTokens',
+  'divide',
+  'extractPageStyleParts',
+  'extractPageStyles',
+  'findEntryCache',
+  'findMissingPaths',
+  'findMissingStyles',
+  'globalStyles',
+  'isAlphaColor',
+  'isDevelopment',
+  'isLiveValue',
+  'isSheetEntry',
+  'isThemedSheet',
+  'keyframes',
+  'mergeDeep',
+  'mergeStyles',
+  'multiply',
+  'negate',
+  'readLabel',
+  'readState',
+  'setNonceSource',
+  'state',
+  'subtract',
+]
+// Every value of the internal entry of the core: what the bindings and the other packages share.
+const CORE_INTERNAL_EXPORTS = [
+  'EMPTY_THEME',
+  'ROOT_SELECTOR',
+  'assertAlphaInput',
+  'callCheckedStyle',
+  'createComponentSelector',
+  'createCssEntry',
+  'createDeferredObject',
+  'createDeferredRecord',
+  'createGlobalMarker',
+  'createLazyRecord',
+  'createLiveValue',
+  'createNoSchemeGuard',
+  'createNonceAttribute',
+  'createSchemeKey',
+  'createScopeRule',
+  'createSheetEntry',
+  'createStyleSelector',
+  'createThemeClass',
+  'createThemeClassName',
+  'createThemeGuard',
+  'createThemeId',
+  'createThemeKey',
+  'createThemeRule',
+  'declareLiveValue',
+  'findCache',
+  'flattenStyle',
+  'getBoundaryClass',
+  'getSchemeClass',
+  'hashString',
+  'isTemplateStrings',
+  'mergeTheme',
+  'parseKeyframesTemplate',
+  'parseStyleTemplate',
+  'readCondition',
+  'readEntrySource',
+  'readKeyframesSteps',
+  'readNonceSource',
+  'readPageNonce',
+  'readSharedState',
+  'readStaticTemplate',
+  'readStyleArguments',
+  'rejectFunctions',
+  'resolveThemeInput',
+  'toDeclarationText',
+  'toRgba',
+  'withTagShorthands',
+  'writeLiveValue',
+]
 // The names every entry of the package must export, and that the ESM and CJS builds must agree on.
 const ENTRIES = {
-  '@umber-style/core': ['createEngine', 'createCache', 'extractPageStyles', 'at'],
-  '@umber-style/core/internal': ['createThemeGuard', 'callCheckedStyle', 'readPageNonce'],
+  '@umber-style/core': CORE_EXPORTS,
+  '@umber-style/core/internal': CORE_INTERNAL_EXPORTS,
   '@umber-style/cache': ['default', 'createCache'],
   '@umber-style/server/create-instance': ['default', 'createInstance'],
   '@umber-style/css': [
@@ -432,6 +522,12 @@ const need = async (specifier, names) => {
 const entries = ${JSON.stringify(ENTRIES)}
 const mods = {}
 for (const [specifier, names] of Object.entries(entries)) mods[specifier] = await need(specifier, names)
+// The two entries of the core export exactly their lists, and the root of the umbrella is the main one.
+for (const specifier of ['@umber-style/core', '@umber-style/core/internal']) {
+  const extra = results[specifier].filter((name) => !entries[specifier].includes(name))
+  if (extra.length) throw new Error(specifier + ' also exports ' + extra.join(', '))
+}
+if (results['umber-style'].join() !== results['@umber-style/core'].join()) throw new Error('umber-style exports other names than @umber-style/core: ' + results['umber-style'].join(', '))
 // Each default export is also exported by name: the same function.
 for (const [specifier, name] of Object.entries(${JSON.stringify(NAMED_DEFAULTS)})) {
   const mod = mods[specifier]
@@ -659,8 +755,12 @@ if (expected === 'server') {
   const typed = `
 import { createEngine } from '@umber-style/core'
 import type { Theme } from '@umber-style/core'
-import { callCheckedStyle, createThemeGuard } from '@umber-style/core/internal'
-import type { ThemeGuard } from '@umber-style/core/internal'
+import { callCheckedStyle, createCssEntry, createThemeGuard } from '@umber-style/core/internal'
+import type { LiveRule, ThemeGuard } from '@umber-style/core/internal'
+// @ts-expect-error the helpers of the bindings are not in the main entry
+import { createCssEntry as mainCssEntry } from '@umber-style/core'
+// @ts-expect-error nor are their types
+import type { LiveRule as MainLiveRule } from '@umber-style/core'
 import { css, cx } from '@umber-style/css'
 import createCssInstance from '@umber-style/css/create-instance'
 import { createStyle } from '@umber-style/react'
@@ -688,6 +788,8 @@ const theme = { palette: { primary: '#1b5fd1', onPrimary: '#ffffff' }, space: [0
 export const engine = createEngine(theme)
 export const guard: ThemeGuard = createThemeGuard('smoke')
 export const checked: unknown = callCheckedStyle
+export const cssEntry: unknown = [createCssEntry, mainCssEntry]
+export const liveRules: [LiveRule?, MainLiveRule?] = []
 export const umbrellaEngine = createUmbrellaEngine(theme)
 export const umberCache: UmberCache = createCache({ key: 'smoke' })
 export const tags: string = createInstance(umberCache).constructStyleTagsFromChunks(

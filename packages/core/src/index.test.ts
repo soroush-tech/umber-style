@@ -38,12 +38,14 @@ function walkImports(entry: string) {
 }
 
 describe('the core', () => {
-  it('imports no framework and no binding', () => {
-    const { files, specifiers } = walkImports(join(SOURCE, 'index.ts'))
-    expect(files.size).toBeGreaterThan(10)
-    for (const specifier of specifiers) {
-      expect(specifier).not.toMatch(FRAMEWORK_PATTERN)
-      expect(specifier).not.toMatch(BINDING_PATTERN)
+  it('imports no framework and no binding, from either entry', () => {
+    for (const entry of ['index.ts', 'internal.ts']) {
+      const { files, specifiers } = walkImports(join(SOURCE, entry))
+      expect(files.size).toBeGreaterThan(10)
+      for (const specifier of specifiers) {
+        expect(specifier).not.toMatch(FRAMEWORK_PATTERN)
+        expect(specifier).not.toMatch(BINDING_PATTERN)
+      }
     }
   })
 
@@ -81,11 +83,7 @@ describe('the core', () => {
       'negate',
       'keyframes',
       'globalStyles',
-      'createNonceAttribute',
-      'createLiveValue',
-      'declareLiveValue',
       'isLiveValue',
-      'writeLiveValue',
     ]) {
       expect(core).toHaveProperty(name)
     }

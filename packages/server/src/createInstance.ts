@@ -1,4 +1,5 @@
-import { createNonceAttribute, extractPageStyleParts, type Cache } from '@umber-style/core'
+import { extractPageStyleParts, type Cache } from '@umber-style/core'
+import { createNonceAttribute } from '@umber-style/core/internal'
 
 /** The CSS of one key of a page, and the ids it covers. */
 export interface StyleChunk {
