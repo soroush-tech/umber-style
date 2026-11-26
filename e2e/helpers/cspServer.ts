@@ -68,7 +68,7 @@ const RGB = {
 } as const
 
 /** The nonce of every style element (on the development server, of every one of the engine), and how many there are. */
-async function readNonces(page: Page, tier: CspTier): Promise<string[]> {
+export async function readNonces(page: Page, tier: CspTier): Promise<string[]> {
   return readStyleNonces(page, tier === 'production' ? 'style' : SERVER_STYLES)
 }
 
@@ -85,7 +85,7 @@ async function expectCacheNonce(page: Page, tier: CspTier, nonce: string): Promi
 }
 
 /** How many style elements in place the page holds. */
-const countInPlace = (page: Page) =>
+export const countInPlace = (page: Page) =>
   page.evaluate((selector) => document.querySelectorAll(selector).length, IN_PLACE)
 
 /** How many style elements the registry wrote. */
@@ -102,14 +102,14 @@ async function expectHanded(page: Page): Promise<void> {
  * navigation Next.js puts the new page after its route announcer and its scripts, and it adds the
  * announcer at hydration, so the paths of the other children of the body differ whatever the styles.
  */
-async function readPage(page: Page, testId: string): Promise<ComputedStyles> {
+export async function readPage(page: Page, testId: string): Promise<ComputedStyles> {
   const body = await readBody(page)
   const main = await collectComputedStyles(page, `[data-testid="${testId}"]`)
   return { body: body.body, ...main }
 }
 
 /** Moves to the other page with the page's own link, and fails on a document load. */
-async function navigate(
+export async function navigate(
   page: Page,
   link = 'link-csp-server-other',
   target = 'page-csp-server-other'
@@ -127,7 +127,7 @@ async function navigate(
 }
 
 /** A page with scripting disabled at `path`, loaded to its end: its styles, and the policy's refusals. */
-async function openNoScript(tools: RegistryTools, path: string, testId: string) {
+export async function openNoScript(tools: RegistryTools, path: string, testId: string) {
   const context = await tools.browser.newContext({
     baseURL: `http://localhost:${tools.fixture.port}`,
     javaScriptEnabled: false,
@@ -229,7 +229,7 @@ function addFirstUse(
  * of (from the tags before it; void elements, and the text of `script` and `style`, left out), and the
  * start of the first element of each class of `prefix`.
  */
-function readSentLayout(html: string, prefix: string): SentLayout {
+export function readSentLayout(html: string, prefix: string): SentLayout {
   const open: string[] = []
   const styles: SentStyleElement[] = []
   const firstUse = new Map<string, number>()
@@ -262,7 +262,10 @@ async function fetchSent(tools: RegistryTools, path: string) {
 }
 
 /** The classes whose first element in the HTML comes before any style element that holds their rule. */
-function findLateClasses(styles: readonly SentStyleElement[], firstUse: Map<string, number>) {
+export function findLateClasses(
+  styles: readonly SentStyleElement[],
+  firstUse: Map<string, number>
+) {
   return [...firstUse]
     .filter(([name, start]) => {
       const rule = styles.find(({ hrefs }) => hrefs.includes(name))
@@ -285,7 +288,7 @@ function findRepeated(styles: readonly SentStyleElement[]): string[] {
  * the page (each is a child of the head or of the body), each with the nonce of the response; the rule of
  * every class before the first element with the class; one style element for each class.
  */
-async function expectSentInOrder(tools: RegistryTools, path: string, prefix: string) {
+export async function expectSentInOrder(tools: RegistryTools, path: string, prefix: string) {
   const { html, policy } = await fetchSent(tools, path)
   const nonce = readNonce(policy)
   const { styles, firstUse } = readSentLayout(html, prefix)

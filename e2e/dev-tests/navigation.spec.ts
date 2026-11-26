@@ -10,7 +10,9 @@ for (const from of PAGE_NAMES) {
     test(`navigation: ${from} then ${to} is styled as ${to} loaded directly`, async ({
       page,
       fixture,
-    }) => {
+    }, info) => {
+      // The known failure of scenario B of the production tier, which this one is in development.
+      info.fail(fixture.known.B !== undefined, fixture.known.B)
       await loadPage(page, fixture, to)
       const direct = await collectComputedStyles(page)
       await loadPage(page, fixture, from)

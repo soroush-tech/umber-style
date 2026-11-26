@@ -59,7 +59,11 @@ flowchart TD
 
 ## Limits
 
-- Run on Next.js 16.4.6 (Turbopack, production build and development server). Partial prerendering and
-  the edge runtime were not run.
+- Run on Next.js 16.3.8 and 16.4.6 (Turbopack, production build and development server), the versions of
+  the peer range `^16.3.0` that CI runs; on 16.4.6 also on the edge runtime and under partial prerendering
+  (`fixtures/next-ppr`). Under partial prerendering the static shell is rendered at build time, and the
+  render of the request renders its client components again: the rules of their classes are written in
+  both, so they are in the head twice. A nonce policy does not work there (the framework's scripts of the
+  shell have no nonce); see the Limits of `docs/server-rendering.md`.
 - A client-side navigation renders no HTML: the hook does nothing there. The rules of a navigation are
   written by the browser (`NonceStyles`, the engine's cache).

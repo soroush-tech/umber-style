@@ -8,7 +8,10 @@ import { test } from '../helpers/dev'
 
 test('page global: the promo page loaded directly and left, its rule is gone; back, it is there once', async ({
   page,
+  fixture,
 }, info) => {
+  // The known failures of scenario M of the production tier, which these are in development.
+  info.fail(fixture.known['M:promo:left'] !== undefined, fixture.known['M:promo:left'])
   await page.goto('/promo')
   await page.getByTestId('page-promo').waitFor()
   await waitForHydrated(page)
@@ -25,6 +28,7 @@ test('page global: the promo page reached in the browser and left, its rule is g
   page,
   fixture,
 }, info) => {
+  info.fail(fixture.known['M:promo:reached'] !== undefined, fixture.known['M:promo:reached'])
   await loadPage(page, fixture, 'home')
   await navigateInBrowser(page, 'promo')
   await expectOverride(page, 'promo, reached from home')

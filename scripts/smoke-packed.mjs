@@ -22,10 +22,11 @@
 // part), so a stand-in package with the four functions the entry calls takes its place too, at the
 // newest version inside the entry's peer range (4.8.0): the entry is loaded, its subpath of the
 // umbrella is the same value, and it translates an animation.
-// `next`, the optional peer of `@umber-style/react/next`, is a stand-in too, at the version of the peer
-// range (16.4.6), packaged as `next` is (no exports map, `navigation.js` at its root) with the one hook the
-// entry imports. Node loads that entry with `require` only: an ES module cannot import `next/navigation`
-// in Node, as the package has no exports map; inside Next.js its bundler resolves it.
+// `next`, the optional peer of `@umber-style/react/next`, is a stand-in too, at the newest version inside
+// the peer range (16.4.6), packaged as `next` is (no exports map, `navigation.js` at its root) with the one
+// hook the entry imports. Node loads that entry and its subpath of the umbrella, `umber-style/react/next`,
+// with `require` only: an ES module cannot import `next/navigation` in Node, as the package has no exports
+// map; inside Next.js its bundler resolves it.
 // The temporary folder is removed at the end, unless `--keep` is given. Needs the network (npm).
 import { spawnSync } from 'node:child_process'
 import {
@@ -621,7 +622,8 @@ writeFileSync('keys-${format}.json', JSON.stringify(results, null, 2))
     )
   }
 
-  // 3a. The entry of the Next.js registry, from CommonJS: the component, which renders its children.
+  // 3a. The entry of the Next.js registry, from CommonJS: the component, which renders its children, and
+  // the same component from the subpath of the umbrella.
   writeFileSync(
     join(consumer, 'next.cjs'),
     `
@@ -631,12 +633,14 @@ const { StyleRegistry } = require('@umber-style/react/next')
 if (typeof StyleRegistry !== 'function') throw new Error('no StyleRegistry')
 const html = renderToStaticMarkup(React.createElement(StyleRegistry, null, React.createElement('p', null, 'x')))
 if (html !== '<p>x</p>') throw new Error('StyleRegistry rendered ' + html)
+const umbrella = require('umber-style/react/next')
+if (umbrella.StyleRegistry !== StyleRegistry) throw new Error('umber-style/react/next is another StyleRegistry')
 `
   )
   const nextEntry = run('node', ['next.cjs'], { cwd: consumer })
   check(
     nextEntry.isOk,
-    '@umber-style/react/next: require gives StyleRegistry, which renders its children'
+    '@umber-style/react/next: require gives StyleRegistry, which renders its children; umber-style/react/next gives the same'
   )
   if (!nextEntry.isOk) console.error(nextEntry.out)
 
@@ -901,9 +905,13 @@ import { createElement } from 'react'
 import createCache from '@umber-style/cache'
 import { StyleRegistry } from '@umber-style/react/next'
 import type { StyleRegistryProps } from '@umber-style/react/next'
+import { StyleRegistry as UmbrellaRegistry } from 'umber-style/react/next'
+import type { StyleRegistryProps as UmbrellaProps } from 'umber-style/react/next'
 
 const props: StyleRegistryProps = { cache: createCache({ key: 'smoke' }), children: 'x' }
 export const registry = createElement(StyleRegistry, props)
+const umbrellaProps: UmbrellaProps = props
+export const umbrellaRegistry = createElement(UmbrellaRegistry, umbrellaProps)
 `
   )
   const options = {

@@ -28,6 +28,10 @@ inputs:
     description: A React 19 minor (`19.0`) or version (`19.0.9`) to pin across the workspace before the install (scripts/use-react.mjs), in this checkout only - ci.yml's React axis passes it; every other job leaves it empty and installs the lockfile's React.
     required: false
     default: ''
+  next:
+    description: A Next.js 16 minor (`16.0`) or version (`16.0.11`) to pin across the workspace before the install (scripts/use-next.mjs), in this checkout only - ci.yml's Next.js axis passes it on the rows of the App Router fixture; every other job leaves it empty and installs the lockfile's Next.js.
+    required: false
+    default: ''
 
 runs:
   using: composite
@@ -52,10 +56,18 @@ runs:
         REACT: ${{ inputs.react }}
       run: node scripts/use-react.mjs "$REACT"
 
+    # The same for `next`: a root `pnpm.overrides`, in this checkout only.
+    - name: Pin Next.js
+      if: inputs.next != ''
+      shell: bash
+      env:
+        NEXT: ${{ inputs.next }}
+      run: node scripts/use-next.mjs "$NEXT"
+
     # The inputs reach the shell through env and a fixed dispatch, never spliced into
     # the run body - zizmor: template-injection. `$COMMAND` is deliberately unquoted: it
     # is a flag list ("install --frozen-lockfile --ignore-scripts"), not a single word.
-    # With React pinned the lockfile no longer matches, so that install may update it.
+    # With React or Next.js pinned the lockfile no longer matches, so that install may update it.
     - name: Install dependencies
       shell: bash
       env:
@@ -63,8 +75,9 @@ runs:
         MANAGER: ${{ inputs.manager }}
         COMMAND: ${{ inputs.command }}
         REACT: ${{ inputs.react }}
+        NEXT: ${{ inputs.next }}
       run: |
-        if [ -n "$REACT" ]; then COMMAND="${COMMAND/--frozen-lockfile/--no-frozen-lockfile}"; fi
+        if [ -n "$REACT$NEXT" ]; then COMMAND="${COMMAND/--frozen-lockfile/--no-frozen-lockfile}"; fi
         case "$MANAGER" in
           pnpm|yarn|npm) "$MANAGER" $COMMAND ;;
           *) echo "Unsupported package manager: $MANAGER" >&2; exit 1 ;;
@@ -75,3 +88,9 @@ runs:
       if: inputs.react != ''
       shell: bash
       run: node scripts/use-react.mjs --check
+
+    # Every workspace member that resolves next has the pinned version.
+    - name: Check the installed Next.js
+      if: inputs.next != ''
+      shell: bash
+      run: node scripts/use-next.mjs --check

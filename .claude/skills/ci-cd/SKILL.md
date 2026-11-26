@@ -46,20 +46,29 @@ Pin every `uses:` by the action's origin, as the files do:
   used: the step "Discover the matrices" makes the matrices of `packages`, `browser`, `e2e` and `e2e-dev`
   from the files (outputs `packages`, `browser`, `fixtures`, `fixtures_dev`), and a package or fixture whose
   `package.json` lists `react` in its dependencies, peerDependencies or devDependencies has a row for each
-  minor, the others one row with `react: ''`. The App Router fixture (`next` and an `app` folder) runs the React
-  that Next.js bundles, so it runs once and says so in its name. Each row carries a `label` that its job name
+  minor, the others one row with `react: ''`. An App Router fixture (`next` and an `app` folder) runs the React
+  that Next.js bundles, so it has no React row and says so in its name. Each row carries a `label` that its job name
   appends (`, react 19.0`) and `coverage`, true on the newest minor of a package per minor and on the only row
   of any other. A row gives `react: ${{ matrix.react }}` to the setup action, which pins the newest patch of the
   minor (`scripts/use-react.mjs`, a root `pnpm.overrides` in the checkout only), installs with
   `--no-frozen-lockfile`, and checks the installed copies; an empty `react` installs the lockfile's React, as
   `lint`, `build` and `bench` do.
+- **The Next.js axis**: `NEXT_MINORS` in the `env` of `prepare` lists the Next.js 16 minors that the `e2e` and
+  `e2e-dev` rows of `next-app` run on: the lowest of the peer range of `@umber-style/react/next` first, the
+  newest last (`16.3`, `16.4`). A `pull_request` runs the newest only, a `push` to `main` both (the `next` step's
+  `minors` output). Only the fixtures in `nextFixtures` of the discovery script (`next-app`) get the axis, one row
+  for each minor (`, next 16.4, runs the React of Next.js`); any other App Router fixture (`next-ppr`) runs once.
+  A row gives `next: ${{ matrix.next }}` to the setup action, which pins the newest patch of the minor
+  (`scripts/use-next.mjs`, a root `pnpm.overrides`), installs with `--no-frozen-lockfile` and checks the installed
+  copies. When the peer range is raised, replace the first minor; when Next.js releases a new minor, replace the
+  last.
 - **The package matrix is discovered from `packages/`**: a row per folder with a `package.json`
   (see the axis above), with `dir`, `filter` (the package name) and `flag` (the folder name). Adding
   a package needs no edit to `ci.yml`. The same holds for `e2e`: rows for each folder of `fixtures/` except
   `shared`, and for `browser`: the packages with a `test:browser` script.
-- **One list is written out**: the fixtures of `e2e-dev` (`vike-ssg`, `next-app`, `spa`: the ones with a
-  `devPort` in `e2e/fixtures.ts`), in the discovery script of `prepare`. A new fixture with a development
-  server is added there by hand.
+- **Two lists are written out**, in the discovery script of `prepare`: the fixtures of `e2e-dev` (`vike-ssg`,
+  `next-app`, `next-ppr`, `spa`: the ones with a `devPort` in `e2e/fixtures.ts`), and the fixtures of the Next.js
+  axis (`next-app`). A new fixture with a development server is added to the first by hand.
 - **`lint`** runs `format:check`, `lint`, `typecheck`, `test:scripts` (Node's test runner on
   `scripts/*.test.mjs`, at 100%), `gen:publish-options --check`, `check:typography` and
   `check:release-notes`, once for the whole workspace.

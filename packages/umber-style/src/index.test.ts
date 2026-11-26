@@ -76,7 +76,7 @@ describe('the entries of umber-style', () => {
 
   it('the exports map points at files that exist, with the platform switch on /react', () => {
     const targets = Object.values(manifest.exports).flatMap(collectTargets)
-    expect(targets).toHaveLength(9)
+    expect(targets).toHaveLength(10)
     for (const target of targets) {
       expect(existsSync(fileURLToPath(new URL(`../${target}`, import.meta.url)))).toBe(true)
     }

@@ -9,7 +9,8 @@ npm hands them out. It checks the contents of the tarballs, that every entry loa
 that a CommonJS file that loads it as a bundler's Node interop does gets the function by that name, a
 server render of a styled component, the animated entry of React Native (over a stand-in of the animation
 library: the entry and its subpath of the umbrella are one value, and it translates a shorthand), the
-Next.js registry entry of React (`@umber-style/react/next`, over a stand-in of `next`), the export
+Next.js registry entry of React (`@umber-style/react/next`, over a stand-in of `next`: the entry and its
+subpath of the umbrella, `umber-style/react/next`, are one component), the export
 conditions, and that TypeScript resolves the declarations. It prints `ok` or `FAIL` for each check, exits 1 if any failed, and
 removes the folder unless `--keep` is given.
 
@@ -36,7 +37,7 @@ flowchart TD
   s3 --> exact{"the core's two entries export exactly their lists, umber-style the main one?"}
   exact -->|no| f2["FAIL"]
   exact -->|yes| keys["both write the exported names: compare them"]
-  keys --> s3a["3a: node next.cjs: StyleRegistry from require renders its children"]
+  keys --> s3a["3a: node next.cjs: StyleRegistry from require renders its children, the umbrella gives the same"]
   s3a --> s3b["3b: node interop.cjs for each entry of NAMED_DEFAULTS"]
   s3b --> s4["4: conditions.mjs and conditions.cjs under none, react-server, react-native"]
   s4 --> s5["5: tsc on four tsconfigs"]
@@ -63,8 +64,9 @@ condition scripts with `--conditions=react-server` and `--conditions=react-nativ
 `entries.ts`, `entries.mts` and `entries.cts` (bundler, node16), `library.cts` (node16: a CommonJS file
 that imports the default exports by name), `server.ts` (custom condition
 `react-server`), `strict.ts` (the strict switch of `StyleTypeOptions`) and `next.ts` (bundler: the props
-of `StyleRegistry` with a cache of `@umber-style/cache`) with `skipLibCheck` off. Step 3a requires
-`@umber-style/react/next` and renders `StyleRegistry` on the server over the stand-in of `next`; it is not
+of `StyleRegistry` with a cache of `@umber-style/cache`, from the entry and from the umbrella) with
+`skipLibCheck` off. Step 3a requires `@umber-style/react/next`, renders `StyleRegistry` on the server over
+the stand-in of `next`, and requires `umber-style/react/next` for the same component; neither is
 imported from an ES module, which Node cannot do for `next/navigation` (the package has no exports map).
 
 ## The data

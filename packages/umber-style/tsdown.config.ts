@@ -10,6 +10,7 @@ export default defineConfig({
     index: 'src/index.ts',
     react: 'src/react.ts',
     'react.server': 'src/react.server.ts',
+    'react-next': 'src/react-next.ts',
     'react-native': 'src/react-native.ts',
     'react-native-animated': 'src/react-native-animated.ts',
     vue: 'src/vue.ts',

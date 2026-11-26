@@ -40,6 +40,7 @@
       "react-native": "./src/react-native.ts",
       "default": "./src/react.ts"
     },
+    "./react/next": "./src/react-next.ts",
     "./react-native": "./src/react-native.ts",
     "./react-native/animated": "./src/react-native-animated.ts",
     "./vue": "./src/vue.ts"
@@ -85,6 +86,16 @@
         "require": {
           "types": "./dist/shared.d.cts",
           "default": "./dist/react.cjs"
+        }
+      },
+      "./react/next": {
+        "import": {
+          "types": "./dist/react-next.d.mts",
+          "default": "./dist/react-next.mjs"
+        },
+        "require": {
+          "types": "./dist/react-next.d.cts",
+          "default": "./dist/react-next.cjs"
         }
       },
       "./react-native": {
