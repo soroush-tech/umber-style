@@ -20,7 +20,7 @@ one copy reads the provider of the other (the comment says so). The umbrella pac
 flowchart LR
   ds["defaultStyle.createDefaultStyle"] --> sh["readSharedState vue.default-style@1"]
   sh --> mem["named exports: configure, styled, ..."]
-  core["@umber-style/core"] --> h["add, alpha, at, divide, multiply, negate, state, subtract"]
+  core["@umber-style/core"] --> h["add, alpha, at, divide, multiply, negate, state, subtract, setNonceSource"]
   cp["CacheProvider.ts"] --> api["package entry"]
   cr["createStyle.ts: bindEngine, createStyle"] --> api
   df["defaultStyle.ts: createDefaultStyle, DefaultStyleOptions"] --> api
@@ -34,6 +34,7 @@ flowchart LR
 - One default style for the whole program, however many copies are loaded.
 - Making it touches no engine: `createDefaultStyle` is lazy.
 - `export *` adds only what `createStyle.ts`, `defaultStyle.ts` and `types.ts` export.
+- `setNonceSource` is the core's, exported so that every binding has the name: Vue renders no server components, and nothing here reads it.
 
 ## Decisions
 

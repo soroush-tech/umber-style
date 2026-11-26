@@ -51,7 +51,11 @@ flowchart TD
 ```
 
 `insertLayered` writes the layer order statement before the first rule, writes each rule to the sheet,
-reports the group to `onInsert`, and asks the dev checker (`checkLater`) to look at the page later.
+reports the group to `onInsert`, and asks the dev checker (`checkLater`) to look at the page later. A cache
+whose sheet is a style element of its page joins the check of that page that every cache of its prefix
+there shares (`joinPageCheck`, `cacheRegistry.ts`), so two caches of one prefix (the engine's own and an
+app's `createCache({ key })`) tell each problem once; any other cache with a page (a sheet in memory)
+has a check of its own (`createDevChecker`), as before.
 
 Held classes (`cssHeld`) are for a plain style object a component is given from outside, so that a
 changing value leaves no class behind:
@@ -142,10 +146,24 @@ The rest of the closure, in the order of the file:
   class -> its base class.
 - Class name: `[prefix, label, hash].join('-') + suffix`; the hash is of the rules, plus the layer when it
   is `overrides` and layers are on, plus `after`. Example from `cache.test.ts`: a name with prefix, label,
-  hash and suffix.
+  hash and suffix. The label there is `toLabelPart(readLabel(merged))` (`cssName.ts`): `a-z`, `A-Z`, `0-9`,
+  `_` and `-` are kept, white space at its ends is trimmed and every other code point becomes `-`, so a class
+  name never needs an escape (a space would split the class attribute, a `.` or `:` would change the
+  selector). `nameClass` is the one place every class name passes; with the development checks a label that
+  is written differently is warned about once, with the label as the user wrote it (`readLabel` and the
+  messages keep that).
 - `ThemeEntry`, `RootEntry`, `GlobalEntry`, `HeldEntry` keep, for each, the variables written, where the rule
   sits in the sheet (so a rule can be replaced or removed), and counts.
 - Layers: `theme`, `global`, `components`, `overrides`, from lowest to highest, named `<prefix>-<layer>`.
+- `getFullRules(id)`: for a class, the list of `insertedRules` itself (the rules it was written with),
+  the same list while the cache holds the class and a new one when a held class let go is written again;
+  for a theme class or a root theme (an id of `themeNames`), the list made the first time it is asked for
+  and kept in `fullThemeRules` until `registerProperties` changes the `@property` rules, which empties it.
+  A theme class and a root theme are named by the hash of what they declare, so their rules change with
+  nothing else. A server render asks for the full rules of every class of every element in each render
+  (the style elements, `styleElements.ts` of the React binding), and of the root theme with every variable
+  of the theme (159 on a design system's page): they were made again each time. `fullThemeRules` holds one
+  list for each theme class and root theme asked for, which the cache already keeps for good.
 
 ## What it guarantees
 

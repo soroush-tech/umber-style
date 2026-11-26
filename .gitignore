@@ -22,6 +22,9 @@ pnpm-debug.log*
 coverage
 cov.txt
 
+# Browser tier: the attachments vitest writes for a test run in Chromium
+.vitest
+
 # Build
 node_modules
 build

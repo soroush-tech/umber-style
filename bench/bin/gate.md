@@ -11,7 +11,8 @@ machine as the `bench` job of `.github/workflows/ci.yml` runs it. The root `pack
 3. runs `bench/bin/previous.mjs` (with `--ref` when it was given), which builds the last release in
    `.bench-previous/`;
 4. runs each file with the soroush-bench CLI, one after the other, with the job's options
-   (`--baseline-case previous --min-ratio 80 --rounds 5`) and then the options given, which win;
+   (`GATE_OPTIONS` of `bench/gate/baseline.ts`, which the job reads too: `--baseline-case previous
+   --min-ratio 80 --rounds 5`) and then the options given, which win;
 5. exits 1 when any file failed, after running them all.
 
 ## Why it exists
@@ -52,6 +53,10 @@ flowchart TD
 
 ## Decisions
 
+- **The job's options are read, not written here.** `GATE_OPTIONS` (`bench/gate/baseline.ts`) is the one
+  place; this script turns it into the options of the CLI (`toCliArguments`, `bench/src/gateOptions.ts`),
+  and the job prints it as the outputs of a step (`bench/bin/gate-options.mjs`) that it gives the action.
+
 - **A script of its own, not a flag of `local.mjs`.** The local files and the gate files differ in where
   they are, what they need (the gate needs the previous build, the local files a second mount for the
   `node_modules` links) and how they are judged (the gate has a baseline case and a ratio).
@@ -60,8 +65,11 @@ flowchart TD
 
 ## Limits
 
-- `JOB_OPTIONS` repeats the inputs of the job in `ci.yml`; nothing checks that they stay the same.
-- The action of the job vendors its own copy of soroush-bench (2.1.0 at the pinned commit), the
-  workspace has 2.2.3: the gate's rule is the same in both (`baseline.avg / case.avg` against the
-  minimum ratio), the reports differ in layout.
+- The action of the job vendors its own copy of soroush-bench (2.3.0 at the pinned commit of 1.2.0), and
+  the workspace has 2.3.0 too: the gate's rule is the same in both (`baseline.avg / case.avg` against the
+  minimum ratio). What is printed differs: the action posts a summary table across the files and each
+  file's table under it; this script prints the tool's own report for each file.
+- It prints what the tool prints and judges by its exit code. The tool's `--json-file` (2.3.0) would let
+  it lay out a table of its own; that was not done, because the printed report already says which case
+  failed and by how much, and an exit code needs no file read back from the sandbox.
 - It has no test; it needs Docker.

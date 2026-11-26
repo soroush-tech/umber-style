@@ -1,4 +1,5 @@
 import type { Cache } from './cache'
+import { createPageCheck, type LabelReader, type PageCheck } from './devChecks'
 import { readSharedState } from './sharedState'
 
 // The cache of each prefix in each document: the first one made that writes into a style element there,
@@ -23,4 +24,36 @@ export function registerCache(page: Document, cache: Cache): void {
  */
 export function findCache(prefix: string, page: Document): Cache | undefined {
   return registry.get(page)?.get(prefix)
+}
+
+// The development check of each prefix in each document, which every cache of that prefix that writes
+// into that document asks for, by any copy of the core: one run, and one warning for each problem.
+const pageChecks = readSharedState(
+  'core.page-checks@1',
+  () => new WeakMap<Document, Map<string, PageCheck>>()
+)
+
+/**
+ * The function that asks for the development check of `page` for `prefix`, the one that every cache of
+ * that prefix writing into `page` shares (`createPageCheck`, made by the first that asks): the page is
+ * looked at once for all of them, every problem is warned about once, and the rules of each cache are asked
+ * about with the labels of its own classes (`readLabel`).
+ */
+export function joinPageCheck(
+  prefix: string,
+  page: Document,
+  readLabel: LabelReader
+): (rules?: readonly string[]) => void {
+  let checks = pageChecks.get(page)
+  if (checks === undefined) {
+    checks = new Map()
+    pageChecks.set(page, checks)
+  }
+  let check = checks.get(prefix)
+  if (check === undefined) {
+    check = createPageCheck(prefix, undefined, page)
+    checks.set(prefix, check)
+  }
+  const shared = check
+  return (rules) => shared(rules, readLabel)
 }

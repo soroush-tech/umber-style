@@ -23,11 +23,13 @@ import { readSharedState } from './sharedState'
 import { isStyleFunction, splitLeading } from './styleBase'
 import { createReferenceGuard } from './referenceKeys'
 import { isSameView } from './sameView'
+import { createThemeMemo } from './sameTheme'
 import { createThemeClass, declareRootTheme, toDeclarationText } from './theme'
 import {
   createTokens,
   findMissingPaths,
   type DeepPartial,
+  type KeywordReport,
   type TokenOptions,
   type Tokens,
 } from './tokens'
@@ -236,6 +238,8 @@ interface EngineFamily<T> {
   engines: WeakMap<Cache, Engine<T>>
   /** The tokens last made for each prefix, with the theme and the options they were made from (see `readFamilyTokens`). */
   tokens: Map<string, FamilyTokens<T>>
+  /** The first theme object seen with the contents of a theme (`createThemeMemo`): what a root rule and a view are kept by. */
+  findSameTheme: <V extends object>(theme: V) => V
 }
 
 /** The tokens of one theme object for one set of token options. */
@@ -265,13 +269,14 @@ function isSameTokenOptions(first: TokenOptions, second: TokenOptions): boolean 
 function readFamilyTokens<T extends object>(
   family: EngineFamily<T>,
   theme: T,
-  options: TokenOptions
+  options: TokenOptions,
+  reportKeyword: KeywordReport | undefined
 ): Tokens<T> {
   // The engine always gives its prefix.
   const key = options.prefix as string
   const made = family.tokens.get(key)
   if (made?.theme === theme && isSameTokenOptions(made.options, options)) return made.tokens
-  const tokens = createTokens(theme, options)
+  const tokens = createTokens(theme, options, reportKeyword)
   family.tokens.set(key, { theme, options, tokens })
   return tokens
 }
@@ -436,6 +441,7 @@ export function createLazyEngine<T extends object = Theme>(options: EngineOption
     givenTheme: undefined,
     engines: new WeakMap(),
     tokens: new Map(),
+    findSameTheme: createThemeMemo(),
   })
 }
 
@@ -459,6 +465,13 @@ function createFamilyEngine<T extends object>(
   const { isChecked, warn, guardView, reportGlobal } = createEngineChecks(options, cache, () =>
     readTokens()
   )
+  // A token whose value is a CSS-wide keyword is told about with the checks, once for each path.
+  const reportKeyword: KeywordReport | undefined = isChecked
+    ? (path, keyword, name) => {
+        const message = `The token "${path}" is the CSS-wide keyword ${keyword}, which a variable takes as itself: ${name}: ${keyword} makes var(${name}) the value of ${name} on the parent (often nothing), so a property that does not inherit, such as background-color, gets its initial value, and only one that inherits, such as color, seems to work. Write ${keyword} in the style itself, or give the path the mode raw (modes: { '${path}': 'raw' }) so that a style gets the keyword as it is.`
+        warn(`keyword:${path}`, message)
+      }
+    : undefined
   // Whether a component's list is split into a base class and a props class: the engine's option, else the cache's.
   const isBaseSplit = hasBaseClass ?? cache.hasBaseClass
   const tokenOptions: TokenOptions = { prefix, rawKeys, lengthKeys, modes, registered }
@@ -474,7 +487,7 @@ function createFamilyEngine<T extends object>(
     const theme = family.theme
     if (theme === tokensTheme) return
     tokensTheme = theme
-    tokens = readFamilyTokens(family, theme as T, tokenOptions)
+    tokens = readFamilyTokens(family, theme as T, tokenOptions, reportKeyword)
     if (isChecked && theme) warnMissingPaths(theme, { modes, registered, alwaysDeclare }, warn)
     views = new WeakMap()
     recentViews = []
@@ -512,16 +525,24 @@ function createFamilyEngine<T extends object>(
   let views = new WeakMap<object, T>()
   // The last views made that differ from each other, newest first, for a new theme object to reuse.
   let recentViews: T[] = []
+  /** The view of `realTheme` made now: a recent view that is the same, else the new one, which becomes recent. */
+  const makeView = (realTheme: T): T => {
+    const made = (tokens ?? createTokens(realTheme, tokenOptions, reportKeyword)).createView(
+      realTheme
+    )
+    const same = recentViews.find((recent) => isSameView(recent, made))
+    if (same !== undefined) return same
+    recentViews = [made, ...recentViews].slice(0, RECENT_VIEWS)
+    return made
+  }
   const createThemeView = (realTheme: T): T => {
     sync()
     let view = views.get(realTheme)
     if (view === undefined) {
-      const made = (tokens ?? createTokens(realTheme, tokenOptions)).createView(realTheme)
-      view = recentViews.find((recent) => isSameView(recent, made))
-      if (view === undefined) {
-        view = made
-        recentViews = [made, ...recentViews].slice(0, RECENT_VIEWS)
-      }
+      // A theme of the same contents as one seen has its view, while that view is still recent: the one
+      // that making the view again would find.
+      const known = views.get(family.findSameTheme(realTheme))
+      view = known !== undefined && recentViews.includes(known) ? known : makeView(realTheme)
       views.set(realTheme, view)
     }
     return view
@@ -546,8 +567,14 @@ function createFamilyEngine<T extends object>(
   const declareRoot = (theme: T, colorScheme?: ColorScheme) => {
     adoptTheme(theme)
     const key = colorScheme ?? ''
-    const known = roots.get(theme) ?? new Map<string, [string, Record<string, string>]>()
-    roots.set(theme, known)
+    let known = roots.get(theme)
+    if (known === undefined) {
+      // A theme of the same contents as one seen shares its root rules: the same declarations, the same id.
+      const same = family.findSameTheme(theme)
+      known = roots.get(same) ?? new Map<string, [string, Record<string, string>]>()
+      roots.set(same, known)
+      roots.set(theme, known)
+    }
     let made = known.get(key)
     if (made === undefined) {
       const declarations = readTokens().declare(theme as DeepPartial<T>)
@@ -564,7 +591,8 @@ function createFamilyEngine<T extends object>(
     let text = themeTexts.get(partial)
     if (text === undefined) {
       // The declarations need the token options only: with no base theme, the tokens of `partial` give them.
-      const { declare, registrations } = tokens ?? createTokens(partial as T, tokenOptions)
+      const { declare, registrations } =
+        tokens ?? createTokens(partial as T, tokenOptions, reportKeyword)
       const declarations = declare(partial)
       const names = Object.keys(declarations)
       text = {

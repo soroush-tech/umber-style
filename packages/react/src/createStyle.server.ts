@@ -15,7 +15,7 @@ import {
   type WebStyleObject,
 } from '@umber-style/core'
 import { createGlobal } from './Global.server'
-import { createRequestSlot, type CacheFunction } from './serverContext'
+import { createNonceReader, createRequestSlot, type CacheFunction } from './serverContext'
 import { createStyled } from './styled.server'
 import { createThemeProvider } from './ThemeProvider.server'
 import type { ServerStyle, SheetDefinition, StyleOptions } from './types'
@@ -35,6 +35,8 @@ export function bindEngine<T extends object>(
 ): ServerStyle<T> {
   // The theme of the first provider of the request, and whether one has rendered.
   const readFirstSlot = createRequestSlot<DeepPartial<T> | undefined>(undefined, cache)
+  // The nonce of the request's style elements: the cache's, or the answer of the source the app registered.
+  const readNonce = createNonceReader(() => engine.cache.nonce, cache)
   let hasWarned = false
 
   const readBaseTheme = (): T => engine.givenTheme ?? (EMPTY_THEME as T)
@@ -82,13 +84,19 @@ export function bindEngine<T extends object>(
   return {
     engine,
     cache: engine.cache,
-    styled: createStyled(engine, readViewTheme),
+    styled: createStyled(engine, readViewTheme, readNonce),
     StyleSheet: { create },
     useStyle,
     useStyleValue: createServerStyleValue(engine.cache),
     apply: (...entries) => ({ className: engine.css(...entries) || undefined }),
     css: ((...args: unknown[]) => createCssEntry(engine.cache, args)) as ServerStyle<T>['css'],
-    ThemeProvider: createThemeProvider(engine, { readFirstSlot, readBaseTheme }),
+    // The provider and `Global` return a Promise only while the nonce a registered source gives is not
+    // known yet, which a render of server components awaits: they keep the types of the client build.
+    ThemeProvider: createThemeProvider(engine, {
+      readFirstSlot,
+      readBaseTheme,
+      readNonce,
+    }) as ServerStyle<T>['ThemeProvider'],
     useTheme,
     readTheme: useTheme,
     themeClass,
@@ -96,7 +104,7 @@ export function bindEngine<T extends object>(
     whenScheme: engine.whenScheme,
     keyframes: engine.keyframes,
     globalStyles,
-    Global: createGlobal(engine, readViewTheme),
+    Global: createGlobal(engine, readViewTheme, readNonce) as ServerStyle<T>['Global'],
   }
 }
 

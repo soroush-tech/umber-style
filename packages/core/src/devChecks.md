@@ -4,8 +4,10 @@
 
 The development-time warning machinery. `isDevelopment()` and `isProduction()` read
 `process.env.NODE_ENV`, `createWarner(prefix)` makes a function that warns once for each key, and
-`createDevChecker(prefix, delay, page, readLabel)` makes the function that schedules a check of a page after
-the rules have stopped arriving. `warnRenamedOption(prefix, options)` warns, in development, about an
+`createPageCheck(prefix, delay, page)` makes the check of a page that schedules a run after the rules have
+stopped arriving; each call gives the rules just written and the reader of the labels of their classes, so
+the caches of one prefix that write into one page can share it (`joinPageCheck` of `cacheRegistry.ts`).
+`createDevChecker(prefix, delay, page, readLabel)` makes a check of its own, for one reader. `warnRenamedOption(prefix, options)` warns, in development, about an
 options object that still has `hasRuleText`, the name of `speedy` before 0.3.0.
 
 ## Why it exists
@@ -21,8 +23,8 @@ development only. `cache.ts` builds the checker and the warner, `createEngine.ts
 
 ```mermaid
 flowchart TD
-  call["checker(rules?)"] --> sup{"browser can answer CSS.supports?"}
-  sup -->|yes| keep["keep the rules written since the last run"]
+  call["check(rules?, readLabel)"] --> sup{"browser can answer CSS.supports?"}
+  sup -->|yes| keep["keep the rules written since the last run, with the rules of the same reader"]
   sup -->|no| skip["rules are not kept"]
   keep --> timer
   skip --> timer{"a timer is waiting?"}
@@ -32,7 +34,7 @@ flowchart TD
   run --> missing["findMissingStyles(page, prefix): warn each problem by its key"]
   missing --> ask{"supports available?"}
   ask -->|no| done["end"]
-  ask -->|yes| unsup["findUnsupportedDeclarations(kept rules): warn each by 'declaration:message'"]
+  ask -->|yes| unsup["for each reader: findUnsupportedDeclarations(its rules, readLabel): warn each by 'declaration:message'; then nothing kept"]
   unsup --> done
   warn["warn(key, message)"] --> seen{"key seen before?"}
   seen -->|yes| drop["nothing"]
@@ -57,6 +59,9 @@ flowchart TD
 ## What it guarantees
 
 - A warning is written once for each key for the life of the warner, and always starts with `[prefix] `.
+  The warner of a check shared by the caches of a page lives as long as the document, so a problem is told
+  once on that page, whichever cache found it.
+- The rules of a reader are asked about with that reader: the class of each cache is named with its label.
 - Rules are kept only when `CSS.supports` can be asked; otherwise nothing accumulates.
 - `isDevelopment()` is false and `isProduction()` is true where `process` does not exist.
 - At module top level nothing touches a browser global (`document` appears only as the default of a

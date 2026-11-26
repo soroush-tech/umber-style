@@ -82,10 +82,10 @@ describe('css', () => {
     expect(css({ color: 'red' }, ['color: blue;'])).toBe(css({ color: 'blue' }))
   })
 
-  it('resolves a class of this cache back to its style even when its name holds ":"', () => {
+  it('resolves a class of this cache back to its style when its label held a character a class name cannot', () => {
     const { css } = createTestInstance()
     const labelled = css({ label: 'a:b', color: 'red' })
-    expect(labelled).toContain('a:b')
+    expect(labelled).toContain('a-b')
     expect(css(labelled, { margin: 0 })).toBe(css({ label: 'a:b', color: 'red', margin: 0 }))
   })
 

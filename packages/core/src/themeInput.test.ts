@@ -21,6 +21,47 @@ describe('mergeTheme', () => {
   })
 })
 
+describe('mergeTheme of a theme of the same contents', () => {
+  const outer = { palette: { primary: '#0000ff', text: '#111111' }, space: [0, 4] }
+
+  it('gives the theme of an earlier merge for the same object, a shallow copy and a deep copy', () => {
+    const given = { palette: { primary: '#ff0000' } }
+    const merged = mergeTheme(outer, given)
+    expect(merged).toEqual({ palette: { primary: '#ff0000', text: '#111111' }, space: [0, 4] })
+    expect(mergeTheme(outer, given)).toBe(merged)
+    expect(mergeTheme(outer, { ...given })).toBe(merged)
+    expect(mergeTheme(outer, structuredClone(given))).toBe(merged)
+  })
+
+  it('merges again for a value changed, and over another theme above', () => {
+    const merged = mergeTheme(outer, { palette: { primary: '#ff0000' } })
+    const changed = mergeTheme(outer, { palette: { primary: '#00ff00' } })
+    expect(changed).not.toBe(merged)
+    expect(changed).toEqual({ palette: { primary: '#00ff00', text: '#111111' }, space: [0, 4] })
+    const other = { ...outer }
+    expect(mergeTheme(other, { palette: { primary: '#ff0000' } })).not.toBe(merged)
+  })
+
+  it('gives the same theme for the same pair of objects every time, one for each pair', () => {
+    const light = { palette: { primary: '#ff0000' } }
+    const dark = { palette: { primary: '#000000', text: '#ffffff' } }
+    const lightMerged = mergeTheme(outer, light)
+    const darkMerged = mergeTheme(outer, dark)
+    expect(mergeTheme(outer, light)).toBe(lightMerged)
+    expect(mergeTheme(outer, dark)).toBe(darkMerged)
+    expect(darkMerged).toEqual({ palette: { primary: '#000000', text: '#ffffff' }, space: [0, 4] })
+  })
+
+  it('takes the theme above for a given that is nothing, as before', () => {
+    expect(mergeTheme(outer, undefined as never)).toBe(outer)
+  })
+
+  it('merges over a value above that is not an object as before', () => {
+    expect(mergeTheme<unknown>('above', { a: 1 })).toEqual({ a: 1 })
+    expect(mergeTheme<unknown>(null, { a: 1 })).toEqual({ a: 1 })
+  })
+})
+
 describe('EMPTY_THEME', () => {
   it('has nothing in it and cannot be changed', () => {
     expect(Object.keys(EMPTY_THEME)).toEqual([])

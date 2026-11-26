@@ -27,6 +27,7 @@ export const {
 } = defaults
 
 export { at, state, type StateKey, type StateName } from '@umber-style/core'
+export { setNonceSource, type NonceSource } from '@umber-style/core'
 export { CacheProvider } from './CacheProvider'
 export * from './alpha'
 export * from './calc'

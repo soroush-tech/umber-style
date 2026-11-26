@@ -63,22 +63,28 @@ export function createWarner(prefix: string): (key: string, message: string) => 
   }
 }
 
+/** What tells the label of a class, for a message: the label of the style a cache made it from. */
+export type LabelReader = (className: string) => string
+
+/** The function that asks for a check of a page: the rules just written, with what tells the labels of their classes. */
+export type PageCheck = (rules: readonly string[] | undefined, readLabel: LabelReader) => void
+
 /**
- * The function that asks for a check of `page` (the document by default): it runs `findMissingStyles` once, after the calls
- * have stopped for a short while, and warns once for each problem (never again for the same one). The
- * rules given to it are asked about in the same run: a declaration that the browser does not support
- * (`findUnsupportedDeclarations`) is warned about once for each message. Where the browser cannot be
- * asked (no `CSS.supports`, or jsdom) the rules are not kept. `readLabel` gives the label of a class, which
- * a message names.
+ * The check of `page` for `prefix`, which any number of callers can ask for: it runs `findMissingStyles`
+ * once, after the calls have stopped for a short while, and warns once for each problem (never again for
+ * the same one). The rules given to it are asked about in the same run: a declaration that the browser
+ * does not support (`findUnsupportedDeclarations`) is warned about once for each message, the class named
+ * with the label that the reader given with its rules tells. Where the browser cannot be asked (no
+ * `CSS.supports`, or jsdom) the rules are not kept.
  */
-export function createDevChecker(
+export function createPageCheck(
   prefix: string,
   delay = CHECK_DELAY,
-  page: Document = document,
-  readLabel: (className: string) => string = () => ''
-): (rules?: readonly string[]) => void {
+  page: Document = document
+): PageCheck {
   const supports = findBrowserSupports()
-  const written: string[] = []
+  // The rules written since the last run, by the reader of their labels, in the order they came.
+  const written = new Map<LabelReader, string[]>()
   let timer: ReturnType<typeof setTimeout> | undefined
   const warn = createWarner(prefix)
   const run = (): void => {
@@ -87,17 +93,33 @@ export function createDevChecker(
       warn(problem.key, problem.message)
     }
     if (!supports) return
-    for (const message of findUnsupportedDeclarations(
-      written.splice(0),
-      prefix,
-      supports,
-      readLabel
-    )) {
-      warn(`declaration:${message}`, message)
+    for (const [readLabel, rules] of written) {
+      for (const message of findUnsupportedDeclarations(rules, prefix, supports, readLabel)) {
+        warn(`declaration:${message}`, message)
+      }
     }
+    written.clear()
   }
-  return (rules) => {
-    if (supports && rules) written.push(...rules)
+  return (rules, readLabel) => {
+    if (supports && rules) {
+      const kept = written.get(readLabel) ?? []
+      kept.push(...rules)
+      written.set(readLabel, kept)
+    }
     timer ??= setTimeout(run, delay)
   }
+}
+
+/**
+ * The function that asks for a check of `page` (the document by default), a check of its own
+ * (`createPageCheck`) whose classes are named with `readLabel`.
+ */
+export function createDevChecker(
+  prefix: string,
+  delay = CHECK_DELAY,
+  page: Document = document,
+  readLabel: LabelReader = () => ''
+): (rules?: readonly string[]) => void {
+  const check = createPageCheck(prefix, delay, page)
+  return (rules) => check(rules, readLabel)
 }

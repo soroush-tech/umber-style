@@ -52,6 +52,10 @@ function collectStyleRules(list: CSSRuleList, found: CSSStyleRule[]): CSSStyleRu
   return found
 }
 
+// The name readers below (`isNameCode`, `isHexCode`, `isWhiteSpace`, `isCharacter`, `readCode`,
+// `readEscape`, `readName`) are a copy of `cssName.ts`, which the engine uses: this file imports nothing,
+// so it cannot import it. Change them together.
+
 /**
  * Whether the UTF-16 unit `code` can be in a name of CSS (an identifier) as it is: a letter of either
  * case, a digit, `-`, `_`, or any unit past ASCII (each half of a pair is). The labels of the classes

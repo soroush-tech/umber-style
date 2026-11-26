@@ -14,6 +14,27 @@ describe('scanStyleText', () => {
     expect(scanStyleText('u', '@import "x";.u-a{color:red;}').hasLayerOrder).toBe(false)
   })
 
+  it('reads a class name whole: upper-case letters, non-ASCII letters and escapes', () => {
+    const text =
+      '@layer u-components{.u-Typography-1p2bgvv{color:red;}.u-\u00dcn\u00ef-a{color:red;}' +
+      '.u-a\\.b-c{color:red;}.u-a\\3a b{color:red;}.u-plain-x:hover{color:red;}}'
+    expect([...scanStyleText('u', text).classes]).toEqual([
+      'u-Typography-1p2bgvv',
+      'u-\u00dcn\u00ef-a',
+      'u-a.b-c',
+      'u-a:b',
+      'u-plain-x',
+    ])
+  })
+
+  it.each([' ', ',', '>', '+', '~', ':', '[', '.'])(
+    'ends a class name at the delimiter %j',
+    (delimiter) => {
+      const found = scanStyleText('u', `.u-Ab_1${delimiter}.u-c{color:red;}`)
+      expect(found.classes.has('u-Ab_1')).toBe(true)
+    }
+  )
+
   it('finds the classes that rules name, in layers and in at-rules, with their variables', () => {
     const text =
       '@layer u-components{.u-a{color:var(--u-x);}}@layer u-components{.u-a:hover{margin:var( --u-y, 1px);}}' +

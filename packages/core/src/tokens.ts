@@ -49,6 +49,12 @@ export interface Tokens<T> {
   registrations: Readonly<Record<string, string>>
 }
 
+/** The keywords that every CSS property takes, which a custom property takes as itself rather than as a value. */
+const CSS_WIDE_KEYWORDS = new Set(['inherit', 'initial', 'unset', 'revert', 'revert-layer'])
+
+/** What is told about a token whose value is a CSS-wide keyword: its dotted path, the keyword, and its variable. */
+export type KeywordReport = (path: string, keyword: string, name: string) => void
+
 const DEFAULT_RAW_KEYS = ['breakpoints', 'components']
 const DEFAULT_LENGTH_KEYS = ['space', 'sizes', 'radii', 'fontSizes', 'borderWidths']
 
@@ -168,8 +174,33 @@ export function findMissingPaths(theme: object, paths: Iterable<string>): string
   return [...paths].filter((path) => !hasPath(theme, path.split('.')))
 }
 
-/** Turns a theme into variable references and the declarations that give them values. */
-export function createTokens<T extends object>(theme: T, options: TokenOptions = {}): Tokens<T> {
+/** The CSS-wide keyword that `value` is, in lowercase, white space around it left out; undefined for any other value. */
+function readCssWideKeyword(value: string): string | undefined {
+  const word = value.trim().toLowerCase()
+  return CSS_WIDE_KEYWORDS.has(word) ? word : undefined
+}
+
+/** Tells `reportKeyword` about the token at `path` when its value is a CSS-wide keyword. */
+function checkKeyword(
+  reportKeyword: KeywordReport,
+  path: readonly string[],
+  value: string | number,
+  name: string
+): void {
+  const keyword = typeof value === 'string' ? readCssWideKeyword(value) : undefined
+  if (keyword !== undefined) reportKeyword(path.join('.'), keyword, name)
+}
+
+/**
+ * Turns a theme into variable references and the declarations that give them values. `reportKeyword`, the
+ * development check of an engine, is told about each variable or reference token declared with a CSS-wide
+ * keyword as its value (`inherit`, `initial`, `unset`, `revert`, `revert-layer`).
+ */
+export function createTokens<T extends object>(
+  theme: T,
+  options: TokenOptions = {},
+  reportKeyword?: KeywordReport
+): Tokens<T> {
   const { prefix = '', rawKeys = DEFAULT_RAW_KEYS, lengthKeys = DEFAULT_LENGTH_KEYS } = options
   const modes = new Map(Object.entries(options.modes ?? {}))
   const registered = new Map(Object.entries(options.registered ?? {}))
@@ -216,8 +247,10 @@ export function createTokens<T extends object>(theme: T, options: TokenOptions =
     } else if (isLeaf(node)) {
       const mode = readMode(path)
       if (mode === 'variable' || mode === 'reference') {
+        const name = toName(path)
+        if (reportKeyword !== undefined) checkKeyword(reportKeyword, path, node, name)
         found.push({
-          name: toName(path),
+          name,
           path: path.join('.'),
           value: toDeclared(path, node),
           source: node,

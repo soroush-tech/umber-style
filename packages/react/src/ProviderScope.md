@@ -63,6 +63,8 @@ build, once one exists).
   under the server build of React works.
 - `ViewContext` is set to `undefined` below this component, so what reads it builds the view from
   `ThemeContext`.
+- `keepRootRule` skips a style element that has no sheet: one that a content security policy refused
+  (its nonce is not the page's) holds no rule, and reading it threw and took the page down.
 - `keepRootRule` leaves one root rule of the prefix in the style elements React keeps, and touches no
   element of the browser's cache or a registry.
 - The server and the browser write the same text from the same props, with the core's tokens and no engine.

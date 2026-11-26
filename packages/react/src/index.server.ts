@@ -26,6 +26,7 @@ export const {
 } = defaults
 
 export { add, alpha, at, divide, multiply, negate, state, subtract } from '@umber-style/core'
+export { setNonceSource, type NonceSource } from '@umber-style/core'
 export * from './createStyle.server'
 export * from './defaultStyle.server'
 export * from './types'

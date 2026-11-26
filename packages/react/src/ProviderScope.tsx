@@ -231,7 +231,9 @@ export function keepRootRule(prefix: string, rootId: string, rule: string, page:
   if (own === undefined) return
   const pattern = new RegExp(String.raw`^(@layer ${prefix}-theme\s*\{\s*)?:where\(:root\)`)
   for (const element of elements) {
-    const sheet = element.sheet as CSSStyleSheet
+    const { sheet } = element
+    // An element that a content security policy refused has no sheet: it holds no rule to keep or remove.
+    if (sheet === null) continue
     let isKept = element !== own
     for (let index = sheet.cssRules.length - 1; index >= 0; index--) {
       if (!pattern.test(sheet.cssRules[index].cssText)) continue

@@ -2,13 +2,18 @@
 
 ## What it does
 
-Says what the benchmark gate compares the current tree with, in three constants:
+Says what the benchmark gate compares the current tree with, in three constants, and how it judges a run,
+in a fourth:
 
 - `BASELINE_PACKAGE`, `@umber-style/core`: the package whose release tags are chosen from.
 - `BASELINE_RELEASE`, `'stable'`: which tag is the last release. `'stable'` is the last stable tag;
   `'newest'` is the newest tag, stable or release candidate (alphas have no tag).
 - `PREVIOUS_DIR`, `.bench-previous`: the folder, at the root of the repository, where that release is
   checked out and built.
+- `GATE_OPTIONS`, `{ baselineCase: 'previous', minRatio: 80, rounds: 5 }`: the case every other one is
+  compared with, the slowest speed against it that passes (in percent), and the rounds whose median is
+  compared. The `bench` job of `ci.yml` reads it through `bench/bin/gate-options.mjs`, and `pnpm bench:gate`
+  through `bench/bin/gate.mjs`: they cannot drift apart.
 
 ## Why it exists
 
@@ -30,6 +35,10 @@ flowchart LR
   dir --> support["support.ts: createGate"]
   build --> support
   support --> cases["the previous case of every gate file"]
+  options["GATE_OPTIONS"] --> gateScript["bench/bin/gate.mjs: toCliArguments"]
+  options --> stepOutputs["bench/bin/gate-options.mjs: toStepOutputs, read by the bench job"]
+  gateScript --> judged["each file judged against previous"]
+  stepOutputs --> judged
 ```
 
 ## What it guarantees
@@ -48,6 +57,10 @@ flowchart LR
   formatter honours `.gitignore`, and lint, type checks, tests and coverage are each run inside a package
   folder, which this is not.
 - **The last stable by default**, as the owner asked; `'newest'` is the other choice, one word away.
+- **The options of the gate in a TypeScript file, not a JSON file.** The job runs Node, which reads a
+  TypeScript file by stripping its types (as `previous.mjs` reads this one already), so a step prints the
+  values without a loader of its own; a JSON file would have needed no step, and a second way of reading
+  values next to the constants above.
 
 ## Limits
 

@@ -17,7 +17,9 @@ style. It is run by the dev checker of a cache (`devChecks.ts`), by the end-to-e
 (`e2e/helpers/rules.ts` and the dev tests), and exported by `index.ts` for anyone who wants it.
 
 The first lines of the file say it imports nothing at run time: the end-to-end tests send its compiled text
-into a page, so the checker they run is the one the development mode runs.
+into a page, so the checker they run is the one the development mode runs. For the same reason its name
+readers (`isNameCode`, `readEscape`, `readName`) are a copy of `cssName.ts`, which the engine uses; they
+are changed together.
 
 ## The logic
 

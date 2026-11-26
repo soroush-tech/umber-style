@@ -27,7 +27,7 @@ Pin every `uses:` by the action's origin, as the files do:
   `github-script`, `create-github-app-token`) - a major version tag: `actions/checkout@v7`.
 - **Everything else, the owner's own actions included** (`pnpm/action-setup`,
   `codecov/codecov-action`, `soroush-tech/bench-action`) - a full commit SHA with the version in a
-  comment: `soroush-tech/bench-action@b527ad4... # v1.1.1`. A tag can be moved, the owner's tags
+  comment: `soroush-tech/bench-action@a162a94... # v1.2.0`. A tag can be moved, the owner's tags
   too. Bumping the SHA is a reviewed line.
 
 ## CI job shape
@@ -87,11 +87,15 @@ commit by the repository's public address into the shallow clone, extracts its t
 `.bench-previous/` (inside the checkout, because the sandbox mounts only the checkout; git ignores
 it), and builds the core there with that release's lockfile. Then `soroush-tech/bench-action`
 (soroush-bench, `@soroush.tech/bench`) runs the `*.bench.ts` files of `bench/gate/` in a Docker
-sandbox pinned to one CPU and 512 MB; each loads both builds by path. With `baseline-case: previous`,
-`min-ratio: '80'` and `rounds: '5'`, a case slower than the release by more than a fifth fails the
+sandbox pinned to one CPU and 512 MB; each loads both builds by path. With the baseline case `previous`, a
+minimum ratio of 80 and 5 rounds (`GATE_OPTIONS` of `bench/gate/baseline.ts`, which a step prints with
+`node bench/bin/gate-options.mjs` into `$GITHUB_OUTPUT` for the action, and `pnpm bench:gate` reads too:
+change them there, never in the workflow), a case slower than the release by more than a fifth fails the
 job and, through `ci-ok`, the pull request. A previous build that cannot be made fails the step before
 the gate: the gate never passes without a comparison. `pnpm bench:gate` (`bench/bin/gate.mjs`) runs the
-same on a machine. The job posts the table on the pull request, as the org's GitHub App when the
+same on a machine. The job posts one comment on the pull request (bench-action 1.2.0: a summary table
+across the files, failures first, each file's table folded under it; `comment-title` and
+`comment-details` stay at their defaults, as there is one bench job), as the org's GitHub App when the
 `BENCH_BOT_APP_ID` variable is set, else with `GITHUB_TOKEN`. Details and how to read a failure:
 `docs/benchmarks.md`.
 
@@ -101,7 +105,9 @@ After `publish`, whose output `published` lists the `<name>@<version>` it publis
 `bench-report` runs `scripts/bench-report.mjs`: it waits (30 tries, 10 seconds apart) until the
 registry lists each version, picks what to compare with `planReport` (`bench/src/releases.ts`: the
 last stable, and for an alpha or an rc the previous one of its channel for the same version), and runs
-the scenarios of `bench/report/` with every version installed from npm in the sandbox. Only the core
+the scenarios of `bench/report/` with every version installed from npm in the sandbox, with the
+soroush-bench CLI and `--json-file` (not bench-action, which refuses a `min-ratio` of 0); the table is
+laid out by `bench/src/reportTable.ts`. Only the core
 has report scenarios. The table goes to the job summary and, for an rc or a stable release, below the
 notes of its GitHub Release (`gh release edit`, after a marker that a rerun replaces from). It is a
 report, not a gate: `continue-on-error: true`, and a last step says in the summary when it did not run

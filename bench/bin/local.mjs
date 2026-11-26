@@ -22,6 +22,7 @@ const VALUE_OPTIONS = new Set([
   '--tag',
   '--mount',
   '--md-file',
+  '--json-file',
   '--rounds',
   '--baseline-case',
   '--min-ratio',
