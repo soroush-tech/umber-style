@@ -21,5 +21,6 @@ export function guardTheme<V extends object>(theme: V, label: string): V {
  */
 export function readStyleOwner(name: string | undefined): string | undefined {
   if (!isDevelopment()) return undefined
-  return `${HEAD}A style function${name ? ` of "${name}"` : ''}`
+  const ownerName = name ? ` of "${name}"` : ''
+  return `${HEAD}A style function${ownerName}`
 }

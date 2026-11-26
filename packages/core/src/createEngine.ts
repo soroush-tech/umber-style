@@ -695,9 +695,8 @@ function createFamilyEngine<T extends object>(
     // in order.
     const isResultChecked = hasFunction && isChecked
     // With the checks, what a write into the frozen argument of a style function is thrown again with.
-    const owner = isChecked
-      ? `[${cache.prefix}] A style function${label ? ` of "${label}"` : ''}`
-      : ''
+    const ownerName = label ? ` of "${label}"` : ''
+    const owner = isChecked ? `[${cache.prefix}] A style function${ownerName}` : ''
     const resolveStyle = (
       style: StyleFunction<unknown, Record<string, unknown>>,
       argument: Record<string, unknown>
