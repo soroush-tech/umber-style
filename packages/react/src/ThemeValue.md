@@ -20,12 +20,12 @@ one file keeps that rule in one place. `createStyle.ts` and `ThemeProvider.tsx` 
 ```mermaid
 flowchart TD
   useTheme["useTheme()"] --> ctx{"ThemeContext set?"}
-  ctx -->|yes| real["that theme"]
+  ctx -->|yes| real["completeTheme(that theme, holder.givenTheme)"]
   ctx -->|no| own["holder.givenTheme or empty theme"]
   view["useThemeView(cache)"] --> local{"cache given?"}
   local -->|no| viewctx{"ViewContext set?"}
   viewctx -->|yes| given["return the view of the provider"]
-  viewctx -->|no| build["createThemeView(use(ThemeContext) or own)"]
+  viewctx -->|no| build["createThemeView(completeTheme(use(ThemeContext), holder.givenTheme) or own)"]
   local -->|yes| build2["holder.withCache(cache).createThemeView(...)"]
   scope["useScope()"] --> marks["use(marks).get(readMarkKey)"]
   marks --> cls["useThemeClass: scope.className"]
@@ -45,6 +45,10 @@ engine's own.
 - `useThemeView` reads `ThemeContext` with `use` and only when it must build a view, so a component that
   reads a view that was given renders again only when the view changes.
 - `ThemeScope` with no nested provider renders its children in a Fragment.
+- A theme that a provider of the server build gave with no base theme under it (no style of the client
+  build of its prefix was loaded when it rendered, see `ProviderScope.md`) is read merged over the base
+  theme of this style (`completeTheme`), by `useTheme` and by the view: a component makes the same class
+  whether its style was loaded before the provider rendered or after. Any other theme is read as it is.
 
 ## Decisions
 

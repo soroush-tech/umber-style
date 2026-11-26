@@ -3,9 +3,11 @@
 ## What it does
 
 The entry `@umber-style/core/internal`. It re-exports the helpers that a binding needs from the engine
-and an app never does: `createThemeGuard` (with its type `ThemeGuard`) from `referenceKeys.ts`, and
-`callCheckedStyle` from `styleBase.ts`. Today the one user is the React Native binding, for its
-development checks (`devGuard.ts`, `styled.ts`).
+and an app never does: `createThemeGuard` (with its type `ThemeGuard`) from `referenceKeys.ts`,
+`callCheckedStyle` from `styleBase.ts`, and `readPageNonce` from `documentNonce.ts`. The React Native
+binding uses the first two, for its development checks (`devGuard.ts`, `styled.ts`); the React binding
+uses `readPageNonce` (`NonceStyles.tsx`), so that the nonce it writes the head with and the nonce the
+cache gives its own elements are read by one definition.
 
 ## Why it exists
 
@@ -29,6 +31,8 @@ modules in a common chunk and both entries import it: no module state is duplica
 flowchart LR
   guardSource["referenceKeys.ts: createThemeGuard, ThemeGuard"] --> entry["internal.ts"]
   callSource["styleBase.ts: callCheckedStyle"] --> entry
+  nonceSource["documentNonce.ts: readPageNonce"] --> entry
   entry --> native["react-native: devGuard.ts, styled.ts"]
+  entry --> react["react: NonceStyles.tsx"]
   entry -. "not re-exported" .-> umbrella["umber-style"]
 ```

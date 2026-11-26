@@ -8,6 +8,7 @@ import {
   isProduction,
   warnRenamedOption,
 } from './devChecks'
+import { readPageNonce } from './documentNonce'
 import { findInvalidValues, findUnknownSchemeKeys } from './findInvalidValues'
 import { describeClass } from './findUnsupportedDeclarations'
 import { createFingerprint, describeFingerprintDifferences } from './fingerprint'
@@ -636,7 +637,7 @@ function createTextSheet(
   claim: () => HTMLStyleElement,
   owner: Document,
   key: string,
-  nonce: string | undefined
+  readNonce: () => string | undefined
 ): Sheet {
   const rules: string[] = []
   const elements: HTMLStyleElement[] = []
@@ -655,7 +656,7 @@ function createTextSheet(
         claimFirst = undefined
       }
       if (anchor === undefined) {
-        const element = createStyleElement(owner, key, nonce)
+        const element = createStyleElement(owner, key, readNonce())
         elementModes.set(element, 'text')
         // The text goes in before the element is in the document, which then parses it once.
         element.appendChild(node)
@@ -739,24 +740,79 @@ export function createDomSheet(
   container: Node = document.head,
   options: DomSheetOptions = {}
 ): Sheet {
+  return openDomSheet(key, container, options, () => options.nonce)
+}
+
+/**
+ * `sheet`, whose first rule, once written, is followed by a look at the element that `readMade` gives (the
+ * one the sheet made, if it made one): when it has no sheet, a content security policy refused it, and
+ * `onRefuse` is called, once.
+ */
+function watchRefusal(
+  sheet: Sheet,
+  readMade: () => HTMLStyleElement | undefined,
+  onRefuse: () => void
+): Sheet {
+  const { insert } = sheet
+  let isChecked = false
+  return {
+    ...sheet,
+    insert(rule) {
+      insert(rule)
+      if (isChecked) return
+      isChecked = true
+      // The browser decides when the element, with its first rule, is in the document: synchronously.
+      if (readMade()?.sheet === null) onRefuse()
+    },
+  }
+}
+
+/**
+ * `createDomSheet`, with the nonce of the elements it makes given by `readNonce`, called once, when the
+ * sheet makes its first element (the options' `nonce` is not read). With `onRefuse`, it is called with
+ * that nonce when a content security policy refused the first element the sheet made.
+ */
+function openDomSheet(
+  key: string,
+  container: Node,
+  options: DomSheetOptions,
+  readNonce: () => string | undefined,
+  onRefuse?: (nonce: string | undefined) => void
+): Sheet {
   warnRenamedOption(key, options)
-  const { speedy = isProduction(), onReject, nonce } = options
+  const { speedy = isProduction(), onReject } = options
   const mode = speedy ? 'rules' : 'text'
   const owner = container.ownerDocument as Document
+  let isNonceRead = false
+  let nonce: string | undefined
+  const readElementNonce = () => {
+    if (!isNonceRead) nonce = readNonce()
+    isNonceRead = true
+    return nonce
+  }
   // The element is found or made when the first rule is written: a sheet that writes nothing adds
   // nothing to the document, so a style made with no nonce leaves no element for a cache that has one.
+  let made: HTMLStyleElement | undefined
   const claim = (): HTMLStyleElement => {
     let element = findSheetElement(owner, key, mode)
     if (!element) {
-      element = createStyleElement(owner, key, nonce)
+      element = createStyleElement(owner, key, readElementNonce())
       container.appendChild(element)
+      made = element
     }
     elementModes.set(element, mode)
     return element
   }
-  return speedy
+  const sheet = speedy
     ? createRuleSheet(claim, owner, onReject)
-    : createTextSheet(claim, owner, key, nonce)
+    : createTextSheet(claim, owner, key, readElementNonce)
+  return onRefuse
+    ? watchRefusal(
+        sheet,
+        () => made,
+        () => onRefuse(nonce)
+      )
+    : sheet
 }
 
 /**
@@ -929,7 +985,13 @@ function assertServerStamp(page: Document, prefix: string, fingerprint: string):
   if (difference !== '') throw new Error(difference)
 }
 
-/** The sheet a cache makes for itself: in the head of its page, its element with `nonce`, else in memory; a rule the browser rejects is told to `warn`. */
+/**
+ * The sheet a cache makes for itself: in the head of its page, else in memory; a rule the browser rejects
+ * is told to `warn`. Its elements carry `nonce`, else the nonce of the page (`readPageNonce`), read when
+ * the first one is made: a policy with a nonce for each request refuses an element without it, and that
+ * nonce cannot be given to a bundle made once for every request. When the policy refused the first one,
+ * `warn` is told why: no nonce anywhere, or a nonce given to the cache that the page does not allow.
+ */
 function createOwnSheet(
   prefix: string,
   page: Document | undefined,
@@ -942,7 +1004,33 @@ function createOwnSheet(
         warn(message, message)
       }
     : undefined
-  return page ? createDomSheet(prefix, page.head, { speedy, onReject, nonce }) : createMemorySheet()
+  if (!page) return createMemorySheet()
+  const onRefuse = warn
+    ? (elementNonce: string | undefined) => {
+        const message = readRefusal(nonce, elementNonce)
+        if (message !== undefined) warn('refused', message)
+      }
+    : undefined
+  const readNonce = () => nonce ?? readPageNonce(page)
+  return openDomSheet(prefix, page.head, { speedy, onReject }, readNonce, onRefuse)
+}
+
+/**
+ * Why the policy of the page refused the style element of a cache given `nonce`, made with
+ * `elementNonce`: no nonce at all, or the one given to the cache. Undefined for one made with the nonce of
+ * the page, which the page itself allowed elsewhere.
+ */
+function readRefusal(
+  nonce: string | undefined,
+  elementNonce: string | undefined
+): string | undefined {
+  if (nonce !== undefined) {
+    return 'The policy of this page refused a style element with the nonce given to the cache: it is not the nonce of this page. Give the cache the nonce of the request that sent the page.'
+  }
+  if (elementNonce === undefined) {
+    return 'The policy of this page refused a style element: no nonce was found on the page. Give one with createCache({ nonce }), or with setNonceSource for server components.'
+  }
+  return undefined
 }
 
 /**

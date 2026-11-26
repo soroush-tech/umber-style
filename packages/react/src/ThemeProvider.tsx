@@ -18,7 +18,7 @@ import {
   type ThemeInput,
 } from '@umber-style/core'
 import { useProvidedCache } from './CacheProvider'
-import { addMark, getMarksContext, type ThemeScopeValue } from './ProviderScope'
+import { addMark, completeTheme, getMarksContext, type ThemeScopeValue } from './ProviderScope'
 import { useStyleRegistry, type StyleRegistryStore } from './styleRegistry'
 import { readMarkKey, type ThemeContexts } from './ThemeValue'
 import type { WebThemeProviderProps } from './types'
@@ -99,7 +99,7 @@ export function createThemeProvider<T extends object>({
     // A provider of another cache is not of this engine: with none of this one above, it starts its own.
     const key = readMarkKey(baseEngine, cache)
     const above = marks.get(key)
-    const outer = useContext(ThemeContext) ?? engine.givenTheme
+    const outer = completeTheme(useContext(ThemeContext), engine.givenTheme) ?? engine.givenTheme
     const isOutermost = above === undefined && !isRoot
     const isNested = above !== undefined && !isRoot
     const given = useMemo(

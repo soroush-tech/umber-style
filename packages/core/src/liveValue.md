@@ -27,7 +27,7 @@ flowchart TD
   declare["declareLiveValue(cache, value)"] --> page{"the cache has a document?"}
   page -->|no| none["a rule that does nothing: the fallback stands"]
   page -->|yes| element{"style data-style='prefix-values' in the head?"}
-  element -->|no| create["make it, with the nonce of the cache, before it is in the document"]
+  element -->|no| create["make it, with the nonce of the cache, else of the page (readPageNonce), before it is in the document"]
   element -->|yes| insert
   create --> insert["insertRule ':root{name:text;}' in the theme layer, or in none"]
   insert --> handle["set: setProperty on the rule; remove: deleteRule, once"]
@@ -57,7 +57,9 @@ flowchart TD
   share an element (`cache.ts`). The cache does not read this element as a page element (its selector names
   `data-style="<prefix>"` exactly).
 - The element is made in the document of the cache (an iframe's, for a cache whose sheet is there), with
-  the cache's nonce set before it is in the document.
+  the cache's nonce set before it is in the document; for a cache with none, the nonce of the page
+  (`readPageNonce` of `documentNonce.ts`), as the cache's own elements take, so that a page under a policy
+  with a nonce for each request lets the element in.
 - The selector is `:root`, not `:where(:root)`: the cache removes the `:where(:root)` rules that a page sent
   when it declares its own root theme (`scanStyleText.ts`), and a value's rule must not be one of them.
 - `remove` twice does nothing, and a rule that something else deleted first is left as it is.

@@ -93,6 +93,21 @@ describe('the rule of a live value', () => {
     expect(readValueRules('lv')).toEqual([])
   })
 
+  it('makes the element of the values with the nonce of the page when the cache has none', () => {
+    const script = document.createElement('script')
+    script.setAttribute('nonce', 'page')
+    document.head.append(script)
+    declareLiveValue(createCache({ prefix: 'lp' }), createLiveValue('--lp-value-1', 1))
+    declareLiveValue(
+      createCache({ prefix: 'lo', nonce: 'mine' }),
+      createLiveValue('--lo-value-1', 1)
+    )
+    const readNonce = (key: string) =>
+      document.head.querySelector(`style[data-style="${key}"]`)?.getAttribute('nonce')
+    expect(readNonce('lp-values')).toBe('page')
+    expect(readNonce('lo-values')).toBe('mine')
+  })
+
   it('puts each value in a rule of its own, in one element, outside every layer without layers', () => {
     const cache = createCache({ prefix: 'lw', hasLayers: false })
     const first = declareLiveValue(cache, createLiveValue('--lw-value-1', 1))

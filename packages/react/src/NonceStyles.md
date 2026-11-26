@@ -42,7 +42,7 @@ flowchart TD
   props --> first{"server render or hydration? (useSyncExternalStore, kept by useState)"}
   first -->|yes| record["insertion effect: record the nonce of the props as the document's"]
   first -->|no| skip["record nothing: the nonce of the props is the navigation's"]
-  record --> read["readDocumentNonce(document)"]
+  record --> read["readDocumentNonce(document): the recorded nonce, else readPageNonce of the core"]
   skip --> read
   read --> found{"a nonce?"}
   found -->|no| none["write nothing"]
@@ -56,8 +56,11 @@ flowchart TD
 ```
 
 `readDocumentNonce` looks, in order, at: the nonce recorded at hydration (the props of the first HTML came
-with the payload of the document's own request), the `.nonce` of a `style[nonce]` that has a sheet (the
-policy let it in), the `.nonce` of a `script[nonce]`. None of these: `undefined`.
+with the payload of the document's own request), then the nonce of the page as the core reads it
+(`readPageNonce` of `@umber-style/core/internal`: the `.nonce` of a `style[nonce]` that has a sheet, the
+policy let it in, else the `.nonce` of a `script[nonce]`). None of these: `undefined`. The engine's cache
+gives the same nonce of the page to the elements it makes for itself when it has none (`documentNonce.md`
+of the core), so the elements this module writes and those of the cache carry one nonce.
 
 ## The data
 

@@ -60,7 +60,7 @@ const PACKAGES = [
 // The names every entry of the package must export, and that the ESM and CJS builds must agree on.
 const ENTRIES = {
   '@umber-style/core': ['createEngine', 'createCache', 'extractPageStyles', 'at'],
-  '@umber-style/core/internal': ['createThemeGuard', 'callCheckedStyle'],
+  '@umber-style/core/internal': ['createThemeGuard', 'callCheckedStyle', 'readPageNonce'],
   '@umber-style/cache': ['default', 'createCache'],
   '@umber-style/server/create-instance': ['default', 'createInstance'],
   '@umber-style/css': [

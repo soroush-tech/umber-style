@@ -34,6 +34,7 @@ const PAGES = {
   other: '/csp-server/other',
   stream: '/csp-server/stream',
   badge: '/csp-server/badge',
+  interactive: '/csp-server/interactive',
 } as const
 
 /** The routes of server components under the policy with no registry: the styles in place. */
@@ -68,6 +69,18 @@ const RGB = {
 /** The nonce of every style element (on the development server, of every one of the engine), and how many there are. */
 async function readNonces(page: Page, tier: CspTier): Promise<string[]> {
   return readStyleNonces(page, tier === 'production' ? 'style' : SERVER_STYLES)
+}
+
+/**
+ * That the browser's cache of the client build made a style element of its own (`data-style`), and that
+ * it and every other style element carry `nonce`, the nonce of the document.
+ */
+async function expectCacheNonce(page: Page, tier: CspTier, nonce: string): Promise<void> {
+  const own = await readStyleNonces(page, `style[data-style="${PREFIX}"]`)
+  expect(own.length, "the style elements of the browser's cache").toBeGreaterThan(0)
+  expect(own, "the nonce of the browser's cache").toEqual(own.map(() => nonce))
+  const nonces = await readNonces(page, tier)
+  expect(nonces, 'the nonce of every style element').toEqual(nonces.map(() => nonce))
 }
 
 /** How many style elements in place the page holds. */
@@ -760,9 +773,7 @@ export const CSP_SERVER_SCENARIOS: readonly CspScenario[] = [
   },
   {
     title:
-      '(s3) server components with the registry, a client component that reads a token: its class in the first HTML is the one after hydration, no style element without the nonce, and a client-side navigation to it styles it with the token, nothing refused',
-    known:
-      'KNOWN #71: the client badge reads a token below the provider of the server build, which merges over the base theme of the client build, unset until a style of the client build of the prefix is loaded: the browser too makes the class with no value for the token, so on a first load its class differs from the one in the first HTML and its rule is written in a style element with no nonce, which the policy refuses, and after a client-side navigation to the page (on any server, warm or not) the badge has no accent',
+      '(s3) server components with the registry, a client component that reads a token: its class in the first HTML is the one after hydration and has the token, no style element without the nonce, and a client-side navigation to it gives it the same class',
     async run(_page, tools, tier) {
       const { page, reports } = await openWatched(tools)
       const response = await page.goto(PAGES.badge)
@@ -779,19 +790,68 @@ export const CSP_SERVER_SCENARIOS: readonly CspScenario[] = [
         'the class of the badge after hydration'
       ).toBe(sent)
       expect(await readStyle(page, 'csp-server-client-badge', 'padding-left')).toBe('6px')
+      expect(await readStyle(page, 'csp-server-client-badge', 'border-bottom-color')).toBe(
+        RGB.accent
+      )
       const nonces = await readNonces(page, tier)
       expect(nonces, 'the nonce of every style element').toEqual(nonces.map(() => nonce))
       expectQuiet(reports, 'on the first load', tier)
       await page.context().close()
 
-      const navigated = await openWatched(tools)
-      await load(navigated.page, PAGES.other, 'page-csp-server-other')
-      await navigate(navigated.page, 'link-csp-server-badge', 'page-csp-server-badge')
+      const { page: navigated } = await openWatched(tools)
+      await load(navigated, PAGES.other, 'page-csp-server-other')
+      await navigate(navigated, 'link-csp-server-badge', 'page-csp-server-badge')
       expect(
-        await readStyle(navigated.page, 'csp-server-client-badge', 'border-bottom-color')
-      ).toBe(RGB.accent)
-      expectQuiet(navigated.reports, 'after the navigation', tier)
-      await navigated.page.context().close()
+        await navigated.getByTestId('csp-server-client-badge').getAttribute('class'),
+        'the class of the badge after a navigation'
+      ).toBe(sent)
+      await navigated.context().close()
+    },
+  },
+  {
+    title:
+      '(s4) server components with the registry, a client-side navigation to a client component whose class no page loaded before used: it is styled with the token, the element that the cache of the browser makes carries the nonce of the document, nothing refused',
+    async run(_page, tools, tier) {
+      const { page, reports } = await openWatched(tools)
+      const nonce = readNonce(await load(page, PAGES.other, 'page-csp-server-other'))
+      await navigate(page, 'link-csp-server-badge', 'page-csp-server-badge')
+      expect(await readStyle(page, 'csp-server-client-badge', 'border-bottom-color')).toBe(
+        RGB.accent
+      )
+      await expectCacheNonce(page, tier, nonce)
+      expectQuiet(reports, 'after the navigation', tier)
+      await page.context().close()
+    },
+  },
+  {
+    title:
+      '(s5) server components with the registry, a client component whose state changes to a class the first HTML did not have: it is styled with the token, the element that the cache of the browser makes carries the nonce of the document, nothing refused',
+    async run(_page, tools, tier) {
+      const { page, reports } = await openWatched(tools)
+      const nonce = readNonce(await load(page, PAGES.interactive, 'page-csp-server-interactive'))
+      expect(await readStyle(page, 'csp-server-toggle', 'padding-left')).toBe('10px')
+      await page.getByTestId('csp-server-toggle').click()
+      await expect(page.getByTestId('csp-server-toggle')).toHaveText('loud')
+      expect(await readStyle(page, 'csp-server-toggle', 'padding-left')).toBe('22px')
+      expect(await readStyle(page, 'csp-server-toggle', 'color')).toBe(RGB.accent)
+      await expectCacheNonce(page, tier, nonce)
+      expectQuiet(reports, 'after the click', tier)
+      await page.context().close()
+    },
+  },
+  {
+    title:
+      '(s6) server components with the registry, a client component that only the browser renders, after a click: it is styled with the token, the element that the cache of the browser makes carries the nonce of the document, nothing refused',
+    async run(_page, tools, tier) {
+      const { page, reports } = await openWatched(tools)
+      const nonce = readNonce(await load(page, PAGES.interactive, 'page-csp-server-interactive'))
+      await page.getByTestId('csp-server-open-panel').click()
+      await page.getByTestId('csp-server-panel').waitFor()
+      expect(await readStyle(page, 'csp-server-panel', 'padding-left')).toBe('18px')
+      expect(await readStyle(page, 'csp-server-panel', 'border-left-color')).toBe(RGB.primary)
+      await expectCacheNonce(page, tier, nonce)
+      expectQuiet(reports, 'after the click', tier)
+      await page.context().close()
     },
   },
   {

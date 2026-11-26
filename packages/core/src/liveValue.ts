@@ -1,4 +1,5 @@
 import type { Cache } from './cache'
+import { readPageNonce } from './documentNonce'
 import { createThemeRule } from './theme'
 
 const BRAND = Symbol.for('umber-style.live-value')
@@ -99,15 +100,19 @@ export interface LiveRule {
 
 const NO_RULE: LiveRule = { set: () => undefined, remove: () => undefined }
 
-/** The style element of the values of `prefix` in `page`: the one there, else one made in its head with `nonce`. */
+/**
+ * The style element of the values of `prefix` in `page`: the one there, else one made in its head with
+ * `nonce`, else the nonce of the page (`readPageNonce`), as the elements of the cache's own sheet.
+ */
 function findValuesElement(page: Document, prefix: string, nonce: string | undefined) {
   const key = `${prefix}-values`
   let element = page.head.querySelector<HTMLStyleElement>(`style[data-style="${key}"]`)
   if (element === null) {
     element = page.createElement('style')
     element.dataset.style = key
+    const elementNonce = nonce ?? readPageNonce(page)
     // Set before the element is in the document, which is when a policy checks it.
-    if (nonce !== undefined) element.setAttribute('nonce', nonce)
+    if (elementNonce !== undefined) element.setAttribute('nonce', elementNonce)
     page.head.appendChild(element)
   }
   return element
@@ -117,7 +122,7 @@ function findValuesElement(page: Document, prefix: string, nonce: string | undef
  * Declares the variable of `value` with the number it holds, in a rule of its own on `:root`, in the
  * theme layer of `cache` (none without layers), and returns what changes the declaration in place. The
  * rule goes into the style element `data-style="<prefix>-values"` of the document of the cache, made
- * with the nonce of the cache, written with `insertRule` so that a change touches that one declaration
+ * with the nonce of the cache (else of the page), written with `insertRule` so that a change touches that one declaration
  * and parses nothing. Without a document (a server) there is no rule: the fallback of the reference
  * stands for the first value.
  */

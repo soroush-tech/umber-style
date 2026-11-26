@@ -4,6 +4,7 @@
 // this package with no bundler (which would make this module a reference) still loads this module. So
 // nothing here calls React when the module loads.
 import * as React from 'react'
+import { readPageNonce } from '@umber-style/core/internal'
 import type { StyleText } from './styleElements'
 import { registerTexts, useStyleRegistry } from './styleRegistry'
 
@@ -34,16 +35,12 @@ function recordDocumentNonce(nonce: string | undefined): void {
 
 /**
  * The nonce that the elements written into the head of `page` carry: the one recorded at hydration, else
- * the `.nonce` of a style element that the policy let in (it has a sheet), else that of a script.
- * Undefined when none is found, and then nothing is written. A nonce read from the page can only make the
- * elements written with it refused when it is wrong: it never lets in what the policy refuses.
+ * the nonce of the page that the engine's cache reads too (`readPageNonce` of the core: the `.nonce` of a
+ * style element that the policy let in, else that of a script). Undefined when none is found, and then
+ * nothing is written.
  */
 export function readDocumentNonce(page: Document): string | undefined {
-  if (recordedNonce !== undefined) return recordedNonce
-  for (const element of page.querySelectorAll<HTMLStyleElement>('style[nonce]')) {
-    if (element.sheet !== null && element.nonce) return element.nonce
-  }
-  return page.querySelector<HTMLScriptElement>('script[nonce]')?.nonce || undefined
+  return recordedNonce ?? readPageNonce(page)
 }
 
 /** The selector of the elements a `StyleRegistry` wrote for `prefix`, in the head and at the top of the body. */

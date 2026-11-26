@@ -12,6 +12,7 @@ import {
   ROOT_SELECTOR,
   toDeclarationText,
   type ColorScheme,
+  type DeepPartial,
   type TokenOptions,
 } from '@umber-style/core'
 import { NonceStyles } from './NonceStyles'
@@ -117,6 +118,22 @@ export function readPrefixStyle(prefix: string): PrefixStyle {
     styles.set(prefix, style)
   }
   return style
+}
+
+// The themes that a provider of the server build gave the contexts of its prefix with no base theme under
+// them, shared by every copy of the binding: the theme of a provider of one copy is read by a style of another.
+const unbased = readSharedState('react.unbased-themes@1', () => new WeakSet<object>())
+
+/**
+ * `theme`, read from the theme context of a prefix, as a style whose base theme is `base` reads it. A
+ * provider of the server build that rendered before any style of the client build of its prefix was loaded
+ * (on the first request of a server, at hydration, before a navigation loads the module of a client
+ * component) had no base theme to merge its theme over: that theme is merged over `base` here. Any other
+ * theme is itself, as it is with no `base`.
+ */
+export function completeTheme<T>(theme: T | undefined, base: T | undefined): T | undefined {
+  if (theme === undefined || !unbased.has(theme as object)) return theme
+  return mergeTheme(base, theme as DeepPartial<T>)
 }
 
 /** The token options that name the variables of a theme, as plain data; the prefix is that of the provider. */
@@ -309,8 +326,16 @@ export function ProviderScope({
     [marks, prefix, scope, nested]
   )
   const { contexts, holder } = readPrefixStyle(prefix)
-  const outer = (React.use(contexts.ThemeContext) ?? holder?.givenTheme) as object | undefined
-  const merged = React.useMemo(() => mergeTheme(outer, given), [outer, given])
+  const base = holder?.givenTheme as object | undefined
+  const outer = completeTheme(React.use(contexts.ThemeContext) as object | undefined, base) ?? base
+  // With no base theme under it (no style of the client build of the prefix is loaded yet, and none of
+  // the providers above had one), the theme is a copy of its own, marked for the styles that read it.
+  const merged = React.useMemo(() => {
+    if (outer !== undefined && !unbased.has(outer)) return mergeTheme(outer, given)
+    const theme = { ...mergeTheme(outer, given) }
+    unbased.add(theme)
+    return theme
+  }, [outer, given])
   const styles = React.useMemo(() => {
     if (theme === undefined) return { list: [] as readonly StyleText[], rule: undefined }
     if (isNested) return { list: createNestedStyles(prefix, given, theme), rule: undefined }
