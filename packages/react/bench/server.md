@@ -20,7 +20,7 @@ because it is a test helper and not part of the built package.
 ```mermaid
 flowchart TD
   prep["prepareBuiltPackages with react-server"] --> core["load the built core"]
-  core --> refs["put ProviderScope.cjs and GlobalRelease.cjs in the require cache as client references"]
+  core --> refs["put ProviderScope.cjs, GlobalRelease.cjs and NonceStyles.cjs in the require cache as client references"]
   refs --> bind["load dist/index.server.cjs -> bindEngine"]
   bind --> rt["load src/vitest.resolveTree.ts -> resolveTree"]
   rt --> fix["fixtures = createFixtures(react, core)"]
@@ -35,12 +35,12 @@ flowchart TD
 - `requestCache`: a `CacheFunction` that keeps one value in a closure. In a real render `React.cache`
   keeps the request's slot; here the slot lives as long as the style object, as in the tests.
 - A require cache entry: `{ id, filename, loaded: true, exports: { [name]: reference } }` with
-  `reference = { $$typeof: Symbol.for('react.client.reference'), $$id: name }`, for `ProviderScope` and
-  `GlobalRelease`.
+  `reference = { $$typeof: Symbol.for('react.client.reference'), $$id: name }`, for `ProviderScope`,
+  `GlobalRelease` and `NonceStyles`.
 
 ## What it guarantees
 
-- `ProviderScope` and `GlobalRelease` are client references when the server build loads, so the work
+- `ProviderScope`, `GlobalRelease` and `NonceStyles` are client references when the server build loads, so the work
   measured is that of a server: a bundler of server components does not run a `'use client'` module that
   a server file imports, and `resolveTree` leaves a reference as it is (`src/vitest.clientReferences.ts`).
 - Each `createServerStyle()` call gives a fresh engine and cache, so one case does not warm another.
@@ -48,12 +48,12 @@ flowchart TD
 
 ## Decisions
 
-- The two modules are put in the require cache before the server build loads them. Why this and not
+- The three modules are put in the require cache before the server build loads them. Why this and not
   another way of making them references is not recorded in the code.
 
 ## Limits
 
 - It needs `pnpm build` first.
-- The two cached module names are a list in the file: a new client module that the server build imports
+- The three cached module names are a list in the file: a new client module that the server build imports
   needs an entry, and nothing checks that the list is complete.
 - `resolveTree` runs from source, not from `dist`.

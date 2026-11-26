@@ -69,6 +69,9 @@ export async function collectComputedStyles(
         result[key] = entry
         let index = 0
         for (const child of element.children) {
+          // A style element has no box, and it does not count in the path: a page whose first HTML holds
+          // one in place (`NonceStyles`, under a nonce source) compares with the same page without it.
+          if (child.tagName === 'STYLE') continue
           index += 1
           walk(child, `${path}/${child.tagName.toLowerCase()}[${index}]`)
         }

@@ -4,6 +4,9 @@
 vi.mock('./GlobalRelease', () => ({
   GlobalRelease: { $$typeof: Symbol.for('react.client.reference'), $$id: 'GlobalRelease' },
 }))
+vi.mock('./NonceStyles', () => ({
+  NonceStyles: { $$typeof: Symbol.for('react.client.reference'), $$id: 'NonceStyles' },
+}))
 vi.mock('./ProviderScope', () => ({
   ProviderScope: { $$typeof: Symbol.for('react.client.reference'), $$id: 'ProviderScope' },
 }))

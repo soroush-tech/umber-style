@@ -3,8 +3,8 @@
 ## What it does
 
 Defines what a theme provider is given and how it is merged. `ThemeInput<T>` is the theme or a part of it,
-or a function of the theme above that returns that. `resolveThemeInput(input, outer)` calls the function
-or returns the object. `mergeTheme(outer, given)` merges `given` over the theme above, or takes `given` as
+or a function of the theme above that returns that. `resolveThemeInput(input, outer, guard?)` calls the
+function (with `outer` through `guard` when one is given) or returns the object. `mergeTheme(outer, given)` merges `given` over the theme above, or takes `given` as
 it is when there is none above; a `given` with the contents of one merged over the same theme above before
 gets the theme that merge made. `EMPTY_THEME` is a frozen empty object for where there is no theme.
 
@@ -21,7 +21,10 @@ Vue `ThemeProvider.ts`, `Global.ts`, `createStyle.ts`; React Native `ThemeValue.
 ```mermaid
 flowchart TD
   input["ThemeInput"] --> fn{"is a function?"}
-  fn -->|yes| callNode["call it with the theme above"]
+  fn -->|yes| guardQ{"a guard given?"}
+  guardQ -->|yes| guarded["call it with guard(outer, 'ThemeProvider')"]
+  guardQ -->|no| callNode["call it with the theme above"]
+  guarded --> given
   fn -->|no| asis["the object as it is"]
   callNode --> given["given: DeepPartial of the theme"]
   asis --> given
@@ -56,7 +59,11 @@ flowchart TD
 ## Decisions
 
 - The merge is a deep merge (`mergeDeep.ts`), so a provider changes one value and keeps the rest.
-- A function input receives the theme above, so a nested provider can derive its values from it.
+- A function input receives the theme above, so a nested provider can derive its values from it. The
+  bindings pass their development guard (`engine.guardTheme`, or `guardTheme` of the React Native
+  binding): the theme above is one object for every render and, on a server, the base theme of every
+  request, so a function that wrote into it would change them all. With the guard a write throws in
+  development; without the checks the guard gives the theme itself.
 - The reason `EMPTY_THEME` is typed `object` rather than a specific shape is not recorded in the code.
 - The merges are kept in two ways, in the module. By the pair of objects first (a `WeakMap` by the theme
   above, of `WeakMap`s by the given): a stable theme over a base theme, a light one and a dark one, pay the

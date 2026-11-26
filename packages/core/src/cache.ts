@@ -8,6 +8,7 @@ import {
   isProduction,
   warnRenamedOption,
 } from './devChecks'
+import { findPageNonce } from './documentNonce'
 import { findInvalidValues, findUnknownSchemeKeys } from './findInvalidValues'
 import { describeClass } from './findUnsupportedDeclarations'
 import { createFingerprint, describeFingerprintDifferences } from './fingerprint'
@@ -381,8 +382,8 @@ export interface Cache {
    * value repair needs a value, and only then.
    */
   registerValues(read: () => Readonly<Record<string, string>>): void
-  /** Gives the cache the theme that steps written as a function of the theme are resolved against, read when a `@keyframes` rule is first written (the engine gives its references). */
-  setKeyframesTheme(read: () => unknown): void
+  /** Gives the cache the theme that steps written as a function of the theme are resolved against, read for the name of the animation when its `@keyframes` rule is first written (the engine gives its references). */
+  setKeyframesTheme(read: (name: string) => unknown): void
   /**
    * Writes the `@keyframes` rule of `name` (a `keyframes` result) now, once, outside every layer: for a
    * use that the cache cannot see in a class. A rule that is written, or that the page has, is not written
@@ -636,7 +637,7 @@ function createTextSheet(
   claim: () => HTMLStyleElement,
   owner: Document,
   key: string,
-  nonce: string | undefined
+  readNonce: () => string | undefined
 ): Sheet {
   const rules: string[] = []
   const elements: HTMLStyleElement[] = []
@@ -655,7 +656,7 @@ function createTextSheet(
         claimFirst = undefined
       }
       if (anchor === undefined) {
-        const element = createStyleElement(owner, key, nonce)
+        const element = createStyleElement(owner, key, readNonce())
         elementModes.set(element, 'text')
         // The text goes in before the element is in the document, which then parses it once.
         element.appendChild(node)
@@ -739,24 +740,79 @@ export function createDomSheet(
   container: Node = document.head,
   options: DomSheetOptions = {}
 ): Sheet {
+  return openDomSheet(key, container, options, () => options.nonce)
+}
+
+/**
+ * `sheet`, whose first rule, once written, is followed by a look at the element that `readMade` gives (the
+ * one the sheet made, if it made one): when it has no sheet, a content security policy refused it, and
+ * `onRefuse` is called, once.
+ */
+function watchRefusal(
+  sheet: Sheet,
+  readMade: () => HTMLStyleElement | undefined,
+  onRefuse: () => void
+): Sheet {
+  const { insert } = sheet
+  let isChecked = false
+  return {
+    ...sheet,
+    insert(rule) {
+      insert(rule)
+      if (isChecked) return
+      isChecked = true
+      // The browser decides when the element, with its first rule, is in the document: synchronously.
+      if (readMade()?.sheet === null) onRefuse()
+    },
+  }
+}
+
+/**
+ * `createDomSheet`, with the nonce of the elements it makes given by `readNonce`, called once, when the
+ * sheet makes its first element (the options' `nonce` is not read). With `onRefuse`, it is called with
+ * that nonce when a content security policy refused the first element the sheet made.
+ */
+function openDomSheet(
+  key: string,
+  container: Node,
+  options: DomSheetOptions,
+  readNonce: () => string | undefined,
+  onRefuse?: (nonce: string | undefined) => void
+): Sheet {
   warnRenamedOption(key, options)
-  const { speedy = isProduction(), onReject, nonce } = options
+  const { speedy = isProduction(), onReject } = options
   const mode = speedy ? 'rules' : 'text'
   const owner = container.ownerDocument as Document
+  let isNonceRead = false
+  let nonce: string | undefined
+  const readElementNonce = () => {
+    if (!isNonceRead) nonce = readNonce()
+    isNonceRead = true
+    return nonce
+  }
   // The element is found or made when the first rule is written: a sheet that writes nothing adds
   // nothing to the document, so a style made with no nonce leaves no element for a cache that has one.
+  let made: HTMLStyleElement | undefined
   const claim = (): HTMLStyleElement => {
     let element = findSheetElement(owner, key, mode)
     if (!element) {
-      element = createStyleElement(owner, key, nonce)
+      element = createStyleElement(owner, key, readElementNonce())
       container.appendChild(element)
+      made = element
     }
     elementModes.set(element, mode)
     return element
   }
-  return speedy
+  const sheet = speedy
     ? createRuleSheet(claim, owner, onReject)
-    : createTextSheet(claim, owner, key, nonce)
+    : createTextSheet(claim, owner, key, readElementNonce)
+  return onRefuse
+    ? watchRefusal(
+        sheet,
+        () => made,
+        () => onRefuse(nonce)
+      )
+    : sheet
 }
 
 /**
@@ -929,7 +985,14 @@ function assertServerStamp(page: Document, prefix: string, fingerprint: string):
   if (difference !== '') throw new Error(difference)
 }
 
-/** The sheet a cache makes for itself: in the head of its page, its element with `nonce`, else in memory; a rule the browser rejects is told to `warn`. */
+/**
+ * The sheet a cache makes for itself: in the head of its page, else in memory; a rule the browser rejects
+ * is told to `warn`. Its elements carry `nonce`, else the nonce of the page (`findPageNonce`), read when
+ * the first one is made: a policy with a nonce for each request refuses an element without it, and that
+ * nonce cannot be given to a bundle made once for every request. When the policy refused the first one,
+ * `warn` is told why: no nonce anywhere, a nonce given to the cache that the page does not allow, or the
+ * nonce of a script of the page, which a page may not share with its styles.
+ */
 function createOwnSheet(
   prefix: string,
   page: Document | undefined,
@@ -942,7 +1005,44 @@ function createOwnSheet(
         warn(message, message)
       }
     : undefined
-  return page ? createDomSheet(prefix, page.head, { speedy, onReject, nonce }) : createMemorySheet()
+  if (!page) return createMemorySheet()
+  let isFromScript = false
+  const onRefuse = warn
+    ? (elementNonce: string | undefined) => {
+        const message = readRefusal(nonce, elementNonce, isFromScript)
+        if (message !== undefined) warn('refused', message)
+      }
+    : undefined
+  const readNonce = () => {
+    if (nonce !== undefined) return nonce
+    const found = findPageNonce(page)
+    isFromScript = found?.from === 'script'
+    return found?.nonce
+  }
+  return openDomSheet(prefix, page.head, { speedy, onReject }, readNonce, onRefuse)
+}
+
+/**
+ * Why the policy of the page refused the style element of a cache given `nonce`, made with
+ * `elementNonce`: no nonce at all, the one given to the cache, or the one of a script of the page
+ * (`isFromScript`). Undefined for one made with the nonce of a style of the page, which the page itself
+ * allowed elsewhere.
+ */
+function readRefusal(
+  nonce: string | undefined,
+  elementNonce: string | undefined,
+  isFromScript: boolean
+): string | undefined {
+  if (nonce !== undefined) {
+    return 'The policy of this page refused a style element with the nonce given to the cache: it is not the nonce of this page. Give the cache the nonce of the request that sent the page.'
+  }
+  if (elementNonce === undefined) {
+    return 'The policy of this page refused a style element: no nonce was found on the page. Give one with createCache({ nonce }), or with setNonceSource for server components.'
+  }
+  if (isFromScript) {
+    return 'The policy of this page refused a style element with the nonce of a script of the page: the page may give its scripts and its styles different nonces. Give the style nonce with createCache({ nonce }), or with setNonceSource for server components.'
+  }
+  return undefined
 }
 
 /**
@@ -1045,8 +1145,12 @@ export function createCache(options: CacheOptions = {}): Cache {
   // They are read when value repair first needs one: a cache that repairs nothing never makes them.
   const tokenValues = new Map<string, string>()
   const pendingValues: (() => Readonly<Record<string, string>>)[] = []
+  // The repaired text of each value, for value repair when nothing reports (see `CompileContext.repairMemo`):
+  // what a value is repaired to depends on the declared values, so a new source of them empties it.
+  const repairMemo = new Map<string, string>()
   const registerValues = (read: () => Readonly<Record<string, string>>): void => {
     pendingValues.push(read)
+    repairMemo.clear()
   }
   const readValue = (name: string): string | undefined => {
     for (const read of pendingValues.splice(0)) {
@@ -1060,7 +1164,7 @@ export function createCache(options: CacheOptions = {}): Cache {
     : undefined
   /** The style options `options` with what the compiler is given for them, made once. */
   const toWrittenAs = (options: Required<StyleOptions>): WrittenAs => {
-    const plain: CompileContext = { ...options, scoping, readValue }
+    const plain: CompileContext = { ...options, scoping, readValue, repairMemo }
     const written: WrittenAs = {
       ...options,
       plain,
@@ -1185,7 +1289,7 @@ export function createCache(options: CacheOptions = {}): Cache {
 
   // The animation names that the rules of each class use, and the theme that steps of a function are resolved against.
   const animations = new Map<string, readonly string[]>()
-  let readKeyframesTheme = (): unknown => {
+  let readKeyframesTheme = (_name: string): unknown => {
     throw new Error(
       'keyframes(): these steps are a function of the theme, and this cache has no theme: make the cache through an engine.'
     )

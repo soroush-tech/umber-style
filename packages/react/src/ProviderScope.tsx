@@ -12,8 +12,10 @@ import {
   ROOT_SELECTOR,
   toDeclarationText,
   type ColorScheme,
+  type DeepPartial,
   type TokenOptions,
 } from '@umber-style/core'
+import { NonceStyles } from './NonceStyles'
 import type { StyleText } from './styleElements'
 
 /** The wrapper of a nested provider: its element and its class string, which `ThemeScope` repeats. */
@@ -118,6 +120,22 @@ export function readPrefixStyle(prefix: string): PrefixStyle {
   return style
 }
 
+// The themes that a provider of the server build gave the contexts of its prefix with no base theme under
+// them, shared by every copy of the binding: the theme of a provider of one copy is read by a style of another.
+const unbased = readSharedState('react.unbased-themes@1', () => new WeakSet<object>())
+
+/**
+ * `theme`, read from the theme context of a prefix, as a style whose base theme is `base` reads it. A
+ * provider of the server build that rendered before any style of the client build of its prefix was loaded
+ * (on the first request of a server, at hydration, before a navigation loads the module of a client
+ * component) had no base theme to merge its theme over: that theme is merged over `base` here. Any other
+ * theme is itself, as it is with no `base`.
+ */
+export function completeTheme<T>(theme: T | undefined, base: T | undefined): T | undefined {
+  if (theme === undefined || !unbased.has(theme as object)) return theme
+  return mergeTheme(base, theme as DeepPartial<T>)
+}
+
 /** The token options that name the variables of a theme, as plain data; the prefix is that of the provider. */
 export type SentTokens = Pick<TokenOptions, 'rawKeys' | 'lengthKeys' | 'modes'>
 
@@ -160,6 +178,8 @@ export interface ScopeTheme {
   readonly styles: readonly StyleText[]
   /** The nonce of the cache (`CacheOptions.nonce`), which every style element of the provider carries. */
   readonly nonce?: string
+  /** Whether its style texts go to `NonceStyles` instead of `<style href precedence>` elements: the request had a nonce, from a nonce source or the cache (`isInlineMode`). */
+  readonly isInline?: boolean
 }
 
 /** The props of `ProviderScope`: what a provider of the server build hands to its browser part. */
@@ -220,14 +240,19 @@ export function createNestedStyles(
  * one in the element of `rootId`, written again there when an earlier pass deleted it, and none in any
  * other element. React keeps a style element for the life of the document, so after the root theme
  * changed (a refresh that renders another theme, a navigation back) the elements of the earlier ones are
- * still there. Nothing changes until React has put the element of `rootId` in the document. The elements
- * of the browser's cache and of a registry are not touched.
+ * still there. The elements a `StyleRegistry` wrote for `prefix` (`data-umber-registry`) count with them:
+ * they stand for React's under a registry. Nothing changes until the element of `rootId` is in the
+ * document. The elements of the browser's cache and of a registry an app wrote are not touched.
  */
 export function keepRootRule(prefix: string, rootId: string, rule: string, page: Document): void {
   const elements = [
-    ...page.querySelectorAll<HTMLStyleElement>(`style[data-precedence="${prefix}"]`),
+    ...page.querySelectorAll<HTMLStyleElement>(
+      `style[data-precedence="${prefix}"], style[data-umber-registry][data-umber~="${prefix}"]`
+    ),
   ]
-  const own = elements.find((element) => element.dataset.href?.split(' ').includes(rootId))
+  const own = elements.find((element) =>
+    (element.dataset.href ?? element.dataset.umber)?.split(' ').includes(rootId)
+  )
   if (own === undefined) return
   const pattern = new RegExp(String.raw`^(@layer ${prefix}-theme\s*\{\s*)?:where\(:root\)`)
   for (const element of elements) {
@@ -259,6 +284,9 @@ export function keepRootRule(prefix: string, rootId: string, rule: string, page:
  *   `:root`), and, once committed in the browser, it leaves that root rule alone in the document. A
  *   provider that has no base theme for that rule (see `ScopeTheme.base`) is nested instead.
  * - With no rules (`isRoot`): no element, no rule.
+ *
+ * Its style elements are `<style href precedence>` elements, or, when the request had a nonce under a nonce
+ * source (`ScopeTheme.isInline`), one `NonceStyles` with their texts.
  *
  * In each case it marks its prefix for the providers below, of both builds, and gives the contexts of
  * its prefix the theme merged over the theme of the provider above it in the page, of either build, else
@@ -298,8 +326,16 @@ export function ProviderScope({
     [marks, prefix, scope, nested]
   )
   const { contexts, holder } = readPrefixStyle(prefix)
-  const outer = (React.use(contexts.ThemeContext) ?? holder?.givenTheme) as object | undefined
-  const merged = React.useMemo(() => mergeTheme(outer, given), [outer, given])
+  const base = holder?.givenTheme as object | undefined
+  const outer = completeTheme(React.use(contexts.ThemeContext) as object | undefined, base) ?? base
+  // With no base theme under it (no style of the client build of the prefix is loaded yet, and none of
+  // the providers above had one), the theme is a copy of its own, marked for the styles that read it.
+  const merged = React.useMemo(() => {
+    if (outer !== undefined && !unbased.has(outer)) return mergeTheme(outer, given)
+    const theme = { ...mergeTheme(outer, given) }
+    unbased.add(theme)
+    return theme
+  }, [outer, given])
   const styles = React.useMemo(() => {
     if (theme === undefined) return { list: [] as readonly StyleText[], rule: undefined }
     if (isNested) return { list: createNestedStyles(prefix, given, theme), rule: undefined }
@@ -324,13 +360,20 @@ export function ProviderScope({
   return React.createElement(
     React.Fragment,
     null,
-    styles.list.map(({ href, text }) =>
-      React.createElement(
-        'style',
-        { key: href, href, precedence: prefix, nonce: theme?.nonce },
-        text
-      )
-    ),
+    theme?.isInline
+      ? React.createElement(NonceStyles, {
+          key: 'nonce-styles',
+          prefix,
+          texts: styles.list,
+          nonce: theme.nonce,
+        })
+      : styles.list.map(({ href, text }) =>
+          React.createElement(
+            'style',
+            { key: href, href, precedence: prefix, nonce: theme?.nonce },
+            text
+          )
+        ),
     wrapper === undefined
       ? content
       : React.createElement(wrapper.as, { className: wrapper.className }, content)

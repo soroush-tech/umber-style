@@ -103,7 +103,11 @@ export function createThemeProvider<T extends object>(baseEngine: Engine<T>, key
       const isNested = scope !== null && !props.isRoot
       const readOuter = () => outer?.value ?? engine.givenTheme
       const given = computed(() =>
-        resolveThemeInput(props.theme as ThemeInput<T>, readOuter() ?? (EMPTY_THEME as T))
+        resolveThemeInput(
+          props.theme as ThemeInput<T>,
+          readOuter() ?? (EMPTY_THEME as T),
+          baseEngine.guardTheme
+        )
       )
       // The first provider gives the engine the shape of its tokens, before its children are set up. It is
       // not a given base theme: what has no provider above never reads it.

@@ -106,7 +106,7 @@ is passed as it is.
   or `both`) and ends shows the step it would end on, so that an entrance whose own style is the start does
   not stay at the start. An infinite animation, or one whose count is not whole, shows its own style.
   Transitions are taken away, so a change of style jumps to its end.
-- The steps of a function of the theme are resolved against the base theme of the styling (`readTheme`), as
+- The steps of a function of the theme are resolved against the base theme of the styling (`readTheme`), given guarded in development (`guardTheme` of `devGuard.ts`, label `keyframes <name>`; the rules stay kept by the theme itself), as
   the web resolves them against the engine's tokens: a provider does not change them.
 
 ## Limits

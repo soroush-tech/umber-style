@@ -18,14 +18,15 @@ import {
   type ThemeInput,
 } from '@umber-style/core'
 import { useProvidedCache } from './CacheProvider'
-import { addMark, getMarksContext, type ThemeScopeValue } from './ProviderScope'
+import { addMark, completeTheme, getMarksContext, type ThemeScopeValue } from './ProviderScope'
+import { useStyleRegistry, type StyleRegistryStore } from './styleRegistry'
 import { readMarkKey, type ThemeContexts } from './ThemeValue'
 import type { WebThemeProviderProps } from './types'
 
 /** What a provider needs to render the style of its classes, where the build does that (a server render of the client build). */
 export interface ServerStyleParts {
-  /** The `<style href precedence>` elements of these classes (or root theme). */
-  createStyleElements(className: string): ReactElement[]
+  /** The `<style href precedence>` elements of these classes (or root theme); none under a `StyleRegistry` (`registry`), which takes their texts. */
+  createStyleElements(className: string, registry?: StyleRegistryStore): ReactElement[]
   /** The element that carries the options of the cache. */
   createStamp(): ReactElement
 }
@@ -91,17 +92,23 @@ export function createThemeProvider<T extends object>({
     children,
   }: WebThemeProviderProps<T>): ReactElement {
     const cache = useProvidedCache()
+    const registry = useStyleRegistry()
     const engine = cache === undefined ? baseEngine : baseEngine.withCache(cache)
     const MarksContext = getMarksContext()
     const marks = use(MarksContext)
     // A provider of another cache is not of this engine: with none of this one above, it starts its own.
     const key = readMarkKey(baseEngine, cache)
     const above = marks.get(key)
-    const outer = useContext(ThemeContext) ?? engine.givenTheme
+    const outer = completeTheme(useContext(ThemeContext), engine.givenTheme) ?? engine.givenTheme
     const isOutermost = above === undefined && !isRoot
     const isNested = above !== undefined && !isRoot
     const given = useMemo(
-      () => resolveThemeInput(theme as ThemeInput<T>, outer ?? (EMPTY_THEME as T)),
+      () =>
+        resolveThemeInput(
+          theme as ThemeInput<T>,
+          outer ?? (EMPTY_THEME as T),
+          baseEngine.guardTheme
+        ),
       [theme, outer]
     )
     // The first provider gives the engine the shape of its tokens, before its children render. It is not
@@ -151,7 +158,7 @@ export function createThemeProvider<T extends object>({
       Fragment,
       null,
       server.createStamp(),
-      ...server.createStyleElements(styled)
+      ...server.createStyleElements(styled, registry)
     )
     return createElement(Fragment, null, sent, element)
   }

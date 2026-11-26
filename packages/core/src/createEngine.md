@@ -39,6 +39,21 @@ flowchart TD
   ov --> outc2["own + overrides"]
 ```
 
+A function of app code that is given the theme gets it through `guardView` (the reference guard of
+`referenceKeys.ts` with the development checks, the theme itself without them), under a label:
+
+```mermaid
+flowchart TD
+  fnKind{"which function?"} -->|"a style function of a component"| argNode["resolveAll: one argument per render, made at the first function: { ...props, theme: guarded view }"]
+  argNode --> checksQ{"development checks?"}
+  checksQ -->|yes| frozen["Object.freeze; each call is callCheckedStyle naming the component; the result is checked"]
+  checksQ -->|no| plainCall["each function called with the argument as it is"]
+  fnKind -->|"a function of global styles"| globalNode["resolveGlobal: guarded theme or refs, label Global"]
+  fnKind -->|"a function of keyframes"| kfNode["the cache's keyframes theme: refs guarded with the checks, label keyframes name"]
+  fnKind -->|"a function sheet"| sheetNode["createThemedSheet: guarded view or refs, label StyleSheet"]
+  fnKind -->|"a provider function, in a binding"| provNode["guardTheme(outer, 'ThemeProvider'), through resolveThemeInput"]
+```
+
 `sync()` is the key step for the theme: when the family's base theme differs from the one the engine's tokens
 were made from, it takes the tokens of the family for it (`readFamilyTokens`: made once for each theme
 object and prefix), empties the view caches, registers the `@property` rules and the token values (for value
@@ -71,9 +86,18 @@ flowchart TD
 ```
 
 `createStyler` builds, for one component: its label (`name-slot`, or the given `label`), the style list
-(inherited, own label, styles), and the labels of the whole chain. A function style is called with the
-props and the guarded theme view, and its result is checked in development (`checkStyleResult`: a string
-passes, a number, `true` or a function warns once and becomes `undefined`).
+(inherited, own label, styles), and the labels of the whole chain. The functions of an element in a render
+get one argument, the props with the guarded theme view (`createStyleArgument`), made by `resolveAll` when it
+meets the first function and never kept; the render that plans the base for a view makes one more, behind
+the tracking of `splitLeading`. With the development checks the argument is frozen, each call goes through
+`callCheckedStyle` (a write into the argument throws, naming the component), and each result is checked
+(`checkStyleResult`: a string passes, a number, `true` or a function warns once and becomes `undefined`).
+Without them a function is called with the argument as it is, which is all the work there is.
+
+The theme given to every other function of app code goes through the same guard: global styles under the
+label `Global`, the steps of `keyframes` under `keyframes <name>` (the cache reads the theme for the name),
+a function sheet under `StyleSheet`, and, through `engine.guardTheme`, the function of a provider of a
+binding under `ThemeProvider`. With the checks a write at any level throws, naming the path and the label.
 
 ## The data
 
@@ -98,7 +122,13 @@ passes, a number, `true` or a function warns once and becomes `undefined`).
 - A lookup that needs the theme shape before there is a theme throws `NO_THEME_MESSAGE`.
 - A prefix in the options that differs from the given cache's prefix throws a `TypeError`.
 - `createEntries` and `adoptSheet` are lazy records; `adoptSheet` gives one record for each record given.
-- With the checks off, a style function gets the view itself and no wrapper is made.
+- With the checks off, a style function gets the view itself and no wrapper is made, and its argument is
+  not frozen: a change to it is seen by the later functions of the same element in that render.
+- The style functions of an element get the same object in a render; another element, or another render,
+  gets another (`createEngine.argument.test.ts`).
+- With the checks on, a write into the argument or into the theme, from any function of app code the
+  engine calls, throws a `TypeError` that names the component (or `Global`, `keyframes <name>`,
+  `StyleSheet`, `ThemeProvider`) and, for the theme, the path.
 - `withCache(cache)` gives the same engine for the same cache (`family.engines`).
 
 ## Decisions
@@ -135,8 +165,18 @@ passes, a number, `true` or a function warns once and becomes `undefined`).
   were made in every render (about half of its time on a server); now a new object of the same contents
   costs a comparison (`sameTheme.md`).
 
+- One argument for the style functions of an element in a render, not a copy for each function (0.7.0):
+  on a design system's every-component page each function had made its own copy in each render. It is made
+  inside the render and never kept, so two renders, and two requests, never share it. The checks freeze it
+  rather than wrap it, so production does nothing more than make it.
+
 ## Limits
 
+- `useTheme()` is not guarded: it gives app code the theme itself, the same object from render to render,
+  which a component may compare or keep. A write into it is not seen.
+- A provider function that returns a part of the theme above as it is (`(outer) => ({ ...outer })`) puts
+  the guard's wrappers of those parts in its theme, in development only: they read the same, and refuse a
+  write, wherever that theme goes.
 - `checkStyleResult` writes its warning with `console.warn` and a module-level set, not through the engine's
   warner, so it does not use the `[prefix]` of `createWarner` the same way (the prefix is added in the
   message by hand) and the set is shared by every engine.

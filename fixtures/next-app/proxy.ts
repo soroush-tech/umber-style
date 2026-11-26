@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server'
+import { FIXED_NONCE } from './app/(csp-fixed)/nonce'
 
 // The routes under /csp are sent with a strict content security policy, as the framework's guide sets
 // one (node_modules/next/dist/docs/01-app/02-guides/content-security-policy.md): a new nonce for each
@@ -12,7 +13,10 @@ import { NextResponse, type NextRequest } from 'next/server'
 // no nonce (what the styles are compared with), `?control=no-cache-nonce` keeps the policy and leaves the
 // nonce off the cache (the negative control of /csp), and `?control=no-source` keeps the policy and makes
 // the nonce source of /csp-server give nothing (its negative control). A `csp-control` cookie of the same
-// value does the same for every request of the page. /csp-server is sent the same way.
+// value does the same for every request of the page. /csp-server is sent the same way. /csp-fixed is sent
+// with the same nonce in every response (the fixed nonce that its engine's cache has) and no `x-nonce`
+// request header, so the nonce source of /csp-server answers nothing there. /csp-inplace is sent as
+// /csp-server is: the same parts with no registry.
 export function proxy(request: NextRequest) {
   // The cookie keeps a switch for the requests of the client-side navigations of a page too.
   const control =
@@ -24,11 +28,12 @@ export function proxy(request: NextRequest) {
     requestHeaders.delete('content-security-policy')
     return NextResponse.next({ request: { headers: requestHeaders } })
   }
-  const nonce = Buffer.from(crypto.randomUUID()).toString('base64')
+  const isFixed = request.nextUrl.pathname.startsWith('/csp-fixed')
+  const nonce = isFixed ? FIXED_NONCE : Buffer.from(crypto.randomUUID()).toString('base64')
   const isDevelopment = process.env.NODE_ENV === 'development'
   const evaluation = isDevelopment ? " 'unsafe-eval'" : ''
   const policy = `style-src 'nonce-${nonce}'; script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${evaluation}`
-  requestHeaders.set('x-nonce', nonce)
+  if (!isFixed) requestHeaders.set('x-nonce', nonce)
   requestHeaders.set('content-security-policy', policy)
   if (control === 'no-cache-nonce' || control === 'no-source') {
     requestHeaders.set('x-csp-control', control)
@@ -38,4 +43,15 @@ export function proxy(request: NextRequest) {
   return response
 }
 
-export const config = { matcher: ['/csp', '/csp/:path*', '/csp-server', '/csp-server/:path*'] }
+export const config = {
+  matcher: [
+    '/csp',
+    '/csp/:path*',
+    '/csp-server',
+    '/csp-server/:path*',
+    '/csp-inplace',
+    '/csp-inplace/:path*',
+    '/csp-fixed',
+    '/csp-fixed/:path*',
+  ],
+}

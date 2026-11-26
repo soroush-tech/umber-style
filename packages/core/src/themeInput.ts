@@ -1,4 +1,5 @@
 import { mergeDeep } from './mergeDeep'
+import type { ThemeGuard } from './referenceKeys'
 import { isSameTheme, RECENT_THEMES } from './sameTheme'
 import type { DeepPartial } from './tokens'
 
@@ -8,9 +9,19 @@ export type ThemeInput<T> = DeepPartial<T> | ((outer: T) => DeepPartial<T>)
 /** The theme where there is no provider and no base theme: an object with nothing in it, never changed. */
 export const EMPTY_THEME: object = Object.freeze({})
 
-/** The theme that a provider given `input` adds below `outer` (the theme above it, or `EMPTY_THEME`): the result of a function, or the object as it is. */
-export function resolveThemeInput<T>(input: ThemeInput<T>, outer: T): DeepPartial<T> {
-  return typeof input === 'function' ? (input as (outer: T) => DeepPartial<T>)(outer) : input
+/**
+ * The theme that a provider given `input` adds below `outer` (the theme above it, or `EMPTY_THEME`): the
+ * result of a function, or the object as it is. A function gets `outer` through `guard` when one is given
+ * (the development guard of the binding, under the label `ThemeProvider`), else as it is.
+ */
+export function resolveThemeInput<T>(
+  input: ThemeInput<T>,
+  outer: T,
+  guard?: ThemeGuard
+): DeepPartial<T> {
+  if (typeof input !== 'function') return input
+  const given = guard ? guard(outer as T & object, 'ThemeProvider') : outer
+  return (input as (outer: T) => DeepPartial<T>)(given)
 }
 
 // The merge of each pair of objects, by the theme above and then the given: both kept weakly.

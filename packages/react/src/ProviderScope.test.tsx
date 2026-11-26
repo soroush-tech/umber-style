@@ -1,4 +1,4 @@
-import { act, StrictMode, use, type ReactNode } from 'react'
+import { act, lazy, StrictMode, Suspense, use, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { createRoot, hydrateRoot, type Root } from 'react-dom/client'
 import { renderToString } from 'react-dom/server'
@@ -588,6 +588,52 @@ describe('useTheme of a client component under providers of the server build', (
     expect(label).toBe('base x')
   })
 
+  it('gives a client style loaded after the providers rendered the base theme under their themes: the class it makes where it was loaded first (#71)', async () => {
+    // The server build has an engine of its own, as in an app of server components: no style of the
+    // client build of the prefix is loaded when the providers render, as on the first request of a
+    // server, at hydration, and before a navigation loads the module of a client component.
+    const { ThemeProvider } = bindServer(createEngine(light, { prefix: p }), requestCache)
+    const inner = { palette: { text: '#333333' } }
+    const seen: string[] = []
+    let Probe = () => <b />
+    const Late = lazy(async () => {
+      const client = bindClient(createEngine(light, { prefix: p }))
+      const Box = client.styled('i')(({ theme }) => ({ borderBottomColor: theme.palette.primary }))
+      Probe = () => {
+        const { palette } = client.useTheme()
+        seen.push(`${palette.primary} ${palette.text} ${palette.surface}`)
+        return (
+          <Box data-testid="late">
+            <client.ThemeProvider theme={{ palette: { text: '#222222' } }}>
+              <Box data-testid="nested" />
+            </client.ThemeProvider>
+          </Box>
+        )
+      }
+      return { default: Probe }
+    })
+    const tree = (node: ReactNode) => (
+      <ThemeProvider theme={brand}>
+        <ThemeProvider theme={inner}>{node}</ThemeProvider>
+      </ThemeProvider>
+    )
+    const cold = mount(
+      tree(
+        <Suspense fallback={null}>
+          <Late />
+        </Suspense>
+      )
+    )
+    await act(async () => undefined)
+    // Rendered again, with the client style loaded: what the providers of a warm server give.
+    const warm = mount(tree(<Probe />))
+    const classOf = (container: HTMLElement, id: string) =>
+      container.querySelector(`[data-testid="${id}"]`)?.className
+    expect(classOf(cold.container, 'late')).toBe(classOf(warm.container, 'late'))
+    expect(classOf(cold.container, 'nested')).toBe(classOf(warm.container, 'nested'))
+    expect(seen).toEqual(['#0000ff #333333 #fff4d6', '#0000ff #333333 #fff4d6'])
+  })
+
   it('gives the theme given as it is where no client style has the prefix, and still renders the wrapper and the rules', () => {
     const engine = createEngine(light, { prefix: `${p}-alone` })
     const { ThemeProvider } = bindServer(engine, requestCache)
@@ -684,6 +730,24 @@ describe('one live root rule', () => {
     keepRootRule('ps', 'ps-root-mine', ':where(:root){--c:1;}', document)
     expect(liveRoots()).toEqual(['@layerps-theme{:where(:root){--a:1;}}', ':where(:root){--c:1;}'])
     expect(other.sheet?.cssRules).toHaveLength(1)
+  })
+
+  it('counts the elements of a StyleRegistry, and leaves those of a registry the app wrote alone', () => {
+    const written = document.createElement('style')
+    written.dataset.umber = 'ps ps-root-written'
+    written.textContent = ':where(:root){--w:1;}'
+    const old = document.createElement('style')
+    old.dataset.umber = 'ps ps-root-old'
+    old.dataset.umberRegistry = ''
+    old.textContent = ':where(:root){--a:1;}'
+    const mine = document.createElement('style')
+    mine.dataset.umber = 'ps ps-root-mine'
+    mine.dataset.umberRegistry = ''
+    mine.textContent = '.y{color:blue}'
+    document.head.append(written, old)
+    document.body.append(mine)
+    keepRootRule('ps', 'ps-root-mine', ':where(:root){--c:1;}', document)
+    expect(liveRoots()).toEqual([':where(:root){--w:1;}', ':where(:root){--c:1;}'])
   })
 
   it('passes over an element that a content security policy refused, which has no sheet', () => {

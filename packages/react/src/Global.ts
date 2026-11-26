@@ -9,6 +9,7 @@ import {
 import type { Cache, Engine, GlobalRules } from '@umber-style/core'
 import { useProvidedCache } from './CacheProvider'
 import { readGlobalSets } from './styleElements'
+import { useStyleRegistry, type StyleRegistryStore } from './styleRegistry'
 import type { GlobalProps } from './types'
 
 /** What is released while nothing is written. */
@@ -35,15 +36,21 @@ function insertSets<T>(engine: Engine<T>, sets: readonly GlobalRules[]): () => v
  * runs and nothing unmounts, so the rules are written for good, during the render, and the elements that
  * `createServerElements` gives for the sets are rendered: the style elements of the sets, or the marker
  * that names them (under a `CacheProvider`, `cache`, and without style elements), so that the CSS
- * extracted for the page holds them and the CSS of another page does not.
+ * extracted for the page holds them and the CSS of another page does not; none under a `StyleRegistry`
+ * (`registry`), which takes their texts.
  */
 export function createGlobal<T>(
   engine: Engine<T>,
   useThemeView: (cache?: Cache) => T,
-  createServerElements: (sets: readonly GlobalRules[], cache: Cache | undefined) => ReactElement[]
+  createServerElements: (
+    sets: readonly GlobalRules[],
+    cache: Cache | undefined,
+    registry: StyleRegistryStore | undefined
+  ) => ReactElement[]
 ) {
   return function Global({ styles }: GlobalProps<T>): ReactElement | null {
     const cache = useProvidedCache()
+    const registry = useStyleRegistry()
     const local = cache === undefined ? engine : engine.withCache(cache)
     const view = useThemeView(cache)
     // Where there is no document (a server render) the sets of the render before are taken again for
@@ -71,7 +78,7 @@ export function createGlobal<T>(
     )
     if (typeof document !== 'undefined') return null
     insertSets(local, sets)
-    const elements = createServerElements(sets, cache)
+    const elements = createServerElements(sets, cache, registry)
     return elements.length === 0 ? null : createElement(Fragment, null, ...elements)
   }
 }

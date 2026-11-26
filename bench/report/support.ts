@@ -1,5 +1,5 @@
-// What the report files share: the versions to compare, which `scripts/bench-report.mjs` writes into
-// `versions.json` next to this file before it runs them, and the report config of a scenario, whose
+// What the report files share: the versions to compare, which `scripts/bench-report.mjs plan` writes into
+// `versions.json` next to this file before they run, and the report config of a scenario, whose
 // cases are those versions installed from npm in the sandbox.
 import type { BenchConfig } from '@soroush.tech/bench'
 import { readFileSync } from 'node:fs'
@@ -20,7 +20,7 @@ function readVersions(): ReportVersions {
     return JSON.parse(readFileSync(new URL('versions.json', import.meta.url), 'utf8'))
   } catch (error) {
     throw new Error(
-      'bench/report/versions.json could not be read: run node scripts/bench-report.mjs <name>@<version>.',
+      'bench/report/versions.json could not be read: run node scripts/bench-report.mjs plan <name>@<version>.',
       { cause: error }
     )
   }

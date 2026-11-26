@@ -26,7 +26,7 @@ flowchart TD
   none --> nest
   nest -->|"yes"| wrap["nested: renders a wrapper element with its classes"]
   nest -->|"no"| bare["renders only the slot"]
-  setup --> giv["given = resolveThemeInput(theme, theme above or base)"]
+  setup --> giv["given = resolveThemeInput(theme, theme above or base, engine.guardTheme): a function gets it guarded with the checks"]
   giv --> adopt["engine.adoptTheme(given): the first provider gives the token shape"]
   giv --> mer["merged = mergeTheme(outer, given)"]
   mer --> prov["provide engine, theme, view, scope, nested"]

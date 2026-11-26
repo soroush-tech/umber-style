@@ -1,7 +1,13 @@
 import { alpha } from './alpha'
 import { negate } from './calc'
 import { DEFAULT_SCOPING } from './scope'
-import { compileRules, compileStyleRules, type StyleObject, type StyleValue } from './serialize'
+import {
+  compileRules,
+  compileStyleRules,
+  REPAIR_MEMO_LIMIT,
+  type StyleObject,
+  type StyleValue,
+} from './serialize'
 
 const MIX_1F = 'color-mix(in srgb, var(--x) 12.16%, transparent)'
 
@@ -268,5 +274,96 @@ describe('compileStyleRules with hasValueRepair: a reference followed by a lengt
     expect(repairWith({ transitionDelay: 'var(--other)ms' }).rules).toEqual([
       '.a{transition-delay:calc(var(--other) * 1ms);}',
     ])
+  })
+})
+
+describe('compileStyleRules with hasValueRepair: the memo of repaired values', () => {
+  const VALUES: Record<string, string> = { '--px': '4px', '--plain': '2', '--rem': '1.5rem' }
+  const FORMS = [
+    'var(--x)1F',
+    'var(--x, #000)1F',
+    'var(--x, var(--y)1F)',
+    '-var(--x)',
+    'var(--x)ms',
+    'var(--px)px',
+    'var(--plain)px',
+    '-var(--plain)px',
+    'var(--rem)px',
+    'var(--other)px',
+    'var(--other)ms',
+    'var(--gap, 8px)px',
+    'var(--x)1Fa',
+    'var(--x)%',
+    'var(--x)-',
+    'var(--x))',
+    'var(--x) 1F',
+    'var(--x)',
+    'xvar(--x)',
+    'rgb(var(--x))',
+    'var(--x',
+    '0 0 4px var(--a)33, inset 0 0 1px var(--b)80',
+  ]
+  /** The rules of `value` for `.a` with the context that `extra` completes. */
+  const compile = (value: string, extra: object) =>
+    compileStyleRules(
+      '.a',
+      { color: value },
+      {
+        hasColorFallbacks: true,
+        hasValueRepair: true,
+        scoping: DEFAULT_SCOPING,
+        readValue: (name) => VALUES[name],
+        ...extra,
+      }
+    )
+
+  it('gives the text of a repair that has no memo, the first time and each time after', () => {
+    const repairMemo = new Map<string, string>()
+    for (const form of FORMS) {
+      const expected = compile(form, {})
+      expect(compile(form, { repairMemo })).toEqual(expected)
+      expect(compile(form, { repairMemo })).toEqual(expected)
+    }
+    expect(repairMemo.size).toBe(FORMS.filter((form) => form.includes('var(')).length)
+  })
+
+  it('reads a value from the memo, once it is there', () => {
+    const repairMemo = new Map([['var(--x)1F', 'remembered']])
+    expect(compile('var(--x)1F', { repairMemo })).toEqual(['.a{color:remembered;}'])
+  })
+
+  it('leaves a value with no reference, and a custom property, out of the memo', () => {
+    const repairMemo = new Map<string, string>()
+    compile('red', { repairMemo })
+    compileStyleRules(
+      '.a',
+      { '--c': 'var(--x)1F' },
+      {
+        hasColorFallbacks: true,
+        hasValueRepair: true,
+        scoping: DEFAULT_SCOPING,
+        repairMemo,
+      }
+    )
+    expect(repairMemo.size).toBe(0)
+  })
+
+  it('does not use the memo when something is told, and tells each time', () => {
+    const repairMemo = new Map([['var(--rem)px', 'remembered']])
+    const reported: string[] = []
+    const report = (message: string) => reported.push(message)
+    expect(compile('var(--rem)px', { repairMemo, report })).toEqual(['.a{color:var(--rem)px;}'])
+    expect(compile('var(--px)px', { repairMemo, report })).toEqual(['.a{color:var(--px);}'])
+    expect(compile('var(--rem)px', { repairMemo, report })).toEqual(['.a{color:var(--rem)px;}'])
+    expect(reported).toHaveLength(2)
+    expect(reported[0]).toBe(reported[1])
+    expect([...repairMemo]).toEqual([['var(--rem)px', 'remembered']])
+  })
+
+  it('is emptied when it holds its limit of values, and holds the new one', () => {
+    const repairMemo = new Map<string, string>()
+    for (let index = 0; index < REPAIR_MEMO_LIMIT; index++) repairMemo.set(`v${index}`, 'x')
+    compile('var(--x)1F', { repairMemo })
+    expect([...repairMemo.keys()]).toEqual(['var(--x)1F'])
   })
 })

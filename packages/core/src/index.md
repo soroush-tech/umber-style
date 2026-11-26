@@ -30,7 +30,9 @@ flowchart LR
 ## What it guarantees
 
 - Only the names listed here are public; a file that is not exported (`findInvalidValues.ts`,
-  `fingerprint.ts`, `referenceKeys.ts`, `codeAt.ts`, `cacheRegistry.ts` apart from `findCache`) is internal.
+  `fingerprint.ts`, `codeAt.ts`, `cacheRegistry.ts` apart from `findCache`) is internal.
+- `createThemeGuard`, `ThemeGuard` and `callCheckedStyle` are not exported here: the entry `internal.ts`
+  (`@umber-style/core/internal`) holds them, for the React Native binding's development checks.
 - Of `devChecks.ts` only `isDevelopment` is exported; of `css.ts` five functions; of `serialize.ts` four
   names and two types.
 - `index.test.ts` pins the surface, and compares every value exported with the table of

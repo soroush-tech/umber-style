@@ -23,7 +23,7 @@ These pages are the one set of documentation for every package below. A document
 | [Cascade layers and overrides](cascade-layers.md)               | Know which style wins, and fit your own CSS and resets around the engine's                                            |
 | [Typed styles](typed-styles.md)                                 | Know what each platform's types catch and what they do not                                                            |
 | [Server rendering](server-rendering.md)                         | Render on the server, extract CSS, hydrate, and use server components                                                 |
-| [The cache and server packages](cache-and-server.md)            | Make a cache with `createCache`, write a registry for the App Router, extract the CSS of a page in chunks             |
+| [The cache and server packages](cache-and-server.md)            | Make a cache with `createCache`, add `StyleRegistry` to the App Router, extract the CSS of a page in chunks           |
 | [React](react.md)                                               | Use what is specific to the React binding                                                                             |
 | [Vue](vue.md)                                                   | Use what is specific to the Vue binding                                                                               |
 | [React Native](react-native.md)                                 | Use what is specific to the React Native binding                                                                      |

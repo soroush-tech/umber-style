@@ -2,7 +2,7 @@ import { createCache, createEngine, createMemorySheet, setNonceSource } from '@u
 import { bindEngine } from './createStyle.server'
 import { createNonceReader, type CacheFunction } from './serverContext'
 import { playScopes } from './vitest.providerScope'
-import { findAll, resolveTree } from './vitest.resolveTree'
+import { findAll, resolveTree, type ResolvedElement, type ResolvedNode } from './vitest.resolveTree'
 
 const theme = { palette: { primary: '#0000ff', text: '#111111' } }
 
@@ -50,14 +50,36 @@ function setup(nonce?: string) {
       </ThemeProvider>
     </>
   )
-  /** The nonce of each style element of a render of the page, as the next request. */
-  const renderNonces = async () => {
+  /** The tree of a render of the page, as the next request, with what each provider's browser part renders. */
+  const renderPage = async () => {
     request += 1
-    const styles = findAll(playScopes(await resolveTree(page)), 'style')
-    expect(styles.length).toBeGreaterThanOrEqual(6)
-    return styles.map((element) => element.props.nonce)
+    return playScopes(await resolveTree(page))
   }
-  return { renderNonces }
+  /**
+   * The nonce of each element that carries the styles of a render of the page, as the next request: the
+   * `<style href precedence>` elements, or, in a request with a nonce under a source, the `NonceStyles`
+   * elements, which then come in their place.
+   */
+  const renderNonces = async () => {
+    const tree = await renderPage()
+    const hoisted = findAll(tree, 'style')
+    const inline = findNonceStyles(tree)
+    expect(hoisted.length === 0 || inline.length === 0, 'one form or the other').toBe(true)
+    const carriers = [...hoisted, ...inline]
+    // Two providers, a `Global` and two boxes: one `NonceStyles` each, or more hoisted elements.
+    expect(carriers.length).toBeGreaterThanOrEqual(5)
+    return carriers.map((element) => element.props.nonce)
+  }
+  return { renderPage, renderNonces }
+}
+
+/** Every element of `nodes` (and below) that is the reference to `NonceStyles`, in document order. */
+function findNonceStyles(nodes: readonly ResolvedNode[]): ResolvedElement[] {
+  return nodes.flatMap((node) => {
+    if (typeof node === 'string') return []
+    const isNonceStyles = (node.type as unknown as { $$id?: string }).$$id === 'NonceStyles'
+    return [...(isNonceStyles ? [node] : []), ...findNonceStyles(node.children)]
+  })
 }
 
 describe('the nonce of each request in the server components build', () => {
@@ -100,6 +122,32 @@ describe('the nonce of each request in the server components build', () => {
     setNonceSource(() => 'request')
     const nonces = await setup('cache-nonce').renderNonces()
     expect(nonces).not.toContain('cache-nonce')
+  })
+
+  it('sends every style of a request with a nonce to NonceStyles, each text shown in place once in the request', async () => {
+    setNonceSource(() => 'request')
+    const tree = await setup().renderPage()
+    expect(findAll(tree, 'style'), 'hoisted elements').toEqual([])
+    const inline = findNonceStyles(tree)
+    expect(inline.map(({ props }) => props.prefix)).toEqual(inline.map(() => 'ns'))
+    // The two boxes, last: the first shows its texts in place, the second needs the same and shows none.
+    const [first, second] = inline.slice(-2).map(({ props }) => props)
+    expect(first.shown).toBeUndefined()
+    expect(second.shown).toEqual([])
+    expect(second.texts).toEqual(first.texts)
+  })
+
+  it('renders the tree of 0.6.0 where the request has no nonce, under a source or with none registered', async () => {
+    const { renderPage } = setup()
+    const unregistered = await renderPage()
+    setNonceSource(() => undefined)
+    const unanswered = await renderPage()
+    expect(unanswered).toEqual(unregistered)
+    expect(findNonceStyles(unanswered)).toEqual([])
+    const hoisted = findAll(unanswered, 'style')
+    expect(hoisted.length).toBeGreaterThanOrEqual(6)
+    for (const { props } of hoisted)
+      expect(props).toMatchObject({ precedence: 'ns', nonce: undefined })
   })
 
   it('gives every component that asks before the source has answered the one Promise, and the value after', async () => {

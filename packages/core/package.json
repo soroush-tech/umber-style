@@ -1,6 +1,6 @@
 {
   "name": "@umber-style/core",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "The UmberStyle engine: theme tokens as CSS variables, a class cache and theme classes. It knows no framework.",
   "keywords": [
     "styling",
@@ -27,7 +27,8 @@
     "dist"
   ],
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./internal": "./src/internal.ts"
   },
   "publishConfig": {
     "access": "public",
@@ -40,6 +41,16 @@
         "require": {
           "types": "./dist/index.d.cts",
           "default": "./dist/index.cjs"
+        }
+      },
+      "./internal": {
+        "import": {
+          "types": "./dist/internal.d.mts",
+          "default": "./dist/internal.mjs"
+        },
+        "require": {
+          "types": "./dist/internal.d.cts",
+          "default": "./dist/internal.cjs"
         }
       }
     },
@@ -60,7 +71,7 @@
     "csstype": "^3.2.3"
   },
   "devDependencies": {
-    "@soroush.tech/bench": "^2.3.0",
+    "@soroush.tech/bench": "^2.4.0",
     "@types/node": "^26.6.6",
     "@umber-style/eslint-config": "workspace:*",
     "@vitest/browser-playwright": "^5.1.1",

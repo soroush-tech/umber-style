@@ -22,6 +22,10 @@
 // part), so a stand-in package with the four functions the entry calls takes its place too, at the
 // newest version inside the entry's peer range (4.8.0): the entry is loaded, its subpath of the
 // umbrella is the same value, and it translates an animation.
+// `next`, the optional peer of `@umber-style/react/next`, is a stand-in too, at the version of the peer
+// range (16.4.6), packaged as `next` is (no exports map, `navigation.js` at its root) with the one hook the
+// entry imports. Node loads that entry with `require` only: an ES module cannot import `next/navigation`
+// in Node, as the package has no exports map; inside Next.js its bundler resolves it.
 // The temporary folder is removed at the end, unless `--keep` is given. Needs the network (npm).
 import { spawnSync } from 'node:child_process'
 import {
@@ -56,6 +60,7 @@ const PACKAGES = [
 // The names every entry of the package must export, and that the ESM and CJS builds must agree on.
 const ENTRIES = {
   '@umber-style/core': ['createEngine', 'createCache', 'extractPageStyles', 'at'],
+  '@umber-style/core/internal': ['createThemeGuard', 'callCheckedStyle', 'readPageNonce'],
   '@umber-style/cache': ['default', 'createCache'],
   '@umber-style/server/create-instance': ['default', 'createInstance'],
   '@umber-style/css': [
@@ -325,6 +330,22 @@ try {
       '',
     ].join('\n')
   )
+  // The stand-in for `next`: its package as it is, with the one hook the entry imports.
+  const nextStub = join(consumer, 'next-stub')
+  mkdirSync(nextStub)
+  writeFileSync(
+    join(nextStub, 'package.json'),
+    JSON.stringify({ name: 'next', version: '16.4.6', main: 'index.js' })
+  )
+  writeFileSync(join(nextStub, 'index.js'), '')
+  writeFileSync(
+    join(nextStub, 'navigation.js'),
+    'exports.useServerInsertedHTML = function useServerInsertedHTML() {}\n'
+  )
+  writeFileSync(
+    join(nextStub, 'navigation.d.ts'),
+    'export declare function useServerInsertedHTML(callback: () => unknown): void\n'
+  )
   // The stand-in for `react-native-reanimated`, which Node cannot load either.
   const reanimated = join(consumer, 'reanimated-stub')
   mkdirSync(reanimated)
@@ -370,6 +391,7 @@ try {
           vue: readVersion('vue', 'devDependencies', 'vue'),
           'react-native': 'file:./react-native-stub',
           'react-native-reanimated': 'file:./reanimated-stub',
+          next: 'file:./next-stub',
           '@types/react': readVersion('react', 'devDependencies', '@types/react'),
           '@types/node': readVersion('react', 'devDependencies', '@types/node'),
           typescript: readVersion('react', 'devDependencies', 'typescript'),
@@ -503,6 +525,25 @@ writeFileSync('keys-${format}.json', JSON.stringify(results, null, 2))
     )
   }
 
+  // 3a. The entry of the Next.js registry, from CommonJS: the component, which renders its children.
+  writeFileSync(
+    join(consumer, 'next.cjs'),
+    `
+const React = require('react')
+const { renderToStaticMarkup } = require('react-dom/server')
+const { StyleRegistry } = require('@umber-style/react/next')
+if (typeof StyleRegistry !== 'function') throw new Error('no StyleRegistry')
+const html = renderToStaticMarkup(React.createElement(StyleRegistry, null, React.createElement('p', null, 'x')))
+if (html !== '<p>x</p>') throw new Error('StyleRegistry rendered ' + html)
+`
+  )
+  const nextEntry = run('node', ['next.cjs'], { cwd: consumer })
+  check(
+    nextEntry.isOk,
+    '@umber-style/react/next: require gives StyleRegistry, which renders its children'
+  )
+  if (!nextEntry.isOk) console.error(nextEntry.out)
+
   // 3b. The CommonJS build of a library that is `"type": "module"` and imports an entry of ours:
   // its bundler compiles the import as Node's interop does, `__toESM(require(id), 1)`, where the
   // default is the whole `module.exports`, whatever `__esModule` says. Our CommonJS files export
@@ -618,6 +659,8 @@ if (expected === 'server') {
   const typed = `
 import { createEngine } from '@umber-style/core'
 import type { Theme } from '@umber-style/core'
+import { callCheckedStyle, createThemeGuard } from '@umber-style/core/internal'
+import type { ThemeGuard } from '@umber-style/core/internal'
 import { css, cx } from '@umber-style/css'
 import createCssInstance from '@umber-style/css/create-instance'
 import { createStyle } from '@umber-style/react'
@@ -643,6 +686,8 @@ import type { ComponentProps, CSSProperties } from 'react'
 const theme = { palette: { primary: '#1b5fd1', onPrimary: '#ffffff' }, space: [0, 4, 8] }
 
 export const engine = createEngine(theme)
+export const guard: ThemeGuard = createThemeGuard('smoke')
+export const checked: unknown = callCheckedStyle
 export const umbrellaEngine = createUmbrellaEngine(theme)
 export const umberCache: UmberCache = createCache({ key: 'smoke' })
 export const tags: string = createInstance(umberCache).constructStyleTagsFromChunks(
@@ -747,6 +792,18 @@ export const page: string = createInstance(cache).renderStylesToString('<p></p>'
   writeFileSync(join(ts, 'server.ts'), server)
   writeFileSync(join(ts, 'strict.ts'), strict)
   writeFileSync(join(ts, 'library.cts'), library)
+  writeFileSync(
+    join(ts, 'next.ts'),
+    `
+import { createElement } from 'react'
+import createCache from '@umber-style/cache'
+import { StyleRegistry } from '@umber-style/react/next'
+import type { StyleRegistryProps } from '@umber-style/react/next'
+
+const props: StyleRegistryProps = { cache: createCache({ key: 'smoke' }), children: 'x' }
+export const registry = createElement(StyleRegistry, props)
+`
+  )
   const options = {
     strict: true,
     noEmit: true,
@@ -759,8 +816,8 @@ export const page: string = createInstance(cache).renderStylesToString('<p></p>'
     [
       'tsconfig.bundler.json',
       { ...options, module: 'esnext', moduleResolution: 'bundler' },
-      ['ts/entries.ts'],
-      'moduleResolution bundler',
+      ['ts/entries.ts', 'ts/next.ts'],
+      'moduleResolution bundler, the Next.js registry included',
     ],
     [
       'tsconfig.node16.json',

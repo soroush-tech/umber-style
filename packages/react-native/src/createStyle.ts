@@ -10,6 +10,7 @@ import {
   readStaticTemplate,
   rejectFunctions,
 } from '@umber-style/core'
+import { guardTheme } from './devGuard'
 import { createThemeValue, type ThemeHolder } from './ThemeValue'
 import type {
   GlobalProps,
@@ -228,7 +229,7 @@ export function bindHolder<T extends object>(
     const prepare = (current: NativeTheme<T>) => {
       let sheet = byTheme.get(current)
       if (!sheet) {
-        sheet = register(styles(current), base)
+        sheet = register(styles(guardTheme(current, 'StyleSheet')), base)
         byTheme.set(current, sheet)
       }
       return sheet

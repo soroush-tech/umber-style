@@ -1,7 +1,8 @@
 import { createElement, Fragment, type ReactElement } from 'react'
 import type { Engine } from '@umber-style/core'
 import { GlobalRelease } from './GlobalRelease'
-import { createGlobalElements, readGlobalSets } from './styleElements'
+import type { StyleSender } from './inlineStyles.server'
+import { collectGlobalTexts, readGlobalSets } from './styleElements'
 import { withNonce, type RequestNonce } from './serverContext'
 import type { GlobalProps } from './types'
 
@@ -9,15 +10,17 @@ import type { GlobalProps } from './types'
  * Makes `Global` for server components: no hook, no context. A function of the theme reads the view of
  * the theme that `readTheme` gives: the base theme (references for tokens, real values for raw keys), else
  * the theme of the first provider of the request, else an empty theme. The rules are written into the cache
- * for good, as a server unmounts nothing, and sent as the style elements of each set and of the
- * animations it uses: React sends each `href` once. After them comes `GlobalRelease`, a client component
- * (an import of a `'use client'` file is a reference to it here), with the sets as plain data: in the
- * browser it lets the cache take the rules over and release them when the page is left.
+ * for good, as a server unmounts nothing, and sent as the style of each set and of the animations it uses,
+ * which `sendStyles` makes with the nonce of the request: each `href` is sent once. After them comes
+ * `GlobalRelease`, a client component (an import of a `'use client'` file is a reference to it here), with
+ * the sets as plain data: in the browser it lets the cache take the rules over and release them when the
+ * page is left.
  */
 export function createGlobal<T>(
   engine: Engine<T>,
   readTheme: () => T,
-  readNonce: () => RequestNonce
+  readNonce: () => RequestNonce,
+  sendStyles: StyleSender
 ) {
   return function Global({ styles }: GlobalProps<T>): ReactElement | Promise<ReactElement> {
     const sets = readGlobalSets(engine, styles, engine.createThemeView(readTheme()))
@@ -34,7 +37,12 @@ export function createGlobal<T>(
             }),
           ]
     return withNonce(readNonce(), (nonce) =>
-      createElement(Fragment, null, ...createGlobalElements(engine.cache, sets, nonce), ...release)
+      createElement(
+        Fragment,
+        null,
+        ...sendStyles(collectGlobalTexts(engine.cache, sets), nonce),
+        ...release
+      )
     )
   }
 }

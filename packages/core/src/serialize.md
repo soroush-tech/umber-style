@@ -42,6 +42,10 @@ flowchart TD
   item --> alpha{"alpha() result?"}
   alpha -->|yes| fb["fallback first (not in a custom property), then the mix"]
   alpha -->|no| val["toValue: number gets px or ms; string may be repaired"]
+  val --> seen{"a string with var(), no report, a memo of the cache?"}
+  seen -->|yes, remembered| said["the repaired text of the memo"]
+  seen -->|yes, new| mend["repairValue, then remembered (emptied at 10,000)"]
+  seen -->|no| mendtold["repairValue, with the report if there is one"]
   items --> pre{"hasVendorPrefixes and property in PREFIXED_FORMS?"}
   fb --> pre
   val --> pre
@@ -54,7 +58,15 @@ flowchart TD
 custom property or a unitless property (`UNITLESS`). With `hasValueRepair`, a string that holds `var(` and
 is not a custom property goes through `repairValue`: `var(--x)1F` becomes the `alpha()` text, `-var(--x)`
 becomes what `negate()` writes, and `var(--x)px` becomes the bare reference when the token has that unit,
-a `calc(ref * 1px)` when it is a plain number, else is left as it is and reported.
+a `calc(ref * 1px)` when it is a plain number, else is left as it is and reported. What follows a reference
+is read only when it starts with a letter, a digit or `%` (`isSuffixStart`): any other character ends the
+reading at once, without a slice or a test for a unit.
+
+When nothing is told (`report` is none) and the context has a `repairMemo`, a value is repaired once: the
+text it gave is kept by the value, and a compile that only names a class already written (the compile of
+the class's name) takes it. The memo is the cache's and holds up to `REPAIR_MEMO_LIMIT` values, emptied
+when it is full. With a `report` the memo is not read or written, so every report is still given. The text
+of a report (`owner`) is made only when a report is told.
 
 A state key (`state.ts`) is read before the at-rule test: its selector takes the place of the key, and the
 rest is the path of a selector key, so `@state pressed` and `&:active` give the same rules, and so the same
@@ -68,7 +80,7 @@ merges nested objects the same way, and joins two labels with `joinLabels`.
 
 `StyleObject` maps a key to a `StyleValue`: string, number, `AlphaColor`, nothing, a list, or a nested
 `StyleObject`. `CompileContext` has `hasColorFallbacks`, `hasValueRepair`, `scoping`, and the optional
-`readValue`, `report` and `hasVendorPrefixes`. `joinLabels('Typography', 'Link')` is `Typography-Link`;
+`readValue`, `report`, `repairMemo` and `hasVendorPrefixes`. `joinLabels('Typography', 'Link')` is `Typography-Link`;
 a label already a whole run of the earlier one is not written again.
 
 ## What it guarantees
@@ -99,6 +111,13 @@ a label already a whole run of the earlier one is not written again.
   nested key and its parent with no comma are joined as one part each, without splitting them into
   lists. Together they took a hit of a small style from 1.28 to 0.93 us, of the large one from 13.3 to
   7.7 us, and a new small style from 3.1 to 1.8 us (host, one process).
+- The memo of repaired values depends on one fact: what a value is repaired to is a function of the value and
+  of the declared values of the tokens (`readValue`), nothing else (the report is a side effect only). So the
+  cache empties it in `registerValues`, the one place the declared values change. A memo that was kept
+  through a change would give the repair of the old values (`createEngine.repair.test.ts`: "repairs a value
+  again after the declared values change"). It is not used with a report because the report is the point of
+  the repair then; the output is the same either way. Measured on a patched copy of 0.6.0 with the
+  design system's every-component page (warm render, repair on): 0.44 to 0.47 ms and 700 KB less a render.
 - The reason the unit list `REPAIR_UNITS` is the one it is (for example, why `in` and `pc` are present)
   is not recorded in the code beyond "a unit a `calc()` can multiply a number by".
 

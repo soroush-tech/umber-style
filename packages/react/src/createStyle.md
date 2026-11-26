@@ -28,7 +28,10 @@ flowchart TD
   value --> hasEls{"hasServerStyleElements, outside a CacheProvider?"}
   hasEls -->|no| none["undefined: no place for style elements"]
   hasEls -->|yes| doc{"no document?"}
-  doc -->|yes| els["the style elements of the class"]
+  doc -->|yes| reg{"a StyleRegistry above?"}
+  reg -->|no| els["the style elements of the class"]
+  reg -->|yes| registered["registerTexts with the nonce of the cache, an empty list"]
+  registered --> parts
   doc -->|no| empty["the browser: an empty list, one for every element and render"]
   value --> use["useStyle: provided cache, view, resolve themed sheet, adoptSheet under a cache"]
   els --> parts["createStyled, createThemeProvider, createGlobal"]
@@ -69,6 +72,12 @@ flowchart TD
   on `ServerStyleOptions` in `types.ts`).
 - `Global` chooses between style elements and the marker of its sets: elements outside a cache provider,
   the marker (with the prefix of that cache) otherwise.
+- Under a `StyleRegistry` (`@umber-style/react/next`), outside a cache provider, a server render sends no
+  style element: `styled`, `ThemeProvider` and `Global` give their texts (`collectStyleTexts`,
+  `collectGlobalTexts`) to the registry, with the nonce of the engine's cache, and render the place the
+  browser renders (an empty list), so the tree and the ids of `useId` are the same on both sides. The
+  engine's cache lives as long as the server, so its new rules are not what a request sends: the registry
+  takes the texts of what the request renders, as the style elements did.
 
 ## Limits
 

@@ -27,7 +27,9 @@ flowchart TD
   role -->|isRoot| rootRole["no element, no rule"]
   role -->|none above| outer["outermost: declareRoot in insertion effect"]
   role -->|above| nested["nested: wrapper"]
-  props --> given["given = resolveThemeInput(theme, outer theme)"]
+  props --> given["given = resolveThemeInput(theme, outer theme, engine.guardTheme): a function gets the theme above guarded with the checks"]
+  props --> outerTheme["outer = completeTheme(ThemeContext, engine.givenTheme) or engine.givenTheme"]
+  outerTheme --> given
   given --> adopt["engine.adoptTheme(given)"]
   adopt --> merged["merged = mergeTheme(outer, given)"]
   above --> nestedTheme["nested = mergeTheme(above.nested, given) when nested, else above.nested"]
@@ -40,13 +42,17 @@ flowchart TD
   place -->|yes| server{"getServerStyle()?"}
   server -->|undefined: the browser| empty["Fragment: null, element"]
   server -->|parts: a server| styled["Fragment: one Fragment of the stamp and the style elements, element"]
+  styled --> reg{"a StyleRegistry above? (useStyleRegistry)"}
+  reg -->|yes| regTexts["no style element: the registry takes the texts, the stamp stays"]
+  reg -->|no| elementsOut["the style elements"]
 ```
 
 ## The data
 
 - `ThemeProviderParts<T>`: the engine, its contexts, `hasServerStyleElements` (the option of the style),
   and `getServerStyle()`, which is `undefined` in the browser and `{ createStyleElements, createStamp }` for
-  a server render of the client build.
+  a server render of the client build; `createStyleElements(className, registry)` gives none under a
+  `StyleRegistry`, which takes their texts.
 - A wrapper is `{ as, className }`; the mark below is `{ scope: wrapper ?? above?.scope ?? null, nested }`.
 - `nested` is the themes of the nested providers from the one below the outermost provider down to this
   one, merged: undefined under the outermost provider, the theme given for a nested provider directly under
@@ -63,7 +69,9 @@ flowchart TD
 - `useTheme()`, the contexts and the view are the whole merged theme (`merged`), as before.
 - Under a `CacheProvider` it uses the engine over that cache, sends no style element, and is outermost when
   no provider of that cache is above.
-- A provider of the server build above counts: the marks are the same.
+- A provider of the server build above counts: the marks are the same. Its theme is the theme above; when it
+  was given with no base theme under it (it rendered before any style of the client build of the prefix was
+  loaded), it is merged over the base theme of this engine first (`completeTheme`, `ProviderScope.md`).
 - A server and the browser render the same tree: outside a cache provider, with `hasServerStyleElements`,
   the stamp and the style elements are one place in front of the content, which the browser renders as
   `null`. React's `useId` makes an id from the place of a component in the tree, and the whole app is under

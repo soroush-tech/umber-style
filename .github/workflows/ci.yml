@@ -557,7 +557,7 @@ jobs:
 
       - name: Run benchmark gate
         # Our own action, pinned like any other: `v1` is a tag, and a tag moves.
-        uses: soroush-tech/bench-action@a162a94a10b461d217dac16bbb3d6d87fd5c3ea6 # v1.2.0
+        uses: soroush-tech/bench-action@ab812be56d4c17b1fd8a9911236d6776cbcabef2 # v1.3.0
         with:
           bench-dir: bench/gate
           baseline-case: ${{ steps.gate.outputs.baseline-case }}

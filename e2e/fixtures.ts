@@ -37,6 +37,7 @@ export const fixtures: readonly FixtureConfig[] = [
     sharesProcess: true,
     scenarios: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N'],
     known: {},
+    only: 'vike-ssg*.spec.ts',
     devPort: 4201,
   },
   {

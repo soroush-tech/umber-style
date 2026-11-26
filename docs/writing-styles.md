@@ -130,6 +130,23 @@ const Avatar = styled('span')<{ size?: number }>(sizeStyle, safeLayout)
 // <Avatar size={80} /> has width: 80px and height: 80px.
 ```
 
+The argument of a function is one object, the props with `theme`, shared by the style functions of one element in a render, on every platform. It is made in the render and never kept, so another element and another render get another. Never change it: in production a key that one function assigns or deletes is seen by the functions after it on the same element. In development (`NODE_ENV` is `development` on the web, the development checks of the engine; anything but `production` on React Native) it is frozen, and a function that assigns or deletes a key of it throws a `TypeError` that names the component:
+
+```
+[umber] A style function of "box-root" threw a TypeError of a write into a frozen object: Cannot define property tone, object is not extensible. In development the argument of a style function is frozen: it is one object, the props with the theme, shared by the style functions of the element in a render. Copy the argument before changing it: const own = { ...props }.
+```
+
+The part after `frozen object:` is the language's own message, which differs between JavaScript engines, and in Node between the first render of a component for a theme (`Cannot define property`) and the next (`Cannot add property`). Copy the argument first, and change the copy:
+
+```tsx
+const toneStyle = (props: { tone?: string }) => {
+  const own = { ...props, tone: props.tone ?? 'plain' }
+  return { color: own.tone === 'plain' ? 'inherit' : own.tone }
+}
+```
+
+The `theme` in it cannot be written in development either: see [Themes](themes.md#the-theme-a-function-gets-is-shared-never-change-it).
+
 ### A function that returns a list
 
 A function style may return a list instead of one object, nested to any depth. Its items are style objects, `css()` values and sheet entries, further lists, `null`, `undefined` and `false`; they merge in order, the last winning, exactly as if they had been separate styles in that order. A wrapper that adds the overrides of a theme returns as many as apply:
@@ -526,6 +543,7 @@ Use a plain object in `style` for a value that changes now and then (a size from
 - The default filter knows the attributes of HTML and SVG under their React names. A lowercase or hyphenated spelling (`tabindex`, `stroke-width`) and an attribute that is not in the specifications (a vendor attribute, a new one) do not reach the element unless `shouldForwardProp` lets them, and a prop of your own that has the name of an attribute (`color`, `size`, `label`, `width`) does reach it.
 - The shorthands are typed for the tags of React's JSX types (React) and Vue's (Vue). At run time any name that starts with a lowercase letter is made into a tag, except `then`.
 - A function style that reads props runs on every render of its component. Keep it cheap. One that reads only `theme` runs once for each theme object.
+- The argument of a style function is frozen in development only. In production a function that changes it is not stopped, and the functions after it on the same element see the change. A frozen object throws on a write in strict mode code (every module) only: a function in sloppy mode code changes nothing and gets no error. The render that first works out the base of a component for a theme gives the functions of the base one argument and those of the props part another.
 - Style functions must be pure: the base keeps the first result of a function that read no prop, for a theme. A function that reads a prop only inside something it returns (a callback) is not seen reading it.
 - A `label` is not checked: a space or a character that a class name cannot hold is written into the class name as it is.
 - Only the tags of React's JSX types are own members of `styled` (in Vue too, which shares the list). `Object.assign` does not copy another name that a shorthand would make on access, such as a custom element: write `styled('my-element')` for it.

@@ -16,15 +16,20 @@ export interface StyleText {
 }
 
 /**
- * The `<style href precedence>` element of `style`, in the precedence of the prefix of `cache`, with
- * `nonce` (the nonce of the cache unless the server build gives the request's) when there is one: React
+ * The `<style href precedence>` elements of `texts`, in the precedence of the prefix of `cache`, with
+ * `nonce` (that of the cache by default; the server build gives the request's) when there is one: React
  * keeps the rules of such an element only when its nonce is the style nonce of the render (`nonce: { style }`
  * of React's server render), and sets it on the element it makes in the browser.
  */
-const toElement =
-  (cache: Cache, nonce: string | undefined) =>
-  ({ href, text }: StyleText): ReactElement =>
+export function createTextElements(
+  cache: Cache,
+  texts: readonly StyleText[],
+  nonce = cache.nonce
+): ReactElement[] {
+  return texts.map(({ href, text }) =>
     createElement('style', { key: href, href, precedence: cache.prefix, nonce }, text)
+  )
+}
 
 /**
  * The style elements of the animations in `names` that `sent` does not hold yet, which it adds them to:
@@ -70,18 +75,70 @@ function readClassText(cache: Cache, rules: readonly string[]): string {
  * class that uses animations comes after the element of each of them, once.
  */
 export function collectStyleTexts(cache: Cache, className: string | undefined): StyleText[] {
+  return collectNameTexts(cache, splitClassNames(className))
+}
+
+/** The class names in `className`, in order. */
+function splitClassNames(className: string | undefined): string[] {
+  return (className ?? '').split(/\s+/).filter(Boolean)
+}
+
+/** The style elements, as data, of the classes `names` (see `collectStyleTexts`). */
+function collectNameTexts(cache: Cache, names: readonly string[]): StyleText[] {
   const sent = new Set<string>()
-  return (className ?? '')
-    .split(/\s+/)
-    .filter(Boolean)
-    .flatMap((name) => {
-      const rules = cache.getFullRules(name)
-      if (rules.length === 0) return []
-      return [
-        ...collectKeyframesTexts(cache, cache.getAnimations(name), sent),
-        { href: name, text: readClassText(cache, rules) },
-      ]
-    })
+  return names.flatMap((name) => {
+    const rules = cache.getFullRules(name)
+    if (rules.length === 0) return []
+    return [
+      ...collectKeyframesTexts(cache, cache.getAnimations(name), sent),
+      { href: name, text: readClassText(cache, rules) },
+    ]
+  })
+}
+
+/** How many entries a level of the memo of element lists holds before it is emptied: a bound on its memory. */
+export const ELEMENT_LIST_LIMIT = 10_000
+
+/** What a render of one class string made, with what each name had then: the list stands while they are the same. */
+interface ElementList {
+  /** The class names of the string. */
+  readonly names: readonly string[]
+  /** The list of full rules that `getFullRules` gave for each name. */
+  readonly rules: readonly (readonly string[])[]
+  /** The animation names that `getAnimations` gave for each name. */
+  readonly animations: readonly (readonly string[])[]
+  /** The elements made. */
+  readonly elements: ReactElement[]
+}
+
+// The lists of elements of each cache, by nonce and then by class string: held weakly by the cache.
+const elementLists = new WeakMap<Cache, Map<string | undefined, Map<string, ElementList>>>()
+
+/** The value of `key` in `map`, made by `make` when there is none; the map is emptied first when it holds the limit. */
+function readOrMake<K, V>(map: Map<K, V>, key: K, make: () => V): V {
+  let value = map.get(key)
+  if (value === undefined) {
+    if (map.size >= ELEMENT_LIST_LIMIT) map.clear()
+    value = make()
+    map.set(key, value)
+  }
+  return value
+}
+
+/** Whether `now` is the list that `before` was: the same object, or both empty (the cache gives a new empty list for a name it has nothing for). */
+function isSameList(now: readonly string[], before: readonly string[]): boolean {
+  return now === before || (now.length === 0 && before.length === 0)
+}
+
+/** Whether each name of `known` has the rules and the animations it had when the list was made. */
+function isStillSame(cache: Cache, known: ElementList): boolean {
+  const { names, rules, animations } = known
+  for (let index = 0; index < names.length; index++) {
+    const name = names[index]
+    if (!isSameList(cache.getFullRules(name), rules[index])) return false
+    if (!isSameList(cache.getAnimations(name), animations[index])) return false
+  }
+  return true
 }
 
 /** The `<style href precedence>` elements for the classes in `className` (see `collectStyleTexts`); the precedence is the prefix of the cache, the nonce `nonce`, that of the cache by default. */
@@ -90,21 +147,44 @@ export function createStyleElements(
   className: string | undefined,
   nonce = cache.nonce
 ): ReactElement[] {
-  return collectStyleTexts(cache, className).map(toElement(cache, nonce))
+  let byNonce = elementLists.get(cache)
+  if (byNonce === undefined) {
+    byNonce = new Map()
+    elementLists.set(cache, byNonce)
+  }
+  const remembered = readOrMake(byNonce, nonce, () => new Map<string, ElementList>())
+  const key = className ?? ''
+  const known = remembered.get(key)
+  if (known !== undefined && isStillSame(cache, known)) return known.elements
+  const names = splitClassNames(className)
+  const elements = createTextElements(cache, collectNameTexts(cache, names), nonce)
+  if (remembered.size >= ELEMENT_LIST_LIMIT) remembered.clear()
+  remembered.set(key, {
+    names,
+    rules: names.map((name) => cache.getFullRules(name)),
+    animations: names.map((name) => cache.getAnimations(name)),
+    elements,
+  })
+  return elements
 }
 
-/**
- * The `<style href precedence>` elements of global rules that the cache wrote (`insertGlobal`): for each set
- * with rules, the elements of the animations it uses, then its own, with its id as `href` and the order
- * statement of the layers first. Each `href` once. The nonce is `nonce`, that of the cache by default.
- */
+/** The `<style href precedence>` elements of the global rules of `sets` (see `collectGlobalTexts`); the nonce is `nonce`, that of the cache by default. */
 export function createGlobalElements(
   cache: Cache,
   sets: readonly GlobalRules[],
   nonce = cache.nonce
 ): ReactElement[] {
+  return createTextElements(cache, collectGlobalTexts(cache, sets), nonce)
+}
+
+/**
+ * The style elements, as data, of global rules that the cache wrote (`insertGlobal`): for each set with
+ * rules, the elements of the animations it uses, then its own, with its id as `href` and the order
+ * statement of the layers first. Each `href` once.
+ */
+export function collectGlobalTexts(cache: Cache, sets: readonly GlobalRules[]): StyleText[] {
   const sent = new Set<string>()
-  const texts = sets.flatMap(({ id, rules, animations }) => {
+  return sets.flatMap(({ id, rules, animations }) => {
     if (rules.length === 0 || sent.has(id)) return []
     sent.add(id)
     return [
@@ -112,7 +192,6 @@ export function createGlobalElements(
       { href: id, text: [cache.layerOrder, ...rules].join('') },
     ]
   })
-  return texts.map(toElement(cache, nonce))
 }
 
 // The sets of global styles resolved by each engine, by the styles (an object, a handle, a function or a

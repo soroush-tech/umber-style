@@ -78,12 +78,14 @@ which grew with the square of N):
 
 ```mermaid
 flowchart TD
-  create["createDomSheet(key, container, speedy)"] --> renamed["warnRenamedOption: hasRuleText in development"]
+  create["createDomSheet(key, container, speedy): its nonce option"] --> openSheet["openDomSheet(key, container, options, readNonce, onRefuse?)"]
+  own["createOwnSheet of a cache with a page"] -->|"readNonce: nonce of the cache, else findPageNonce(page), noting whether it is a script's; onRefuse with the checks"| openSheet
+  openSheet --> renamed["warnRenamedOption: hasRuleText in development"]
   renamed --> nothing["nothing is added to the document; the element is claimed at the first rule"]
   nothing --> mode{"speedy?"}
-  mode -->|yes| ruleEl["first insert: element of key not written by text, else a new one in container"]
+  mode -->|yes| ruleEl["first insert: element of key not written by text, else a new one in container, with readNonce() read once"]
   ruleEl --> insertRule["insert: insertRule into it; remove: deleteRule of the object kept; the element stays"]
-  mode -->|no| firstEl["first insert: an empty element of key that no sheet uses, else a new one in container"]
+  mode -->|no| firstEl["first insert: an empty element of key that no sheet uses, else a new one in container, with readNonce() read once"]
   firstEl --> anchor["anchor = first element"]
   anchor --> ins{"insert: anchor set?"}
   ins -->|yes| intoAnchor["text node into the anchor, anchor cleared"]
@@ -93,6 +95,11 @@ flowchart TD
   list --> rem{"remove(i): other rules left?"}
   rem -->|yes| drop["element of rule i removed"]
   rem -->|no| keep["element emptied and kept as the anchor: the next rule goes where the rules were"]
+  ruleEl --> watched{"onRefuse given? (the checks of a cache)"}
+  firstEl --> watched
+  watched -->|"yes, after the first rule"| refused{"the element the sheet made has no sheet?"}
+  refused -->|yes| warnOnce["onRefuse(nonce): the cache warns once: no nonce found, the nonce of the cache refused, or the nonce of a script refused"]
+  refused -->|no| quiet["nothing said, never looked at again"]
 ```
 
 The rest of the closure, in the order of the file:
@@ -127,6 +134,17 @@ The rest of the closure, in the order of the file:
   element of each rule). An element that the document had (a server's, or an empty one) is used as it is. The nonce is in no rule, class name or
   fingerprint: it is for the elements, and the tags of `extractStyles.ts`, `@umber-style/server` and the
   bindings read it from the cache.
+- The nonce of the page. The sheet a cache makes for itself (`createOwnSheet`, over `openDomSheet`)
+  gives its elements the nonce of the cache, else the nonce of the page (`findPageNonce` of
+  `documentNonce.ts`, which also says whether it is a style's or a script's), read once, when the sheet
+  makes its first element. `cache.nonce` stays what was
+  given. A sheet of `createDomSheet` reads only its own option.
+- The refusal of the policy. With the development checks the sheet a cache makes for itself looks, once,
+  at the element it made, right after its first rule: no sheet means a content security policy refused
+  it (`watchRefusal`). The cache then warns once (key `refused`): with no nonce given and none found on
+  the page, that no nonce was found; with a nonce given, that it is not the page's; with the nonce of a
+  script of the page, that a page may give its scripts and its styles different nonces. An element made
+  with the nonce of a style of the page is not warned about: the page allowed that nonce elsewhere.
 
 ## The data
 
@@ -141,6 +159,10 @@ The rest of the closure, in the order of the file:
   development checks and value repair): the class of each merged style made of style objects alone, by
   its layer, `after` and contents (`contentMemo.md`). At most `CONTENT_STEP_LIMIT` (10,000) steps, then
   emptied.
+- `repairMemo` (one for the cache, shared by every set of style options through `plain`): the repaired text of each
+  value that value repair was given, by the value, read and written only when nothing is told (`serialize.md`).
+  `registerValues`, the one way the declared values of the tokens change, empties it. At most
+  `REPAIR_MEMO_LIMIT` (10,000) values, then emptied.
 - `registered`: class name -> merged `StyleObject`. `insertedIds`: what is written or found on the page.
   `insertedRules`: id -> the rules written for it. `animations`: class -> names it uses. `afters`: props
   class -> its base class.
@@ -243,13 +265,26 @@ The rest of the closure, in the order of the file:
 - A held class is removed after one macrotask, so a class let go and held again in the same task stays.
 - The sheet decides removal: without `remove` every class is permanent and global rules stay.
 - Keyframes live outside every layer (an at-rule that is not a layer's to hold).
+- The nonce of the page is read by the cache's own sheet, not by `createDomSheet`: a sheet an app makes
+  carries what the app gives it, as before. It is read from elements the page already applied (a style
+  element with a sheet, then a script), never from an element the policy refused, and only the engine's
+  own rules go into the element that carries it, so it lets in nothing the policy did not allow already
+  (`documentNonce.md`).
+- The refusal is checked once, on the first element the sheet made, and only with the development checks:
+  a production cache does no work for it. A nonce given to the cache that the page refuses is warned
+  about and kept: the engine does not try another one.
 
 ## Limits
 
 - A sheet without `remove` cannot release held classes or global rules; they stay and count as written.
 - A nonce is set only on a style element the sheet creates. Written with `insertRule`, the sheet uses the
   element of a server when there is one, which carries the server's nonce or none; the cache does not check.
-  `options.nonce` is not read when a `sheet` is given.
+  `options.nonce` is not read when a `sheet` is given, nor the nonce of the page.
+- The nonce of the page is read once, at the first element: a page that gets its nonce later (no applied
+  style element or script with one yet) gives the elements of that sheet none.
+- A refused element made with the nonce of a style of the page is not warned about, and only the first element of a
+  sheet is looked at. Written with `insertRule` into a refused element, each rule is also reported as
+  rejected by the browser (the element has no sheet to insert into).
 - A text sheet puts a new element after the element of its last rule. If other code removed that element
   from the document, the new one is not put in the document, and its rule is not on the page.
 - A copy of the core of an earlier release that writes by text takes any element marked `text`, so it can

@@ -309,11 +309,13 @@ jobs:
           [ -z "$missing" ] || exit 1
 
   # The benchmark report of docs/benchmarks.md: after a publish, the report scenarios (bench/report/) of
-  # each published package that has them run in the soroush-bench sandbox with every version installed
-  # from npm: the version just published, the last stable, and for an alpha or an rc the previous release
-  # of its channel for the same version (planReport, bench/src/releases.ts). The table goes to the job summary and, for an rc or a stable
-  # release, below the notes of its GitHub Release. It is a report, not a gate: continue-on-error keeps a
-  # failure here from failing the release, and the summary says when the report could not run.
+  # the published package that has them (the core) run through soroush-tech/bench-action, in the
+  # soroush-bench sandbox, with every version installed from npm: the version just published, the last
+  # stable, and for an alpha or an rc the previous release of its channel for the same version
+  # (planReport, bench/src/releases.ts). The action writes the report to the job summary; for an rc or a
+  # stable release it also goes below the notes of its GitHub Release. It is a report, not a gate: the
+  # action runs with no minimum ratio, continue-on-error keeps a failure here from failing the release,
+  # and the summary says when the report could not run.
   bench-report:
     needs: publish
     if: ${{ !cancelled() && needs.publish.outputs.published != '' }}
@@ -332,7 +334,7 @@ jobs:
         id: node-version
         run: echo "version=$(cat .nvmrc)" >> "$GITHUB_OUTPUT"
 
-      # soroush-bench, the report files and their shared inputs come from the workspace install.
+      # The Node of .nvmrc, which runs the TypeScript of bench/src/releases.ts that the script imports.
       - name: Setup pnpm, Node and dependencies
         uses: ./.github/actions/setup
         with:
@@ -341,17 +343,43 @@ jobs:
           command: install --frozen-lockfile --ignore-scripts
 
       # The script waits, a bounded number of tries, until the registry lists each published version,
-      # then runs the report. An alpha has no GitHub Release, so its table is in the summary only.
-      # PUBLISHED is a list of name@version words, split on purpose.
-      - name: Run the benchmark report
+      # picks the versions to compare, writes them into bench/report/versions.json for the report files,
+      # and gives the action the published spec and the baseline case. With nothing to compare (a first
+      # release) it gives neither, and the action does not run. PUBLISHED is a list of name@version
+      # words, split on purpose.
+      - name: Choose the versions to compare
+        id: plan
         env:
-          CHANNEL: ${{ inputs.channel }}
           PUBLISHED: ${{ needs.publish.outputs.published }}
+        run: node scripts/bench-report.mjs plan $PUBLISHED --summary "$GITHUB_STEP_SUMMARY" --output "$GITHUB_OUTPUT"
+
+      # Report only: an empty min-ratio runs no gate (a file that crashed or left no results still fails
+      # the step), and an empty github-token posts no comment. The action writes the report to the job
+      # summary and gives it as its `report` output.
+      - name: Run the benchmark report
+        id: bench
+        if: ${{ steps.plan.outputs.baseline-case != '' }}
+        # Pinned like any other action: a tag moves.
+        uses: soroush-tech/bench-action@ab812be56d4c17b1fd8a9911236d6776cbcabef2 # v1.3.0
+        with:
+          bench-dir: bench/report
+          baseline-case: ${{ steps.plan.outputs.baseline-case }}
+          min-ratio: ''
+          rounds: '5'
+          comment-title: 'Benchmarks: `${{ steps.plan.outputs.spec }}`'
+          github-token: ''
+
+      # An alpha has no GitHub Release, so its report is in the summary only. The report is there also
+      # when a file failed: its row says so. A rerun replaces the report a run before put there.
+      - name: Add the report to the GitHub Release
+        if: ${{ !cancelled() && inputs.channel != 'alpha' && steps.bench.outputs.report != '' }}
+        env:
           GH_TOKEN: ${{ github.token }}
+          SPEC: ${{ steps.plan.outputs.spec }}
+          REPORT: ${{ steps.bench.outputs.report }}
         run: |
-          release=""
-          [ "$CHANNEL" != "alpha" ] && release="--release"
-          node scripts/bench-report.mjs $PUBLISHED $release --summary "$GITHUB_STEP_SUMMARY"
+          printf '%s\n' "$REPORT" > "$RUNNER_TEMP/bench-report.md"
+          node scripts/bench-report.mjs append "$SPEC" "$RUNNER_TEMP/bench-report.md" --summary "$GITHUB_STEP_SUMMARY"
 
       - name: Say that the report did not run to the end
         if: ${{ failure() }}

@@ -23,12 +23,12 @@ class. `createStyle.ts` is the importer.
 flowchart TD
   call["styled(tag, options)(...styles)"] --> prep["prepareStyled: styler, resolve, statics"]
   prep --> dyn{"styler.isDynamic?"}
-  dyn -->|no| st["StaticStyled: useProvidedCache only"]
-  dyn -->|yes| dy["DynamicStyled: useProvidedCache + useThemeView(cache)"]
+  dyn -->|no| st["StaticStyled: useProvidedCache, useStyleRegistry"]
+  dyn -->|yes| dy["DynamicStyled: useProvidedCache, useStyleRegistry, useThemeView(cache)"]
   st --> res["resolve(props, view, canHold, cache)"]
   dy --> res
   res --> key["the element, with the key 'element'"]
-  key --> els["createStyleElements(className, cache)"]
+  key --> els["createStyleElements(className, cache, registry)"]
   els --> leaf{"an empty list, a string tag, and hasComponent(children) false?"}
   leaf -->|yes| none["no list: no id below can move"]
   leaf -->|no| held
@@ -49,9 +49,12 @@ flowchart TD
 object, the same on a server and in the browser. `hold` is a function that returns a release function, stable
 while the held class lives; undefined on a server, and for a class that stays for good.
 
-`createStyleElements(className, cache)` returns the style elements of the class on a server, the frozen
-empty list `NO_STYLE_ELEMENTS` in the browser (the same object each time), and `undefined` where the element
-has no place for them: under a cache provider, or with `hasServerStyleElements: false` (`createStyle.ts`).
+`createStyleElements(className, cache, registry)` returns the style elements of the class on a server, an
+empty list on a server under a `StyleRegistry` (`registry`, which takes the texts of the class instead), the
+frozen empty list `NO_STYLE_ELEMENTS` in the browser (the same object each time), and `undefined` where the
+element has no place for them: under a cache provider, or with `hasServerStyleElements: false`
+(`createStyle.ts`). The registry is read with `use`, only once a `StyleRegistry` has rendered in the program
+(`styleRegistry.ts`).
 
 A component returns a list (an array), not a fragment element: React reads a fragment with no key at the
 root of a component as its children, so both give the same tree, and the list is one array where a

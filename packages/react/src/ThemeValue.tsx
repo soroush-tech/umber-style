@@ -3,7 +3,12 @@
 import { createElement, Fragment, use, useContext } from 'react'
 import { EMPTY_THEME, type Cache, type Engine } from '@umber-style/core'
 import { useProvidedCache } from './CacheProvider'
-import { getMarksContext, type ThemeContexts, type ThemeScopeValue } from './ProviderScope'
+import {
+  completeTheme,
+  getMarksContext,
+  type ThemeContexts,
+  type ThemeScopeValue,
+} from './ProviderScope'
 import type { ThemeScopeProps } from './types'
 
 // The contexts of a style are shared by every style of its prefix, and by the browser part of a provider
@@ -42,7 +47,7 @@ export function createThemeValue<T extends object>(
 
   /** The real theme of the nearest provider, the given base theme, or an empty object. */
   function useTheme(): T {
-    return useContext(ThemeContext) ?? readOwnTheme()
+    return completeTheme(useContext(ThemeContext), holder.givenTheme) ?? readOwnTheme()
   }
 
   /**
@@ -57,7 +62,9 @@ export function createThemeValue<T extends object>(
     const view = useContext(ViewContext)
     const local = cache === undefined ? holder : holder.withCache(cache)
     if (local === holder && view !== undefined) return view
-    return local.createThemeView(use(ThemeContext) ?? readOwnTheme())
+    return local.createThemeView(
+      completeTheme(use(ThemeContext), holder.givenTheme) ?? readOwnTheme()
+    )
   }
 
   /** The wrapper of the nearest nested provider of either build: null under the outermost one, undefined with none. */

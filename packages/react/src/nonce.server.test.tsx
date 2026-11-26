@@ -2,7 +2,7 @@ import { createCache, createEngine, createMemorySheet } from '@umber-style/core'
 import { bindEngine } from './createStyle.server'
 import type { CacheFunction } from './serverContext'
 import { playScopes } from './vitest.providerScope'
-import { findAll, resolveTree } from './vitest.resolveTree'
+import { findAll, resolveTree, type ResolvedElement, type ResolvedNode } from './vitest.resolveTree'
 
 const theme = { palette: { primary: '#0000ff', text: '#111111' } }
 
@@ -18,8 +18,17 @@ function setup(nonce?: string) {
   return bindEngine(createEngine(theme, { prefix: 'nc', cache }), requestCache)
 }
 
+/** Every element of `nodes` (and below) that is the reference to `NonceStyles`, in document order. */
+function findNonceStyles(nodes: readonly ResolvedNode[]): ResolvedElement[] {
+  return nodes.flatMap((node) => {
+    if (typeof node === 'string') return []
+    const isNonceStyles = (node.type as unknown as { $$id?: string }).$$id === 'NonceStyles'
+    return [...(isNonceStyles ? [node] : []), ...findNonceStyles(node.children)]
+  })
+}
+
 describe('the style elements of the server components build', () => {
-  it('carry the nonce of the cache: a styled class, its animation, global rules and the providers', async () => {
+  it('carry the fixed nonce of the cache, with no source: a styled class, its animation, global rules and the providers, all in place', async () => {
     const { styled, Global, ThemeProvider, keyframes, themeClass } = setup('n0nce')
     const fade = keyframes({ from: { opacity: 0 } }, { label: 'fade' })
     const Box = styled('div', { name: 'Box' })(({ theme: view }) => ({
@@ -42,11 +51,12 @@ describe('the style elements of the server components build', () => {
         </>
       )
     )
-    const styles = findAll(tree, 'style')
-    // The theme class of isRoot, the root rule, the global set, the nested theme, the animation, the class.
-    expect(styles.length).toBeGreaterThanOrEqual(6)
+    expect(findAll(tree, 'style'), 'hoisted elements').toEqual([])
+    // The providers, `Global` and the box: one `NonceStyles` each.
+    const styles = findNonceStyles(tree)
+    expect(styles.length).toBeGreaterThanOrEqual(4)
     expect(styles.map((element) => element.props.nonce)).toEqual(styles.map(() => 'n0nce'))
-    expect(styles.map((element) => element.children.join('')).join('')).not.toContain('n0nce')
+    expect(JSON.stringify(styles.map((element) => element.props.texts))).not.toContain('n0nce')
   })
 
   it('carry no nonce when the cache has none', async () => {

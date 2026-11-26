@@ -65,11 +65,15 @@ flowchart TD
 
 ## Limits
 
-- The action of the job vendors its own copy of soroush-bench (2.3.0 at the pinned commit of 1.2.0), and
-  the workspace has 2.3.0 too: the gate's rule is the same in both (`baseline.avg / case.avg` against the
-  minimum ratio). What is printed differs: the action posts a summary table across the files and each
-  file's table under it; this script prints the tool's own report for each file.
-- It prints what the tool prints and judges by its exit code. The tool's `--json-file` (2.3.0) would let
-  it lay out a table of its own; that was not done, because the printed report already says which case
-  failed and by how much, and an exit code needs no file read back from the sandbox.
+- The action of the job vendors its own copy of soroush-bench (2.4.0 at the pinned commit of 1.3.0), and
+  the workspace has 2.4.0 too: the gate's rule is the same in both (`baseline.avg / case.avg` against the
+  minimum ratio), and both name the bench version, Node version and sandbox limits of the run (the tool in
+  a line before each file's results, the action under the head line of its report). What else is printed
+  differs: the action posts a summary table across the files and each file's table under it; this script
+  prints the tool's own report for each file.
+- It prints what the tool prints and judges by its exit code. The tool's `--json-file` would let it lay out
+  a table of its own; that was not done, because the printed report already says which case failed and by
+  how much, and an exit code needs no file read back from the sandbox. The action (1.3.0) also fails a file
+  that ran but left no results to compare. A gate file cannot do that: it has both of its cases, `current`
+  and `previous`, or fails as it loads, and the tool fails on a baseline case that matches no case.
 - It has no test; it needs Docker.

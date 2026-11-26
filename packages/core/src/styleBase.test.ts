@@ -1,5 +1,5 @@
 import { types } from 'node:util'
-import { isStyleFunction, splitLeading } from './styleBase'
+import { callCheckedStyle, createStyleArgument, isStyleFunction, splitLeading } from './styleBase'
 import type { StyleInput } from './types'
 
 const view = { palette: { primary: 'var(--x)' } }
@@ -116,5 +116,86 @@ describe('splitLeading', () => {
       base: [],
       propsFrom: 1,
     })
+  })
+})
+
+describe('the argument of the style functions', () => {
+  it('is one object for every function of the list, with the props and the theme', () => {
+    const seen: object[] = []
+    const reader = (props: { theme: unknown }) => {
+      seen.push(props)
+      return { c: props.theme === view ? 1 : 0 }
+    }
+    splitLeading(asList(reader, { a: 1 }, reader), { tone: 'red' }, view)
+    expect(seen).toHaveLength(2)
+    expect(seen[0]).toBe(seen[1])
+  })
+
+  it('is frozen with an owner, and a write into it is thrown again naming the owner', () => {
+    const writer = (props: Record<string, unknown>) => {
+      props.tone = 'blue'
+      return false as const
+    }
+    expect(() =>
+      splitLeading(asList(writer), { tone: 'red' }, view, '[x] A style function of "Box"')
+    ).toThrow(
+      /^\[x\] A style function of "Box" threw a TypeError of a write into a frozen object: .*Copy the argument before changing it: const own = \{ \.\.\.props \}\.$/
+    )
+    expect(splitLeading(asList(writer), { tone: 'red' }, view).propsFrom).toBe(0)
+  })
+
+  it('is made frozen only when asked to', () => {
+    expect(Object.isFrozen(createStyleArgument({ a: 1 }, view, true))).toBe(true)
+    expect(createStyleArgument({ a: 1 }, view, false)).toEqual({ a: 1, theme: view })
+    expect(Object.isFrozen(createStyleArgument({ a: 1 }, view, false))).toBe(false)
+  })
+})
+
+describe('callCheckedStyle', () => {
+  const frozen = Object.freeze({ tone: 'red' })
+
+  it('gives the result of the function', () => {
+    expect(
+      callCheckedStyle((props: typeof frozen) => ({ color: props.tone }), frozen, 'x')
+    ).toEqual({
+      color: 'red',
+    })
+  })
+
+  it('throws a write into a frozen object again, the first error as its cause', () => {
+    let thrown: unknown
+    try {
+      callCheckedStyle(
+        (props: Record<string, unknown>) => {
+          delete props.tone
+          return null
+        },
+        frozen,
+        '[x] A style function'
+      )
+    } catch (error) {
+      thrown = error
+    }
+    expect(thrown).toBeInstanceOf(TypeError)
+    expect((thrown as TypeError).message).toMatch(
+      /^\[x\] A style function threw a TypeError of a write into a frozen object: Cannot delete property 'tone'/
+    )
+    expect((thrown as TypeError).cause).toBeInstanceOf(TypeError)
+  })
+
+  it('throws any other error as it is', () => {
+    const other = new TypeError('Cannot read properties of undefined')
+    const range = new RangeError('read-only range')
+    for (const error of [other, range]) {
+      expect(() =>
+        callCheckedStyle(
+          () => {
+            throw error
+          },
+          frozen,
+          'x'
+        )
+      ).toThrow(error)
+    }
   })
 })

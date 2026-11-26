@@ -1,5 +1,6 @@
 // @vitest-environment node
 import { createCache } from './cache'
+import { createStyleTag } from './extractStyles'
 
 describe('createCache without a document', () => {
   it('keeps its rules in memory', () => {
@@ -24,5 +25,15 @@ describe('createCache without a document', () => {
       ],
     ])
     warn.mockRestore()
+  })
+})
+
+describe('the nonce of a cache without a document', () => {
+  it('is only the one it is given: there is no page to read one from', () => {
+    const cache = createCache({ prefix: 'nn', hasLayers: false })
+    cache.css({ color: 'red' })
+    expect(cache.nonce).toBeUndefined()
+    expect(createStyleTag(cache)).not.toContain('nonce')
+    expect(createCache({ prefix: 'nn', nonce: 'n0nce' }).nonce).toBe('n0nce')
   })
 })

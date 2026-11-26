@@ -34,7 +34,7 @@ flowchart TD
   win --> pick
   fixed --> pick
   pick -->|"object styles name hovered or focused"| held["HeldStyled: useHeldStates, then the dynamic or conditional hooks"]
-  pick -->|"else any function style"| dyn["DynamicStyled: theme, condition, media key"]
+  pick -->|"else any function style"| dyn["DynamicStyled: theme, condition, media key; one argument for all its function styles, frozen with the theme guarded in development"]
   pick -->|"else any conditional style"| cnd["ConditionalStyled"]
   pick -->|"else any media key"| wnd["WindowStyled"]
   pick -->|"else"| stat["StaticStyled: no hooks"]
@@ -135,7 +135,11 @@ entry leaves with its theme object, and a component has at most 16 for each them
 - No string tags: a native app has no `div`. The error names the tag.
 - Four component shapes, and a fifth for kept hover and focus, rather than one with all the hooks, so unused
   features cost nothing.
-- Function styles are given the theme `useTheme` reads: the native theme (lengths are numbers).
+- Function styles are given the theme `useTheme` reads: the native theme (lengths are numbers). The functions of an
+  element share one argument in a render, `{ ...props, theme }`, made in the render and never kept. In development
+  (`devGuard.ts`) it is frozen and its theme guarded, and each call goes through `callCheckedStyle` of the core, so a
+  function that writes into the argument or the theme throws, naming the component; in production a change to the
+  argument is seen by the later functions of the element.
 - How the binding knows a pressable: by identity with the platform's `Pressable`. Rejected: an option of
   `styled` (shared code passes the web's `StyledOptions`, and a wrong option would hand a function to a
   component that cannot read it) and a prop (the same, per element). A wrapper that passes `style` through
