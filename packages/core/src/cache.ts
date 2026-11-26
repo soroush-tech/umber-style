@@ -1151,13 +1151,13 @@ export function createCache(options: CacheOptions = {}): Cache {
   // The repaired text of each value, for value repair when nothing reports (see `CompileContext.repairMemo`):
   // what a value is repaired to depends on the declared values, so a new source of them empties it.
   const repairMemo = new Map<string, string>()
-  // The memos of contents of the style options with value repair: a class they hold was compiled with
-  // the declared values of then, so a new source of them empties each.
-  const repairingContents: ContentMemo[] = []
+  // The memos of contents and of merges of the style options with value repair: a class they hold was
+  // compiled with the declared values of then, so a new source of them empties each.
+  const repairingMemos: { clear(): void }[] = []
   const registerValues = (read: () => Readonly<Record<string, string>>): void => {
     pendingValues.push(read)
     repairMemo.clear()
-    for (const contents of repairingContents) contents.clear()
+    for (const memo of repairingMemos) memo.clear()
   }
   const readValue = (name: string): string | undefined => {
     for (const read of pendingValues.splice(0)) {
@@ -1173,14 +1173,16 @@ export function createCache(options: CacheOptions = {}): Cache {
   const toWrittenAs = (options: Required<StyleOptions>): WrittenAs => {
     const plain: CompileContext = { ...options, scoping, readValue, repairMemo }
     const contents = hasStyleMemo && !warnValue ? createContentMemo() : undefined
-    if (contents && options.hasValueRepair) repairingContents.push(contents)
+    const merges = new Map<string, MergeMemo>()
+    if (options.hasValueRepair) repairingMemos.push(merges)
+    if (contents && options.hasValueRepair) repairingMemos.push(contents)
     const written: WrittenAs = {
       ...options,
       plain,
       naming: { ...plain, hasVendorPrefixes: false },
       reported: { ...plain, report: reportRepair },
       adopt: (entry) => adoptEntry(entry, written),
-      merges: new Map(),
+      merges,
       contents,
     }
     return written

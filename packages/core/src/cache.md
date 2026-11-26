@@ -155,11 +155,13 @@ The rest of the closure, in the order of the file:
   a name whose style was set again (a hit, a held class written again) or removed makes the entry stale, and
   it is made again. At most `MERGE_LIMIT` (1000) entries; the oldest leaves first. Measured: about 450 KB for
   1000 entries, the same after 10,000 distinct merges of 10,000 classes (measured with `--expose-gc` on
-  the build, for issue 10).
+  the build, for issue 10). Those of the sets of style options with value repair are in `repairingMemos`,
+  and `registerValues` empties each of them: a class they hold was made with the declared values of then.
+  Without value repair they keep their classes across `registerValues`.
 - `contents` (one for each set of style options, on `WrittenAs`, only with `hasStyleMemo` and without the
   development checks): the class of each merged style made of style objects alone, by its layer, `after`
   and contents (`contentMemo.md`). At most `CONTENT_STEP_LIMIT` (10,000) steps, then emptied. Those of
-  the sets of style options with value repair are also in `repairingContents`, and `registerValues`
+  the sets of style options with value repair are also in `repairingMemos`, and `registerValues`
   empties each of them: a class they hold was compiled with the declared values of then.
 - `repairMemo` (one for the cache, shared by every set of style options through `plain`): the repaired text of each
   value that value repair was given, by the value, read and written only when nothing is told (`serialize.md`).

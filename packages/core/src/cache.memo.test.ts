@@ -482,6 +482,50 @@ describe('the memo of contents (hasStyleMemo)', () => {
       }
     })
 
+    describe('the memo of merged class names', () => {
+      const changed = () => ({ '--n': '4px' })
+      const options = { prefix: 'm', hasDevChecks: false }
+      /** The class names of two styles made on `cache` with `--n` declared as `2`. */
+      const makeNames = (cache: Cache) => {
+        cache.registerValues(() => ({ '--n': '2' }))
+        return [cache.css({ width: 'var(--n)px' }), cache.css({ color: 'red' })]
+      }
+      /** The class that a cache with no memo of the merge gives after `--n` changed. */
+      const freshMerge = () => {
+        const fresh = createCache({ ...options, sheet: createMemorySheet(), hasValueRepair: true })
+        const names = makeNames(fresh)
+        fresh.registerValues(changed)
+        return fresh.css(...names)
+      }
+
+      it('is emptied when the declared values change, with value repair, on a cache and on a view', () => {
+        const makers = [
+          () => createCache({ ...options, sheet: createMemorySheet(), hasValueRepair: true }),
+          () =>
+            createCache({ ...options, sheet: createMemorySheet() }).withStyleOptions({
+              hasValueRepair: true,
+            }),
+        ]
+        for (const make of makers) {
+          const cache = make()
+          const names = makeNames(cache)
+          const before = cache.css(...names)
+          cache.registerValues(changed)
+          const after = cache.css(...names)
+          expect(after).not.toBe(before)
+          expect(after).toBe(freshMerge())
+        }
+      })
+
+      it('keeps its classes across registerValues without value repair', () => {
+        const cache = createCache({ ...options, sheet: createMemorySheet() })
+        const names = makeNames(cache)
+        const before = cache.css(...names)
+        cache.registerValues(changed)
+        expect(cache.css(...names)).toBe(before)
+      })
+    })
+
     it('keeps what the memo of style options without value repair holds', () => {
       const { cache, find } = spyMemo(() =>
         createCache({ prefix: 'm', sheet: createMemorySheet(), hasStyleMemo: true })
