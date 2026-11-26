@@ -9,6 +9,7 @@ import {
 import { readStyleArguments, withTagShorthands, type Cache, type Engine } from '@umber-style/core'
 import { useProvidedCache } from './CacheProvider'
 import { isStyledComponent, prepareStyled } from './styledParts'
+import { useStyleRegistry, type StyleRegistryStore } from './styleRegistry'
 import type { Styled, StyledOptions } from './types'
 
 interface HoldProps {
@@ -57,8 +58,9 @@ interface Resolved {
  * provider through `useThemeView`; one with only object styles reads no context, until a `CacheProvider`
  * has rendered: from then on each component reads the cache of the nearest one, and makes its class with
  * the engine over that cache. `createStyleElements` gives the style elements of a class where the build
- * sends them (a server render outside any cache provider), an empty list made once in the browser, and
- * undefined where an element has no place for them (under a cache provider, or where the style sends none).
+ * sends them (a server render outside any cache provider), an empty list made once in the browser and
+ * under a `StyleRegistry` (`registry`), which takes the texts instead, and undefined where an element has
+ * no place for them (under a cache provider, or where the style sends none).
  * In the browser, an element given a plain object in `style` holds the class that object made (`Hold`,
  * rendered after it), so that the class is removed when no element uses it.
  *
@@ -69,7 +71,11 @@ interface Resolved {
 export function createStyled<T>(
   engine: Engine<T>,
   useThemeView: (cache?: Cache) => T,
-  createStyleElements: (className: string, cache?: Cache) => readonly ReactElement[] | undefined
+  createStyleElements: (
+    className: string,
+    cache?: Cache,
+    registry?: StyleRegistryStore
+  ) => readonly ReactElement[] | undefined
 ): Styled<T> {
   /**
    * The element, with the list of the style elements of its class in front of it where it has a place for
@@ -77,13 +83,14 @@ export function createStyled<T>(
    */
   const render = (
     { element, forwarded, className, isHeld, hold }: Resolved,
-    cache: Cache | undefined
+    cache: Cache | undefined,
+    registry: StyleRegistryStore | undefined
   ): ReactNode => {
     // React asks for a key in a list it is given. The same one with no list around the element, so that
     // React keeps the element when the list comes and goes (its `Hold`, or its place).
     forwarded.key = 'element'
     const rendered = createElement(element, forwarded)
-    let styles = createStyleElements(className, cache)
+    let styles = createStyleElements(className, cache, registry)
     // An empty place matters only to a component below the element: a tag with none below it goes alone.
     if (styles?.length === 0 && typeof element === 'string' && !hasComponent(forwarded.children)) {
       styles = undefined
@@ -105,13 +112,15 @@ export function createStyled<T>(
 
       const StaticStyled = (props: Record<string, unknown>) => {
         const cache = useProvidedCache()
-        return render(resolve(props, undefined, canHold(), cache), cache)
+        const registry = useStyleRegistry()
+        return render(resolve(props, undefined, canHold(), cache), cache, registry)
       }
 
       const DynamicStyled = (props: Record<string, unknown>) => {
         const cache = useProvidedCache()
+        const registry = useStyleRegistry()
         const view = useThemeView(cache)
-        return render(resolve(props, view, canHold(), cache), cache)
+        return render(resolve(props, view, canHold(), cache), cache, registry)
       }
 
       return Object.assign(styler.isDynamic ? DynamicStyled : StaticStyled, statics)

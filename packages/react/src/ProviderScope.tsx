@@ -223,14 +223,19 @@ export function createNestedStyles(
  * one in the element of `rootId`, written again there when an earlier pass deleted it, and none in any
  * other element. React keeps a style element for the life of the document, so after the root theme
  * changed (a refresh that renders another theme, a navigation back) the elements of the earlier ones are
- * still there. Nothing changes until React has put the element of `rootId` in the document. The elements
- * of the browser's cache and of a registry are not touched.
+ * still there. The elements a `StyleRegistry` wrote for `prefix` (`data-umber-registry`) count with them:
+ * they stand for React's under a registry. Nothing changes until the element of `rootId` is in the
+ * document. The elements of the browser's cache and of a registry an app wrote are not touched.
  */
 export function keepRootRule(prefix: string, rootId: string, rule: string, page: Document): void {
   const elements = [
-    ...page.querySelectorAll<HTMLStyleElement>(`style[data-precedence="${prefix}"]`),
+    ...page.querySelectorAll<HTMLStyleElement>(
+      `style[data-precedence="${prefix}"], style[data-umber-registry][data-umber~="${prefix}"]`
+    ),
   ]
-  const own = elements.find((element) => element.dataset.href?.split(' ').includes(rootId))
+  const own = elements.find((element) =>
+    (element.dataset.href ?? element.dataset.umber)?.split(' ').includes(rootId)
+  )
   if (own === undefined) return
   const pattern = new RegExp(String.raw`^(@layer ${prefix}-theme\s*\{\s*)?:where\(:root\)`)
   for (const element of elements) {

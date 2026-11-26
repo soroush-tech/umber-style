@@ -5,6 +5,7 @@
 // nothing here calls React when the module loads.
 import * as React from 'react'
 import type { StyleText } from './styleElements'
+import { registerTexts, useStyleRegistry } from './styleRegistry'
 
 /** The props of `NonceStyles`: the style texts of one component of the server build, as data. */
 export interface NonceStylesProps {
@@ -45,27 +46,34 @@ export function readDocumentNonce(page: Document): string | undefined {
   return page.querySelector<HTMLScriptElement>('script[nonce]')?.nonce || undefined
 }
 
+/** The selector of the elements a `StyleRegistry` wrote for `prefix`, in the head and at the top of the body. */
+const selectRegistered = (prefix: string) => `style[data-umber-registry][data-umber~="${prefix}"]`
+
 /**
- * An element of the head of `page` that holds `href` and that the policy let in (it has a sheet): React's
- * own, or one of this module. An element with no sheet holds no rule, so it never stands for one.
+ * An element of `page` that holds `href` of `prefix` and that the policy let in (it has a sheet): one of
+ * the head in the form React gives (React's own, or one of this module), or one a `StyleRegistry` wrote.
+ * An element with no sheet holds no rule, so it never stands for one.
  */
-function findApplied(page: Document, href: string): HTMLStyleElement | undefined {
-  for (const element of page.head.querySelectorAll<HTMLStyleElement>('style[data-href]')) {
-    if (element.sheet !== null && element.dataset.href?.split(' ').includes(href)) return element
+function findApplied(page: Document, prefix: string, href: string): HTMLStyleElement | undefined {
+  const selector = `head style[data-href], ${selectRegistered(prefix)}`
+  for (const element of page.querySelectorAll<HTMLStyleElement>(selector)) {
+    const hrefs = element.dataset.href ?? element.dataset.umber
+    if (element.sheet !== null && hrefs?.split(' ').includes(href)) return element
   }
   return undefined
 }
 
 /**
- * Writes each of `texts` that the head of `page` does not hold yet into an element of its own, in the form
- * React gives a `<style href precedence>` element (`data-precedence`, `data-href`), with `nonce`, after the
- * last element of `prefix`: the order of first use. The text comes from the props, never from an element
- * of the page.
+ * Writes each of `texts` that `page` does not hold yet into an element of its own, in the form React gives
+ * a `<style href precedence>` element (`data-precedence`, `data-href`), with `nonce`, after the last
+ * element of `prefix` in document order (React's, this module's, a `StyleRegistry`'s, which may be at the
+ * top of the body): the order of first use. The text comes from the props, never from an element of the
+ * page.
  */
 function writeTexts(page: Document, prefix: string, texts: readonly StyleText[], nonce: string) {
   for (const { href, text } of texts) {
     if (held.get(href)?.isConnected) continue
-    const found = findApplied(page, href)
+    const found = findApplied(page, prefix, href)
     if (found !== undefined) {
       held.set(href, found)
       continue
@@ -75,9 +83,11 @@ function writeTexts(page: Document, prefix: string, texts: readonly StyleText[],
     element.dataset.precedence = prefix
     element.dataset.href = href
     element.textContent = text
-    const last = [...page.head.querySelectorAll<HTMLStyleElement>('style[data-precedence]')]
-      .filter(({ dataset }) => dataset.precedence === prefix)
-      .at(-1)
+    const last = [
+      ...page.querySelectorAll<HTMLStyleElement>(
+        `head style[data-precedence="${prefix}"], ${selectRegistered(prefix)}`
+      ),
+    ].at(-1)
     if (last === undefined) page.head.append(element)
     else last.after(element)
     held.set(href, element)
@@ -104,9 +114,12 @@ const isNothingHanded = () => false
  *   its texts into elements of the head with the document's nonce, then renders nothing, so the element
  *   in place goes. When the head cannot hold them (no nonce found, or the policy refused what was
  *   written), the element in place stays.
+ * - Under a `StyleRegistry` (`@umber-style/react/next`) the server render registers its texts there,
+ *   which writes them before the piece of the stream that holds this element, and it renders nothing, in
+ *   the first HTML and at its hydration.
  * - Mounted after the first HTML (a client-side navigation) it renders nothing, so no element with the
- *   nonce of the navigation's request is inserted, and writes its texts into the head with the document's
- *   nonce before the browser paints.
+ *   nonce of the navigation's request is inserted, and writes its texts with the document's nonce before
+ *   the browser paints, after the last style element of its prefix in document order.
  */
 export function NonceStyles({
   prefix,
@@ -123,6 +136,10 @@ export function NonceStyles({
     () => isEveryApplied(texts),
     isNothingHanded
   )
+  // Under a `StyleRegistry` the server render hands the texts to it, which writes them before the piece of
+  // the stream that holds this element, and nothing is in place.
+  const registry = useStyleRegistry()
+  if (registry !== undefined) registerTexts(registry, prefix, texts, nonce)
 
   React.useInsertionEffect(() => {
     if (isFirstHtml) recordDocumentNonce(nonce)
@@ -130,7 +147,7 @@ export function NonceStyles({
     if (documentNonce !== undefined) writeTexts(document, prefix, texts, documentNonce)
   }, [isFirstHtml, nonce, prefix, texts])
 
-  if (!isFirstHtml || isHanded) return null
+  if (!isFirstHtml || isHanded || registry !== undefined) return null
   const shownHrefs = shown === undefined ? undefined : new Set(shown)
   const inPlace = texts.filter(({ href }) => shownHrefs?.has(href) ?? true)
   if (inPlace.length === 0) return null

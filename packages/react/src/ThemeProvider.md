@@ -40,13 +40,17 @@ flowchart TD
   place -->|yes| server{"getServerStyle()?"}
   server -->|undefined: the browser| empty["Fragment: null, element"]
   server -->|parts: a server| styled["Fragment: one Fragment of the stamp and the style elements, element"]
+  styled --> reg{"a StyleRegistry above? (useStyleRegistry)"}
+  reg -->|yes| regTexts["no style element: the registry takes the texts, the stamp stays"]
+  reg -->|no| elementsOut["the style elements"]
 ```
 
 ## The data
 
 - `ThemeProviderParts<T>`: the engine, its contexts, `hasServerStyleElements` (the option of the style),
   and `getServerStyle()`, which is `undefined` in the browser and `{ createStyleElements, createStamp }` for
-  a server render of the client build.
+  a server render of the client build; `createStyleElements(className, registry)` gives none under a
+  `StyleRegistry`, which takes their texts.
 - A wrapper is `{ as, className }`; the mark below is `{ scope: wrapper ?? above?.scope ?? null, nested }`.
 - `nested` is the themes of the nested providers from the one below the outermost provider down to this
   one, merged: undefined under the outermost provider, the theme given for a nested provider directly under

@@ -8,7 +8,8 @@ npm hands them out. It checks the contents of the tarballs, that every entry loa
 `require` and gives the same names, that an entry with a default export has the same function by name and
 that a CommonJS file that loads it as a bundler's Node interop does gets the function by that name, a
 server render of a styled component, the animated entry of React Native (over a stand-in of the animation
-library: the entry and its subpath of the umbrella are one value, and it translates a shorthand), the export
+library: the entry and its subpath of the umbrella are one value, and it translates a shorthand), the
+Next.js registry entry of React (`@umber-style/react/next`, over a stand-in of `next`), the export
 conditions, and that TypeScript resolves the declarations. It prints `ok` or `FAIL` for each check, exits 1 if any failed, and
 removes the folder unless `--keep` is given.
 
@@ -28,12 +29,13 @@ flowchart TD
   s0["each sibling range in source is workspace:^"] --> dist{"every packages/dir/dist exists?"}
   dist -->|no| stop["say run pnpm build, exit 1"]
   dist -->|yes| s1["1: pnpm pack each, extract, inspect"]
-  s1 --> s2["2: consumer folder: tarballs, a react-native stand-in, a react-native-reanimated stand-in, npm install with overrides"]
+  s1 --> s2["2: consumer folder: tarballs, a react-native stand-in, a react-native-reanimated stand-in, a next stand-in, npm install with overrides"]
   s2 --> one{"a nested copy of the core?"}
   one -->|yes| f1["FAIL"]
   one -->|no| s3["3: node check.mjs and check.cjs"]
   s3 --> keys["both write the exported names: compare them"]
-  keys --> s3b["3b: node interop.cjs for each entry of NAMED_DEFAULTS"]
+  keys --> s3a["3a: node next.cjs: StyleRegistry from require renders its children"]
+  s3a --> s3b["3b: node interop.cjs for each entry of NAMED_DEFAULTS"]
   s3b --> s4["4: conditions.mjs and conditions.cjs under none, react-server, react-native"]
   s4 --> s5["5: tsc on four tsconfigs"]
   s5 --> end1{"any FAIL?"}
@@ -58,7 +60,10 @@ front of it, makes a class, answers for a prop of the platform) and checks the a
 condition scripts with `--conditions=react-server` and `--conditions=react-native`. Step 5 compiles
 `entries.ts`, `entries.mts` and `entries.cts` (bundler, node16), `library.cts` (node16: a CommonJS file
 that imports the default exports by name), `server.ts` (custom condition
-`react-server`) and `strict.ts` (the strict switch of `StyleTypeOptions`) with `skipLibCheck` off.
+`react-server`), `strict.ts` (the strict switch of `StyleTypeOptions`) and `next.ts` (bundler: the props
+of `StyleRegistry` with a cache of `@umber-style/cache`) with `skipLibCheck` off. Step 3a requires
+`@umber-style/react/next` and renders `StyleRegistry` on the server over the stand-in of `next`; it is not
+imported from an ES module, which Node cannot do for `next/navigation` (the package has no exports map).
 
 ## The data
 

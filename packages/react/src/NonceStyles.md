@@ -15,9 +15,14 @@ hoists:
   and the policy lets it in with no script.
 - At hydration it writes every text into an element of the head, with the nonce of the document, then
   renders nothing, so React removes the element in place.
+- Under a `StyleRegistry` (`next.tsx`), the server render registers every text in the registry of the
+  request (`styleRegistry.ts`), which writes them before the piece of the stream that holds the element,
+  and renders nothing, in the first HTML and at its hydration. Its insertion effect then finds each text in
+  an element of the registry and writes nothing.
 - Mounted after the first HTML (the page of a client-side navigation) it renders nothing and writes its
-  texts into the head with the document's nonce, so React never inserts an element with the nonce of the
-  navigation's request, which the policy of the document refuses.
+  texts with the document's nonce after the last style element of its prefix in document order (React's
+  in the head, this module's, the registry's, which may be at the top of the body), so React never inserts
+  an element with the nonce of the navigation's request, which the policy of the document refuses.
 
 `readDocumentNonce(page)` gives the nonce the elements of the head are written with.
 
@@ -32,7 +37,9 @@ answers the first; writing into the head with the document's nonce answers the s
 
 ```mermaid
 flowchart TD
-  props["prefix, texts, shown, nonce"] --> first{"server render or hydration? (useSyncExternalStore, kept by useState)"}
+  props["prefix, texts, shown, nonce"] --> registry{"a StyleRegistry above? (useStyleRegistry)"}
+  registry -->|"yes, server render"| register["registerTexts: the registry writes them before the piece"]
+  props --> first{"server render or hydration? (useSyncExternalStore, kept by useState)"}
   first -->|yes| record["insertion effect: record the nonce of the props as the document's"]
   first -->|no| skip["record nothing: the nonce of the props is the navigation's"]
   record --> read["readDocumentNonce(document)"]
@@ -40,11 +47,11 @@ flowchart TD
   read --> found{"a nonce?"}
   found -->|no| none["write nothing"]
   found -->|yes| each["for each text, in order"]
-  each --> held{"held already, or an element of the head with this href and a sheet?"}
+  each --> held{"held already, or an element with this href and a sheet: of the head, or of the registry?"}
   held -->|yes| next["nothing to write"]
-  held -->|no| write["new style: nonce, data-precedence, data-href, the text of the props, after the last element of the prefix"]
+  held -->|no| write["new style: nonce, data-precedence, data-href, the text of the props, after the last element of the prefix in document order"]
   props --> handed{"every href held in an element with a sheet? (useSyncExternalStore)"}
-  handed -->|"yes, or not the first HTML"| empty["render nothing"]
+  handed -->|"yes, or not the first HTML, or a registry above"| empty["render nothing"]
   handed -->|"no, first HTML"| inPlace["render style nonce data-umber-inline with the shown texts"]
 ```
 
@@ -54,9 +61,10 @@ policy let it in), the `.nonce` of a `script[nonce]`. None of these: `undefined`
 
 ## The data
 
-- `held`: a module `Map` from an `href` to the element of the head that holds it: one this module wrote
-  (kept even when the policy refused it, so it is not written again and again), or one of the page found
-  with a sheet.
+- `held`: a module `Map` from an `href` to the element that holds it: one this module wrote (kept even
+  when the policy refused it, so it is not written again and again), or one of the page found with a
+  sheet: a `style[data-href]` of the head, or a `style[data-umber-registry][data-umber~="<prefix>"]` that
+  a `StyleRegistry` wrote, in the head or at the top of the body.
 - `recordedNonce`: the nonce of the document, the first one recorded at hydration.
 - The two `useSyncExternalStore` stores have nothing to subscribe to: whether a render is the first HTML
   is the server snapshot against the browser's, and whether the texts are handed changes only in the
@@ -77,7 +85,12 @@ policy let it in), the `.nonce` of a `script[nonce]`. None of these: `undefined`
 - No flash at hydration: the head is written in the insertion effect, before the element in place goes,
   and both hold the same rules (scenario (h3) of `e2e/helpers/cspServer.ts`).
 - The elements it writes have the form React gives its own (`data-precedence`, `data-href`), after the last
-  element of the prefix, in the order of first use; `keepRootRule` of `ProviderScope.tsx` finds them.
+  element of the prefix in document order (`style[data-precedence]` of the head, the elements of a
+  `StyleRegistry`), in the order of first use: a props class a navigation brings comes after a base class
+  that a later piece of the stream put at the top of the body. `keepRootRule` of `ProviderScope.tsx` finds
+  them.
+- With no `StyleRegistry` above, what it renders and writes is what it did before the registry: the
+  elements of a registry an app writes itself (no `data-umber-registry`) are neither read nor counted.
 - Hydration accepts the first HTML: the first render in the browser is the same as the server's.
 
 ## Decisions
@@ -86,10 +99,13 @@ policy let it in), the `.nonce` of a `script[nonce]`. None of these: `undefined`
 - The nonce the props carry is used as the document's only at hydration: after it, the props come from the
   request of a navigation.
 - With no nonce found nothing is written, rather than an element the policy would refuse and report.
+- Under a registry it renders nothing on both sides, so hydration sees the same tree, and the elements of
+  the later pieces stay at the top of the body, where the registry wrote them: moving them into the head
+  would make the browser parse their rules again, and the engine's cache holds the rules it read there.
 
 ## Limits
 
-- With JavaScript off the element stays in place: as a child among the app's elements it shifts
+- Without a `StyleRegistry`, with JavaScript off the element stays in place: as a child among the app's elements it shifts
   `:first-child`, `:nth-child` and `+`. Inside a `<select>` the HTML parser of the specification drops a
   `<style>`, so a styled `<option>` can be unstyled; Chromium 158 keeps it and applies it, other browsers
   were not run.
@@ -97,3 +113,7 @@ policy let it in), the `.nonce` of a `script[nonce]`. None of these: `undefined`
   nonce, writes nothing after a navigation: the classes only the navigation brings are unstyled, with no
   violation reported.
 - `held` and the recorded nonce live as long as the page (the module).
+- Without a `StyleRegistry`, a text is shown in place once in a request (`shown`): a class first shown in
+  the fallback of a `Suspense` boundary has no rule for a frame when React's script swaps the content in
+  before the boundary hydrates (22 to 30 ms, measured on the prototype of the registry and seen again on
+  the fixture's `/csp-inplace`). Under a registry the rule is in the piece of the fallback, before it.

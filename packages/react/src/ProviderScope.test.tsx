@@ -686,6 +686,24 @@ describe('one live root rule', () => {
     expect(other.sheet?.cssRules).toHaveLength(1)
   })
 
+  it('counts the elements of a StyleRegistry, and leaves those of a registry the app wrote alone', () => {
+    const written = document.createElement('style')
+    written.dataset.umber = 'ps ps-root-written'
+    written.textContent = ':where(:root){--w:1;}'
+    const old = document.createElement('style')
+    old.dataset.umber = 'ps ps-root-old'
+    old.dataset.umberRegistry = ''
+    old.textContent = ':where(:root){--a:1;}'
+    const mine = document.createElement('style')
+    mine.dataset.umber = 'ps ps-root-mine'
+    mine.dataset.umberRegistry = ''
+    mine.textContent = '.y{color:blue}'
+    document.head.append(written, old)
+    document.body.append(mine)
+    keepRootRule('ps', 'ps-root-mine', ':where(:root){--c:1;}', document)
+    expect(liveRoots()).toEqual([':where(:root){--w:1;}', ':where(:root){--c:1;}'])
+  })
+
   it('passes over an element that a content security policy refused, which has no sheet', () => {
     const refused = document.createElement('style')
     refused.dataset.precedence = 'ps'

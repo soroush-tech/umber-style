@@ -80,6 +80,9 @@ flowchart TD
 
 - "Once in a request" is the order in which the request renders its components. A text first shown inside
   a `Suspense` fallback is not shown again by the content that replaces it: when React's script swaps the
-  content in before the boundary hydrates, the class has no rule until it does. Not run.
+  content in before the boundary hydrates, the class has no rule until it does (seen on the fixture's
+  `/csp-inplace`, 22 to 30 ms on the prototype). Under a `StyleRegistry` (`@umber-style/react/next`)
+  `NonceStyles` shows nothing in place: the registry writes each text once, before the piece of the stream
+  that first uses it, so the fallback's piece carries the rule.
 - The slot needs a request to scope to (`React.cache` in the server build of React); outside a render every
   call makes a new slot, and every `NonceStyles` shows all of its texts.

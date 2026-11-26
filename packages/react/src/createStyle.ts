@@ -7,6 +7,7 @@ import {
   type Engine,
   findEntryCache,
   globalStyles,
+  type GlobalRules,
   isThemedSheet,
   type ObjectSheet,
   type SheetEntries,
@@ -19,11 +20,14 @@ import { useProvidedCache } from './CacheProvider'
 import { createGlobal } from './Global'
 import { readPrefixStyle } from './ProviderScope'
 import {
+  collectGlobalTexts,
+  collectStyleTexts,
   createGlobalElements,
   createGlobalMarkerElements,
   createStampElement,
   createStyleElements,
 } from './styleElements'
+import { registerTexts, type StyleRegistryStore } from './styleRegistry'
 import { createStyled } from './styled'
 import { createThemeProvider } from './ThemeProvider'
 import { createThemeValue, type ThemeContexts } from './ThemeValue'
@@ -62,11 +66,34 @@ export function bindEngine<T extends object>(
   // Where there is no document (a server render), the style of a class is sent as style elements; not
   // under a cache provider (`cache`), whose rules the app sends itself.
   const hasStyleElements = () => hasServerStyleElements && typeof document === 'undefined'
+  // The style elements of the classes in `className`; under a `StyleRegistry` none, and their texts go to
+  // the registry, with the nonce of the cache.
+  const sendStyleElements = (className: string, registry?: StyleRegistryStore): ReactElement[] => {
+    if (registry === undefined) return createStyleElements(engine.cache, className)
+    const { cache } = engine
+    registerTexts(registry, cache.prefix, collectStyleTexts(cache, className), cache.nonce)
+    return []
+  }
   // Where they are sent, an element has a place for them in the browser too, an empty list there, so that
   // both render the same tree; undefined where it has none.
-  const renderStyleElements = (className: string, cache?: Cache) => {
+  const renderStyleElements = (className: string, cache?: Cache, registry?: StyleRegistryStore) => {
     if (cache !== undefined || !hasServerStyleElements) return undefined
-    return hasStyleElements() ? createStyleElements(engine.cache, className) : NO_STYLE_ELEMENTS
+    return hasStyleElements() ? sendStyleElements(className, registry) : NO_STYLE_ELEMENTS
+  }
+  // The style elements of global rules where they are sent, or the marker that names them; under a
+  // `StyleRegistry` none, and their texts go to the registry.
+  const renderGlobalElements = (
+    sets: readonly GlobalRules[],
+    cache: Cache | undefined,
+    registry: StyleRegistryStore | undefined
+  ): ReactElement[] => {
+    if (cache !== undefined || !hasStyleElements()) {
+      return createGlobalMarkerElements(cache ?? engine.cache, sets)
+    }
+    if (registry === undefined) return createGlobalElements(engine.cache, sets)
+    const { prefix, nonce } = engine.cache
+    registerTexts(registry, prefix, collectGlobalTexts(engine.cache, sets), nonce)
+    return []
   }
 
   const themeClass = (partial: DeepPartial<T>, colorScheme?: ColorScheme) =>
@@ -112,7 +139,7 @@ export function bindEngine<T extends object>(
       getServerStyle: () =>
         hasStyleElements()
           ? {
-              createStyleElements: (className) => createStyleElements(engine.cache, className),
+              createStyleElements: sendStyleElements,
               createStamp: () => createStampElement(engine.cache),
             }
           : undefined,
@@ -128,11 +155,7 @@ export function bindEngine<T extends object>(
     globalStyles,
     // A server render sends the style elements of the sets, or, where it sends none, the marker that
     // names them in the markup, with the prefix of the cache that holds them.
-    Global: createGlobal(engine, useThemeView, (sets, cache) =>
-      cache === undefined && hasStyleElements()
-        ? createGlobalElements(engine.cache, sets)
-        : createGlobalMarkerElements(cache ?? engine.cache, sets)
-    ),
+    Global: createGlobal(engine, useThemeView, renderGlobalElements),
   }
 }
 

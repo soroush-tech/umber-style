@@ -71,8 +71,9 @@ build, once one exists).
   `ThemeContext`.
 - `keepRootRule` skips a style element that has no sheet: one that a content security policy refused
   (its nonce is not the page's) holds no rule, and reading it threw and took the page down.
-- `keepRootRule` leaves one root rule of the prefix in the style elements React keeps, and touches no
-  element of the browser's cache or a registry.
+- `keepRootRule` leaves one root rule of the prefix in the style elements React keeps and in those a
+  `StyleRegistry` wrote (`data-umber-registry`, found by `data-umber`), which stand for React's under a
+  registry, and touches no element of the browser's cache or of a registry an app writes itself.
 - The server and the browser write the same text from the same props, with the core's tokens and no engine.
 - Every style element it renders has the `nonce` of `ScopeTheme`, so under a policy that allows style
   elements by nonce React keeps their rules on the server and the browser lets in the ones it adds.

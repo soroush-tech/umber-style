@@ -7,7 +7,8 @@ Build: client (the `Global` that `createStyle.ts` makes). Its server counterpart
 `createGlobal(engine, useThemeView, createServerElements)` makes the `Global` component. It resolves the
 global styles of its props against the view of the theme, writes the resulting sets into the cache, and
 renders nothing in the browser. Where there is no document it also renders the style elements, or the
-marker, that name the sets.
+marker, that name the sets; under a `StyleRegistry` the registry takes their texts and nothing is rendered
+(`createStyle.ts`).
 
 ## Why it exists
 
@@ -19,7 +20,7 @@ importer; it passes in its own `useThemeView` and a function that picks style el
 
 ```mermaid
 flowchart TD
-  props["props.styles"] --> cache["useProvidedCache()"]
+  props["props.styles"] --> cache["useProvidedCache(), useStyleRegistry()"]
   cache --> local{"cache given?"}
   local -->|yes| over["engine.withCache(cache)"]
   local -->|no| own["engine"]
@@ -36,7 +37,7 @@ flowchart TD
   effect --> doc{"document defined?"}
   doc -->|yes| null["return null"]
   doc -->|no| forever["insertSets during render, never released"]
-  forever --> elems["createServerElements(sets, cache)"]
+  forever --> elems["createServerElements(sets, cache, registry)"]
   elems --> out["Fragment of elements, or null"]
 ```
 

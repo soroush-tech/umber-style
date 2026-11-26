@@ -2,8 +2,9 @@ import Link from 'next/link'
 import type { ReactNode } from 'react'
 import { keyframes, styled } from './style'
 
-// The server components of the pages under /csp-server: every class is made in the server components
-// build, and each element sends the style element of its class.
+// The server components of the pages under /csp-server, and of /csp-inplace, which renders the same
+// parts with no registry: every class is made in the server components build, and each element sends the
+// style of its class.
 
 const Frame = styled('main', { name: 'CspServerFrame' })(({ theme }) => ({
   padding: theme.space[3],
@@ -22,23 +23,25 @@ const Title = styled('h1', { name: 'CspServerTitle' })(({ theme }) => ({
   color: theme.palette.primary,
 }))
 
-/** The frame of a page under /csp-server: the links, a title, and what the page puts in it. */
+/** The frame of a page under `base` (/csp-server by default): the links, a title, and what the page puts in it. */
 export function ServerFrame({
   testId,
   title,
+  base = '/csp-server',
   children,
 }: {
   testId: string
   title: string
+  base?: string
   children?: ReactNode
 }) {
   return (
     <Frame data-testid={testId}>
       <Nav>
-        <Link href="/csp-server" data-testid="link-csp-server">
+        <Link href={base} data-testid="link-csp-server">
           Home
         </Link>
-        <Link href="/csp-server/other" data-testid="link-csp-server-other">
+        <Link href={`${base}/other`} data-testid="link-csp-server-other">
           Other
         </Link>
       </Nav>
@@ -95,3 +98,50 @@ export const OtherCard = styled('section', { name: 'CspServerOtherCard' })(({ th
   animationDuration: 1000,
   animationPlayState: 'paused',
 }))
+
+/** A list whose items are styled by their place in it. */
+export const List = styled('ul', { name: 'CspServerList' })({
+  margin: 0,
+  padding: 0,
+  listStyle: 'none',
+})
+
+/**
+ * An item whose look depends on its place: `:first-child`, `:nth-child(2)` and `& + &`. A style element
+ * among the items would shift all three.
+ */
+export const Item = styled('li', { name: 'CspServerItem' })(({ theme }) => ({
+  color: theme.palette.text,
+  marginTop: 1,
+  '&:first-child': { color: theme.palette.accent },
+  '&:nth-child(2)': { color: theme.palette.primary },
+  '& + &': { marginTop: 9 },
+}))
+
+/** A tag shown first in the fallback of a boundary, then in the content that replaces it. */
+export const Tag = styled('em', { name: 'CspServerTag' })(({ theme }) => ({
+  color: theme.palette.primary,
+  paddingLeft: 5,
+}))
+
+/** Holds a nested boundary of the streaming page. */
+export const Box = styled('div', { name: 'CspServerBox' })({
+  outlineStyle: 'solid',
+  outlineWidth: 3,
+})
+
+/**
+ * A pill: a base class whose `paddingLeft` its props class overrides. The streaming page uses it first
+ * inside a boundary; the other page brings a props class of its own, which a client-side navigation writes
+ * after the base class.
+ */
+export const Pill = styled('span', { name: 'CspServerPill' })<{ size: 'small' | 'big' }>(
+  { display: 'inline-block', paddingLeft: 8, borderStyle: 'dotted', borderWidth: 1 },
+  ({ size }) => ({ paddingLeft: size === 'big' ? 30 : 12 })
+)
+
+/** Waits `ms`, then renders its children: an async server component, which suspends. */
+export async function Late({ ms, children }: { ms: number; children: ReactNode }) {
+  await new Promise((resolve) => setTimeout(resolve, ms))
+  return <>{children}</>
+}
