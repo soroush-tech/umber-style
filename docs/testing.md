@@ -29,7 +29,7 @@ Tiers 2 and 3 need Chromium, which Playwright installs once: `pnpm --filter @umb
 
 ### On each React 19 minor
 
-The packages declare `react` `^19.0.0`, and CI runs the suite on each minor: the `packages`, `build` (with the typecheck), `browser`, `e2e` and `e2e-dev` jobs have one row for each of 19.0, 19.1, 19.2 and 19.3, named with it (`packages (core, react 19.0)`). Each row pins the newest patch of its minor across the workspace before its install, and checks the installed copies after it. Coverage goes to Codecov from the rows on the newest minor only. A machine runs a row the same way:
+The packages declare `react` `^19.0.0`, and CI runs the suite on the minors, but only where React is used: a package that lists `react` in its dependencies, peer dependencies or dev dependencies (today `react`, `react-native`, `server`, `styled` and `umber-style`) has one `packages` row for each minor, named with it (`packages (react, react 19.0)`), and every other package has one row, on the React of the lockfile. In the `browser` job `@umber-style/react` has a row for each minor and `@umber-style/core` one; in `e2e` and `e2e-dev` every fixture with React has a row for each minor, and `vue-ssr` (no React) and `next-app` (it runs the React that Next.js bundles, whatever is installed) have one, the second saying so in its name. The `build` job runs once: the typecheck reads `@types/react`, which the pin leaves alone, the build leaves React external and the packed-tarball test installs its own React. The rows are found from the manifests in `fixtures/` and `packages/`, so a new package or fixture needs no edit of the workflow. A pull request runs the oldest and the newest minor (19.0 and 19.3); a push to `main` runs all four (19.0, 19.1, 19.2 and 19.3), which is where an in-between minor is first seen. Each row with a minor pins the newest patch of it across the workspace before its install, and checks the installed copies after it. Coverage goes to Codecov once for each package: from the newest minor where the package has one row for each minor, from its only row otherwise. A machine runs a row the same way:
 
 ```sh
 node scripts/use-react.mjs 19.0      # or an exact version: 19.0.9
@@ -205,7 +205,7 @@ The tests change `fixtures/shared/src/components.tsx`, `fixtures/shared/src/page
 ## Limits
 
 - The fixtures hold the same few components. A defect that needs another shape of style may not show.
-- The React rows run the newest patch of each minor, resolved when the job runs: an older patch of a minor is not run, and a new patch can make a row fail on a pull request that changed nothing. The App Router fixture never runs the React an app installs, on any row.
+- The React rows run the newest patch of each minor, resolved when the job runs: an older patch of a minor is not run, a new patch can make a row fail on a pull request that changed nothing, and the minors between the oldest and the newest are run by a push to `main` only, so a pull request can pass and break `main`. The App Router fixture never runs the React an app installs, on any row.
 - Scenario G runs several times at once with the other scenarios on one machine. Its numbers are for comparison between fixtures on the same run, not absolute.
 - The text of a rule that a browser cache inserted after load is not seen by the rule usage tracking: scenario E does not apply to a client-only app.
 - The class on `<html>` is switched by script. A page with scripting disabled stays in the scheme that the server chose.

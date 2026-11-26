@@ -38,29 +38,36 @@ Pin every `uses:` by the action's origin, as the files do:
 - **`prepare` detects once** and the other jobs read `needs.prepare.outputs.*`: the Node version
   from `.nvmrc` (never hard-coded), the package manager and its install command, the package
   matrix, the Playwright version (for the browser cache key), the fixture matrix, and the React
-  axis (`react`, `react_newest`).
+  axis (the minors of the event, `newest`, and one matrix per React-using job).
 - **The React axis**: `REACT_MINORS` in the `env` of `prepare` lists the React 19 minors, oldest
-  first (`19.0` to `19.3`); it is the one place to add a minor. `packages`, `build`, `browser`, `e2e`
-  and `e2e-dev` have one row for each, named with it (`packages (core, react 19.0)`); the package
-  and fixture matrices are crossed with it in `prepare`, the written-out ones take it as an axis.
-  Each of those jobs gives `react: ${{ matrix.react }}` to the setup action, which pins the newest
-  patch of the minor (`scripts/use-react.mjs`, a root `pnpm.overrides` in the checkout only), installs
-  with `--no-frozen-lockfile`, and checks the installed copies. `lint` and `bench` run the lockfile's
-  React. The rows of `next-app` say in their names that they run the React of Next.js.
-- **The package matrix is discovered from `packages/`**: one row per folder with a `package.json`,
-  with `dir`, `filter` (the package name) and `flag` (the folder name). Adding a package needs no
-  edit to `ci.yml`. The same holds for `e2e`: one row per folder of `fixtures/` except `shared`.
-- **Two matrices are written out**: `browser` lists `@umber-style/core` and `@umber-style/react`
-  (the packages with a `test:browser` script), and `e2e-dev` lists `vike-ssg`, `next-app` and
-  `spa` (the fixtures with a `devPort` in `e2e/fixtures.ts`). A new package with browser tests or
-  a new fixture with a development server is added there by hand.
+  first (`19.0` to `19.3`); it is the one place to add a minor. `prepare` turns it into the minors of
+  the event: the oldest and the newest on a `pull_request`, every one on a `push` to `main` (the `react`
+  step's `minors` and `newest` outputs, which only `prepare` reads). The axis is a row's only where React is
+  used: the step "Discover the matrices" makes the matrices of `packages`, `browser`, `e2e` and `e2e-dev`
+  from the files (outputs `packages`, `browser`, `fixtures`, `fixtures_dev`), and a package or fixture whose
+  `package.json` lists `react` in its dependencies, peerDependencies or devDependencies has a row for each
+  minor, the others one row with `react: ''`. The App Router fixture (`next` and an `app` folder) runs the React
+  that Next.js bundles, so it runs once and says so in its name. Each row carries a `label` that its job name
+  appends (`, react 19.0`) and `coverage`, true on the newest minor of a package per minor and on the only row
+  of any other. A row gives `react: ${{ matrix.react }}` to the setup action, which pins the newest patch of the
+  minor (`scripts/use-react.mjs`, a root `pnpm.overrides` in the checkout only), installs with
+  `--no-frozen-lockfile`, and checks the installed copies; an empty `react` installs the lockfile's React, as
+  `lint`, `build` and `bench` do.
+- **The package matrix is discovered from `packages/`**: a row per folder with a `package.json`
+  (see the axis above), with `dir`, `filter` (the package name) and `flag` (the folder name). Adding
+  a package needs no edit to `ci.yml`. The same holds for `e2e`: rows for each folder of `fixtures/` except
+  `shared`, and for `browser`: the packages with a `test:browser` script.
+- **One list is written out**: the fixtures of `e2e-dev` (`vike-ssg`, `next-app`, `spa`: the ones with a
+  `devPort` in `e2e/fixtures.ts`), in the discovery script of `prepare`. A new fixture with a development
+  server is added there by hand.
 - **`lint`** runs `format:check`, `lint`, `typecheck`, `test:scripts` (Node's test runner on
   `scripts/*.test.mjs`, at 100%), `gen:publish-options --check`, `check:typography` and
   `check:release-notes`, once for the whole workspace.
-- **`packages`** runs one package's tests on one React: `test:coverage` and the lcov upload on the
-  newest minor, `test` on the others. **`build`** runs `pnpm typecheck` and `pnpm build` on each React,
-  and `scripts/smoke-packed.mjs` (the packed tarballs, installed from outside the workspace) on the
-  newest only, because its consumer installs React from npm whatever is pinned. **`browser`**, **`e2e`** and **`e2e-dev`** restore the Playwright binaries from the
+- **`packages`** runs one package's tests on one React where the package uses it: `test:coverage` and
+  the lcov upload on the row with `coverage`, `test` on the others. **`build`** runs once, on the
+  lockfile's React (the typecheck reads `@types/react`, which the pin leaves alone; the build leaves React
+  external; `scripts/smoke-packed.mjs`, the packed tarballs installed from outside the workspace, installs
+  its own React): `pnpm typecheck`, `pnpm build` and the smoke test. **`browser`**, **`e2e`** and **`e2e-dev`** restore the Playwright binaries from the
   cache, install Chromium on a miss and its system libraries on a hit (three attempts of three
   minutes), and run `test:browser`, `test:e2e` or `test:e2e:dev`.
 - **Every job that installs uses `./.github/actions/setup`**, the composite action that holds
@@ -125,7 +132,7 @@ run to the end. CI never runs it.
 
 ## Coverage to Codecov
 
-- Only the rows on the newest React (`react_newest`) upload, so a flag gets one report per run.
+- Only the row with `coverage` of each package uploads (the newest React of a package per minor, its only row otherwise), so a flag gets one report per run.
 - Each `packages` row rewrites `SF:` in `packages/<dir>/coverage/lcov.info` to start with
   `packages/<dir>/` (a lone `src/index.ts` is ambiguous across the monorepo), then uploads it with
   `flags` and `name` set to the folder name and `slug: soroush-tech/umber-style`.
