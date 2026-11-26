@@ -99,7 +99,7 @@ stops the same way when the dependency's version is not on npm.
    (`bench/gate/baseline.ts`), which the release just made.
 
 After every dispatch, the `bench-report` job of the same run compares what was published with the
-last stable (and an alpha or an rc with the previous one of its channel): its table is in the run's
+last stable (and an alpha or an rc with the previous one of its channel): its report is in the run's
 summary and, for an rc or a stable, below the notes of the GitHub Release (`docs/benchmarks.md`). It
 never fails the release.
 

@@ -63,7 +63,7 @@
     "vue": "^3.5.0"
   },
   "devDependencies": {
-    "@soroush.tech/bench": "^2.3.0",
+    "@soroush.tech/bench": "^2.4.0",
     "@types/node": "^26.6.6",
     "@umber-style/eslint-config": "workspace:*",
     "@umber-style/is-prop-valid": "workspace:*",

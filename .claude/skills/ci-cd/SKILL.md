@@ -27,7 +27,7 @@ Pin every `uses:` by the action's origin, as the files do:
   `github-script`, `create-github-app-token`) - a major version tag: `actions/checkout@v7`.
 - **Everything else, the owner's own actions included** (`pnpm/action-setup`,
   `codecov/codecov-action`, `soroush-tech/bench-action`) - a full commit SHA with the version in a
-  comment: `soroush-tech/bench-action@a162a94... # v1.2.0`. A tag can be moved, the owner's tags
+  comment: `soroush-tech/bench-action@ab812be... # v1.3.0`. A tag can be moved, the owner's tags
   too. Bumping the SHA is a reviewed line.
 
 ## CI job shape
@@ -93,25 +93,35 @@ minimum ratio of 80 and 5 rounds (`GATE_OPTIONS` of `bench/gate/baseline.ts`, wh
 change them there, never in the workflow), a case slower than the release by more than a fifth fails the
 job and, through `ci-ok`, the pull request. A previous build that cannot be made fails the step before
 the gate: the gate never passes without a comparison. `pnpm bench:gate` (`bench/bin/gate.mjs`) runs the
-same on a machine. The job posts one comment on the pull request (bench-action 1.2.0: a summary table
-across the files, failures first, each file's table folded under it; `comment-title` and
-`comment-details` stay at their defaults, as there is one bench job), as the org's GitHub App when the
-`BENCH_BOT_APP_ID` variable is set, else with `GITHUB_TOKEN`. Details and how to read a failure:
-`docs/benchmarks.md`.
+same on a machine. The job posts one comment on the pull request (bench-action 1.3.0, which vendors
+soroush-bench 2.4.0: a summary table across the files, failures first, each file's table folded under it,
+and a line under the head that names the bench version, Node version and sandbox limits;
+`comment-title` and `comment-details` stay at their defaults, as there is one bench job), as the org's
+GitHub App when the `BENCH_BOT_APP_ID` variable is set, else with `GITHUB_TOKEN`. The action writes the
+same report to the job summary. A file that ran but left no results fails the job too. Details and how
+to read a failure: `docs/benchmarks.md`.
 
 ## The benchmark report after a release (`bench-report` in `cd-packages.yml`)
 
-After `publish`, whose output `published` lists the `<name>@<version>` it published,
-`bench-report` runs `scripts/bench-report.mjs`: it waits (30 tries, 10 seconds apart) until the
-registry lists each version, picks what to compare with `planReport` (`bench/src/releases.ts`: the
-last stable, and for an alpha or an rc the previous one of its channel for the same version), and runs
-the scenarios of `bench/report/` with every version installed from npm in the sandbox, with the
-soroush-bench CLI and `--json-file` (not bench-action, which refuses a `min-ratio` of 0); the table is
-laid out by `bench/src/reportTable.ts`. Only the core
-has report scenarios. The table goes to the job summary and, for an rc or a stable release, below the
-notes of its GitHub Release (`gh release edit`, after a marker that a rerun replaces from). It is a
-report, not a gate: `continue-on-error: true`, and a last step says in the summary when it did not run
-to the end. CI never runs it.
+After `publish`, whose output `published` lists the `<name>@<version>` it published, `bench-report`
+runs three steps:
+
+1. `node scripts/bench-report.mjs plan`: waits (30 tries, 10 seconds apart) until the registry lists
+   each version, picks what to compare with `planReport` (`bench/src/releases.ts`: the last stable, and
+   for an alpha or an rc the previous one of its channel for the same version), writes the versions into
+   `bench/report/versions.json`, and gives the step the outputs `spec` and `baseline-case` (the last
+   stable, else the previous of the channel). A first release gets neither, and the next steps skip.
+2. `soroush-tech/bench-action` (the same pin as the gate) on `bench/report/` in report-only mode:
+   `min-ratio: ''` (no gate; a file that crashed or left no results still fails the step),
+   `rounds: '5'`, `github-token: ''` (no comment), `comment-title` naming the spec. Every version is
+   installed from npm in the sandbox; the ratios are soroush-bench's. The action writes the report to
+   the job summary and gives it as its `report` output.
+3. For an rc or a stable release, `node scripts/bench-report.mjs append` puts that output below the
+   notes of its GitHub Release (`gh release edit`, after a marker that a rerun replaces from).
+
+Only the core has report scenarios, so the action runs once. No ratio is computed in the repository. It
+is a report, not a gate: `continue-on-error: true`, and a last step says in the summary when it did not
+run to the end. CI never runs it.
 
 ## Coverage to Codecov
 

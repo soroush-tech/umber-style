@@ -71,7 +71,7 @@
     "csstype": "^3.2.3"
   },
   "devDependencies": {
-    "@soroush.tech/bench": "^2.3.0",
+    "@soroush.tech/bench": "^2.4.0",
     "@types/node": "^26.6.6",
     "@umber-style/eslint-config": "workspace:*",
     "@vitest/browser-playwright": "^5.1.1",

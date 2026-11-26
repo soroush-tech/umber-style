@@ -69,7 +69,7 @@
     "@umber-style/core": "workspace:^"
   },
   "devDependencies": {
-    "@soroush.tech/bench": "^2.3.0",
+    "@soroush.tech/bench": "^2.4.0",
     "@types/node": "^26.6.6",
     "@umber-style/eslint-config": "workspace:*",
     "@vitest/coverage-v8": "^5.1.0",

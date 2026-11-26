@@ -16,7 +16,7 @@ and prerelease identifiers, `compareVersions` orders two versions as semantic ve
 ## Why it exists
 
 The two scripts that read git and the registry (`bench/bin/previous.mjs` for the gate,
-`scripts/bench-report.mjs` for the report) are hard to test: they need the network, git and Docker. The
+`scripts/bench-report.mjs` for the report) are hard to test: they need the network, git and `gh`. The
 rules they follow are pure functions of lists of strings, so they live here, where the bench package's
 tests hold them at 100% coverage, and the scripts import them (Node runs the TypeScript file by stripping
 its types). It is in `bench/src/` and not in `scripts/` because `scripts/` has no test runner.

@@ -10,7 +10,7 @@ There are three sets of files:
 
 - **Local files**, in `packages/<package>/bench/`: the cases of a file compare with each other, on the build of this checkout. `pnpm bench` runs them.
 - **The gate**, in `bench/gate/`: each file compares this checkout with the last release, and a pull request fails when a case is more than a fifth slower. CI runs it; `pnpm bench:gate` runs it on your machine.
-- **The report**, in `bench/report/`: after a release, the scenarios of the gate with every version installed from npm, written as a table to the run's summary and the GitHub Release. It is never a gate.
+- **The report**, in `bench/report/`: after a release, the scenarios of the gate with every version installed from npm, written as a report to the run's summary and the GitHub Release. It is never a gate.
 
 ## What is measured
 
@@ -145,6 +145,14 @@ Without `--rounds`, soroush-bench prints a report for each file: for each case t
 
 With `--rounds N` the whole file runs N times in the sandbox and one table of the median of each case is printed instead.
 
+Before its results, every run prints one line that names what produced them: the version of soroush-bench whose harness ran, the Node version of the sandbox, and its limits. With `--json-file` the same is written as `env`.
+
+```text
+soroush-bench 2.4.0 - node v24.22.3 - cpus 1 - cpuset 0 - memory 512m
+```
+
+The tool separates the parts with a middle dot; here it is a hyphen. Two runs compare when this line is the same in both. When it differs (another version of soroush-bench, whose sandbox image is pinned to another Node), a difference in the figures may come from the sandbox and not from the code.
+
 ## What the figures include
 
 - **The built packages, in production mode.** Each file measures the `dist` of this checkout, as an app loads it. React and Vue take their production paths (`NODE_ENV` is `production`).
@@ -237,7 +245,8 @@ bench: performance target failed (min ratio 80%):
 - The percentage is `previous.avg / current.avg`: 48.3 means this checkout takes about twice as long as the release for that operation.
 - A real regression fails every time, with a figure well under 80. Noise shows as a figure just under 80 that passes on the next run: run the job again. A file that fails on identical code (`pnpm bench:gate --ref HEAD`) is noisy, not slow; raise `rounds` for it, or leave it out of the folder.
 - To look closer, run the one file with `--md` to see the p75 and the allocation of each case. Compare `avg` with `p75`: if the average is far above it, a few slow samples are moving the mean.
-- The job also posts the results as a comment on the pull request: one summary table across every gate file (a row for each case that is not `previous`, with its status, its file, its speed against `previous` and its mean time, the failures first), and the table of each file folded underneath. A push updates the same comment.
+- The job also posts the results as a comment on the pull request: under the head line, the line that names the version of soroush-bench, the Node version and the sandbox limits of the run (see "Reading the table"); then one summary table across every gate file (a row for each case that is not `previous`, with its status, its file, its speed against `previous` and its mean time, the failures first), and the table of each file folded underneath. A push updates the same comment, and the same report is in the summary of the job.
+- A file that ran but left no results to compare fails too, with a row "no results". A gate file has both of its cases or fails as it loads, so such a row means the sandbox itself broke: look at the log of the job.
 
 ### What is gated
 
@@ -273,39 +282,61 @@ The previous build adds about a minute (a filtered install from the pnpm store a
 
 ## The report after a release
 
-After the workflow `CD - Packages (npm)` publishes, its job `bench-report` runs `scripts/bench-report.mjs` with the `<name>@<version>` of each package it published. For a package that has report scenarios (only `@umber-style/core`), the script waits until the registry lists the version (30 tries, 10 seconds apart), picks the versions to compare, and runs the scenarios of `bench/report/` with every version installed from npm in the sandbox, five rounds each. It is a report, not a gate: the job may fail without failing the release, and the summary says so when it could not run.
+After the workflow `CD - Packages (npm)` publishes, its job `bench-report` makes the report in three steps:
+
+1. `node scripts/bench-report.mjs plan` gets the `<name>@<version>` of each package it published. For a package that has report scenarios (only `@umber-style/core`), it waits until the registry lists the version (30 tries, 10 seconds apart), picks the versions to compare, writes them into `bench/report/versions.json` (each version is a case of every report file), and writes a line to the summary that names each with its role. The other packages get a line that says they have no report scenarios.
+2. The action `soroush-tech/bench-action` (the same version and pin as the gate) runs the scenarios of `bench/report/` with every version installed from npm in the sandbox, five rounds each, with the baseline case the last stable (or, with no stable, the previous release of the channel) and no minimum ratio: it reports, and no case fails for being slow. It writes the report to the summary of the run, and posts no comment (there is no pull request).
+3. For an rc or a stable release, `node scripts/bench-report.mjs append` puts the action's report below the notes of its GitHub Release.
+
+It is a report, not a gate: the job may fail without failing the release, and the summary says so when it could not run.
 
 Which versions are compared (`planReport` in `bench/src/releases.ts`):
 
-| Release just made                                                                 | Compared with                                                                                   | Versions in the table |
-| --------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- | --------------------- |
-| a release candidate, `0.3.0-rc.1`                                                 | the previous release candidate of the same version (`0.3.0-rc.0`) and the last stable (`0.2.0`) | 3                     |
-| an alpha, `0.3.0-alpha.1`                                                         | the previous alpha of the same version (`0.3.0-alpha.0`) and the last stable (`0.2.0`)          | 3                     |
-| the first prerelease of its channel for a version (`0.3.0-rc.0`, `0.3.0-alpha.0`) | the last stable only                                                                            | 2                     |
-| a stable release, `0.3.0`                                                         | the previous stable only (`0.2.0`)                                                              | 2                     |
+| Release just made                                                                 | Compared with                                                                                   | Versions in the report |
+| --------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- | ---------------------- |
+| a release candidate, `0.3.0-rc.1`                                                 | the previous release candidate of the same version (`0.3.0-rc.0`) and the last stable (`0.2.0`) | 3                      |
+| an alpha, `0.3.0-alpha.1`                                                         | the previous alpha of the same version (`0.3.0-alpha.0`) and the last stable (`0.2.0`)          | 3                      |
+| the first prerelease of its channel for a version (`0.3.0-rc.0`, `0.3.0-alpha.0`) | the last stable only                                                                            | 2                      |
+| a stable release, `0.3.0`                                                         | the previous stable only (`0.2.0`)                                                              | 2                      |
 
 "Previous" is the highest that exists below the version just published on its channel, for the same version: `0.3.0-rc.2` for `0.3.0-rc.3`, or `0.3.0-rc.1` when `rc.2` was never published. An rc is never compared with an alpha. "The last stable" is the highest stable version below the one released, never the placeholder `0.0.0` or `0.0.0-stage`. A package with no stable yet is compared with the previous release of its channel alone; the first release of a package has nothing to compare, and the job says so and passes. The other packages get a line that says they have no report scenarios.
 
 ### Reading the report
 
+The report is the action's. This is the start of the report of `0.2.0-alpha.1`, made on a laptop as if it had just been published (the files run with the command line of soroush-bench that the action wraps, and laid out by the action's own code):
+
 ```text
-| Scenario | 0.1.0 (last stable) | 0.2.0-alpha.0 (previous alpha) | 0.2.0-alpha.1 (published) |
-| --- | ---: | ---: | ---: |
-| core: the same style again | 2.03 us | 2.35 us (86.6%) | 2.22 us (91.4%) |
-| core: a theme and its variables | 1.43 ms | 1.39 ms (102.9%) | 1.35 ms (106.2%) |
+## Benchmarks: `@umber-style/core@0.2.0-alpha.1`
+
+Baseline case: `0.1.0` - report only, no gate
+
+soroush-bench 2.4.0 - node v24.22.3 - cpus 1 - cpuset 0 - memory 512m
+
+|  | Case | File | vs baseline | avg |
+| --- | --- | --- | ---: | ---: |
+| passed | `0.2.0-alpha.1` | `bench/report/extract-page.bench.ts` | 94.5% | 163.59 us |
+| passed | `0.2.0-alpha.0` | `bench/report/extract-page.bench.ts` | 95.9% | 161.22 us |
+| passed | `0.2.0-alpha.1` | `bench/report/class-merge.bench.ts` | 98.9% | 8.22 us |
+...
+| passed | `0.2.0-alpha.1` | `bench/report/theme-tokens.bench.ts` | 106.7% | 1.25 ms |
 ```
 
-That is two rows of the report of `0.2.0-alpha.1`, made on a laptop as if it had just been published.
+The action writes a check mark where this says "passed", the micro sign for `us`, and a middle dot for the hyphens of the two lines under the title.
 
-- Each row is one file of `bench/report/` (one scenario of the gate). Each cell is the median of five rounds of the mean time of one operation.
-- The percentage in brackets is the speed against the baseline, the last stable (or, with no stable, the previous release of the channel): `baseline.avg / version.avg`, so above 100% is faster than the baseline. The times are soroush-bench's own: the script runs each file with `--json-file` and reads the median mean of each version from the raw numbers it writes. The percentage is the formula of its gate, divided from those numbers (`bench/src/reportTable.ts`); no gate runs, so the tool's exit code says whether the file ran.
-- The table is in the summary of the run. For an rc or a stable release it is also added below the notes of its GitHub Release, after a marker that a run again replaces from; the notes file `release-notes/<version>.md` is not changed. An alpha has no GitHub Release, so its table is in the summary only.
+- The first line under the title says the baseline (the last stable, or, with no stable, the previous release of the channel) and that no gate runs. The second names what produced the numbers (see "Reading the table"): two reports compare when it is the same in both.
+- The summary table has a row for each version but the baseline in each file of `bench/report/` (one scenario of the gate), the slowest first. "vs baseline" is the speed against the baseline, `baseline.avg / version.avg`, so above 100% is faster than the baseline; "avg" is the median of five rounds of the mean time of one operation. Both are soroush-bench's own (`ratioPct` and `avg` of its `--json-file`): nothing is worked out in this repository.
+- Under it, the table of each file is folded, one row for each version with its p75 and allocation.
+- No case fails for being slow. A file that crashed or left no results has a failed row, and the job fails (the release does not).
+- The report is in the summary of the run, after the line of `plan` that names the role of each version (last stable, previous alpha or rc). For an rc or a stable release it is also added below the notes of its GitHub Release, after a marker that a run again replaces from; the notes file `release-notes/<version>.md` is not changed. An alpha has no GitHub Release, so its report is in the summary only.
 
-To make the report of a past release on your machine, as if it had just been published (Docker running, the workspace installed):
+To make the report of a past release on your machine, as if it had just been published (Docker running, the workspace installed), write its versions file, then run each report file with the baseline that `plan` printed and no minimum ratio, as the action does:
 
 ```sh
-node scripts/bench-report.mjs @umber-style/core@0.2.0-alpha.1
+node scripts/bench-report.mjs plan @umber-style/core@0.2.0-alpha.1
+npx @soroush.tech/bench bench/report/class-hit.bench.ts --baseline-case 0.1.0 --rounds 5
 ```
+
+The command line prints its own table for the file, not the action's summary across the files.
 
 ## Whole pages
 
@@ -319,8 +350,8 @@ These benchmarks measure parts. The numbers of a whole page (first HTML, hydrati
 - `scanHtml`, `scanVariables` and `scanStyleText` are measured from the source compiled by tsx, not from the build; the difference between the two was not measured.
 - The figure of a new variable in `pruning-mark-used.bench.ts` includes 1/127 of a fresh cache with five theme classes, which is most of it; the cost of the marking alone is the difference of two figures, each with its own noise. The same holds for the setup cases of the `dom-*` files.
 - `sheets-dom.bench.ts` has no case of 3200 classes written as text: jsdom keeps every style element it removed, and 6401 elements an operation run the sandbox out of memory. How text mode grows in a browser is checked by `sheetText.browser.test.ts` of the core (1600 rules in Chromium), outside the benchmarks.
-- The gate on identical code differed by up to 8.3% on a laptop; a hosted runner was not measured, and the first runs in continuous integration are the real test of the ratio. The action of the job (`soroush-tech/bench-action` 1.2.0) vendors soroush-bench 2.3.0, the version the workspace (and so `pnpm bench:gate`) has; their gate rule is the same, and only what is printed differs.
+- The gate on identical code differed by up to 8.3% on a laptop; a hosted runner was not measured, and the first runs in continuous integration are the real test of the ratio. The action of the job (`soroush-tech/bench-action` 1.3.0) vendors soroush-bench 2.4.0, the version the workspace (and so `pnpm bench:gate`) has; their gate rule is the same, and only what is printed differs.
 - The gate builds the release from its git tag: a release whose lockfile can no longer be installed stops the gate.
-- The `bench-report` job has not run in GitHub Actions; its script and its files were run on a laptop for past releases. The report compares versions measured in one job on one runner.
+- The `bench-report` job has not run in GitHub Actions; its script and its files were run on a laptop for past releases, with the command line of soroush-bench that the action wraps, so the action's own report of them has not been seen. The report compares versions measured in one job on one runner.
 - `pnpm bench` was run on Windows with Docker Desktop only. On Linux and macOS it mounts the repository at its own path for the `node_modules` links; that was not tried.
 - `alloc/iter` is an estimate from the heap. Below about 1 KB it is noise, and it counts the heap of one Node process: a browser's style sheet keeps its own copy of each rule outside it.
