@@ -73,6 +73,9 @@ export function createDefaultStyle() {
         get givenTheme() {
           return bound?.engine.givenTheme ?? pending.theme ?? pending.engine?.givenTheme
         },
+        get tokenOptions() {
+          return bound?.engine.tokenOptions ?? pending.engine?.tokenOptions ?? pending
+        },
       },
     }
   )

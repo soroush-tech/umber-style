@@ -64,13 +64,13 @@ export function createThemeProvider<T extends object>(
   { readFirstSlot, readBaseTheme, readNonce, sendStyles }: ServerProviderParts<T>
 ) {
   const prefix = engine.cache.prefix
-  // The token options as plain data, one object for the engine.
+  // The token options as plain data, one object for the engine: they cross to `ProviderScope` too.
   const { rawKeys, lengthKeys, modes } = engine.tokenOptions
-  const tokens: SentTokens = {
+  const tokens = toPlainTheme({
     ...(rawKeys && { rawKeys }),
     ...(lengthKeys && { lengthKeys }),
     ...(modes && { modes }),
-  }
+  }).theme as SentTokens
   // The base theme as sent, one object for each base theme.
   let sentBase: { theme: T; sent: ScopeBase } | undefined
   let hasWarned = false

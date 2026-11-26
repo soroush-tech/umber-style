@@ -267,6 +267,20 @@ describe('the contexts of the prefix of the default style', () => {
     expect(readPrefixStyle('claim-d').holder?.givenTheme).toBe(light)
   })
 
+  it('gives the token options of its options, of the engine it is given, and of its engine once used', () => {
+    const modes = { 'palette.text': 'raw' } as const
+    const fromOptions = createDefaultStyle()
+    fromOptions.configure({ prefix: 'claim-g', modes })
+    expect(readPrefixStyle('claim-g').holder?.tokenOptions).toMatchObject({ modes })
+    const engine = createLazyEngine({ prefix: 'claim-h', rawKeys: ['space'] })
+    createDefaultStyle().configure({ engine })
+    expect(readPrefixStyle('claim-h').holder?.tokenOptions).toBe(engine.tokenOptions)
+    fromOptions.getEngine()
+    expect(readPrefixStyle('claim-g').holder?.tokenOptions).toBe(
+      fromOptions.getEngine().tokenOptions
+    )
+  })
+
   it('shares the contexts of a prefix with each createStyle of that prefix', () => {
     const style = createDefaultStyle()
     style.configure({ prefix: 'claim-e' })

@@ -819,6 +819,187 @@ describe('a theme with no variable', () => {
   })
 })
 
+describe('a theme with hidden helpers on its breakpoints (#81)', () => {
+  /** Breakpoints of `sizes` with `up(key)`, a helper that is not enumerable and closes over the sizes, as a design system makes it. */
+  function withHelpers(sizes: { sm: string; md: string }) {
+    const breakpoints = { ...sizes }
+    Object.defineProperty(breakpoints, 'up', {
+      value: (key: 'sm' | 'md') => `@media (min-width:${sizes[key]})`,
+      enumerable: false,
+    })
+    return breakpoints as typeof sizes & { up?(key: 'sm' | 'md'): string }
+  }
+  const helperTheme = {
+    palette: light.palette,
+    breakpoints: withHelpers({ sm: '600px', md: '840px' }),
+  }
+  const otherSizes = { sm: '600px', md: '900px' }
+
+  /** The style of both builds over one engine whose base theme is `helperTheme`, and a client component that calls the helper. */
+  function setupHelpers() {
+    const engine = createEngine(helperTheme, { prefix: p })
+    const client = bindClient(engine)
+    const Probe = ({ id }: { id: string }) => {
+      const { breakpoints } = client.useTheme()
+      return (
+        <code data-testid={id}>{breakpoints.up?.('md') ?? `no helper, md ${breakpoints.md}`}</code>
+      )
+    }
+    return { engine, client, request: () => bindServer(engine, requestCache), Probe }
+  }
+  const read = (container: HTMLElement, id: string) =>
+    container.querySelector(`[data-testid="${id}"]`)?.textContent
+
+  afterEach(() => vi.unstubAllEnvs())
+
+  /** Watches `console.warn` in development. */
+  function watchWarnings() {
+    vi.stubEnv('NODE_ENV', 'development')
+    return vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+  }
+
+  it('with the same sizes as the base theme: a client component calls the helper and gets what it gets under a client provider, with no warning', () => {
+    const warn = watchWarnings()
+    const { client, request, Probe } = setupHelpers()
+    const { ThemeProvider } = request()
+    const { container } = mount(
+      <>
+        <ThemeProvider theme={{ palette: { surface: '#e9efe3' } }}>
+          <ThemeProvider theme={helperTheme}>
+            <Probe id="server" />
+          </ThemeProvider>
+        </ThemeProvider>
+        <client.ThemeProvider theme={helperTheme}>
+          <Probe id="client" />
+        </client.ThemeProvider>
+      </>
+    )
+    expect(read(container, 'server')).toBe('@media (min-width:840px)')
+    expect(read(container, 'server')).toBe(read(container, 'client'))
+    expect(warn).not.toHaveBeenCalled()
+  })
+
+  it('with the same sizes, where the client style is loaded after the providers rendered: the helper of the base theme is there (#71)', async () => {
+    const warn = watchWarnings()
+    const { ThemeProvider } = bindServer(createEngine(helperTheme, { prefix: p }), requestCache)
+    let Probe = () => <b />
+    const Late = lazy(async () => {
+      const client = bindClient(createEngine(helperTheme, { prefix: p }))
+      Probe = () => <code data-testid="late">{client.useTheme().breakpoints.up?.('md')}</code>
+      return { default: Probe }
+    })
+    const { container } = mount(
+      <ThemeProvider theme={helperTheme}>
+        <Suspense fallback={null}>
+          <Late />
+        </Suspense>
+      </ThemeProvider>
+    )
+    await act(async () => undefined)
+    expect(read(container, 'late')).toBe('@media (min-width:840px)')
+    expect(warn).not.toHaveBeenCalled()
+  })
+
+  it('with other sizes than the base theme: the helper of the base theme is not used, and the warning names the path and both values, once', () => {
+    const warn = watchWarnings()
+    const { request, Probe } = setupHelpers()
+    const tree = () => {
+      const { ThemeProvider } = request()
+      return (
+        <ThemeProvider theme={{ ...helperTheme, breakpoints: otherSizes }}>
+          <Probe id="other" />
+        </ThemeProvider>
+      )
+    }
+    const { container, render } = mount(tree())
+    render(tree())
+    expect(read(container, 'other')).toBe('no helper, md 900px')
+    expect(warn.mock.calls.map(([text]) => text)).toEqual([
+      `[${p}] The theme of a server ThemeProvider has breakpoints.md = "900px", but the base theme of the client build has "840px": the client build does not have this theme. Register the same theme in a module the client loads, with getEngine().setTheme(theme), createStyle(theme) or configure({ theme }).`,
+    ])
+  })
+
+  it('with other sizes, where the client style is loaded after the providers rendered: the same, through the base theme it completes the theme with', async () => {
+    const warn = watchWarnings()
+    const { ThemeProvider } = bindServer(createEngine(helperTheme, { prefix: p }), requestCache)
+    let Probe = () => <b />
+    const Late = lazy(async () => {
+      const client = bindClient(createEngine(helperTheme, { prefix: p }))
+      Probe = () => {
+        const { breakpoints } = client.useTheme()
+        return <code data-testid="late">{breakpoints.up?.('md') ?? `md ${breakpoints.md}`}</code>
+      }
+      return { default: Probe }
+    })
+    const { container } = mount(
+      <ThemeProvider theme={{ ...helperTheme, breakpoints: otherSizes }}>
+        <Suspense fallback={null}>
+          <Late />
+        </Suspense>
+      </ThemeProvider>
+    )
+    await act(async () => undefined)
+    expect(read(container, 'late')).toBe('md 900px')
+    expect(warn).toHaveBeenCalledTimes(1)
+    expect(warn.mock.calls[0][0]).toContain(
+      'has breakpoints.md = "900px", but the base theme of the client build has "840px"'
+    )
+  })
+
+  it('with other sizes than a provider above: the helpers of its theme are not used, and the warning names that theme', () => {
+    const warn = watchWarnings()
+    const { request, Probe } = setupHelpers()
+    const { ThemeProvider } = request()
+    const { container } = mount(
+      <ThemeProvider theme={helperTheme}>
+        <Probe id="outer" />
+        <ThemeProvider theme={{ breakpoints: otherSizes }}>
+          <Probe id="inner" />
+        </ThemeProvider>
+      </ThemeProvider>
+    )
+    expect(read(container, 'outer')).toBe('@media (min-width:840px)')
+    expect(read(container, 'inner')).toBe('no helper, md 900px')
+    expect(warn).toHaveBeenCalledTimes(1)
+    expect(warn.mock.calls[0][0]).toContain(
+      'has breakpoints.md = "900px", but the theme of the provider above it has "840px"'
+    )
+  })
+
+  it('in production: the same theme, with no message', () => {
+    vi.stubEnv('NODE_ENV', 'production')
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const { request, Probe } = setupHelpers()
+    const { ThemeProvider } = request()
+    const { container } = mount(
+      <ThemeProvider theme={{ ...helperTheme, breakpoints: otherSizes }}>
+        <Probe id="other" />
+      </ThemeProvider>
+    )
+    expect(read(container, 'other')).toBe('no helper, md 900px')
+    expect(warn).not.toHaveBeenCalled()
+  })
+
+  it('a theme with no hidden member: the theme a client component reads is the merge it was before', () => {
+    const warn = watchWarnings()
+    const { request, client } = setup()
+    const { ThemeProvider } = request()
+    let seen: unknown
+    const Probe = () => {
+      seen = client.useTheme()
+      return null
+    }
+    const given = { palette: { primary: '#123456' }, breakpoints: ['300px'] }
+    mount(
+      <ThemeProvider theme={given}>
+        <Probe />
+      </ThemeProvider>
+    )
+    expect(seen).toBe(mergeTheme(light, given))
+    expect(warn).not.toHaveBeenCalled()
+  })
+})
+
 describe('ProviderScope alone', () => {
   it('renders the children of a provider with isRoot under no other one', () => {
     const { container } = mount(

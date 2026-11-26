@@ -323,6 +323,68 @@ describe('what crosses to the browser part', () => {
     expect(warn).not.toHaveBeenCalled()
   })
 
+  /** Whether `value` is plain data at every depth: no prototype but the usual one, no member that is not enumerable, no symbol key. */
+  const isPlainDeep = (value: unknown): boolean => {
+    if (typeof value !== 'object' || value === null) return typeof value !== 'function'
+    const isList = Array.isArray(value)
+    const prototype = Object.getPrototypeOf(value)
+    const visible = Object.keys(value).length + (isList ? 1 : 0)
+    return (
+      (isList || prototype === Object.prototype) &&
+      Reflect.ownKeys(value).length === visible &&
+      Object.values(value).every(isPlainDeep)
+    )
+  }
+
+  it('sends a theme with hidden members (not enumerable, or under a symbol) as a plain copy, the given theme and the base theme, with no warning in development (#81)', async () => {
+    vi.stubEnv('NODE_ENV', 'development')
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const sizes = { sm: '600px', md: '840px' }
+    const breakpoints = { ...sizes }
+    Object.defineProperty(breakpoints, 'up', {
+      value: (key: keyof typeof sizes) => `@media (min-width:${sizes[key]})`,
+      enumerable: false,
+    })
+    Object.defineProperty(breakpoints, 'down', { value: () => '', enumerable: false })
+    const helpers = {
+      palette: { primary: '#0000ff', text: '#111111', [Symbol('brand')]: true },
+      breakpoints,
+    }
+    const modes = { 'palette.primary': 'reference' as const }
+    Object.defineProperty(modes, 'note', { value: 'hidden', enumerable: false })
+    const engine = createEngine(helpers, { prefix: 'sh', modes })
+    const { ThemeProvider } = bindEngine(engine, requestCache)
+    const tree = await resolveTree(
+      <ThemeProvider theme={{ palette: { primary: '#ff0000' } }}>
+        <ThemeProvider theme={helpers} />
+      </ThemeProvider>
+    )
+    const [outer, inner] = findScopes(tree).map(propsOf)
+    const base = (outer.theme as ScopeTheme).base?.theme
+    expect(base).toEqual({
+      palette: { primary: '#0000ff', text: '#111111' },
+      breakpoints: { sm: '600px', md: '840px' },
+    })
+    expect(isPlainDeep(base)).toBe(true)
+    expect(inner.given).not.toBe(helpers)
+    expect(inner.given).toEqual(base)
+    expect(isPlainDeep(inner.given)).toBe(true)
+    // The token options cross too: an option object with a hidden member is copied the same way.
+    expect((inner.theme as ScopeTheme).tokens).toEqual({
+      modes: { 'palette.primary': 'reference' },
+    })
+    expect(isPlainDeep((inner.theme as ScopeTheme).tokens)).toBe(true)
+    expect(warn).not.toHaveBeenCalled()
+  })
+
+  it('sends the base theme as it is when it has no hidden member', async () => {
+    const { ThemeProvider } = bindEngine(createEngine(theme, { prefix: 'sn' }), requestCache)
+    const [scope] = findScopes(
+      await resolveTree(<ThemeProvider theme={{ palette: { primary: '#ff0000' } }} />)
+    )
+    expect((propsOf(scope).theme as ScopeTheme).base?.theme).toBe(theme)
+  })
+
   it('sends an empty theme for a theme that is itself not plain data', async () => {
     const { ThemeProvider } = bindEngine(createEngine(theme, { prefix: 'sc' }), requestCache)
     const [scope] = findScopes(

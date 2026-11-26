@@ -287,6 +287,44 @@ export function Breakpoint() {
 
 The file imports the theme itself instead of receiving it as a prop. Use the same `prefix` and options as in the server file: classes are named from the hash of the rules and the prefix, so the two builds then make the same class name for the same style (a test compares the two). Every style of one prefix in the client build (the default style, each `createStyle`) shares one theme context, as they share the marks that say which provider is above.
 
+##### Hidden members: helpers on `breakpoints`
+
+A design system often puts helpers on its theme as members that are not enumerable, closures over the sizes:
+
+```ts
+const sizes = { sm: '600px', md: '840px' }
+const breakpoints = { ...sizes }
+Object.defineProperty(breakpoints, 'up', {
+  value: (key: keyof typeof sizes) => `@media (min-width:${sizes[key]})`,
+  enumerable: false,
+})
+export const theme = { palette: { primary: '#8a4b2a' }, breakpoints }
+```
+
+Such members (not enumerable, or under a symbol) are not data. A provider of a server component sends a copy of each object that has them, with its enumerable members only, and says nothing about them: the development server prints no "Only plain objects can be passed to Client Components" for the theme. A function under an enumerable key is still left out with the warning above.
+
+In the browser, the theme of that provider is merged over the theme below it: the base theme of the client bundle, or the theme of a provider above in the page. The hidden members come from there, built by the app's own code, as long as the provider's raw values are the same. A raw value is one a class depends on: a value under `breakpoints` or `components`, any path whose mode is `raw` or `inline` (see [Tokens](tokens.md)), and a value that is not a string or a number. Tokens are variables and are never compared. So with the same theme registered on the client (the `createStyle(theme)` module that client components import, `configure({ theme })` or `getEngine().setTheme(theme)`), a client component below the provider calls `useTheme().breakpoints.up('md')` and gets what it gets below a provider of a client file:
+
+```tsx
+'use client'
+
+import { useTheme } from './style'
+
+export function Query() {
+  return <code>{useTheme().breakpoints.up('md')}</code>
+}
+```
+
+Where a raw value of the provider differs (the server provider was given a theme the client bundle does not have), the hidden members of that top-level member are not taken: `breakpoints.up` is `undefined` below that provider rather than a helper built from other sizes, and in development the browser warns once for each such path:
+
+```
+[umber] The theme of a server ThemeProvider has breakpoints.md = "900px", but the base theme of the client build has "840px": the client build does not have this theme. Register the same theme in a module the client loads, with getEngine().setTheme(theme), createStyle(theme) or configure({ theme }).
+```
+
+The fix is the one it names: register the theme you give the server provider in a module the client loads. Where the theme below is that of a provider above, the message names it (`but the theme of the provider above it has "840px"`) and gives the other fix: a provider in a client file, which passes its own theme object, helpers included. In production the theme is the same, with no message: the merge still compares the raw values, once for each pair of themes, and only where the theme below has hidden members. A theme with no hidden member is merged as before.
+
+The fixture page `/csp-server/helpers` of the App Router fixture renders this, and scenario x of `e2e/helpers/cspServer.ts` checks it on the production build and on the development server: the media query in the first HTML and after hydration, and no "Only plain objects" message in the browser console, where the development server replays what it printed. The unit tests are in `packages/react/src/crossedTheme.test.ts` and `ProviderScope.test.tsx`.
+
 #### The server render of a client component
 
 A client component is also rendered on the server for the first HTML, by the client build. Where there is no `document`, that build renders the same `<style href precedence>` elements for its classes as the server components build does (one implementation, `styleElements.ts`), and its theme providers send the style of their theme classes, and the outermost one the style of its root theme. React moves them to the head and renders each `href` once, so a class that a server component and a client component both use is sent once. In the browser the client build keeps inserting into its sheet and renders none; the cache recognises the rules that arrived as style elements, so it does not insert them again. A theme class that only the browser made (the dark one) gets, from the rules of the page, every variable that the page uses.
@@ -483,6 +521,7 @@ The end-to-end suite loads a page of the Vue fixture under that policy (`e2e/tes
 - `useTheme()` of a server component never gives the theme of a provider, by design: in a partial render the providers above it do not render. Read the nearest provider's values in a client component.
 - With no base theme (the default style without `configure({ theme })`) the server build has none to give: a provider never makes its theme the base theme there, so what a request reads does not depend on which request came first. A function style, a function sheet and `Global` then read the shape of the theme of the first provider that renders in the request (tokens are references either way, and the real values are that theme's); in a request where no provider renders before them (a partial render of a page with no provider) they get an empty theme, and one that reads a token throws a `TypeError`. In development a style function of the server components build that would read that empty theme is warned about first, once for each component, with the ways to give a base theme: `createStyle(theme)` or `configure({ theme })` before the first `styled` call, or `getEngine().setTheme(theme)` when it is known only later. `themeClass` and `when` still make their theme the base theme when there is none, as the engine does in every build: give the base theme to `createStyle` or `configure`.
 - A provider of a server component sends the plain data of its theme only (see [What crosses to the browser](#what-crosses-to-the-browser)). Members that are not enumerable, and members of a list other than its items, are not read.
+- Hidden members reach a client component only from the theme below the provider in the browser, and only where the provider's raw values are the same (see [Hidden members](#hidden-members-helpers-on-breakpoints)). A helper hidden on the root of the theme is always taken from below, whatever the sizes. A list is replaced whole by a merge, so a helper hidden on a list (`breakpoints: ['600px']` with an `up`) never reaches a client component below a provider that gives that list. A token whose value is its own reference (`var(--umber-palette-primary)` for `palette.primary`) is compared as a raw value; such a variable is invalid in CSS anyway. The server's output of the development server was read for the message by hand (a script that starts it and loads the page: two messages before the change, none after); the end-to-end scenario reads the browser console.
 - A payload in which the first provider that renders has a theme that does not declare every variable of the base theme (the page provider of a client-side navigation) holds the values of the base theme once: about 0.3 kB with the fixture's theme of 22 variables, about 10 kB with a theme of 500 variables, before compression. A full render whose outermost provider has the whole theme sends none.
 - The first HTML holds the theme of each provider of the server build twice: as values in the payload of server components that the framework puts in the page, and as declarations in the style element of the outcome chosen.
 - The server components build runs in the Next.js App Router fixture (Turbopack, production build) and the end-to-end suite checks it. Other frameworks with server components were not run.

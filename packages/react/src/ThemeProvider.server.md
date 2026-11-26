@@ -54,6 +54,10 @@ request and a partial theme, the base theme as plain data (`readBase`, one objec
 - Only the first provider of a request sends the stamp and the base theme.
 - Members of the theme that cannot cross (function, symbol, class instance) are left out, with one warning
   for the life of the provider maker, in development.
+- Everything it sends that it did not make goes through `toPlainTheme`: the given theme, the base theme of
+  `readBase` and the token options (`tokens`, one object for the engine). An object with hidden members
+  (not enumerable, or under a symbol: helpers on `breakpoints`) is sent as a copy of its enumerable members,
+  with no warning (#81), so React's development build has nothing to report about it.
 - It calls no hook and imports nothing of the client build (`serverGuard.test.ts`).
 
 ## The nonce of a request
@@ -87,4 +91,6 @@ flowchart LR
 ## Limits
 
 - A theme with a member that is not plain loses it for client components below; they read the value of the
-  theme above (the warning text says so).
+  theme above (the warning text says so). A hidden member is lost the same way, without a warning: the
+  browser takes the hidden members of the base theme of the client build where the raw values are the same
+  (`crossedTheme.md`).

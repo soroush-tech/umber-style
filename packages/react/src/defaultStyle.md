@@ -57,7 +57,9 @@ else `'css'`.
 ## Decisions
 
 - `claimPrefixStyle` gets a `holder` whose `givenTheme` reads the bound engine, else the pending theme, else the
-  pending engine's, so the browser part of a server provider merges over the right base theme.
+  pending engine's, so the browser part of a server provider merges over the right base theme. Its
+  `tokenOptions` reads the bound engine's, else the pending engine's, else the pending options, which say
+  which values of a crossed theme are raw (`crossedTheme.md`).
 
 ## Limits
 

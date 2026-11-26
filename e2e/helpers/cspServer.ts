@@ -35,6 +35,7 @@ const PAGES = {
   stream: '/csp-server/stream',
   badge: '/csp-server/badge',
   interactive: '/csp-server/interactive',
+  helpers: '/csp-server/helpers',
 } as const
 
 /** The routes of server components under the policy with no registry: the styles in place. */
@@ -962,6 +963,31 @@ export const CSP_SERVER_SCENARIOS: readonly CspScenario[] = [
       expect(registered[0]).toMatch(/data-umber="cspsrv cspsrv-csp-server-client-badge-root-\w+"/)
       expect(registered[0], 'a nonce').not.toContain('nonce=')
       expect(html, 'a style element in place').not.toContain('data-umber-inline')
+    },
+  },
+  {
+    title:
+      '(x) server providers given a theme with hidden helpers on its breakpoints: a client component below calls one and shows the media query of the size, in the first HTML and after hydration, and no "Only plain objects" message reaches the console (#81)',
+    async run(_page, tools, tier) {
+      const query = '@media (min-width:840px)'
+      const { page, reports } = await openWatched(tools)
+      const response = await page.goto(PAGES.helpers)
+      const html = (await response?.text()) ?? ''
+      await page.getByTestId('page-csp-server-helpers').waitFor()
+      await waitForHydrated(page)
+      await page.waitForLoadState('networkidle')
+      expect(html, 'the query in the first HTML').toContain(
+        `data-testid="csp-server-helpers-query">${query}</code>`
+      )
+      await expect(page.getByTestId('csp-server-helpers-query')).toHaveText(query)
+      // On the development server React replays in the browser what the server printed while it sent
+      // the payload of server components, so a theme that cannot cross shows here too.
+      expect(
+        reports.console.filter((line) => line.includes('Only plain objects')),
+        'the message of a member that cannot cross'
+      ).toEqual([])
+      expectQuiet(reports, 'on the first load', tier)
+      await page.context().close()
     },
   },
 ]

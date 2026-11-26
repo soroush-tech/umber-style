@@ -99,7 +99,8 @@ export function createThemeProvider<T extends object>({
     // A provider of another cache is not of this engine: with none of this one above, it starts its own.
     const key = readMarkKey(baseEngine, cache)
     const above = marks.get(key)
-    const outer = completeTheme(useContext(ThemeContext), engine.givenTheme) ?? engine.givenTheme
+    const outer =
+      completeTheme(useContext(ThemeContext), engine, engine.cache.prefix) ?? engine.givenTheme
     const isOutermost = above === undefined && !isRoot
     const isNested = above !== undefined && !isRoot
     const given = useMemo(
