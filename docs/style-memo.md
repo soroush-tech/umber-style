@@ -123,7 +123,7 @@ This section is for a reader who knows Emotion and styled-components and wants t
 - **An override.** Emotion takes a `css` prop, UmberStyle a plain object in `style`. styled-components has no `css` prop without its build-time plugin, so its override is a component made once, `styled(Fixed)`, whose style is the object of a transient prop `$override`, a new object on each element.
 - **No equivalent.** styled-components has no function that returns a class name from a style object outside a component, so the rows of a class with no framework are empty for it. It does not read a page's HTML either: it collects a page's CSS while the page renders, so the row that picks one page's CSS out of its HTML has no step of its to time.
 - **Warm and cold.** Warm is a cache made warm by a render before the measurement, on every side. styled-components' documentation makes a `ServerStyleSheet` for each request; here its warm rows keep one sheet across renders, so that it starts as warm as the others. Cold is a fresh cache, or a fresh sheet, for every render, the same on every side. Emotion's server cache keeps what it compiled in a memo of the whole process, by the key of the cache, and that is in its cold rows.
-- **The output is not the same.** Emotion gives an element one class, a merged rule for each combination, with vendor prefixes: the tree of 500 is 18.3 KB of markup and 25.1 KB of CSS. styled-components gives two classes, the component's and the generated one, without vendor prefixes: 20.4 KB and 8.8 KB. UmberStyle gives a base class and a props class, in cascade layers, with the theme as variables: 30.3 KB and 7.7 KB. These are with the one-letter keys of the timed run; [The CSS a page gets](#the-css-a-page-gets) has the sizes with each library's default. UmberStyle renders a wrapper element for each nested theme provider; the other two render none.
+- **The output is not the same.** Emotion gives an element one class, a merged rule for each combination, with vendor prefixes: the tree of 500 is 18.3 KB of markup and 25.1 KB of CSS. styled-components gives two classes, the component's and the generated one, without vendor prefixes: 20.4 KB and 8.8 KB. UmberStyle gives a base class and a props class, in cascade layers, with the theme as variables: 30.3 KB and 7.7 KB. These are with the one-letter keys of the timed run; the sizes with each library's default options are not measured here. UmberStyle renders a wrapper element for each nested theme provider; the other two render none.
 
 ### A class from a style object, no framework
 
@@ -183,8 +183,6 @@ One operation is the CSS of the tree of 500 read from its HTML, as one style tag
 | The tree of 500 | 44.1 us |     no equivalent |               150 us |              144 us |
 
 Emotion is 3.13 times faster than UmberStyle with the memo off and 3.31 times faster with it on: the memo does not take part in reading a page. [Where it is slower, and why](performance.md#where-it-is-slower-and-why) explains the gap.
-
-@@SIZES@@
 
 ### The score
 

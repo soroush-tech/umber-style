@@ -21,7 +21,7 @@ takes the path it took before, chosen once when its compilers are made.
 
 ```mermaid
 flowchart TD
-  call["cssWithMemo(values)"] --> plain{"every value a style object (falsy ones left out)?"}
+  invoked["cssWithMemo(values)"] --> plain{"every value a style object (falsy ones left out)?"}
   plain -->|no| full["cssWith: the full path"]
   plain -->|yes| merge["mergeStyles, as cssWith merges: a fresh object, every top-level value read once"]
   merge --> find["find(layer, after, merged): walk the keys in order, each with its value"]

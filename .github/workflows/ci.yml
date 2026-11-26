@@ -210,6 +210,10 @@ jobs:
       - name: Check release notes
         run: ${{ needs.prepare.outputs.runner }} run check:release-notes
 
+      # No sidecar graph uses a reserved node id, and no link in docs/ points at a missing page or heading.
+      - name: Check docs
+        run: ${{ needs.prepare.outputs.runner }} run check:docs
+
   # One row per package, and per React minor of the event for a package that uses React: install (with
   # that React pinned, where there is one), run the package's tests. The row that has `coverage` (the
   # newest React of a package per minor, the only row of any other) runs `test:coverage` and uploads the

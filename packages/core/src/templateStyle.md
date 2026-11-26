@@ -20,7 +20,7 @@ strings array, so a call site pays for it once. Importers: `css.ts`, `globalStyl
 
 ```mermaid
 flowchart TD
-  call["parseStyleTemplate(strings, values)"] --> cached{"strings array seen before?"}
+  invoked["parseStyleTemplate(strings, values)"] --> cached{"strings array seen before?"}
   cached -->|no| parse["parse(strings joined with a HOLE character)"]
   cached -->|yes| nodes["cached statements"]
   parse --> nodes

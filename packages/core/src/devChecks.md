@@ -23,7 +23,7 @@ development only. `cache.ts` builds the checker and the warner, `createEngine.ts
 
 ```mermaid
 flowchart TD
-  call["check(rules?, readLabel)"] --> sup{"browser can answer CSS.supports?"}
+  invoked["check(rules?, readLabel)"] --> sup{"browser can answer CSS.supports?"}
   sup -->|yes| keep["keep the rules written since the last run, with the rules of the same reader"]
   sup -->|no| skip["rules are not kept"]
   keep --> timer

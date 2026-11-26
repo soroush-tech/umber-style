@@ -22,7 +22,7 @@ and `@umber-style/server` build on its public members.
 
 ```mermaid
 flowchart TD
-  call["css, cssIn, cssWith(values)"] --> memoOn{"hasStyleMemo, no development checks, no value repair (chosen once)?"}
+  invoked["css, cssIn, cssWith(values)"] --> memoOn{"hasStyleMemo, no development checks, no value repair (chosen once)?"}
   memoOn -->|no| entry
   memoOn -->|yes| objects{"every value a style object?"}
   objects -->|no| entry

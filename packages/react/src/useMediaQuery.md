@@ -17,7 +17,7 @@ for that case. It is exported from `index.ts`.
 
 ```mermaid
 flowchart TD
-  call["query, defaultMatches"] --> sub["subscribe: matchMedia(query), listen to change"]
+  invoked["query, defaultMatches"] --> sub["subscribe: matchMedia(query), listen to change"]
   sub --> store["useSyncExternalStore"]
   store --> where{"where is it read?"}
   where -->|browser| live["window.matchMedia(query).matches"]

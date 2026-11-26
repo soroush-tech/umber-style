@@ -20,7 +20,7 @@ fixtures and benchmark files of `react`, `react-native`, `vue` and `css` call it
 
 ```mermaid
 flowchart TD
-  call["prepareBuiltPackages(options)"] --> env["NODE_ENV = production"]
+  invoked["prepareBuiltPackages(options)"] --> env["NODE_ENV = production"]
   env --> targets["targets: core, is-prop-valid/react, plus redirects"]
   targets --> hook["registerHooks: a resolve hook"]
   hook --> ret["return the registration"]

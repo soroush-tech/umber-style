@@ -18,7 +18,7 @@ place that reads it and answers the question, so the three filters behave the sa
 
 ```mermaid
 flowchart TD
-  call["filter(prop)"] --> built{"answers built yet?"}
+  invoked["filter(prop)"] --> built{"answers built yet?"}
   built -->|no| expand["expandNames(groups): split on space"]
   expand --> group{"group has a colon?"}
   group -->|no| self["the name itself -> true"]
