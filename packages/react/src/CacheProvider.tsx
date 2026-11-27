@@ -1,7 +1,8 @@
 'use client'
 
 import { createContext, createElement, use, type ReactElement } from 'react'
-import { readSharedState, type Cache } from '@umber-style/core'
+import { type Cache } from '@umber-style/core'
+import { readSharedState } from '@umber-style/core/internal'
 import type { CacheProviderProps } from './types'
 
 // The context of the cache that the nearest `CacheProvider` gives, and whether one has rendered: until

@@ -1,13 +1,8 @@
 'use client'
 
 import { createContext, useContext, useMemo, type Context, type ReactNode } from 'react'
-import {
-  type ColorScheme,
-  EMPTY_THEME,
-  mergeTheme,
-  resolveThemeInput,
-  type ThemeInput,
-} from '@umber-style/core'
+import { type ColorScheme, type ThemeInput } from '@umber-style/core'
+import { EMPTY_THEME, mergeTheme, resolveThemeInput } from '@umber-style/core/internal'
 import { readSchemeName, type NativeCondition } from './conditions'
 import { guardTheme } from './devGuard'
 import type { NativeTheme } from './nativeTheme'

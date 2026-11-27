@@ -323,13 +323,13 @@ Where the styles name a state, `pressed`, `hovered` and `focused` are the bindin
 
 | Case                                                                | Average  | Allocated |
 | ------------------------------------------------------------------- | -------- | --------- |
-| 48 pressables, no state key (a style array)                         | 46.37 us | 125.21 KB |
-| 48 pressables, state keys (a `style` function)                      | 59.94 us | 166 B     |
-| 48 pressables, the same look as an own `style` function, no binding | 12.41 us | 104 B     |
-| One press, state keys                                               | 441 ns   | 106 B     |
+| 48 pressables, no state key (a style array)                         | 48.15 us | 125.18 KB |
+| 48 pressables, state keys (a `style` function)                      | 61.57 us | 164 B     |
+| 48 pressables, the same look as an own `style` function, no binding | 13.39 us | 105 B     |
+| One press, state keys                                               | 466 ns   | 113 B     |
 | One press, the own `style` function                                 | 2 ns     | 0 B       |
 
-Measured with `pnpm bench react-native states --rounds 3` in the soroush-bench Docker sandbox (the median of three rounds): read the ratios, not the times, and an allocation under about 1 KB as noise. A pressable with state keys costs about 1.3 times one without on a render: its state parts are resolved once for each combination of the theme, the color scheme of the provider, the matching queries and the states, and the same object is given again after (resolved on each render, as they were first written, it was 2.5 times); a press looks up the style resolved for its states (441 ns), where a hand-written function over registered entries only picks one. The binding's cost against no binding at all (the third row) is that of `styled` itself, with or without state keys.
+Measured on 0.8.0 with `pnpm bench react-native states --rounds 3` in the soroush-bench Docker sandbox (the median of three rounds): read the ratios, not the times, and an allocation under about 1 KB as noise. A pressable with state keys costs about 1.3 times one without on a render: its state parts are resolved once for each combination of the theme, the color scheme of the provider, the matching queries and the states, and the same object is given again after (resolved on each render, as they were first written, it was 2.5 times); a press looks up the style resolved for its states (466 ns), where a hand-written function over registered entries only picks one. The binding's cost against no binding at all (the third row) is that of `styled` itself, with or without state keys.
 
 ## Animations
 
@@ -483,14 +483,14 @@ What stays web-only: `linear()` easings, `animation-timeline`, `animation-compos
 
 | Case                                                     | Average   | Allocated |
 | -------------------------------------------------------- | --------- | --------- |
-| 48 views, no animation                                   | 39.79 us  | 110 B     |
-| 48 views, no animation, with the entry                   | 37.02 us  | 116 B     |
-| 48 views, a skeleton animation, no entry (keys dropped)  | 37.80 us  | 117 B     |
-| 48 views, a skeleton animation, with the entry           | 41.83 us  | 116.99 KB |
-| 48 views, a function style that animates, no entry       | 94.66 us  | 186.81 KB |
-| 48 views, a function style that animates, with the entry | 149.28 us | 284.92 KB |
+| 48 views, no animation                                   | 39.21 us  | 110.01 KB |
+| 48 views, no animation, with the entry                   | 38.95 us  | 117 B     |
+| 48 views, a skeleton animation, no entry (keys dropped)  | 38.27 us  | 118 B     |
+| 48 views, a skeleton animation, with the entry           | 40.23 us  | 116.61 KB |
+| 48 views, a function style that animates, no entry       | 95.33 us  | 186.96 KB |
+| 48 views, a function style that animates, with the entry | 149.22 us | 284.90 KB |
 
-Measured with `pnpm bench react-native animations --rounds 3` in the soroush-bench Docker sandbox (the median of three rounds): read the ratios, not the times. A component that does not animate costs the same with the entry as without it. One whose object style animates costs about as much as one that does not, its style translated once when the component is made; it watches reduced motion with the hook of the media keys. A function style that animates is resolved and translated on each render, about 1.6 times the same function style without the entry.
+Measured on 0.8.0 with `pnpm bench react-native animations --rounds 3` in the soroush-bench Docker sandbox (the median of three rounds): read the ratios, not the times. The allocation is an estimate from the heap: the first row allocated 110 B in the run this table showed before and 110.01 KB in this one, so read the first four rows of that column as noise. A component that does not animate costs the same with the entry as without it. One whose object style animates costs about as much as one that does not, its style translated once when the component is made; it watches reduced motion with the hook of the media keys. A function style that animates is resolved and translated on each render, about 1.6 times the same function style without the entry.
 
 ### Development warnings of the entry
 

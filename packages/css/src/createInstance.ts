@@ -3,8 +3,6 @@ import {
   createDomSheet,
   createMemorySheet,
   keyframes as registerKeyframes,
-  parseKeyframesTemplate,
-  parseStyleTemplate,
   type Cache,
   type CacheOptions,
   type ClassValue,
@@ -16,6 +14,7 @@ import {
   type UmberSheet,
   type WebStyleObject,
 } from '@umber-style/core'
+import { parseKeyframesTemplate, parseStyleTemplate } from '@umber-style/core/internal'
 
 /** What `css` takes: style objects, class names, CSS text (a string with `:` or `{`), nothing (`false`, `null`, `undefined`, `''`, `true`), and lists of them, nested. */
 export type CssInput = WebStyleObject | string | boolean | null | undefined | readonly CssInput[]

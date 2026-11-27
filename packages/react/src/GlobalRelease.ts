@@ -3,7 +3,7 @@
 // A namespace import: the server build of React has no hooks, and a server that loads the server build
 // of this package with no bundler (which would make this module a reference) still loads this module.
 import * as React from 'react'
-import { findCache } from '@umber-style/core'
+import { findCache } from '@umber-style/core/internal'
 
 /** The props of `GlobalRelease`: the sets of global rules that a server component wrote, by its prefix. */
 export interface GlobalReleaseProps {

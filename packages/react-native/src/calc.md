@@ -16,7 +16,7 @@ divide, which return numbers"), so on this platform the helpers compute the resu
 
 ```mermaid
 flowchart TD
-  call["helper called with operands"] --> kind{"scale or sum?"}
+  invoked["helper called with operands"] --> kind{"scale or sum?"}
   kind -->|"multiply, divide, negate"| s1["read the operand"]
   kind -->|"add, subtract"| t1["read every operand"]
   s1 --> bad{"readable?"}

@@ -1,13 +1,15 @@
 import {
   type BindingOptions,
-  createDeferredObject,
-  createDeferredRecord,
   createLazyEngine,
   globalStyles,
   keyframes,
-  withTagShorthands,
   type WebStyleObject,
 } from '@umber-style/core'
+import {
+  createDeferredObject,
+  createDeferredRecord,
+  withTagShorthands,
+} from '@umber-style/core/internal'
 import { defineComponent, h, type Component, type ComputedRef } from 'vue'
 import { bindEngine } from './createStyle'
 import type { Style, StyledOptions, Theme } from './types'

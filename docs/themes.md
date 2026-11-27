@@ -207,7 +207,7 @@ With no given base theme and no provider, a style function, a function sheet and
 
 Arrays are replaced as a whole in the real values: a provider with `{ space: [0, 8] }` makes `useTheme().space` that two-item array. The variables are per item, so only `--umber-space-0` and `--umber-space-1` are redeclared and `--umber-space-2` and `--umber-space-3` keep the outer values. If you need to change an array, give all of it.
 
-A merge keeps every own member of an object, with its descriptor: a helper function that is not enumerable (the `up` of `theme.breakpoints`, made with `Object.defineProperty`) survives a nested provider that sets `breakpoints`, from that provider's object when it has one, else from the one above.
+A merge keeps every own member of an object, with its descriptor: a helper function that is not enumerable (the `up` of `theme.breakpoints`, made with `Object.defineProperty`) survives a nested provider that sets `breakpoints`, from that provider's object when it has one, else from the one above. A provider of a server component is the exception: its theme crosses without such members, and the browser takes those of the theme below only where its raw values are the same (see [Server rendering](server-rendering.md#hidden-members-helpers-on-breakpoints)).
 
 ## Typing your theme
 

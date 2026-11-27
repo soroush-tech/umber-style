@@ -14,7 +14,7 @@ the markup uses, which style elements are already in it, and which sets of globa
 A `Global` component that renders no style element leaves only a marker: a `<meta name="<prefix>-global"
 content="ids">` for React or a comment `<!--<prefix>-global ids-->` for Vue. Reading all that with patterns
 risks backtracking on hostile input, so this is a scanner with indexes. It is its own file because the
-scan knows only HTML text; `extractStyles.ts` imports `scanHtml`, and `index.ts` re-exports it and
+scan knows only HTML text; `extractStyles.ts` imports `scanHtml`, and `internal.ts` re-exports
 `createGlobalMarker` for the bindings (React `styleElements.ts`, Vue `Global.ts`).
 
 ## The logic

@@ -1,5 +1,6 @@
 import { defineComponent, inject, provide, type InjectionKey, type PropType } from 'vue'
-import { readSharedState, type Cache } from '@umber-style/core'
+import { type Cache } from '@umber-style/core'
+import { readSharedState } from '@umber-style/core/internal'
 
 // The key under which the nearest `CacheProvider` provides its cache, and whether one has been set up:
 // until then no component looks for one, so that an app that has none pays nothing. Both are shared by

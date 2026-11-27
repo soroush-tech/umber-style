@@ -28,7 +28,7 @@ flowchart TD
   role -->|none above| outer["outermost: declareRoot in insertion effect"]
   role -->|above| nested["nested: wrapper"]
   props --> given["given = resolveThemeInput(theme, outer theme, engine.guardTheme): a function gets the theme above guarded with the checks"]
-  props --> outerTheme["outer = completeTheme(ThemeContext, engine.givenTheme) or engine.givenTheme"]
+  props --> outerTheme["outer = completeTheme(ThemeContext, engine, prefix) or engine.givenTheme"]
   outerTheme --> given
   given --> adopt["engine.adoptTheme(given)"]
   adopt --> merged["merged = mergeTheme(outer, given)"]

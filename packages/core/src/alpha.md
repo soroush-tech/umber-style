@@ -17,7 +17,7 @@ declaration written before it. The result is an object, not a string, because th
 texts and has to know when the pair is the whole value of a property.
 
 It is its own file because several modules use it: `serialize.ts`, `calc.ts`, `findInvalidValues.ts`,
-`globalStyles.ts`, `keyframes.ts`, `styleTypes.ts`, `templateStyle.ts`, `webStyle.ts`, `index.ts` and
+`globalStyles.ts`, `keyframes.ts`, `styleTypes.ts`, `templateStyle.ts`, `webStyle.ts`, `index.ts`, `internal.ts` and
 `packages/react-native/src/index.ts`.
 
 ## The logic

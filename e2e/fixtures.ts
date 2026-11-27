@@ -26,6 +26,24 @@ export interface FixtureConfig {
 
 const routes = { home: '/', catalog: '/catalog', settings: '/settings' }
 
+/**
+ * Under partial prerendering (`cacheComponents`) Next.js keeps the page that a client-side navigation
+ * leaves mounted, hidden by React's `Activity`, so the document holds the page left and the page reached.
+ */
+const KNOWN_HIDDEN_PAGE =
+  'KNOWN: under partial prerendering (cacheComponents) Next.js keeps the page left in a client-side navigation in the document, hidden by an Activity, so the app root of a page reached by a navigation holds the elements of the page left too, which the comparison with a direct load reads'
+
+/** A `Global` keeps its rules in an insertion effect, which React does not clean up in a hidden `Activity`. */
+const KNOWN_HIDDEN_GLOBAL =
+  'KNOWN: under partial prerendering (cacheComponents) the page left in a client-side navigation is hidden by an Activity and not unmounted; React does not clean up the insertion effect of its Global while it is hidden, so its global rule stays on the page reached'
+
+/** The pairs of pages of scenario C, as `C:<target>:<from>`. */
+const C_PAIRS = ['home', 'catalog', 'settings'].flatMap((target) =>
+  ['home', 'catalog', 'settings']
+    .filter((from) => from !== target)
+    .map((from) => `C:${target}:${from}`)
+)
+
 export const fixtures: readonly FixtureConfig[] = [
   {
     name: 'vike-ssg',
@@ -52,6 +70,24 @@ export const fixtures: readonly FixtureConfig[] = [
     only: 'next-app*.spec.ts',
     known: {},
     devPort: 4202,
+  },
+  {
+    name: 'next-ppr',
+    port: 4106,
+    filter: '@umber-fixtures/next-ppr',
+    routes,
+    hasHtml: true,
+    hasClientNavigation: true,
+    sharesProcess: false,
+    scenarios: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N'],
+    only: 'next-ppr*.spec.ts',
+    known: {
+      B: KNOWN_HIDDEN_PAGE,
+      ...Object.fromEntries(C_PAIRS.map((key) => [key, KNOWN_HIDDEN_PAGE])),
+      'M:promo:left': KNOWN_HIDDEN_GLOBAL,
+      'M:promo:reached': KNOWN_HIDDEN_GLOBAL,
+    },
+    devPort: 4206,
   },
   {
     name: 'next-pages',

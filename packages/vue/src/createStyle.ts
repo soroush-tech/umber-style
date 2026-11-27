@@ -1,9 +1,7 @@
 import { computed, inject, type ComputedRef } from 'vue'
 import {
   type Cache,
-  createCssEntry,
   createEngine,
-  EMPTY_THEME,
   type Engine,
   findEntryCache,
   globalStyles,
@@ -12,6 +10,7 @@ import {
   type SheetEntries,
   type WebStyleObject,
 } from '@umber-style/core'
+import { createCssEntry, EMPTY_THEME } from '@umber-style/core/internal'
 import { injectCache } from './CacheProvider'
 import { createGlobal } from './Global'
 import { createStyled } from './styled'

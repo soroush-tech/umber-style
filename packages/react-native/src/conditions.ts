@@ -1,12 +1,5 @@
-import {
-  createThemeKey,
-  readCondition,
-  readSharedState,
-  readState,
-  type SchemeName,
-  type StateName,
-  type ThemeKey,
-} from '@umber-style/core'
+import { readState, type SchemeName, type StateName, type ThemeKey } from '@umber-style/core'
+import { createThemeKey, readCondition, readSharedState } from '@umber-style/core/internal'
 import { platformAppearance } from './platform'
 
 /** What a condition key is matched against: the theme object and the color scheme of the nearest provider. */

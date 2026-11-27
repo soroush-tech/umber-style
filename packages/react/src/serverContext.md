@@ -21,7 +21,7 @@ slot for each engine.
 
 ```mermaid
 flowchart TD
-  call["createRequestSlot(default, cache)"] --> wrap["cache(make slot)"]
+  invoked["createRequestSlot(default, cache)"] --> wrap["cache(make slot)"]
   wrap --> reader["returned reader function"]
   reader --> inreq{"first call in this request?"}
   inreq -->|yes| fresh["slot: current = default, isSet = false"]

@@ -11,7 +11,7 @@ that writes into `page` the function that asks for the check that every cache of
 
 Some code has no engine of its own and still has to reach the cache of the page. The doc comment names a
 component that a server component renders, in the browser, which needs to release a global rule that a
-server sent. This file is that lookup. `cache.ts` calls `registerCache` and `index.ts` exports `findCache`.
+server sent. This file is that lookup. `cache.ts` calls `registerCache` and `internal.ts` exports `findCache`.
 
 ## The logic
 

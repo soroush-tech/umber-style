@@ -1,13 +1,12 @@
 import type { ElementType } from 'react'
 import {
-  createComponentSelector,
-  flattenStyle,
   isSheetEntry,
   type Cache,
   type Engine,
   type StyleInput,
   type Styler,
 } from '@umber-style/core'
+import { createComponentSelector, flattenStyle } from '@umber-style/core/internal'
 import { isPropValid } from '@umber-style/is-prop-valid/react'
 import type { StyledOptions, StyledStatics } from './types'
 

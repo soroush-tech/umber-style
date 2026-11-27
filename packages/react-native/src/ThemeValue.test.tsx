@@ -1,5 +1,5 @@
 import { render } from '@testing-library/react'
-import { EMPTY_THEME } from '@umber-style/core'
+import { EMPTY_THEME } from '@umber-style/core/internal'
 import type { NativeTheme } from './nativeTheme'
 import { createThemeValue } from './ThemeValue'
 

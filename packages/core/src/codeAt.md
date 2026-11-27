@@ -14,7 +14,7 @@ own. It is shared by `scanHtml.ts`, `scanStyleText.ts`, `serialize.ts` and `vari
 
 ```mermaid
 flowchart LR
-  call["codeAt(text, index)"] --> read{"codePointAt(index) is defined?"}
+  invoked["codeAt(text, index)"] --> read{"codePointAt(index) is defined?"}
   read -->|yes| code["the code point"]
   read -->|no| nan["NaN"]
 ```

@@ -1,12 +1,12 @@
 import { onBeforeUnmount, onMounted, useId } from 'vue'
+import { type Cache } from '@umber-style/core'
 import {
   createLiveValue,
   declareLiveValue,
   hashString,
   writeLiveValue,
-  type Cache,
   type LiveRule,
-} from '@umber-style/core'
+} from '@umber-style/core/internal'
 import { injectCache } from './CacheProvider'
 import type { StyleValueRef } from './types'
 

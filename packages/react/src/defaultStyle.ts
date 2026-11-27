@@ -1,14 +1,16 @@
 import type { ElementType } from 'react'
 import {
-  createDeferredObject,
-  createDeferredRecord,
   createLazyEngine,
   globalStyles,
   isDevelopment,
   keyframes,
-  withTagShorthands,
   type WebStyleObject,
 } from '@umber-style/core'
+import {
+  createDeferredObject,
+  createDeferredRecord,
+  withTagShorthands,
+} from '@umber-style/core/internal'
 import { bindEngine } from './createStyle'
 import { claimPrefixStyle } from './ProviderScope'
 import { createThemeContexts } from './ThemeValue'
@@ -72,6 +74,9 @@ export function createDefaultStyle() {
       holder: {
         get givenTheme() {
           return bound?.engine.givenTheme ?? pending.theme ?? pending.engine?.givenTheme
+        },
+        get tokenOptions() {
+          return bound?.engine.tokenOptions ?? pending.engine?.tokenOptions ?? pending
         },
       },
     }

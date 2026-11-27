@@ -16,7 +16,7 @@ written, long before any theme or engine may exist, and the same steps must give
 server, in the browser and in every engine of the process. So the name is a hash of the steps alone, the
 steps go into a registry, and the rule is written only when a class that names the animation is inserted.
 `cache.ts` finds the names in the rules it writes and asks for the rule; `createEngine.ts`, `styleTypes.ts`
-and `templateStyle.ts` use the name and types; `index.ts` exports `keyframes` and its types.
+and `templateStyle.ts` use the name and types; `index.ts` exports `keyframes` and its types, and `internal.ts` exports `readKeyframesSteps`.
 
 ## The logic
 

@@ -1,11 +1,6 @@
 import { createElement, Fragment, type ElementType } from 'react'
-import {
-  EMPTY_THEME,
-  isDevelopment,
-  readStyleArguments,
-  withTagShorthands,
-  type Engine,
-} from '@umber-style/core'
+import { isDevelopment, type Engine } from '@umber-style/core'
+import { EMPTY_THEME, readStyleArguments, withTagShorthands } from '@umber-style/core/internal'
 import type { StyleSender } from './inlineStyles.server'
 import { withNonce, type RequestNonce } from './serverContext'
 import { collectStyleTexts } from './styleElements'

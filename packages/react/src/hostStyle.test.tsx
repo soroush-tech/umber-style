@@ -1,5 +1,6 @@
 import { render } from '@testing-library/react'
-import { createCache, createMemorySheet, createSheetEntry } from '@umber-style/core'
+import { createCache, createMemorySheet } from '@umber-style/core'
+import { createSheetEntry } from '@umber-style/core/internal'
 import type { CSSProperties } from 'react'
 import { renderToString } from 'react-dom/server'
 import { createStyle } from './createStyle'

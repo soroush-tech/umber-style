@@ -1,4 +1,5 @@
-import { readCondition, readState, type Condition, type StateName } from '@umber-style/core'
+import { readState, type StateName } from '@umber-style/core'
+import { readCondition, type Condition } from '@umber-style/core/internal'
 import { matchesCondition, type InteractionState, type NativeCondition } from './conditions'
 import { isMediaKey, readMediaQuery, type WindowState } from './mediaQuery'
 import type { NativeStyleObject } from './nativeStyle'

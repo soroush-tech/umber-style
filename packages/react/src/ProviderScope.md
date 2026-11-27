@@ -32,14 +32,14 @@ flowchart TD
   nestedOut --> mark["addMark(prefix, scope, nested)"]
   rootOut --> mark
   passScope --> mark
-  mark --> outerTheme["outer = completeTheme(ThemeContext, holder base) or holder base"]
+  mark --> outerTheme["outer = completeTheme(ThemeContext, holder, prefix) or holder base"]
   outerTheme --> based{"outer defined, and not marked unbased?"}
-  based -->|yes| merge["merged = mergeTheme(outer, given)"]
+  based -->|yes| merge["merged = mergeCrossed(outer, given): the hidden members of outer only where the raw values are the same"]
   based -->|no| unbasedTheme["merged = a copy of mergeTheme(outer, given), marked unbased"]
   merge --> ctx["ThemeContext = merged, ViewContext = undefined"]
   unbasedTheme --> ctx
-  reader["a reader: useTheme, useThemeView, a client ThemeProvider"] --> complete{"completeTheme(theme, its base): theme marked unbased?"}
-  complete -->|yes| over["mergeTheme(its base, theme)"]
+  reader["a reader: useTheme, useThemeView, a client ThemeProvider"] --> complete{"completeTheme(theme, its engine, prefix): theme marked unbased?"}
+  complete -->|yes| over["mergeCrossed(its base, theme)"]
   complete -->|no| same["the theme itself"]
   rootOut --> keep["layout effect: keepRootRule"]
   ctx --> inline{"ScopeTheme.isInline?"}
@@ -60,6 +60,13 @@ its own too, unless the holder has appeared since, in which case `completeTheme`
 marked theme first. Every reader of the client build completes a marked theme with the base theme of its
 own engine (`completeTheme`), so it reads what it would have read had the style been loaded first.
 
+Both merges of a crossed theme over a theme of the browser (`merged` over `outer`, and `completeTheme` over
+the base theme) go through `mergeCrossed` (`crossedTheme.md`): `given` is plain data, so the hidden members
+of a design system's theme (helpers on `breakpoints`, made with `Object.defineProperty`) come from the theme
+below it, and only where the raw values of `given` are the same as there. Where one differs, the member of
+the theme below is taken with its enumerable members only, with a development warning that names the path,
+both values and the fix (#81).
+
 ## The data
 
 - `ProviderMarks`: a `Map` from a key (the cache prefix, or a `Cache` when a `CacheProvider` gave another)
@@ -68,7 +75,9 @@ own engine (`completeTheme`), so it reads what it would have read had the style 
   above). A nested `ProviderScope` adds its given theme to the `nested` above, the outermost one adds
   nothing, and one with no rules (`isRoot`) passes the one above on. It makes no class of it: a nested
   provider of the client build below reads it for the class of the nested themes merged.
-- `PrefixStyle`: `{ contexts, holder? }`, one for each prefix, in `readPrefixStyle`'s map.
+- `PrefixStyle`: `{ contexts, holder? }`, one for each prefix, in `readPrefixStyle`'s map. The holder is a
+  `CrossingHolder`: `{ givenTheme, tokenOptions }`, the engine of the first style of the client build of the
+  prefix (or the default style's getters), whose token options say which values of a crossed theme are raw.
 - The unbased themes: a `WeakSet` of the theme objects a `ProviderScope` gave its `ThemeContext` with no
   base theme under them. `mergeTheme` keeps each merge of a pair of objects, so `completeTheme` gives the
   same object for the same theme and base each time, and the view the engine keeps for it is reused.
@@ -92,6 +101,10 @@ own engine (`completeTheme`), so it reads what it would have read had the style 
   a later one, at hydration and after a client-side navigation (#71). A theme with a base under it is not
   marked, and `completeTheme` gives it back as it is: where the holder was there when the provider
   rendered, nothing changes.
+- A client component below reads a hidden helper of the base theme of its style (`theme.breakpoints.up`)
+  when the provider's raw values are those of the base theme, whichever came first, and never a helper of a
+  theme whose raw values differ. Where the theme below has no hidden member, the merge is `mergeTheme`'s, as
+  before.
 - `keepRootRule` skips a style element that has no sheet: one that a content security policy refused
   (its nonce is not the page's) holds no rule, and reading it threw and took the page down.
 - `keepRootRule` leaves one root rule of the prefix in the style elements React keeps and in those a

@@ -21,7 +21,7 @@ class. `createStyle.ts` is the importer.
 
 ```mermaid
 flowchart TD
-  call["styled(tag, options)(...styles)"] --> prep["prepareStyled: styler, resolve, statics"]
+  invoked["styled(tag, options)(...styles)"] --> prep["prepareStyled: styler, resolve, statics"]
   prep --> dyn{"styler.isDynamic?"}
   dyn -->|no| st["StaticStyled: useProvidedCache, useStyleRegistry"]
   dyn -->|yes| dy["DynamicStyled: useProvidedCache, useStyleRegistry, useThemeView(cache)"]

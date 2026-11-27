@@ -104,6 +104,18 @@ describe('createContentMemo', () => {
     expect(memo.find('components', '', { left: -1 })).toBeUndefined()
     expect(memo.find('components', '', { top: 1 })).toBe('later')
   })
+
+  it('forgets every class it holds when it is cleared, and goes on remembering', () => {
+    const memo = createContentMemo()
+    memo.remember('components', '', { left: 1, '&:hover': { top: 2 } }, 'first')
+    memo.remember('overrides', 'm-a', { left: 1 }, 'second')
+    memo.clear()
+    expect(memo.size).toBe(0)
+    expect(memo.find('components', '', { left: 1, '&:hover': { top: 2 } })).toBeUndefined()
+    expect(memo.find('overrides', 'm-a', { left: 1 })).toBeUndefined()
+    memo.remember('components', '', { left: 1 }, 'later')
+    expect(memo.find('components', '', { left: 1 })).toBe('later')
+  })
 })
 
 describe('readStableStyle', () => {

@@ -7,7 +7,6 @@ import {
   createCache,
   createLazyEngine,
   createMemorySheet,
-  createSchemeKey,
   divide,
   multiply,
   negate,
@@ -18,6 +17,7 @@ import {
   type StyleObject,
   type WebStyleObject,
 } from './index'
+import { createSchemeKey } from './internal'
 
 function setup() {
   const sheet = createMemorySheet()

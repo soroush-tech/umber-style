@@ -13,7 +13,8 @@ import { FIXED_NONCE } from './app/(csp-fixed)/nonce'
 // no nonce (what the styles are compared with), `?control=no-cache-nonce` keeps the policy and leaves the
 // nonce off the cache (the negative control of /csp), and `?control=no-source` keeps the policy and makes
 // the nonce source of /csp-server give nothing (its negative control). A `csp-control` cookie of the same
-// value does the same for every request of the page. /csp-server is sent the same way. /csp-fixed is sent
+// value does the same for every request of the page. /csp-server is sent the same way, and so is /edge,
+// its pages on the edge runtime. /csp-fixed is sent
 // with the same nonce in every response (the fixed nonce that its engine's cache has) and no `x-nonce`
 // request header, so the nonce source of /csp-server answers nothing there. /csp-inplace is sent as
 // /csp-server is: the same parts with no registry.
@@ -53,5 +54,7 @@ export const config = {
     '/csp-inplace/:path*',
     '/csp-fixed',
     '/csp-fixed/:path*',
+    '/edge',
+    '/edge/:path*',
   ],
 }

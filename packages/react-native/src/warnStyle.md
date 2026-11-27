@@ -24,7 +24,7 @@ functions an app gives the binding turn on where its warnings do.
 
 ```mermaid
 flowchart TD
-  call["a warn function"] --> dev{"development: process exists and not production?"}
+  invoked["a warn function"] --> dev{"development: process exists and not production?"}
   dev -->|"no"| quiet["nothing"]
   dev -->|"yes"| desc["describe the problem"]
   desc --> kind{"which function?"}

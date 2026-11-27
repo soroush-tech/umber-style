@@ -1,10 +1,5 @@
-import {
-  createLiveValue,
-  isDevelopment,
-  writeLiveValue,
-  type Cache,
-  type LiveValue,
-} from '@umber-style/core'
+import { isDevelopment, type Cache, type LiveValue } from '@umber-style/core'
+import { createLiveValue, writeLiveValue } from '@umber-style/core/internal'
 import type { StyleValueSetter } from './types'
 
 /**

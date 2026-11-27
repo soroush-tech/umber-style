@@ -22,12 +22,13 @@ and `@umber-style/server` build on its public members.
 
 ```mermaid
 flowchart TD
-  call["css, cssIn, cssWith(values)"] --> memoOn{"hasStyleMemo, no development checks, no value repair (chosen once)?"}
+  invoked["css, cssIn, cssWith(values)"] --> memoOn{"hasStyleMemo, no development checks (chosen once)?"}
   memoOn -->|no| entry
   memoOn -->|yes| objects{"every value a style object?"}
   objects -->|no| entry
   objects -->|yes| contents["cssContents: merge, find the class by contents (contentMemo.ts), else compile, name, remember"]
   contents --> reg
+  values["registerValues: new declared values of the tokens"] --> forget["empty the repair memo, and the memo of contents of each set of style options with value repair"]
   entry["cssWith"] --> names{"no development checks, and every value a class string?"}
   names -->|yes| memo{"a merge of these names remembered, each name with the same style, its class written?"}
   memo -->|yes| again["registered.set(name, the merged style of then); return what it returned"]
@@ -154,11 +155,14 @@ The rest of the closure, in the order of the file:
   a name whose style was set again (a hit, a held class written again) or removed makes the entry stale, and
   it is made again. At most `MERGE_LIMIT` (1000) entries; the oldest leaves first. Measured: about 450 KB for
   1000 entries, the same after 10,000 distinct merges of 10,000 classes (measured with `--expose-gc` on
-  the build, for issue 10).
+  the build, for issue 10). Those of the sets of style options with value repair are in `repairingMemos`,
+  and `registerValues` empties each of them: a class they hold was made with the declared values of then.
+  Without value repair they keep their classes across `registerValues`.
 - `contents` (one for each set of style options, on `WrittenAs`, only with `hasStyleMemo` and without the
-  development checks and value repair): the class of each merged style made of style objects alone, by
-  its layer, `after` and contents (`contentMemo.md`). At most `CONTENT_STEP_LIMIT` (10,000) steps, then
-  emptied.
+  development checks): the class of each merged style made of style objects alone, by its layer, `after`
+  and contents (`contentMemo.md`). At most `CONTENT_STEP_LIMIT` (10,000) steps, then emptied. Those of
+  the sets of style options with value repair are also in `repairingMemos`, and `registerValues`
+  empties each of them: a class they hold was compiled with the declared values of then.
 - `repairMemo` (one for the cache, shared by every set of style options through `plain`): the repaired text of each
   value that value repair was given, by the value, read and written only when nothing is told (`serialize.md`).
   `registerValues`, the one way the declared values of the tokens change, empties it. At most
@@ -195,6 +199,8 @@ The rest of the closure, in the order of the file:
 - The layer order statement is the first rule written, once.
 - A remembered merge gives what merging again would give: the same names, each with the same style object,
   merge to the same class, and nothing is remembered with the development checks on.
+- The memo of contents of a set of style options with value repair holds no class made before the last
+  `registerValues`.
 - `extractPage` reads the cache and changes nothing, so pages rendered in any order get the same CSS, apart
   from the root theme, which is the one inserted last.
 - Without a document nothing browser-specific runs: the sheet is in memory and nothing is watched. Nothing
@@ -222,6 +228,13 @@ The rest of the closure, in the order of the file:
   class, the rules, `registered` and the sheet are what the full path leaves (`contentMemo.md`, with the
   cases it guards against). The compilers choose `cssWithMemo` or `cssWith` once, when they are made, so
   without the option the path is the one before it, with no check added.
+- With value repair the memo of contents is used too (it was not, up to 0.7.0), and is emptied, all of
+  it, by `registerValues`: a repaired value reads the declared values of the tokens, which reach the
+  cache only there, so a class remembered before was made with the values of then. The engine calls it
+  once for each base theme, so the memo of a page that keeps its theme stays full. Rejected: keeping
+  the declared values a class read with each entry, to empty only what changed; a change of base theme
+  is rare, and the memo fills again from the next calls. The memos of style options without value
+  repair keep what they hold: their compile reads no declared value.
 - `registered` is set again on every call, also on a hit: two styles with the same rules can differ in
   what writes no rule (an empty nested object, a function value), and a later merge of the class name reads
   the style of the last call. Keeping the first one would be faster and is not done.

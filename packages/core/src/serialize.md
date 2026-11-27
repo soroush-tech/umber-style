@@ -111,6 +111,11 @@ a label already a whole run of the earlier one is not written again.
   nested key and its parent with no comma are joined as one part each, without splitting them into
   lists. Together they took a hit of a small style from 1.28 to 0.93 us, of the large one from 13.3 to
   7.7 us, and a new small style from 3.1 to 1.8 us (host, one process).
+- Rejected (issue 77): moving a key to the end without `delete`, by keeping the order of the writes and
+  writing the merged object once in its final order. On the design system's every-component page 52 of
+  the 393 merges of a render move a key (167 moves); the page took the same time with it and without it
+  (fastest render 3.97 against 3.91 ms, and 3.97 against 3.97 ms with no guard for a key `__proto__`),
+  and the gate allocated more (a hit of the same style 217 B against 162 B). The `delete` stays.
 - The memo of repaired values depends on one fact: what a value is repaired to is a function of the value and
   of the declared values of the tokens (`readValue`), nothing else (the report is a side effect only). So the
   cache empties it in `registerValues`, the one place the declared values change. A memo that was kept

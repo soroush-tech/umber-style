@@ -20,7 +20,7 @@ fixture app of `fixtures/next-app` and the tests of `server` use it.
 
 ```mermaid
 flowchart TD
-  call["createCache(options)"] --> hasOnInsert{"'onInsert' in options?"}
+  invoked["createCache(options)"] --> hasOnInsert{"'onInsert' in options?"}
   hasOnInsert -->|yes| throwTE["throw TypeError"]
   hasOnInsert -->|no| split["key, rest"]
   split --> engine["engine cache: rest as it is, prefix = key, onInsert calls cache.insert"]

@@ -1,7 +1,6 @@
 import {
   type Cache,
   type ColorScheme,
-  createCssEntry,
   createEngine,
   type DeepPartial,
   type Engine,
@@ -15,6 +14,7 @@ import {
   type SheetStyles,
   type WebStyleObject,
 } from '@umber-style/core'
+import { createCssEntry } from '@umber-style/core/internal'
 import type { ReactElement } from 'react'
 import { useProvidedCache } from './CacheProvider'
 import { createGlobal } from './Global'

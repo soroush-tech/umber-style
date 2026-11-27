@@ -1,0 +1,29 @@
+{
+  "name": "@umber-fixtures/next-ppr",
+  "private": true,
+  "version": "0.1.0",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "dev": "next dev --port 4206",
+    "build": "next build",
+    "start": "next start --port 4106",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@umber-fixtures/shared": "workspace:*",
+    "@umber-style/cache": "workspace:*",
+    "@umber-style/core": "workspace:*",
+    "@umber-style/react": "workspace:*",
+    "next": "16.4.6",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "umber-style": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "typescript": "~7.0.2"
+  }
+}

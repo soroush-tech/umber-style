@@ -12,7 +12,7 @@ component be used as a selector (`createComponentSelector`).
 React, React Native and Vue all accept the same arguments to `css()` and `styled(tag)(...)`: a tagged
 template, style objects, results of `css()`, sheet entries, lists, and falsy values. The reading of those
 arguments, and the errors for what a call cannot take, must be the same everywhere, so it lives in core.
-It is imported by `index.ts`, and by `createStyle.ts`, `createStyle.server.ts`, `styled.ts`,
+It is exported by `internal.ts` (`@umber-style/core/internal`), and imported by `createStyle.ts`, `createStyle.server.ts`, `styled.ts`,
 `styled.server.ts` and `styledParts.ts` in `packages/react`, `createStyle.ts` in `packages/react-native`,
 and `createStyle.ts` and `styled.ts` in `packages/vue`.
 

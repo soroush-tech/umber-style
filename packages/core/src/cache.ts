@@ -114,8 +114,9 @@ export interface CacheOptions {
    * object (a style function's result on each render) are not compiled and hashed again. The class, the
    * rules and their order are the same with it or without it. It covers style objects alone whose values
    * are strings and numbers, at any depth of nesting; anything else takes the full path, and so does
-   * every call with the development checks or value repair on. A style is remembered the second time its
-   * class is made; the memo holds at most `CONTENT_STEP_LIMIT` steps for each set of style options, and is
+   * every call with the development checks on. With value repair it is emptied whenever the declared
+   * values of the tokens change (`registerValues`). A style is remembered the second time its class is
+   * made; the memo holds at most `CONTENT_STEP_LIMIT` steps for each set of style options, and is
    * emptied when full. Default false (`docs/options.md`).
    */
   hasStyleMemo?: boolean
@@ -379,7 +380,9 @@ export interface Cache {
    * Gives the cache what reads the declared value of each variable of a theme, by name (the engine gives
    * those of its base theme), adding to those it has: value repair reads the unit of a token from it, so
    * that `var(--x)px` is the reference alone when `--x` is declared in px. `read` is called the first time
-   * value repair needs a value, and only then.
+   * value repair needs a value, and only then. The repaired values and the classes that the memos of
+   * contents hold for style options with value repair are forgotten, as they were made with the values
+   * of before.
    */
   registerValues(read: () => Readonly<Record<string, string>>): void
   /** Gives the cache the theme that steps written as a function of the theme are resolved against, read for the name of the animation when its `@keyframes` rule is first written (the engine gives its references). */
@@ -488,8 +491,8 @@ interface WrittenAs extends Required<StyleOptions> {
   readonly merges: Map<string, MergeMemo>
   /**
    * The class of each merged style made of style objects alone, by its layer, `after` and contents (see
-   * `contentMemo.ts`). None with the development checks, which check every call, or value repair, whose
-   * compile reads the values of the tokens too.
+   * `contentMemo.ts`). None with the development checks, which check every call. With value repair,
+   * whose compile reads the declared values of the tokens too, `registerValues` empties it.
    */
   readonly contents: ContentMemo | undefined
 }
@@ -1148,9 +1151,13 @@ export function createCache(options: CacheOptions = {}): Cache {
   // The repaired text of each value, for value repair when nothing reports (see `CompileContext.repairMemo`):
   // what a value is repaired to depends on the declared values, so a new source of them empties it.
   const repairMemo = new Map<string, string>()
+  // The memos of contents and of merges of the style options with value repair: a class they hold was
+  // compiled with the declared values of then, so a new source of them empties each.
+  const repairingMemos: { clear(): void }[] = []
   const registerValues = (read: () => Readonly<Record<string, string>>): void => {
     pendingValues.push(read)
     repairMemo.clear()
+    for (const memo of repairingMemos) memo.clear()
   }
   const readValue = (name: string): string | undefined => {
     for (const read of pendingValues.splice(0)) {
@@ -1165,15 +1172,18 @@ export function createCache(options: CacheOptions = {}): Cache {
   /** The style options `options` with what the compiler is given for them, made once. */
   const toWrittenAs = (options: Required<StyleOptions>): WrittenAs => {
     const plain: CompileContext = { ...options, scoping, readValue, repairMemo }
+    const contents = hasStyleMemo && !warnValue ? createContentMemo() : undefined
+    const merges = new Map<string, MergeMemo>()
+    if (options.hasValueRepair) repairingMemos.push(merges)
+    if (contents && options.hasValueRepair) repairingMemos.push(contents)
     const written: WrittenAs = {
       ...options,
       plain,
       naming: { ...plain, hasVendorPrefixes: false },
       reported: { ...plain, report: reportRepair },
       adopt: (entry) => adoptEntry(entry, written),
-      merges: new Map(),
-      contents:
-        hasStyleMemo && !warnValue && !options.hasValueRepair ? createContentMemo() : undefined,
+      merges,
+      contents,
     }
     return written
   }

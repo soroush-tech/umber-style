@@ -1,11 +1,6 @@
 import { createElement, type ReactElement } from 'react'
-import {
-  createGlobalMarker,
-  type Cache,
-  type Engine,
-  type GlobalInput,
-  type GlobalRules,
-} from '@umber-style/core'
+import { type Cache, type Engine, type GlobalInput, type GlobalRules } from '@umber-style/core'
+import { createGlobalMarker } from '@umber-style/core/internal'
 
 /** A `<style href precedence>` element, as data: what a server component can hand to a client component. */
 export interface StyleText {

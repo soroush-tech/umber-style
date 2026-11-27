@@ -1,11 +1,6 @@
 import { createContext } from 'react'
-import {
-  createDeferredObject,
-  createDeferredRecord,
-  globalStyles,
-  keyframes,
-  type Theme,
-} from '@umber-style/core'
+import { globalStyles, keyframes, type Theme } from '@umber-style/core'
+import { createDeferredObject, createDeferredRecord } from '@umber-style/core/internal'
 import type { NativeStyleObject } from './nativeStyle'
 import { bindHolder } from './createStyle'
 import type { ThemeHolder } from './ThemeValue'

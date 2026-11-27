@@ -1,12 +1,12 @@
 import {
   createCache as createEngineCache,
-  createStyleSelector,
   type CacheOptions,
   type SerializedRule,
   type StyleObject,
   type UmberCache,
   type UmberSheet,
 } from '@umber-style/core'
+import { createStyleSelector } from '@umber-style/core/internal'
 
 export type { SerializedRule, UmberCache, UmberSheet } from '@umber-style/core'
 

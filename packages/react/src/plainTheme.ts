@@ -59,8 +59,12 @@ function toPlainContainer(
     ([key, member]) => [key, toPlain(member, joinPath(key), dropped, ancestors)] as const
   )
   const kept = entries.filter(([, member]) => member !== DROPPED)
+  // A member that is not enumerable or has a symbol for its key (a helper that a design system puts on
+  // `breakpoints` with `Object.defineProperty`) is not read, and not reported: such an object is copied
+  // with its enumerable members, as only an object with none of them crosses as it is.
   const isSame =
     Object.getPrototypeOf(value) === Object.prototype &&
+    Reflect.ownKeys(value).length === entries.length &&
     kept.length === entries.length &&
     kept.every(([key, member]) => member === (value as Record<string, unknown>)[key])
   // An object with no prototype is copied: only an object with the usual one crosses.
@@ -73,7 +77,8 @@ const plainThemes = new WeakMap<object, PlainTheme>()
  * The plain data of `theme`: strings, numbers, booleans, `null`, `undefined`, lists and plain objects,
  * deeply. A function, a symbol and an object that is not plain (a class instance, a `Date`, a `Map`) are
  * left out, and their paths listed, and so is a member that refers back to an object it is inside of (a
- * cycle). Only own enumerable members are read. Made once for each theme
+ * cycle). Only own enumerable members are read: a plain object that has others (not enumerable, or under a
+ * symbol) is copied without them, which is not reported. Made once for each theme
  * object, so a payload that names one theme in several places holds it once.
  */
 export function toPlainTheme(theme: object): PlainTheme {

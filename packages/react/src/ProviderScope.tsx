@@ -5,16 +5,19 @@
 // still loads this module. So nothing here calls React when the module loads.
 import * as React from 'react'
 import {
-  createThemeRule,
   createTokens,
-  mergeTheme,
-  readSharedState,
-  ROOT_SELECTOR,
-  toDeclarationText,
   type ColorScheme,
   type DeepPartial,
   type TokenOptions,
 } from '@umber-style/core'
+import {
+  createThemeRule,
+  mergeTheme,
+  readSharedState,
+  ROOT_SELECTOR,
+  toDeclarationText,
+} from '@umber-style/core/internal'
+import { mergeCrossed } from './crossedTheme'
 import { NonceStyles } from './NonceStyles'
 import type { StyleText } from './styleElements'
 
@@ -82,12 +85,20 @@ export function createThemeContexts<T>(): ThemeContexts<T> {
   }
 }
 
+/** What a crossed theme is completed with in the client build: the base theme given to an engine, and how that engine names its tokens. */
+export interface CrossingHolder {
+  /** The base theme given to the engine, or undefined. */
+  readonly givenTheme: unknown
+  /** The token options of the engine, which say which values of a theme are raw. */
+  readonly tokenOptions: Readonly<TokenOptions>
+}
+
 /** The styles of the client build of one prefix: the contexts they share, and the engine whose base theme a provider of the server build merges over. */
 export interface PrefixStyle {
   /** The contexts that every style of the prefix reads and its providers give. */
   readonly contexts: ThemeContexts<unknown>
   /** What holds the base theme given to the engine, once a style of the client build has one; undefined before. */
-  holder?: { readonly givenTheme: unknown }
+  holder?: CrossingHolder
 }
 
 // The styles of each prefix, and the default style's claim, shared by every copy of the binding in the
@@ -125,15 +136,24 @@ export function readPrefixStyle(prefix: string): PrefixStyle {
 const unbased = readSharedState('react.unbased-themes@1', () => new WeakSet<object>())
 
 /**
- * `theme`, read from the theme context of a prefix, as a style whose base theme is `base` reads it. A
+ * `theme`, read from the theme context of `prefix`, as a style whose engine is `holder` reads it. A
  * provider of the server build that rendered before any style of the client build of its prefix was loaded
  * (on the first request of a server, at hydration, before a navigation loads the module of a client
- * component) had no base theme to merge its theme over: that theme is merged over `base` here. Any other
- * theme is itself, as it is with no `base`.
+ * component) had no base theme to merge its theme over: that theme is merged over the base theme of
+ * `holder` here (`mergeCrossed`, which keeps the hidden members of the base where the raw values are the
+ * same). Any other theme is itself, as it is with no base theme.
  */
-export function completeTheme<T>(theme: T | undefined, base: T | undefined): T | undefined {
+export function completeTheme<T>(
+  theme: T | undefined,
+  holder: CrossingHolder | undefined,
+  prefix: string
+): T | undefined {
   if (theme === undefined || !unbased.has(theme as object)) return theme
-  return mergeTheme(base, theme as DeepPartial<T>)
+  return mergeCrossed(holder?.givenTheme as T | undefined, theme as DeepPartial<T>, {
+    prefix,
+    tokens: holder?.tokenOptions,
+    isBase: true,
+  })
 }
 
 /** The token options that name the variables of a theme, as plain data; the prefix is that of the provider. */
@@ -327,15 +347,19 @@ export function ProviderScope({
   )
   const { contexts, holder } = readPrefixStyle(prefix)
   const base = holder?.givenTheme as object | undefined
-  const outer = completeTheme(React.use(contexts.ThemeContext) as object | undefined, base) ?? base
+  const context = React.use(contexts.ThemeContext) as object | undefined
+  const outer = completeTheme(context, holder, prefix) ?? base
+  const tokens = holder?.tokenOptions
   // With no base theme under it (no style of the client build of the prefix is loaded yet, and none of
   // the providers above had one), the theme is a copy of its own, marked for the styles that read it.
   const merged = React.useMemo(() => {
-    if (outer !== undefined && !unbased.has(outer)) return mergeTheme(outer, given)
+    if (outer !== undefined && !unbased.has(outer)) {
+      return mergeCrossed(outer, given, { prefix, tokens, isBase: outer === base })
+    }
     const theme = { ...mergeTheme(outer, given) }
     unbased.add(theme)
     return theme
-  }, [outer, given])
+  }, [outer, given, prefix, tokens, base])
   const styles = React.useMemo(() => {
     if (theme === undefined) return { list: [] as readonly StyleText[], rule: undefined }
     if (isNested) return { list: createNestedStyles(prefix, given, theme), rule: undefined }

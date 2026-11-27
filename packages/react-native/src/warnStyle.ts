@@ -1,4 +1,5 @@
-import { readCondition, readState } from '@umber-style/core'
+import { readState } from '@umber-style/core'
+import { readCondition } from '@umber-style/core/internal'
 import { isMediaKey, readMediaQuery } from './mediaQuery'
 
 /** A length or `auto`: one value of a CSS shorthand. */

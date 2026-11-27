@@ -22,10 +22,11 @@
 // part), so a stand-in package with the four functions the entry calls takes its place too, at the
 // newest version inside the entry's peer range (4.8.0): the entry is loaded, its subpath of the
 // umbrella is the same value, and it translates an animation.
-// `next`, the optional peer of `@umber-style/react/next`, is a stand-in too, at the version of the peer
-// range (16.4.6), packaged as `next` is (no exports map, `navigation.js` at its root) with the one hook the
-// entry imports. Node loads that entry with `require` only: an ES module cannot import `next/navigation`
-// in Node, as the package has no exports map; inside Next.js its bundler resolves it.
+// `next`, the optional peer of `@umber-style/react/next`, is a stand-in too, at the newest version inside
+// the peer range (16.4.6), packaged as `next` is (no exports map, `navigation.js` at its root) with the one
+// hook the entry imports. Node loads that entry and its subpath of the umbrella, `umber-style/react/next`,
+// with `require` only: an ES module cannot import `next/navigation` in Node, as the package has no exports
+// map; inside Next.js its bundler resolves it.
 // The temporary folder is removed at the end, unless `--keep` is given. Needs the network (npm).
 import { spawnSync } from 'node:child_process'
 import {
@@ -57,10 +58,100 @@ const PACKAGES = [
   { dir: 'vue', name: '@umber-style/vue' },
   { dir: 'umber-style', name: 'umber-style' },
 ]
+// Every value the main entry of the core exports: what an app uses (the table of docs/plain-javascript.md).
+const CORE_EXPORTS = [
+  'DEFAULT_SCOPING',
+  'NO_THEME_MESSAGE',
+  'RULE_LAYERS',
+  'STATE_SELECTORS',
+  'add',
+  'alpha',
+  'at',
+  'compileRules',
+  'createCache',
+  'createDomSheet',
+  'createEngine',
+  'createLazyEngine',
+  'createMemorySheet',
+  'createStyleTag',
+  'createTokens',
+  'divide',
+  'extractPageStyleParts',
+  'extractPageStyles',
+  'findEntryCache',
+  'findMissingPaths',
+  'findMissingStyles',
+  'globalStyles',
+  'isAlphaColor',
+  'isDevelopment',
+  'isLiveValue',
+  'isSheetEntry',
+  'isThemedSheet',
+  'keyframes',
+  'mergeDeep',
+  'mergeStyles',
+  'multiply',
+  'negate',
+  'readLabel',
+  'readState',
+  'setNonceSource',
+  'state',
+  'subtract',
+]
+// Every value of the internal entry of the core: what the bindings and the other packages share.
+const CORE_INTERNAL_EXPORTS = [
+  'EMPTY_THEME',
+  'ROOT_SELECTOR',
+  'assertAlphaInput',
+  'callCheckedStyle',
+  'createComponentSelector',
+  'createCssEntry',
+  'createDeferredObject',
+  'createDeferredRecord',
+  'createGlobalMarker',
+  'createLazyRecord',
+  'createLiveValue',
+  'createNoSchemeGuard',
+  'createNonceAttribute',
+  'createSchemeKey',
+  'createScopeRule',
+  'createSheetEntry',
+  'createStyleSelector',
+  'createThemeClass',
+  'createThemeClassName',
+  'createThemeGuard',
+  'createThemeId',
+  'createThemeKey',
+  'createThemeRule',
+  'declareLiveValue',
+  'findCache',
+  'flattenStyle',
+  'getBoundaryClass',
+  'getSchemeClass',
+  'hashString',
+  'isTemplateStrings',
+  'mergeTheme',
+  'parseKeyframesTemplate',
+  'parseStyleTemplate',
+  'readCondition',
+  'readEntrySource',
+  'readKeyframesSteps',
+  'readNonceSource',
+  'readPageNonce',
+  'readSharedState',
+  'readStaticTemplate',
+  'readStyleArguments',
+  'rejectFunctions',
+  'resolveThemeInput',
+  'toDeclarationText',
+  'toRgba',
+  'withTagShorthands',
+  'writeLiveValue',
+]
 // The names every entry of the package must export, and that the ESM and CJS builds must agree on.
 const ENTRIES = {
-  '@umber-style/core': ['createEngine', 'createCache', 'extractPageStyles', 'at'],
-  '@umber-style/core/internal': ['createThemeGuard', 'callCheckedStyle', 'readPageNonce'],
+  '@umber-style/core': CORE_EXPORTS,
+  '@umber-style/core/internal': CORE_INTERNAL_EXPORTS,
   '@umber-style/cache': ['default', 'createCache'],
   '@umber-style/server/create-instance': ['default', 'createInstance'],
   '@umber-style/css': [
@@ -432,6 +523,12 @@ const need = async (specifier, names) => {
 const entries = ${JSON.stringify(ENTRIES)}
 const mods = {}
 for (const [specifier, names] of Object.entries(entries)) mods[specifier] = await need(specifier, names)
+// The two entries of the core export exactly their lists, and the root of the umbrella is the main one.
+for (const specifier of ['@umber-style/core', '@umber-style/core/internal']) {
+  const extra = results[specifier].filter((name) => !entries[specifier].includes(name))
+  if (extra.length) throw new Error(specifier + ' also exports ' + extra.join(', '))
+}
+if (results['umber-style'].join() !== results['@umber-style/core'].join()) throw new Error('umber-style exports other names than @umber-style/core: ' + results['umber-style'].join(', '))
 // Each default export is also exported by name: the same function.
 for (const [specifier, name] of Object.entries(${JSON.stringify(NAMED_DEFAULTS)})) {
   const mod = mods[specifier]
@@ -525,7 +622,8 @@ writeFileSync('keys-${format}.json', JSON.stringify(results, null, 2))
     )
   }
 
-  // 3a. The entry of the Next.js registry, from CommonJS: the component, which renders its children.
+  // 3a. The entry of the Next.js registry, from CommonJS: the component, which renders its children, and
+  // the same component from the subpath of the umbrella.
   writeFileSync(
     join(consumer, 'next.cjs'),
     `
@@ -535,12 +633,14 @@ const { StyleRegistry } = require('@umber-style/react/next')
 if (typeof StyleRegistry !== 'function') throw new Error('no StyleRegistry')
 const html = renderToStaticMarkup(React.createElement(StyleRegistry, null, React.createElement('p', null, 'x')))
 if (html !== '<p>x</p>') throw new Error('StyleRegistry rendered ' + html)
+const umbrella = require('umber-style/react/next')
+if (umbrella.StyleRegistry !== StyleRegistry) throw new Error('umber-style/react/next is another StyleRegistry')
 `
   )
   const nextEntry = run('node', ['next.cjs'], { cwd: consumer })
   check(
     nextEntry.isOk,
-    '@umber-style/react/next: require gives StyleRegistry, which renders its children'
+    '@umber-style/react/next: require gives StyleRegistry, which renders its children; umber-style/react/next gives the same'
   )
   if (!nextEntry.isOk) console.error(nextEntry.out)
 
@@ -659,8 +759,12 @@ if (expected === 'server') {
   const typed = `
 import { createEngine } from '@umber-style/core'
 import type { Theme } from '@umber-style/core'
-import { callCheckedStyle, createThemeGuard } from '@umber-style/core/internal'
-import type { ThemeGuard } from '@umber-style/core/internal'
+import { callCheckedStyle, createCssEntry, createThemeGuard } from '@umber-style/core/internal'
+import type { LiveRule, ThemeGuard } from '@umber-style/core/internal'
+// @ts-expect-error the helpers of the bindings are not in the main entry
+import { createCssEntry as mainCssEntry } from '@umber-style/core'
+// @ts-expect-error nor are their types
+import type { LiveRule as MainLiveRule } from '@umber-style/core'
 import { css, cx } from '@umber-style/css'
 import createCssInstance from '@umber-style/css/create-instance'
 import { createStyle } from '@umber-style/react'
@@ -688,6 +792,8 @@ const theme = { palette: { primary: '#1b5fd1', onPrimary: '#ffffff' }, space: [0
 export const engine = createEngine(theme)
 export const guard: ThemeGuard = createThemeGuard('smoke')
 export const checked: unknown = callCheckedStyle
+export const cssEntry: unknown = [createCssEntry, mainCssEntry]
+export const liveRules: [LiveRule?, MainLiveRule?] = []
 export const umbrellaEngine = createUmbrellaEngine(theme)
 export const umberCache: UmberCache = createCache({ key: 'smoke' })
 export const tags: string = createInstance(umberCache).constructStyleTagsFromChunks(
@@ -799,9 +905,13 @@ import { createElement } from 'react'
 import createCache from '@umber-style/cache'
 import { StyleRegistry } from '@umber-style/react/next'
 import type { StyleRegistryProps } from '@umber-style/react/next'
+import { StyleRegistry as UmbrellaRegistry } from 'umber-style/react/next'
+import type { StyleRegistryProps as UmbrellaProps } from 'umber-style/react/next'
 
 const props: StyleRegistryProps = { cache: createCache({ key: 'smoke' }), children: 'x' }
 export const registry = createElement(StyleRegistry, props)
+const umbrellaProps: UmbrellaProps = props
+export const umbrellaRegistry = createElement(UmbrellaRegistry, umbrellaProps)
 `
   )
   const options = {

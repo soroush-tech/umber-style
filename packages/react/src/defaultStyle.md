@@ -24,7 +24,7 @@ flowchart TD
   conf["configure(options)"] --> bound{"already bound?"}
   bound -->|yes| throw["throw Error"]
   bound -->|no| set["pending = options; configured"]
-  call["any function of the style"] --> get["getStyle()"]
+  invoked["any function of the style"] --> get["getStyle()"]
   get --> made{"bound?"}
   made -->|no| make["engine = options.engine or createLazyEngine; watchProvidedCaches if never configured, in development; setTheme if theme; bindEngine with the contexts"]
   made -->|yes| reuse["the bound style"]
@@ -57,7 +57,9 @@ else `'css'`.
 ## Decisions
 
 - `claimPrefixStyle` gets a `holder` whose `givenTheme` reads the bound engine, else the pending theme, else the
-  pending engine's, so the browser part of a server provider merges over the right base theme.
+  pending engine's, so the browser part of a server provider merges over the right base theme. Its
+  `tokenOptions` reads the bound engine's, else the pending engine's, else the pending options, which say
+  which values of a crossed theme are raw (`crossedTheme.md`).
 
 ## Limits
 

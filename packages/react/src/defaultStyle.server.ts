@@ -1,13 +1,10 @@
 import type { ElementType } from 'react'
+import { createLazyEngine, globalStyles, keyframes, type WebStyleObject } from '@umber-style/core'
 import {
   createDeferredObject,
   createDeferredRecord,
-  createLazyEngine,
-  globalStyles,
-  keyframes,
   withTagShorthands,
-  type WebStyleObject,
-} from '@umber-style/core'
+} from '@umber-style/core/internal'
 import { bindEngine } from './createStyle.server'
 import type {
   DefaultStyleOptions,

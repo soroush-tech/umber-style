@@ -10,7 +10,7 @@ every run.
 Class names, keys of rules and names of keyframes are made from the text of the rules, so the same style
 gets the same name on the server and in the browser and is written once. The hash has no dependency, and it
 must not change between releases or every generated name changes. It is used by `cache.ts`,
-`createEngine.ts`, `globalStyles.ts`, `keyframes.ts` and `theme.ts`, and exported by `index.ts`.
+`createEngine.ts`, `globalStyles.ts`, `keyframes.ts` and `theme.ts`, and exported by `internal.ts`, for the bindings.
 
 ## The logic
 

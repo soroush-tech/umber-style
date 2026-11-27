@@ -23,7 +23,7 @@ flowchart TD
   conf["configure(options)"] --> bound{"already bound?"}
   bound -->|yes| throw["throw Error"]
   bound -->|no| pending["pending = options"]
-  call["any function of the style"] --> get["getStyle()"]
+  invoked["any function of the style"] --> get["getStyle()"]
   get --> made{"bound?"}
   made -->|no| engine["engine = options.engine or createLazyEngine; setTheme if theme"]
   engine --> bind["bindEngine(engine) of createStyle.server"]

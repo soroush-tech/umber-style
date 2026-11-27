@@ -1,7 +1,8 @@
 'use client'
 
 import { createElement, Fragment, use, useContext } from 'react'
-import { EMPTY_THEME, type Cache, type Engine } from '@umber-style/core'
+import { type Cache, type Engine } from '@umber-style/core'
+import { EMPTY_THEME } from '@umber-style/core/internal'
 import { useProvidedCache } from './CacheProvider'
 import {
   completeTheme,
@@ -31,7 +32,7 @@ export function readMarkKey(
 /** What the hooks read where no provider is above: the base theme given to the engine, or nothing. */
 export type ThemeHolder<T> = Pick<
   Engine<T>,
-  'cache' | 'givenTheme' | 'createThemeView' | 'withCache'
+  'cache' | 'givenTheme' | 'tokenOptions' | 'createThemeView' | 'withCache'
 >
 
 /** The hooks of one style, and `ThemeScope`, over its contexts. */
@@ -47,7 +48,7 @@ export function createThemeValue<T extends object>(
 
   /** The real theme of the nearest provider, the given base theme, or an empty object. */
   function useTheme(): T {
-    return completeTheme(useContext(ThemeContext), holder.givenTheme) ?? readOwnTheme()
+    return completeTheme(useContext(ThemeContext), holder, holder.cache.prefix) ?? readOwnTheme()
   }
 
   /**
@@ -63,7 +64,7 @@ export function createThemeValue<T extends object>(
     const local = cache === undefined ? holder : holder.withCache(cache)
     if (local === holder && view !== undefined) return view
     return local.createThemeView(
-      completeTheme(use(ThemeContext), holder.givenTheme) ?? readOwnTheme()
+      completeTheme(use(ThemeContext), holder, holder.cache.prefix) ?? readOwnTheme()
     )
   }
 

@@ -9,14 +9,8 @@ import {
   useMemo,
   type ReactElement,
 } from 'react'
-import {
-  EMPTY_THEME,
-  mergeTheme,
-  resolveThemeInput,
-  type DeepPartial,
-  type Engine,
-  type ThemeInput,
-} from '@umber-style/core'
+import { type DeepPartial, type Engine, type ThemeInput } from '@umber-style/core'
+import { EMPTY_THEME, mergeTheme, resolveThemeInput } from '@umber-style/core/internal'
 import { useProvidedCache } from './CacheProvider'
 import { addMark, completeTheme, getMarksContext, type ThemeScopeValue } from './ProviderScope'
 import { useStyleRegistry, type StyleRegistryStore } from './styleRegistry'
@@ -99,7 +93,8 @@ export function createThemeProvider<T extends object>({
     // A provider of another cache is not of this engine: with none of this one above, it starts its own.
     const key = readMarkKey(baseEngine, cache)
     const above = marks.get(key)
-    const outer = completeTheme(useContext(ThemeContext), engine.givenTheme) ?? engine.givenTheme
+    const outer =
+      completeTheme(useContext(ThemeContext), engine, engine.cache.prefix) ?? engine.givenTheme
     const isOutermost = above === undefined && !isRoot
     const isNested = above !== undefined && !isRoot
     const given = useMemo(

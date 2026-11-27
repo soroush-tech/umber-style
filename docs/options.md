@@ -127,8 +127,11 @@ What it covers, and what takes the full path as before:
 - A class name or a sheet entry among the values, a list of fallback values, an `alpha()` value, a live
   value of `useStyleValue`, a function, an object that is not a plain object, or a getter in a nested
   style: that call takes the full path, and is not remembered.
-- With the development checks on (`hasDevChecks`), or value repair (`hasValueRepair`, whose result reads
-  the values of the tokens), there is no memo: every call takes the full path and is checked as before.
+- With the development checks on (`hasDevChecks`) there is no memo: every call takes the full path and
+  is checked as before.
+- With value repair (`hasValueRepair`, whose result reads the declared values of the tokens) the memo
+  is used, and is emptied each time the engine gives the cache new declared values (a new base theme),
+  so that it never names a class made with the values of before.
 - A held class (a plain object given to `style`) is not remembered.
 
 What it costs: one walk of the contents of the call's merged style, on every call it covers. A style is

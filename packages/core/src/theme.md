@@ -16,7 +16,7 @@ cache writes the rule, but the naming and the text format are theme concerns, ke
 (`createThemeId`, used by the React server `ThemeProvider` to name a class without a cache write) and the
 client agree. Importers: `cache.ts` (the text and rule helpers), `createEngine.ts`
 (`createThemeClass`, `declareRootTheme`), `scanStyleText.ts` (`ROOT_SELECTOR`, to find the root rule in the
-text of a page), and `index.ts`, which re-exports `createThemeId`.
+text of a page), and `internal.ts`, which re-exports the exports of this file for the bindings.
 
 ## The logic
 

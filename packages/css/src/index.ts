@@ -1,4 +1,4 @@
-import { readSharedState } from '@umber-style/core'
+import { readSharedState } from '@umber-style/core/internal'
 import createInstance from './createInstance'
 
 export type {

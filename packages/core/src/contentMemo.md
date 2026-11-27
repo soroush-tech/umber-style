@@ -5,7 +5,7 @@
 `createContentMemo()` makes the memo of a cache's `hasStyleMemo` option: a tree that maps the contents of
 a merged style, with the layer and the class it is made after, to the class name the cache made for it.
 `find` walks a style down the tree and gives the class at its end; `remember` makes the steps of a style
-and puts its class there. `readStableStyle` decides whether a style can be remembered, and gives the
+and puts its class there; `clear` forgets every class, as a full memo does. `readStableStyle` decides whether a style can be remembered, and gives the
 form of it that is compiled and remembered (itself, or a copy when it has nested styles).
 
 ## Why it exists
@@ -21,7 +21,7 @@ takes the path it took before, chosen once when its compilers are made.
 
 ```mermaid
 flowchart TD
-  call["cssWithMemo(values)"] --> plain{"every value a style object (falsy ones left out)?"}
+  invoked["cssWithMemo(values)"] --> plain{"every value a style object (falsy ones left out)?"}
   plain -->|no| full["cssWith: the full path"]
   plain -->|yes| merge["mergeStyles, as cssWith merges: a fresh object, every top-level value read once"]
   merge --> find["find(layer, after, merged): walk the keys in order, each with its value"]
@@ -35,6 +35,9 @@ flowchart TD
   stable -->|yes| keep["remember the stable form"]
   keep --> reg["registerClass(class, merged): registered, held, after, written if the sheet lacks it"]
   reg --> ret["the class"]
+  values["registerValues of the cache"] --> repairs{"the memo of style options with value repair?"}
+  repairs -->|yes| clear["clear: the memo is empty"]
+  repairs -->|no| kept["kept as it is"]
 ```
 
 One step of a walk is a key and its value: `node.next.get(key).get(value)`. A nested style is a step of
@@ -49,15 +52,16 @@ comes again costs a failed walk and no remembering.
   style with no rule).
 - `roots`: layer -> `after` -> the root node of that pair. `steps`: the number of nodes made.
 - A memo is made for each set of style options of a cache (`WrittenAs.contents`, so `withStyleOptions`
-  views have their own), and only when `hasStyleMemo` is on and neither the development checks nor value
-  repair are.
+  views have their own), and only when `hasStyleMemo` is on and the development checks are not.
 
 What the class of a call depends on, and how each is part of the key: the merged style (its keys in
 order and their values, nested styles, the label, which `mergeStyles` makes from the `label` option and
 the labels of the styles) is the walk; the layer and `after` are the root; the style options
 (`hasColorFallbacks`, `hasVendorPrefixes`) are the memo itself, one for each `WrittenAs`; the prefix,
 suffix, `hasLabels`, `hasLayers` and the scoping are the cache's, which owns the memo. Value repair reads
-the values of the tokens (`readValue`), which change, so with it there is no memo.
+the declared values of the tokens (`readValue`), which are not part of the walk: they reach the cache only
+through `registerValues`, which clears the memo of each set of style options with value repair, so the
+memo holds only classes made with the declared values of now.
 
 ## Why two styles never share an entry
 
@@ -114,9 +118,12 @@ the `styleMemo` tests of the React binding were not run against the breaks: `doc
     the full path does`, `calls no getter of a nested style`).
 12. The cap: `is emptied when it holds the most steps it may`, `names the right class after it was
     emptied, with the rule in the sheet`.
-13. The development checks and value repair: no memo, every call checked (`is not used with the
-    development checks`, `is not used with value repair`). Off by default, no memo is made (`is off by
-    default`).
+13. The development checks: no memo, every call checked (`is not used with the development checks`).
+    Off by default, no memo is made (`is off by default`). Value repair: the memo is used, and cleared
+    when the declared values change, so a class made with the values of before is never named (`is
+    used, on a cache made with it and on a view, and is emptied when the declared values change`,
+    `names after a change of theme what it names without the memo`, and one `gives what the full path
+    gives` test for each form of repair; `forgets every class it holds when it is cleared`).
 14. On generated styles (400 styles, 2000 calls, three sets of options) every class, rule, registered
     style and page is that of the full path (`gives every class, rule, registered style and page of the
     full path`); a React tree renders the same markup and CSS with it on and off, on the server and in a
@@ -138,7 +145,10 @@ the `styleMemo` tests of the React binding were not run against the breaks: `doc
   never called, and a style with one is not remembered), so what is remembered is the data that was
   compiled. A getter is called as often as without the memo.
 - Emptied when full, not the oldest first: a tree has no order of entries, and emptying is one
-  assignment.
+  assignment. `clear` is that emptying, for the cache to call when what a compile reads has changed.
+- With value repair, cleared whole when the declared values change, not entry by entry: no entry knows
+  which tokens its compile read, and the engine gives new values only with a new base theme. Up to
+  0.7.0 there was no memo with value repair at all.
 - Remembered on the second sight, not the first. Remembering on the first sight made every new style
   pay a copy of its nested styles and a node and two maps for each step of its tail: in the comparison
   (Docker, one CPU) a new large style went from 34 us to 89 us, a new small one from 4.1 to 5.1 us, and

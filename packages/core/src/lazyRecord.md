@@ -13,7 +13,7 @@ returns, made on the first use of any kind.
 A sheet or a default style is defined at module level, before the engine it needs may exist (before
 `configure` is called) or before a platform call may run. The helpers let the names exist now and the work
 happen later. Without them a module that defines a style would force an engine at import time. `createEngine.ts`
-uses `createLazyRecord` for the entries of a sheet, `index.ts` exports all three, and
+uses `createLazyRecord` for the entries of a sheet, `internal.ts` exports all three, and
 `packages/react/src/defaultStyle.ts` and `defaultStyle.server.ts` use `createDeferredRecord` and
 `createDeferredObject`.
 

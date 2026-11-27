@@ -8,13 +8,8 @@ import {
   watch,
   type PropType,
 } from 'vue'
-import {
-  createGlobalMarker,
-  EMPTY_THEME,
-  type Engine,
-  type GlobalInput,
-  type GlobalRules,
-} from '@umber-style/core'
+import { type Engine, type GlobalInput, type GlobalRules } from '@umber-style/core'
+import { createGlobalMarker, EMPTY_THEME } from '@umber-style/core/internal'
 import { injectCache } from './CacheProvider'
 import type { ThemeKeys } from './ThemeProvider'
 
