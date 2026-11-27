@@ -150,6 +150,9 @@ and a `channel` (`alpha`, `rc`, `stable`), npm Trusted Publishing, and `pnpm pub
 swap is always applied and there is no long-lived token. [Releasing](../docs/releasing.md) has the
 channels, the order of the packages and how to verify a published tarball. Every package has
 `release-notes/<version>.md`, which the workflow and `pnpm check:release-notes` require.
+`pnpm check:versions` fails when the publishable packages do not carry one version, when `CORE_VERSION`
+differs from it, or when a sibling is not declared as above; the pre-commit hook, CI and the workflow
+(before anything is published) run it.
 
 ---
 

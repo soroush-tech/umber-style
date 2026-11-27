@@ -9,6 +9,8 @@ pnpm exec aiwg --staged --fix
 pnpm gen:publish-options --check
 # A publishable package has notes for its version, and a staged one is ahead of npm.
 pnpm check:release-notes
+# The publishable packages carry one version, CORE_VERSION names it, siblings are workspace:^.
+pnpm check:versions
 # No graph in a sidecar uses a reserved node id, and no link in docs/ points at a missing page or heading.
 pnpm check:docs
 pnpm test
