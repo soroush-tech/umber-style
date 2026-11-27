@@ -5,6 +5,11 @@ import { findAll, resolveTree, type ResolvedElement } from './vitest.resolveTree
 
 const theme = { palette: { primary: '#0000ff' } }
 
+/** What `css` throws for a function, as an argument or as an interpolation: the message of every binding. */
+const FUNCTION_ERROR = new TypeError(
+  "css(): a function is not a style here, as an argument or as an interpolation: css() makes a class with no component, so it has no props or theme to call it with. For a value of the props, use a styled component's style function; for a value of the theme, give an entry of StyleSheet.create((theme) => ...) to the style prop."
+)
+
 /** The slot of one request, which `React.cache` keeps inside a real server render only. */
 const requestCache: CacheFunction = (make) => {
   let value: ReturnType<typeof make> | undefined
@@ -36,7 +41,7 @@ describe('css in the server build', () => {
     ])
   })
 
-  it('reads a tagged template, and throws for a function in it', () => {
+  it('reads a tagged template, and throws for a function in it or given to it', () => {
     const { css } = setup()
     expect(
       css`
@@ -47,7 +52,8 @@ describe('css in the server build', () => {
       () => css`
         color: ${(() => 'red') as never};
       `
-    ).toThrow(TypeError)
+    ).toThrow(FUNCTION_ERROR)
+    expect(() => css((() => ({ color: 'red' })) as never)).toThrow(FUNCTION_ERROR)
   })
 })
 

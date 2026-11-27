@@ -96,11 +96,13 @@ css`
 // the class of { margin: 0, padding: 4, color: 'blue' }
 ```
 
-A function in a template is called with props in `styled`. `css` has no props and no theme, so a function in its template throws a `TypeError` at once, rather than being called with nothing:
+A function in a template is called with props in `styled`. `css` has no props and no theme, so a function in its template, or given to it as an argument (alone or in a list), throws a `TypeError` at once, rather than being called with nothing. It is the error of the `css()` of every binding (`packages/css/src/createInstance.test.ts`):
 
 ```text
-css(): an interpolation of this template is a function, which needs props or a theme, and css() has none. Call it yourself and interpolate what it returns.
+css(): a function is not a style here, as an argument or as an interpolation: css() makes a class with no component, so it has no props or theme to call it with. For a value of the props, use a styled component's style function; for a value of the theme, give an entry of StyleSheet.create((theme) => ...) to the style prop.
 ```
+
+Up to 0.8.0 a function given as an argument was dropped with no error, and a function in a template threw a message of this package's own.
 
 ## `cx`
 

@@ -6,6 +6,11 @@ import { expectTypeOf } from 'vitest'
 import { apply, css, styled, type SharedEntry } from 'umber-style/react'
 import * as native from './react-native'
 
+/** What `css` throws for a function, as an argument or as an interpolation: the message of every binding. */
+const FUNCTION_ERROR = new TypeError(
+  "css(): a function is not a style here, as an argument or as an interpolation: css() makes a class with no component, so it has no props or theme to call it with. For a value of the props, use a styled component's style function; for a value of the theme, give an entry of StyleSheet.create((theme) => ...) to the style prop."
+)
+
 const Host = (props: { id?: string; className?: string }) => (
   <i id={props.id} className={props.className} />
 )
@@ -30,5 +35,18 @@ describe('css of a style written for web and mobile', () => {
     expect(isSheetEntry(card)).toBe(true)
     expect(native.css`padding: 8px;`).toEqual({ padding: 8 })
     expect(native.css({ padding: 8 }, { margin: 2 })).toEqual({ padding: 8, margin: 2 })
+  })
+
+  it('throws one error on both platforms for a function, given to it or in its template', () => {
+    const byProps = (() => ({ padding: 8 })) as never
+    // The value of the default style is made at its first use, so the error comes when it is read.
+    expect(() => String(css(byProps))).toThrow(FUNCTION_ERROR)
+    expect(() =>
+      String(css`
+        padding: ${byProps};
+      `)
+    ).toThrow(FUNCTION_ERROR)
+    expect(() => ({ ...native.css(byProps) })).toThrow(FUNCTION_ERROR)
+    expect(() => ({ ...native.css`padding: ${byProps};` })).toThrow(FUNCTION_ERROR)
   })
 })

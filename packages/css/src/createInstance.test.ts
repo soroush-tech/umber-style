@@ -8,7 +8,15 @@ import {
   type UmberSheet,
 } from '@umber-style/core'
 import { expectTypeOf } from 'vitest'
-import createInstance, { createInstance as namedCreateInstance } from './createInstance'
+import createInstance, {
+  createInstance as namedCreateInstance,
+  type CssInput,
+} from './createInstance'
+
+/** What `css` throws for a function, the error of every binding's `css`. */
+const FUNCTION_ERROR = new TypeError(
+  "css(): a function is not a style here, as an argument or as an interpolation: css() makes a class with no component, so it has no props or theme to call it with. For a value of the props, use a styled component's style function; for a value of the theme, give an entry of StyleSheet.create((theme) => ...) to the style prop."
+)
 
 /** An instance over an in-memory sheet, with its own key. */
 function createTestInstance(key = 't') {
@@ -124,11 +132,14 @@ describe('css', () => {
       () => css`
         color: ${() => 'red'};
       `
-    ).toThrow(
-      new TypeError(
-        'css(): an interpolation of this template is a function, which needs props or a theme, and css() has none. Call it yourself and interpolate what it returns.'
-      )
-    )
+    ).toThrow(FUNCTION_ERROR)
+  })
+
+  it('throws the same TypeError for a function given as an argument, or in a list', () => {
+    const { css } = createTestInstance()
+    const byProps = (() => ({ color: 'red' })) as unknown as CssInput
+    expect(() => css(byProps)).toThrow(FUNCTION_ERROR)
+    expect(() => css({ margin: 0 }, [false, [byProps]])).toThrow(FUNCTION_ERROR)
   })
 })
 

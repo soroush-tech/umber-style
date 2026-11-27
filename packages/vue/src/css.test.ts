@@ -3,6 +3,11 @@ import { at, createCache, createMemorySheet, isSheetEntry } from '@umber-style/c
 import { createStyle } from './createStyle'
 import type { FilteringStyledOptions, Keyframes, SerializedStyles, StyledComponent } from './index'
 
+/** What `css` throws for a function, as an argument or as an interpolation: the message of every binding. */
+const FUNCTION_ERROR = new TypeError(
+  "css(): a function is not a style here, as an argument or as an interpolation: css() makes a class with no component, so it has no props or theme to call it with. For a value of the props, use a styled component's style function; for a value of the theme, give an entry of StyleSheet.create((theme) => ...) to the style prop."
+)
+
 const theme = { palette: { primary: '#0000ff' } }
 
 function setup() {
@@ -71,9 +76,14 @@ describe('css on Vue', () => {
     expect(sheet.rules).toContain('@layer v-global{body{margin:0;}}')
   })
 
-  it('throws a TypeError for a function: there are no props', () => {
+  it('throws a TypeError that says what to use for a function, alone or in a template', () => {
     const { css } = setup()
-    expect(() => css((() => ({})) as never)).toThrow(TypeError)
+    expect(() => css((() => ({})) as never)).toThrow(FUNCTION_ERROR)
+    expect(
+      () => css`
+        color: ${(() => 'red') as never};
+      `
+    ).toThrow(FUNCTION_ERROR)
   })
 })
 

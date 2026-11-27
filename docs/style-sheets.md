@@ -168,7 +168,13 @@ function Reader() {
 
 `styles` holds the real values of the theme, `#0000ff`, because the object holds them. An object built from the theme that a style function gets holds references, and its `styles` holds `var(--umber-palette-primary)`.
 
-A function is a `TypeError`: `css()` has no props to call it with, and so no `css()` value is made from a function of the theme. Give a function style to `styled`.
+A function, given as an argument (alone or in a list) or as an interpolation of the template, is a `TypeError`: `css()` makes a class with no component, so it has no props or theme to call the function with. The message is the same in every binding and in `@umber-style/css`, and says what takes a function instead (`packages/react/src/css.test.tsx`):
+
+```text
+css(): a function is not a style here, as an argument or as an interpolation: css() makes a class with no component, so it has no props or theme to call it with. For a value of the props, use a styled component's style function; for a value of the theme, give an entry of StyleSheet.create((theme) => ...) to the style prop.
+```
+
+A value of the props is written in a style function of a styled component; a value of the theme, in a sheet of `StyleSheet.create((theme) => ...)` whose entry goes in the `style` prop. With `css` of `createStyle()` the error comes at the call; with `css` of the default style it comes at the first use of the value, where the entry is made (below).
 
 `css` of the default style (`import { css } from '@umber-style/react'`) can be called at module level before `configure()`: the value stands for the entry, which is made on its first use, with the options that `configure` gave. `css` of `createStyle()` makes the entry at once.
 

@@ -16,6 +16,11 @@ const args = (strings: TemplateStringsArray, ...values: unknown[]): unknown[] =>
   ...values,
 ]
 
+/** The error of `css()` given a function, as an argument or as an interpolation: one message for both. */
+const FUNCTION_ERROR = new TypeError(
+  "css(): a function is not a style here, as an argument or as an interpolation: css() makes a class with no component, so it has no props or theme to call it with. For a value of the props, use a styled component's style function; for a value of the theme, give an entry of StyleSheet.create((theme) => ...) to the style prop."
+)
+
 const setup = () => {
   const sheet = createMemorySheet()
   return { sheet, cache: createCache({ prefix: 'c', sheet, hasLayers: false }) }
@@ -32,23 +37,15 @@ describe('readStaticTemplate', () => {
     expect(readStaticTemplate([['color: red']], 'css')).toBeUndefined()
   })
 
-  it('throws a TypeError that names the caller for a function among the interpolations', () => {
-    expect(() => readStaticTemplate(args`color: ${() => 'red'};`, 'keyframes')).toThrow(
-      new TypeError(
-        'keyframes(): an interpolation of this template is a function, which needs props, and keyframes() has none. Use the template with styled, or call the function yourself and interpolate what it returns.'
-      )
-    )
+  it('throws a TypeError that names the caller and what to use for a function among the interpolations', () => {
+    expect(() => readStaticTemplate(args`color: ${() => 'red'};`, 'css')).toThrow(FUNCTION_ERROR)
   })
 })
 
 describe('rejectFunctions', () => {
   it('throws for a function, or one in a list, and passes anything else', () => {
     expect(() => rejectFunctions([{ color: 'red' }, [null, [false]]], 'css')).not.toThrow()
-    expect(() => rejectFunctions([() => ({})], 'css')).toThrow(
-      new TypeError(
-        'css(): a function is not a style here, because css() has no props. Give it to styled, or call it yourself and pass what it returns.'
-      )
-    )
+    expect(() => rejectFunctions([() => ({})], 'css')).toThrow(FUNCTION_ERROR)
     expect(() => rejectFunctions([[{}, [() => ({})]]], 'css')).toThrow(TypeError)
   })
 })
@@ -86,7 +83,8 @@ describe('readCssStyle', () => {
   })
 
   it('throws a TypeError for a function, a string and an entry that is only a class name', () => {
-    expect(() => readCssStyle([() => ({ color: 'red' })])).toThrow(TypeError)
+    expect(() => readCssStyle([() => ({ color: 'red' })])).toThrow(FUNCTION_ERROR)
+    expect(() => readCssStyle(args`color: ${() => 'red'};`)).toThrow(FUNCTION_ERROR)
     expect(() => readCssStyle(['color: red'])).toThrow('cannot be merged into a class')
     expect(() => readCssStyle([createSheetEntry('foreign')])).toThrow(
       new TypeError(

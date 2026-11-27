@@ -14,7 +14,11 @@ import {
   type UmberSheet,
   type WebStyleObject,
 } from '@umber-style/core'
-import { parseKeyframesTemplate, parseStyleTemplate } from '@umber-style/core/internal'
+import {
+  parseKeyframesTemplate,
+  parseStyleTemplate,
+  rejectFunctions,
+} from '@umber-style/core/internal'
 
 /** What `css` takes: style objects, class names, CSS text (a string with `:` or `{`), nothing (`false`, `null`, `undefined`, `''`, `true`), and lists of them, nested. */
 export type CssInput = WebStyleObject | string | boolean | null | undefined | readonly CssInput[]
@@ -213,11 +217,13 @@ export default function createInstance(
     if (args.length === 1 && typeof first === 'object' && first !== null && !Array.isArray(first)) {
       return current.css(first as WebStyleObject)
     }
+    // A function, as an argument or as an interpolation, throws the error of every binding's `css`.
     if (isTemplate(first)) {
-      return current.css(
-        readTemplate('css', parseStyleTemplate(first, values.map(resolveClass))) as WebStyleObject
-      )
+      const style = parseStyleTemplate(first, values.map(resolveClass))
+      rejectFunctions([style], 'css')
+      return current.css(style as WebStyleObject)
     }
+    rejectFunctions(args, 'css')
     return current.css(...flatten<ClassValue>(args).map(readText))
   }) as CssFunction
 

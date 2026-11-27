@@ -14,7 +14,8 @@ template, style objects, results of `css()`, sheet entries, lists, and falsy val
 arguments, and the errors for what a call cannot take, must be the same everywhere, so it lives in core.
 It is exported by `internal.ts` (`@umber-style/core/internal`), and imported by `createStyle.ts`, `createStyle.server.ts`, `styled.ts`,
 `styled.server.ts` and `styledParts.ts` in `packages/react`, `createStyle.ts` in `packages/react-native`,
-and `createStyle.ts` and `styled.ts` in `packages/vue`.
+`createStyle.ts` and `styled.ts` in `packages/vue`, and `createInstance.ts` in `packages/css`
+(`rejectFunctions` only, for the error of a function).
 
 ## The logic
 
@@ -23,10 +24,10 @@ flowchart TD
   args["readCssStyle(args)"] --> tpl{"first argument is template strings?"}
   tpl -->|yes| parse["parseStyleTemplate"]
   parse --> fn{"result is a function?"}
-  fn -->|yes| errT["throw TypeError: needs props"]
+  fn -->|yes| errT["throw the TypeError of a function: no props or theme, what to use instead"]
   fn -->|no| out1["style object"]
   tpl -->|no| rej{"any argument, or item of a list, is a function?"}
-  rej -->|yes| errF["throw TypeError: no props here"]
+  rej -->|yes| errT
   rej -->|no| flat["flattenStyle: lists flattened, false/null/undefined dropped, entries found"]
   flat --> read["readEntryStyle of each item"]
   read --> merge["mergeStyles in order, last wins"]
@@ -48,7 +49,13 @@ The function rule differs on purpose: `css()` has no props, so it rejects functi
 ## What it guarantees
 
 - A template given to `css()` with a function interpolation, and any function among the other arguments,
-  throws a `TypeError` that names the caller (`css()` or the one given).
+  throws one `TypeError`, made by `createFunctionError`: it names the caller (`css()` or the one given),
+  says that there are no props or theme to call the function with, and says what takes one instead: a
+  styled component's style function for a value of the props, an entry of
+  `StyleSheet.create((theme) => ...)` given to the `style` prop for a value of the theme (#87). The
+  bindings' `css()` and `css` of `@umber-style/css` reach it through `readStaticTemplate` and
+  `rejectFunctions`, so the message is the same on every path. It never suggests a `css` prop: there
+  is none (#86).
 - Equal styles give the same class: the entry is made by the cache, which writes its rule when the entry
   is first used. Its `name` and `styles` can be read without writing the rule.
 - A string argument and an entry that is only a class name throw, through `readEntryStyle`.
