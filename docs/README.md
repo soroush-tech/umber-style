@@ -8,36 +8,37 @@ These pages are the one set of documentation for every package below. A document
 
 ## Pages
 
-| Page                                                            | What you can do after reading it                                                                                                 |
-| --------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| [Getting started](getting-started.md)                           | Install a package and render a themed button on any platform                                                                     |
-| [How it works](how-it-works.md)                                 | Follow a style object to a CSS rule, read the text format of a rule, and see why one class serves every theme                    |
-| [Writing styles](writing-styles.md)                             | Use `styled`, labels, function styles, `shouldForwardProp`, `as` and wrapping                                                    |
-| [Prop filters](prop-filters.md)                                 | Keep the props of a component off the element on each platform with `@umber-style/is-prop-valid`                                 |
-| [Style sheets and the style prop](style-sheets.md)              | Share styles with `StyleSheet`, `useStyle` and `apply`, and override a component                                                 |
-| [Themes](themes.md)                                             | Nest providers, read values, and type your theme                                                                                 |
-| [The root theme and switching](root-theme.md)                   | Switch light and dark with no render, add a theme at run time, render a static page                                              |
-| [Theme conditions](theme-conditions.md)                         | Write a rule that applies only in one theme or colour scheme                                                                     |
-| [Tokens](tokens.md)                                             | Do arithmetic on tokens, use `alpha`, pick token modes, animate tokens                                                           |
-| [Animations and global styles](animations-and-global-styles.md) | Define an animation with `keyframes`, write `body` rules and resets with `globalStyles` and `Global`                             |
-| [Cascade layers and overrides](cascade-layers.md)               | Know which style wins, and fit your own CSS and resets around the engine's                                                       |
-| [Typed styles](typed-styles.md)                                 | Know what each platform's types catch and what they do not                                                                       |
-| [Server rendering](server-rendering.md)                         | Render on the server, extract CSS, hydrate, and use server components                                                            |
-| [The cache and server packages](cache-and-server.md)            | Make a cache with `createCache`, add `StyleRegistry` to the App Router, extract the CSS of a page in chunks                      |
-| [React](react.md)                                               | Use what is specific to the React binding                                                                                        |
-| [Vue](vue.md)                                                   | Use what is specific to the Vue binding                                                                                          |
-| [React Native](react-native.md)                                 | Use what is specific to the React Native binding                                                                                 |
-| [Plain JavaScript](plain-javascript.md)                         | Use the engine with no framework                                                                                                 |
-| [Class names without a theme](css.md)                           | Make class names from styles with `@umber-style/css`: no framework, no theme, no provider                                        |
-| [Working with styled-system](styled-system.md)                  | Use `@soroush.tech/styled-system` parsers and variants, and know the gaps                                                        |
-| [No inline styles](no-inline-styles.md)                         | Understand the guarantee, its one caveat, and what a content security policy needs                                               |
-| [The style memo](style-memo.md)                                 | Decide whether to turn on `hasStyleMemo`, turn it on, and know its costs, risks and known issues                                 |
-| [Options reference](options.md)                                 | Look up every option and prop: name, type, default and effect                                                                    |
-| [Browser and platform support](browser-support.md)              | See which browser features each part of the output needs                                                                         |
-| [Testing](testing.md)                                           | Choose the tier of a test, run the browser tests and the fixture apps, turn the development checks on, read the gaps             |
-| [Benchmarks](benchmarks.md)                                     | Run the benchmark suite in its sandbox, read its table, and know which figures are steady                                        |
-| [Performance](performance.md)                                   | Know how fast the engine is against its last release and the styling library the design system used before, and where it is slow |
-| [Releasing](releasing.md)                                       | Publish the packages through alpha, rc and stable, install a prerelease, and verify a tarball                                    |
+| Page                                                            | What you can do after reading it                                                                                                           |
+| --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| [Getting started](getting-started.md)                           | Install a package and render a themed button on any platform                                                                               |
+| [How it works](how-it-works.md)                                 | Follow a style object to a CSS rule, read the text format of a rule, and see why one class serves every theme                              |
+| [Writing styles](writing-styles.md)                             | Use `styled`, labels, function styles, `shouldForwardProp`, `as` and wrapping                                                              |
+| [Prop filters](prop-filters.md)                                 | Keep the props of a component off the element on each platform with `@umber-style/is-prop-valid`                                           |
+| [Style sheets and the style prop](style-sheets.md)              | Share styles with `StyleSheet`, `useStyle` and `apply`, and override a component                                                           |
+| [Themes](themes.md)                                             | Nest providers, read values, and type your theme                                                                                           |
+| [The root theme and switching](root-theme.md)                   | Switch light and dark with no render, add a theme at run time, render a static page                                                        |
+| [Theme conditions](theme-conditions.md)                         | Write a rule that applies only in one theme or colour scheme                                                                               |
+| [Tokens](tokens.md)                                             | Do arithmetic on tokens, use `alpha`, pick token modes, animate tokens                                                                     |
+| [Animations and global styles](animations-and-global-styles.md) | Define an animation with `keyframes`, write `body` rules and resets with `globalStyles` and `Global`                                       |
+| [Cascade layers and overrides](cascade-layers.md)               | Know which style wins, and fit your own CSS and resets around the engine's                                                                 |
+| [Typed styles](typed-styles.md)                                 | Know what each platform's types catch and what they do not                                                                                 |
+| [Server rendering](server-rendering.md)                         | Render on the server, extract CSS, hydrate, and use server components                                                                      |
+| [The cache and server packages](cache-and-server.md)            | Make a cache with `createCache`, add `StyleRegistry` to the App Router, extract the CSS of a page in chunks                                |
+| [Next.js App Router](nextjs.md)                                 | Set up an App Router app file by file, with server and client components, a strict nonce policy, partial prerendering and the edge runtime |
+| [React](react.md)                                               | Use what is specific to the React binding                                                                                                  |
+| [Vue](vue.md)                                                   | Use what is specific to the Vue binding                                                                                                    |
+| [React Native](react-native.md)                                 | Use what is specific to the React Native binding                                                                                           |
+| [Plain JavaScript](plain-javascript.md)                         | Use the engine with no framework                                                                                                           |
+| [Class names without a theme](css.md)                           | Make class names from styles with `@umber-style/css`: no framework, no theme, no provider                                                  |
+| [Working with styled-system](styled-system.md)                  | Use `@soroush.tech/styled-system` parsers and variants, and know the gaps                                                                  |
+| [No inline styles](no-inline-styles.md)                         | Understand the guarantee, its one caveat, and what a content security policy needs                                                         |
+| [The style memo](style-memo.md)                                 | Decide whether to turn on `hasStyleMemo`, turn it on, and know its costs, risks and known issues                                           |
+| [Options reference](options.md)                                 | Look up every option and prop: name, type, default and effect                                                                              |
+| [Browser and platform support](browser-support.md)              | See which browser features each part of the output needs                                                                                   |
+| [Testing](testing.md)                                           | Choose the tier of a test, run the browser tests and the fixture apps, turn the development checks on, read the gaps                       |
+| [Benchmarks](benchmarks.md)                                     | Run the benchmark suite in its sandbox, read its table, and know which figures are steady                                                  |
+| [Performance](performance.md)                                   | Know how fast the engine is against its last release and the styling library the design system used before, and where it is slow           |
+| [Releasing](releasing.md)                                       | Publish the packages through alpha, rc and stable, install a prerelease, and verify a tarball                                              |
 
 ## The packages
 
