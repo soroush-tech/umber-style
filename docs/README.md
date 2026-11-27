@@ -2,7 +2,7 @@
 
 UmberStyle is a styling engine for React, React Native, Vue and plain JavaScript. Every theme token becomes a CSS variable, so a style is the same for every theme and is computed once. A theme is a class on an element: switching it re-renders nothing. React Native has no CSS, so there the same API hands your styles the real values.
 
-**Status:** UmberStyle is at version 0.8.0 and the API can still change. How the packages reach npm, and how to try a prerelease, is in [Releasing](releasing.md).
+**Status:** UmberStyle is at version 0.9.0 and the API can still change. How the packages reach npm, and how to try a prerelease, is in [Releasing](releasing.md).
 
 These pages are the one set of documentation for every package below. A documentation site will be built from them later; until then they are read in this folder.
 
