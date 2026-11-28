@@ -116,9 +116,9 @@ Node cannot load `react-native`, so the test installs a small stand-in with the 
 
 ## Limits
 
-- The workflow itself has never run: CI does not run it, so a dispatch is the first proof. What is checked before is its pieces: `scripts/prerelease-versions.mjs --dry-run`, the build, and the packed-tarball test.
+- The workflow is not run by CI: it runs when a release is dispatched (it has published every release since 0.4.0), so a change to it is first proven by the next dispatch. What is checked before is its pieces: `scripts/prerelease-versions.mjs --dry-run`, `pnpm check:versions`, the build, and the packed-tarball test.
 - The first release of each package is `0.1.0`. The names existed on npm as `0.0.0` placeholders, which `latest` points to until the first stable release.
 - Trusted Publishing needs npm CLI 11.5.1 or later and Node 22.14.0 or later, according to the [npm documentation](https://docs.npmjs.com/trusted-publishers). The workflow checks the first and installs the newest 11.x when the one that came with Node is older. The same page names a higher version, 11.21.0, for managing dist-tags with `npm dist-tag`; the workflow does not call that command.
-- The packed-tarball test runs the React Native binding against a stand-in, so the types of the real `react-native` are checked only by the workspace typecheck, and the binding has never run in a real app.
+- The packed-tarball test runs the React Native binding against a stand-in, so the types of the real `react-native` are checked only by the workspace typecheck, and the binding has run in a real app on iOS only (an Expo example on an iPhone), not on Android.
 - Stable releases could later go through npm's staged publishing. The workflow does not use it.
-- The `bench-report` job has not run in GitHub Actions either. Its script and its benchmark files were run on a laptop for past releases as if they had just been published, with the command line of soroush-bench that the action wraps; the action's own report of these files has not been seen.
+- The `bench-report` job runs in GitHub Actions after each release, through bench-action in report-only mode; its report is appended to the GitHub Release (seen on `@umber-style/core@0.8.0`).

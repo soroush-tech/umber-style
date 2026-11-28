@@ -71,4 +71,4 @@ The server components build runs in the Next.js App Router fixture, and `Global`
 
 ## Limits
 
-Some things have never been run: the React Native binding in a real app; `@umber-style/cache` and `@umber-style/server` in a real app or a real browser (the registry of [The cache and server packages](cache-and-server.md) runs in a unit test, with stand-ins for the framework's hook); and `@umber-style/css` in a real browser. The pages that depend on them say it.
+Some things have not been run: the React Native binding on Android (it has run on an iPhone, in Expo Go); `@umber-style/cache` and `@umber-style/server` in an app outside this repository (they run in the fixture apps: see [The cache and server packages](cache-and-server.md)); and `@umber-style/css` in a real browser. The pages that depend on them say it.

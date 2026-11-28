@@ -154,5 +154,5 @@ const night = engine.themeClass(dark, 'dark')
 ## Limits
 
 - The install lines install the release on `latest`; the examples here are checked against the code of this repository, which can be ahead of that release (see the release notes of each package).
-- The React Native example was compiled against the real `react-native` types and run against a stand-in for the platform in a test. The binding has never been run in a real app.
+- The React Native example was compiled against the real `react-native` types and run against a stand-in for the platform in a test. The binding has run in a real app: an Expo example on an iPhone in Expo Go (themes, a nested theme, state keys and the animated entry); Android has not been observed.
 - The Vue template form is compiled and rendered on a server in a test; it is not run in a browser in this repository.
