@@ -26,6 +26,8 @@ export interface StyleFindings {
   globals: [index: number, text: string][]
   /** The places, among the top-level rules, of the rules of a root theme: `:where(:root){...}`, in the `<prefix>-theme` layer or in none. */
   roots: number[]
+  /** The top-level rules whose text names a class of the prefix (`.<prefix>-`), each with its place among the top-level rules: what may be the rule of a class that a cache wrote. */
+  classRules: [index: number, text: string][]
 }
 
 /** Makes findings that hold nothing. */
@@ -40,6 +42,7 @@ export function createEmptyFindings(): StyleFindings {
     ruleCount: 0,
     globals: [],
     roots: [],
+    classRules: [],
   }
 }
 
@@ -152,7 +155,7 @@ function isRootRule(prefix: string, text: string): boolean {
   )
 }
 
-/** Closes the innermost block at `index`, a `}`; when it is a top-level rule (which started at `ruleStart`), records its place in `found`, and whether it is the rule of a root theme or may be a global rule. */
+/** Closes the innermost block at `index`, a `}`; when it is a top-level rule (which started at `ruleStart`), records its place in `found`, whether it is the rule of a root theme or may be a global rule, and its text when it names a class. */
 function closeRule(
   stack: OpenBlock[],
   found: StyleFindings,
@@ -165,8 +168,12 @@ function closeRule(
   if (!block || stack.length > 0) return
   const place = found.ruleCount++
   const rule = text.slice(ruleStart, index + 1).trimStart()
-  if (isRootRule(prefix, rule)) found.roots.push(place)
-  else if (isGlobalPrelude(prefix, block.prelude)) found.globals.push([place, rule])
+  if (isRootRule(prefix, rule)) {
+    found.roots.push(place)
+    return
+  }
+  if (isGlobalPrelude(prefix, block.prelude)) found.globals.push([place, rule])
+  if (rule.includes(`.${prefix}-`)) found.classRules.push([place, rule])
 }
 
 /** Records the top-level statement `statement` (the text before a `;`, trimmed) in `found`: a rule unless it is empty, and the layer order statement when it is one. */
@@ -179,8 +186,8 @@ function recordStatement(found: StyleFindings, statement: string): void {
  * Reads the CSS that an engine wrote (compact, no comments) in one pass and adds what it holds to
  * `found`: the layer order statement, the classes with a rule, each theme class with the variables it
  * declares, the `@property` rules, the names of the `@keyframes` rules, the variables that rules use, how
- * many rules are at the top level, the top-level rules that may be global rules, and the places of the
- * rules of a root theme.
+ * many rules are at the top level, the top-level rules that may be global rules, the places of the
+ * rules of a root theme, and the top-level rules that name a class.
  */
 export function scanStyleText(
   prefix: string,

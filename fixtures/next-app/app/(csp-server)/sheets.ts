@@ -16,10 +16,6 @@ export const sheet = StyleSheet.create((theme) => ({
   label: { paddingLeft: 43, color: theme.palette.accent },
   root: { paddingLeft: 33, borderTopWidth: 2, borderTopStyle: 'dotted' },
   avatar: { marginLeft: 7, color: theme.palette.primary },
-  // The slots of the client have names of their own: a class that server components and client
-  // components both write is not what these pages test.
-  clientRoot: { paddingLeft: 35, borderTopWidth: 2, borderTopStyle: 'dashed' },
-  clientAvatar: { marginLeft: 9, color: theme.palette.primary },
 }))
 
 /** An object sheet: its entries exist at once, with no theme. */

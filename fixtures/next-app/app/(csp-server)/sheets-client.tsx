@@ -78,7 +78,7 @@ function SlotCard({
   )
 }
 
-/** The slot pattern within the client: a client component passes handles to the parts of its child. */
+/** The slot pattern within the client: a client component passes handles to the parts of its child, the same entries as the server's slots, so each class is written by both sides. */
 export function ClientSlot() {
-  return <SlotCard styleProps={{ root: sheet.clientRoot, avatar: [sheet.clientAvatar] }} />
+  return <SlotCard styleProps={{ root: sheet.root, avatar: [sheet.avatar] }} />
 }

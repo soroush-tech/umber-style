@@ -26,7 +26,7 @@ const PADDING: Readonly<Record<string, string>> = {
   'sheets-client-handle': '31px',
   'sheets-client-use-style': '31px',
   'sheets-client-picked': '31px',
-  'sheets-client-slot-root': '35px',
+  'sheets-client-slot-root': '33px',
 }
 
 /** The cases that are not supported: a style passed from a server component to a client component. */
@@ -40,7 +40,7 @@ const UNSTYLED = [
 /** The parts of the slots, with the left margin each is given, and the primary colour. */
 const AVATAR_MARGIN: Readonly<Record<string, string>> = {
   'sheets-server-slot-avatar': '7px',
-  'sheets-client-slot-avatar': '9px',
+  'sheets-client-slot-avatar': '7px',
 }
 const AVATARS = Object.keys(AVATAR_MARGIN)
 

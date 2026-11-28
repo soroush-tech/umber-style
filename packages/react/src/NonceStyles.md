@@ -95,6 +95,10 @@ of the core), so the elements this module writes and those of the cache carry on
 - With no `StyleRegistry` above, what it renders and writes is what it did before the registry: the
   elements of a registry an app writes itself (no `data-umber-registry`) are neither read nor counted.
 - Hydration accepts the first HTML: the first render in the browser is the same as the server's.
+- A class that a client component of the same page wrote first, in the render of a navigation, is not
+  applied twice: the engine's cache deletes its rule from the element this module writes in the commit,
+  which comes before the cache's own elements (`cache.md` of the core, #91). The element stays, with its
+  sheet, so `held` keeps it and it is not written again.
 
 ## Decisions
 
