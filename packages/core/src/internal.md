@@ -7,8 +7,9 @@ React Native, Vue) and the other packages of the family (`css`, `cache`, `server
 and an app never does:
 
 - the parts of `css()` and `styled` of a web binding (`css.ts`, `tagShorthands.ts`, `templateStyle.ts`),
-  the sheet entries as a binding makes and flattens them (`sheetEntry.ts`), and the lazy records of the
-  default style (`lazyRecord.ts`);
+  the sheet entries as a binding makes and flattens them (`sheetEntry.ts`), the handles of a sheet made
+  from a function of the theme (`themedEntry.ts`: `createThemedSheet`, `readThemedSource` and
+  `rejectThemedEntries`, with the types `ThemedSheetOptions` and `ThemedSource`), and the lazy records of the default style (`lazyRecord.ts`);
 - the providers: the theme a provider adds and the theme below it (`themeInput.ts`, with
   `EMPTY_THEME`), the names and rules of the theme classes a provider writes itself (`theme.ts`), and the
   pieces of theme conditions (`scope.ts`, with the type `Condition`);
@@ -51,7 +52,7 @@ modules in a common chunk and both entries import it: no module state is duplica
 
 ```mermaid
 flowchart LR
-  styledParts["css.ts, tagShorthands.ts, templateStyle.ts, sheetEntry.ts, lazyRecord.ts"] --> entry["internal.ts"]
+  styledParts["css.ts, tagShorthands.ts, templateStyle.ts, sheetEntry.ts, themedEntry.ts, lazyRecord.ts"] --> entry["internal.ts"]
   providers["themeInput.ts, theme.ts, scope.ts"] --> entry
   live["liveValue.ts: create, declare, write"] --> entry
   page["cache.ts, cacheRegistry.ts, extractStyles.ts, nonceSource.ts, documentNonce.ts, scanHtml.ts"] --> entry

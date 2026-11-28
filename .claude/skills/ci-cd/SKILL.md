@@ -71,7 +71,9 @@ Pin every `uses:` by the action's origin, as the files do:
   axis (`next-app`). A new fixture with a development server is added to the first by hand.
 - **`lint`** runs `format:check`, `lint`, `typecheck`, `test:scripts` (Node's test runner on
   `scripts/*.test.mjs`, at 100%), `gen:publish-options --check`, `check:typography` and
-  `check:release-notes`, once for the whole workspace.
+  `check:release-notes`, `check:versions` (one version for the family, `CORE_VERSION` equal to it, siblings
+  `workspace:^`; `cd-packages.yml` runs it too, before the versions of the run are written), once for the
+  whole workspace.
 - **`packages`** runs one package's tests on one React where the package uses it: `test:coverage` and
   the lcov upload on the row with `coverage`, `test` on the others. **`build`** runs once, on the
   lockfile's React (the typecheck reads `@types/react`, which the pin leaves alone; the build leaves React

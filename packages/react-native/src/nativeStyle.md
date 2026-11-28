@@ -5,7 +5,8 @@
 Types only. It defines the style object of this binding (`NativeStyleObject`) and the types built from it:
 sheets (`NativeSheetStyles`, `NativeObjectSheet`, `NativeSheetInput`) and style functions
 (`NativeStyleFunction`, `NativeStyleResult`, `NativeStyleInput`), and the animation and transition keys
-(`NativeMotionStyle`). It has no run-time code.
+(`NativeMotionStyle`), and the entry of a sheet of the binding (`NativeSheetEntry`, a `NativeStyleObject`
+with the mark `NativeSheetMark`). It has no run-time code.
 
 ## Why it exists
 
@@ -36,6 +37,9 @@ flowchart TD
 every key optional, nothing nested, no `label`. `NativeMotionStyle` has the `animation` and `transition`
 shorthands and their longhands, with text values (a time also as a number of milliseconds). `NativeObjectSheet<K>` is `Record<K, NativeStyleObject> & { call?: never }`.
 
+`NativeSheetMark` is `{ readonly [sheetMark]: true }` on a `unique symbol` that is only declared: the mark
+exists for the compiler and never at run time. `NativeSheetEntry` is `NativeStyleObject & NativeSheetMark`.
+
 ## What it guarantees
 
 - An unknown key is an error in an object literal.
@@ -55,6 +59,11 @@ shorthands and their longhands, with text values (a time also as a number of mil
   `units.test.ts` reads those.
 - The `native` and `web` parts of a shared style, and the condition and media keys, are not keys of this
   type, although `toNativeStyle` reads them at run time. The reason is not recorded in the code.
+
+- The entries of the binding carry a mark that a plain object lacks, so that `SheetStyleProp` can take
+  the entries and refuse a plain object (#89, decision 3 of the owner). The mark is required, not optional:
+  an optional mark is met by an object that has none. The cost is that the type of an entry is no longer
+  `NativeStyleObject` alone; it is still assignable to it, so an entry goes wherever a native style does.
 
 ## Limits
 

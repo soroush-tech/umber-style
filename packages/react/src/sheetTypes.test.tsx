@@ -1,5 +1,5 @@
 import { createStyle } from './createStyle'
-import type { SheetEntry } from './types'
+import type { SheetEntry, ThemedEntry } from './types'
 
 const { styled, StyleSheet, apply, useStyle } = createStyle({ palette: { primary: '#0000ff' } })
 const Box = styled('div')({ color: 'red' })
@@ -20,8 +20,8 @@ describe('the types of an object sheet and of a sheet made from a function', () 
 
   it('gives a sheet for useStyle for a function of the theme, which is not an entry and has none', () => {
     const sheet = StyleSheet.create((theme) => ({ box: { color: theme.palette.primary } }))
-    // @ts-expect-error a sheet that is not resolved has no entries
-    expect(sheet.box).toBeUndefined()
+    // Each name is a handle, which the style prop of a styled component resolves with its theme.
+    expectTypeOf(sheet.box).toEqualTypeOf<ThemedEntry>()
     // @ts-expect-error it is not an entry, so it is not given to apply
     expect(apply(sheet)).toBeDefined()
     // @ts-expect-error it is not what the style prop takes

@@ -13,9 +13,20 @@ function hasFunction(value: unknown): boolean {
 }
 
 /**
+ * The error of `caller` given a function, as an argument or as an interpolation of its template, the
+ * same for both: it makes a class with no component, so it has no props or theme to call the function
+ * with. The message says what takes one instead.
+ */
+function createFunctionError(caller: string): TypeError {
+  return new TypeError(
+    `${caller}(): a function is not a style here, as an argument or as an interpolation: ${caller}() makes a class with no component, so it has no props or theme to call it with. For a value of the props, use a styled component's style function; for a value of the theme, give an entry of StyleSheet.create((theme) => ...) to the style prop.`
+  )
+}
+
+/**
  * The style of `args` when they are a tagged template (`caller` was used as a tag), read as CSS text;
  * undefined when they are not. `caller` has no props, so a function among the interpolations is a
- * `TypeError` that names it.
+ * `TypeError` that names it and says what to use instead.
  */
 export function readStaticTemplate(
   args: readonly unknown[],
@@ -24,24 +35,16 @@ export function readStaticTemplate(
   const [first, ...values] = args
   if (!isTemplateStrings(first)) return undefined
   const parsed = parseStyleTemplate(first, values)
-  if (typeof parsed === 'function') {
-    throw new TypeError(
-      `${caller}(): an interpolation of this template is a function, which needs props, and ${caller}() has none. Use the template with styled, or call the function yourself and interpolate what it returns.`
-    )
-  }
+  if (typeof parsed === 'function') throw createFunctionError(caller)
   return parsed
 }
 
 /**
- * Throws a `TypeError` that names `caller` when an argument, or an item of a list among them, is a
- * function: `caller` has no props to call it with.
+ * Throws a `TypeError` that names `caller` and says what to use instead when an argument, or an item
+ * of a list among them, is a function: `caller` has no props or theme to call it with.
  */
 export function rejectFunctions(args: readonly unknown[], caller: string): void {
-  if (args.some(hasFunction)) {
-    throw new TypeError(
-      `${caller}(): a function is not a style here, because ${caller}() has no props. Give it to styled, or call it yourself and pass what it returns.`
-    )
-  }
+  if (args.some(hasFunction)) throw createFunctionError(caller)
 }
 
 /**

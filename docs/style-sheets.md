@@ -37,12 +37,32 @@ function Box({ isActive }: { isActive?: boolean }) {
 
 `StyleSheet.create` takes a function of the theme that returns the styles, or an object of styles. They give different things:
 
-- A **function** receives the theme as references, like a function style, and gives a sheet. `useStyle(sheet)` resolves it against the nearest provider and returns one entry for each name: a theme that changes a breakpoint gets its own entries. The sheet is not an entry and has none: `sheet.box` and `apply(sheet)` are type errors.
+- A **function** receives the theme as references, like a function style, and gives a sheet. `useStyle(sheet)` resolves it against the nearest provider and returns one entry for each name: a theme that changes a breakpoint gets its own entries. Each name of the sheet is also a handle, `sheet.box`, that the `style` prop of a styled component resolves with its own theme, with no hook: see "A sheet of the theme without a hook" below. The sheet itself is not an entry: `apply(sheet)` and `style={sheet}` are type errors.
 - An **object** gives the entries themselves, at once, with no hook: see "A sheet without a hook" below.
 
 On the web an entry is a frozen object that holds a class name. It prints as that class name (`String(entry)` and `entry.className` agree). On React Native an entry is a style object. Treat an entry as opaque: pass it on, do not read it, so that your code runs on both platforms.
 
 `useStyle` is a hook on React (call it in a component) and must run in `setup` on Vue. `StyleSheet.create` is not a hook.
+
+### `withStyle`: the entries as a prop
+
+A class component cannot call `useStyle`. `withStyle(sheet)(Component)` wraps it: the wrapper calls `useStyle(sheet)` in its render and gives the result to the component as its `styles` prop, the same entries, typed as the hook's result. It is in the React binding (both builds), the React Native binding and `umber-style/react`; Vue keeps its composables. From `packages/react/src/wrappers.types.test.tsx`:
+
+```tsx
+const sheet = StyleSheet.create((theme) => ({
+  card: { padding: theme.space[3], background: theme.palette.surface },
+}))
+
+class Panel extends Component<{ title: string; styles: { card: SheetEntry } }> {
+  render() {
+    return <section {...apply(this.props.styles.card)}>{this.props.title}</section>
+  }
+}
+
+export const StyledPanel = withStyle(sheet)(Panel)
+```
+
+Where it fits: a class component, or a component that should receive its entries from outside rather than call a hook. The entries go where the hook's go: in the `style` of a styled component (`style={styles.card}`), and on a plain element through `apply` (`{...apply(styles.card)}`). Make the sheet at module level, as for `useStyle`. The wrapper forwards `ref`, keeps the statics and is named `withStyle(Panel)`; a component whose `styles` names an entry the sheet does not have is a type error. See [React](react.md#class-components-withtheme-and-withstyle) and [React Native](react-native.md#class-components-withtheme-and-withstyle); `withTheme` gives `useTheme()` the same way ([Themes](themes.md#reading-values-in-javascript-usetheme)).
 
 ## A sheet without a hook
 
@@ -56,9 +76,43 @@ const overrides = StyleSheet.create({
 const Page = () => <Button style={overrides.danger}>Delete</Button>
 ```
 
-An object sheet has no theme. It works with no theme set and with no provider above it, in the server components build and before any provider has rendered, and a module can create one before the app calls `configure()`. Nothing is computed when `create` is called: an entry is made when its key is first read, and a sheet that is imported and never used writes nothing. `Object.keys` and a spread list the keys (the entries of a sheet that was only imported are not made until a spread reads them; `JSON.stringify` of an entry is not meaningful).
+An object sheet has no theme. It works with no theme set and with no provider above it, in the server components build and before any provider has rendered, and a module can create one before the app calls `configure()`. Nothing is computed when `create` is called: an entry is made when its key is first read, and a sheet that is imported and never used writes nothing. `Object.keys` and a spread list the keys (the entries of a sheet that was only imported are not made until a spread reads them).
 
 Its limit is that it cannot use tokens. A token is a reference that comes from the theme, so a style that needs `theme.palette.primary` is written as a function: `StyleSheet.create((theme) => ({ ... }))`. An object can still use plain values and `var(--name)` strings that you write yourself. On React Native an object sheet is registered with the platform when its first key is read, and a `when()` or `whenScheme()` key in it is dropped, because there is no hook to read the providers: use a function sheet for those.
+
+## A sheet of the theme without a hook
+
+A styled component takes a handle of a sheet made from a function of the theme in `style`, and resolves it with the theme it renders under. From `packages/react/src/sheetHandle.test.tsx`:
+
+```tsx
+const sheet = StyleSheet.create((theme) => ({
+  box: {
+    color: theme.palette.primary,
+    ...at(`@media (width >= ${theme.breakpoints[0]})`, { margin: 1 }),
+  },
+  raised: { opacity: 0.9 },
+}))
+
+const Static = styled('div', { name: 'Static' })({ display: 'block' })
+
+const Box = () => <Static style={[sheet.box, false, sheet.raised, { width: 1 }]} />
+```
+
+`sheet.box` is a handle: a frozen object that holds the sheet and the name, made the first time it is read and the same object after (`sheet.box === sheet.box`). Making it computes nothing. When the component renders, it reads the entry with the binding's own `useStyle(sheet).box`, so the class and the rules are exactly those of `useStyle(sheet).box` under the same provider: on the server and in the browser, under nested providers with different themes, under a `CacheProvider` (written in its cache), and in the server components build, where the theme is the base theme as a server component reads it. A handle works alone, in a list, mixed with entries and plain objects, and with `false`, `null` and `undefined`, as an entry does. On React Native the handle is resolved into the registered style object that `useStyle` gives, and it follows a rotation of the window (see [React Native](react-native.md#handles-of-a-sheet-of-the-theme)).
+
+`useStyle` is still the way where there is no styled component:
+
+- a plain element: `apply(useStyle(sheet).box)`, or `className={String(useStyle(sheet).box)}`;
+- code that reads an entry or passes it to something that is not a styled component of this engine (another library's component, a `className` prop of your own);
+- a value of the theme in JavaScript: that is `useTheme()`, as before.
+
+A handle given where no theme is known is a type error, and a `TypeError` in every build, development and production. The places are `apply`, `css()`, the styles of `styled` (`styled('div')(sheet.box)`), `globalStyles` and `Global`, React Native's `apply` and `css()`, and a plain element: in the client build of React and on React Native a plain element reads the keys of its `style`, which a handle answers with the error, and `String(sheet.box)` (a `className`) throws too. In a server component of React a plain element given a handle in `style` writes nothing instead (see the Limits). The message names the place and the fix:
+
+```text
+apply(): an entry of a sheet made from a function of the theme (StyleSheet.create((theme) => ...)) has no theme here. Give it to the style prop of a styled component, which resolves it with its theme, or read the entry from useStyle(sheet) first.
+```
+
+A name that the sheet does not have is a type error, and at run time the component throws `The sheet has no style named "missing".` Some names are never handles, because frameworks and serializers read them on any object: the sheet's own members (`resolve`, and `prepare` on React Native), the members every object has (`toString`, `valueOf`, `constructor`, `hasOwnProperty` and the rest), `then`, `toJSON`, `$$typeof`, and any name that starts with `__`. A style with such a name is reached through `useStyle` only.
 
 ## When a rule is written
 
@@ -106,6 +160,64 @@ Here three things were given (two entries and an object), so they are merged int
 In the browser, an element that is given a plain object counts the class it renders, and the class is removed from the sheet one macrotask after the last element lets it go: a value that changes leaves no class behind. Two elements with the same value share the class. On a server nothing is removed. See "A value that changes" in [No inline styles](no-inline-styles.md) for what it costs.
 
 The `style` prop is only for components made by `styled()`. On a plain element, `style` is the platform's own prop: a sheet entry there is not turned into a class (and writes no style attribute, see [No inline styles](no-inline-styles.md)), and the types reject it. Use `apply` for a plain element.
+
+### A style passed from a server component
+
+A style does not cross from a server component to a client component. React turns the props of a client component into data, and an entry, an entry of an object sheet, a handle, a `css()` value or a class name arrives there without its CSS: the styled component of the client gets a class that no rule names, or nothing, and is unstyled. Import the sheet in the client component, and pass a plain value, a string or a boolean, to choose the style there. The page `/csp-server/sheets` of the App Router fixture does it.
+
+The sheet, imported by both sides (`fixtures/next-app/app/(csp-server)/sheets.ts`, shortened):
+
+```ts
+export const sheet = StyleSheet.create((theme) => ({
+  card: {
+    paddingLeft: 31,
+    borderLeftWidth: 3,
+    borderLeftStyle: 'solid',
+    borderLeftColor: theme.palette.accent,
+  },
+  label: { paddingLeft: 43, color: theme.palette.accent },
+}))
+```
+
+The client component chooses the style from a plain value (`sheets-client.tsx`):
+
+```tsx
+'use client'
+
+import { sheet } from './sheets'
+import { styled } from './style'
+
+const Card = styled('section', { name: 'CspServerSheetCard' })({ display: 'block', marginTop: 2 })
+
+/** A card whose style the server component chooses with a plain value: the way to do it. */
+export function ClientPicked({ tone }: { tone: 'card' | 'label' }) {
+  return (
+    <Card data-testid="sheets-client-picked" style={sheet[tone]}>
+      picked
+    </Card>
+  )
+}
+```
+
+And the server component passes the value, not the style (`csp-server/sheets/page.tsx`):
+
+```tsx
+<ClientPicked tone="card" />
+```
+
+In development, a styled component of React given what such a style became (an object of one key, `--umber-entry-<class>` or `--umber-themed-<id>`, with no CSS) warns once for each key (here for the entry of `StyleSheet.create({ card: { color: 'red' } }).card` under the prefix `umber`):
+
+```text
+[umber] A style was passed from a server component to a client component (--umber-entry-umber-bkhmwp), and its CSS cannot cross: import the sheet in the client component, and pass a plain value such as a string to choose the style.
+```
+
+A class name passed as text, `String(entry)` or `entry.className`, carries no rule either, and the development check of the page says so:
+
+```text
+[umber] p[] has the class umber-bkhmwp, which no rule names: if it is the class of a sheet entry passed as text (String(entry), entry.className), use the entry itself where the style is used, importing its sheet there: a class name carries no rule
+```
+
+The slot pattern, an object of entries for the parts of a component (`styleProps={{ root: sheet.root, avatar: sheet.avatar }}`), works within one side: a client component passing them to its styled client children, or a server component to its styled server children.
 
 ## `apply`
 
@@ -168,7 +280,13 @@ function Reader() {
 
 `styles` holds the real values of the theme, `#0000ff`, because the object holds them. An object built from the theme that a style function gets holds references, and its `styles` holds `var(--umber-palette-primary)`.
 
-A function is a `TypeError`: `css()` has no props to call it with, and so no `css()` value is made from a function of the theme. Give a function style to `styled`.
+A function, given as an argument (alone or in a list) or as an interpolation of the template, is a `TypeError`: `css()` makes a class with no component, so it has no props or theme to call the function with. The message is the same in every binding and in `@umber-style/css`, and says what takes a function instead (`packages/react/src/css.test.tsx`):
+
+```text
+css(): a function is not a style here, as an argument or as an interpolation: css() makes a class with no component, so it has no props or theme to call it with. For a value of the props, use a styled component's style function; for a value of the theme, give an entry of StyleSheet.create((theme) => ...) to the style prop.
+```
+
+A value of the props is written in a style function of a styled component; a value of the theme, in a sheet of `StyleSheet.create((theme) => ...)` whose entry goes in the `style` prop. With `css` of `createStyle()` the error comes at the call; with `css` of the default style it comes at the first use of the value, where the entry is made (below).
 
 `css` of the default style (`import { css } from '@umber-style/react'`) can be called at module level before `configure()`: the value stands for the entry, which is made on its first use, with the options that `configure` gave. `css` of `createStyle()` makes the entry at once.
 
@@ -300,6 +418,10 @@ A sheet entry in the `style` prop only works on a component made by `styled()`. 
 - The override class is in the `overrides` layer, so an `!important` rule of the app, or CSS outside the engine's layers, wins over it. A style attribute would win over every normal rule.
 - A `css()` value of the default style is a stand-in until its first use: any use (a read, a spread, `in`, a listing of its keys) makes it. A template given to it is read then, so a template that cannot be read throws at that first use, not at the call. A value given to `globalStyles` at module level is used there (the id of the global styles is made from it), so it makes the default style's engine, and a `configure()` after that throws.
 - `css()` takes no class name as a string, and no sheet entry that is only a class name (one that a cache did not make): both are errors, because their style is not known.
+- A handle on a plain Vue element, in Vue's `style` or `class`, writes nothing and raises no error: Vue reads its key, which holds `null` there so that Vue's merge of a list keeps it. The types reject it.
+- In a server component of React, `<div style={sheet.box}>` writes nothing and raises no error either: the handles of the server components build hold `null` in their key, because React reads every key of a prop for its development messages, and a key that throws made the page fail on the development server. This departs from the `TypeError` of a plain element that the client build gives; the types reject it, and `className={sheet.box}` still throws.
+- A styled component given a handle on React Native renders through an inner component; switching its `style` between a handle and none mounts its element again. On the web nothing changes in the tree.
+- A style passed from a server component to a client component is unstyled ("A style passed from a server component" above). The development warning is given in the React builds only, for an object of that one key: in Vue, or with other keys in the same object, nothing says so.
 - In a template a `css()` value is merged only when it stands alone on its line; see the limits of [Writing styles](writing-styles.md).
 - A shared source that uses `useStyle` or function sheets resolves them with the platform's own rules: on the web, entries are classes, on React Native they are registered objects.
 - The `host.native.ts` file was compiled in the React Native package, against the real `react-native` types, apart from the shared source that imports `./host`.

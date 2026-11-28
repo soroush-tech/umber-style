@@ -259,7 +259,62 @@ The cases above are those of `packages/umber-style/src/sharedTypes.test.tsx`, wh
 
 ## Vue
 
-Vue uses the web types for styles, in the same two modes: `declare module '@umber-style/vue' { interface StyleTypeOptions { isStrict: true } }` switches them to strict. A styled component's props are not typed: `styled` returns a component that takes any attributes. A function style receives the attributes as a `Record<string, unknown>`.
+Vue uses the web types for styles, in the same two modes: `declare module '@umber-style/vue' { interface StyleTypeOptions { isStrict: true } }` switches them to strict. A styled component's props are not typed: `styled` returns a component that takes any attributes, `style` included. A function style receives the attributes as a `Record<string, unknown>`. `StyleProp` and `SheetStyleProp` are exported for a component of your own that types its `style` (see [Sheet entries only](#sheet-entries-only)).
+
+## Sheet entries only
+
+Each binding and `umber-style/react` export two types for a `style` prop: `StyleProp`, what the `style` of a styled component takes, and `SheetStyleProp`, the part of it that takes sheet entries only, for a design system whose components take no plain style objects. The names are the same everywhere.
+
+| Package                     | `StyleProp` takes                                                                               | `SheetStyleProp` takes                                                                                                      |
+| --------------------------- | ----------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `@umber-style/react`        | entries, handles, web style objects, `CSSProperties` (not with the strict switch), falsy, lists | entries (`StyleSheet.create`, `useStyle`, `css()`), handles, `false`, `null`, `undefined`, nested lists                     |
+| `@umber-style/vue`          | entries, handles, web style objects, falsy, lists                                               | the same as React                                                                                                           |
+| `@umber-style/react-native` | native style objects (the platform's own included), handles, falsy, lists                       | `SheetStyleProp<S = ViewStyle>`: the entries of the binding (`StyleSheet.create`, `useStyle`), handles, falsy, nested lists |
+| `umber-style/react`         | `SharedStyleProp`: shared entries, handles, shared style objects, falsy, lists                  | shared entries (`StyleSheet.create`, `useStyle`, `css()`), handles, falsy, nested lists                                     |
+
+A plain style object and a string are type errors in `SheetStyleProp`, on every platform. A `SheetStyleProp` is a `StyleProp`, so a component passes it on to the `style` of one of its parts as it is. From `packages/react/src/sheetStyleProp.types.test.tsx`:
+
+```tsx
+const object = StyleSheet.create({ a: { color: 'red' } })
+const themed = StyleSheet.create((theme) => ({ b: { color: theme.palette.primary } }))
+const accepted: SheetStyleProp[] = [
+  object.a,
+  themed.b,
+  [object.a, [themed.b, false]],
+  null,
+  undefined,
+  false,
+  css({ color: 'red' }),
+]
+const asStyle: StyleProp = accepted
+
+// @ts-expect-error a plain object
+const plain: SheetStyleProp = { color: 'red' }
+// @ts-expect-error a string
+const text: SheetStyleProp = 'x'
+```
+
+`themed.b` is a handle, typed `ThemedEntry` ([Style sheets](style-sheets.md#a-sheet-of-the-theme-without-a-hook)). It carries its sheet's names, so a misspelt name is a type error, and it is not taken by `apply`, `css()`, `useStyle` or the `style` of a plain element.
+
+On React Native an entry of the binding is typed `NativeSheetEntry`: a native style with a mark that exists for the compiler only, which a plain object and a style of the platform's `StyleSheet.create` do not have; `StyleProp` still takes both. `S` is the kind of the component the prop is for, `ViewStyle`, `TextStyle` or `ImageStyle`, and picks the keys the entry is typed with; an entry of the binding has every key, so it fits every kind. From `packages/react-native/src/themedStyle.test.tsx`:
+
+```tsx
+const object = StyleSheet.create({ box: { margin: 1 }, label: { fontSize: 12 } })
+const view: SheetStyleProp[] = [object.box, sheet.card, [false, [null, sheet.tone]], undefined]
+const text: SheetStyleProp<TextStyle> = [object.label, sheet.card]
+const image: SheetStyleProp<ImageStyle> = object.box
+
+const own = platformSheet.create({ box: { margin: 1 } })
+// @ts-expect-error a plain object
+const plain: SheetStyleProp = { margin: 1 }
+// @ts-expect-error a style of the platform StyleSheet
+const registered: SheetStyleProp = own.box
+const taken: StyleProp = [{ margin: 1 }, own.box]
+```
+
+In `umber-style/react` the one type serves both platforms: `packages/umber-style/src/sharedSheetStyleProp.test.tsx` is compiled with and without the `react-native` export condition.
+
+A prop typed `SheetStyleProp` takes entries from the side it is on: a style does not cross from a server component to a client component ([A style passed from a server component](style-sheets.md#a-style-passed-from-a-server-component)).
 
 ## Server components
 
@@ -426,6 +481,9 @@ The number is a count of instantiations: how many times the checker made a gener
 ## Limits
 
 - The values of colours and lengths are not checked, on any platform.
+- The `style` attribute of a Vue styled component is not typed as `StyleProp`: it takes any value, and a string fails at run time only.
+- On React Native the kind `S` of `SheetStyleProp<S>` does not tell a text entry from a view entry: the entries of the binding are typed with every key. The mark of `NativeSheetEntry` is not checked at run time; a value cast to it passes.
+- `SheetEntry` is an interface of one member, `className`: an object of your own with a `className` string type-checks as an entry.
 - `StateKey` is any `@state` key, so a key written by hand (`'@state pressd'`) type-checks: only the argument of `state()` is checked. The state props are typed on every styled component, also one whose styles name no state, where they are forwarded as any prop.
 - By default a misspelt key, a keyword that does not exist (`display: 'gird'`) and a selector without `&` compile, in a nested style as at the top: that is the price of the drop-in. The strict switch catches them again, for the whole program; it cannot be switched on for one file.
 - By default the extra keys of a style must hold a style or a value: an object typed with another key whose value is neither (a shared style with its `native` part, given to the `styled` of a web binding) is a type error where the strict types accepted it, because the strict types have no index signature for such a key.

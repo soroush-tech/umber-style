@@ -135,7 +135,7 @@ describe('the check of the page in another document', () => {
     createDevChecker('u', 10, frame)()
     vi.advanceTimersByTime(10)
     expect(warn.mock.calls.map(([message]) => message)).toEqual([
-      '[u] p[] has the class u-missing, which no rule names',
+      '[u] p[] has the class u-missing, which no rule names: if it is the class of a sheet entry passed as text (String(entry), entry.className), use the entry itself where the style is used, importing its sheet there: a class name carries no rule',
     ])
   })
 

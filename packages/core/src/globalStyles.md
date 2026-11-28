@@ -34,6 +34,7 @@ flowchart TD
   kind -->|list| each["each item, any depth"]
   kind -->|handle| res["resolve(readTheme), read again"]
   kind -->|function| callfn["input(readTheme()), read again"]
+  kind -->|"a handle of a theme sheet"| themed["TypeError: Global"]
   kind -->|sheet entry| entry["nested rules of its style; a declaration outside a selector is warned and left out"]
   kind -->|object| keep["keep as one set"]
   kind -->|null, undefined, false| drop["leave out"]
@@ -43,7 +44,8 @@ flowchart TD
 ```
 
 In `compileGlobalRules` a value that is a list writes the key once for each item, because an object cannot
-hold one key twice. Each item is read through `readEntryStyle`, so a sheet entry stands for its style.
+hold one key twice. Each item is read through `readEntryStyle`, so a sheet entry stands for its style, and
+a handle of a sheet made from a function of the theme is a `TypeError` that starts with `globalStyles()`.
 
 ## The data
 
@@ -59,6 +61,8 @@ a style object, a sheet entry, a nested set of rules, at-rule descriptors, or a 
   it is built on first read and kept.
 - Styles that are not an object (or a function) throw a `TypeError`, and so does a key that holds no style.
 - An empty group at-rule writes nothing.
+- A handle of a sheet made from a function of the theme (`sheet.card`), given as the styles of `Global` or
+  under a key, is a `TypeError`: global styles have no provider to resolve it with.
 
 ## Decisions
 

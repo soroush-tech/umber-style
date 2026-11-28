@@ -67,7 +67,12 @@ export function prepareStyled<T>(
     const own = cache === undefined ? styler : readStyler(cache)
     // Everything in the style prop, entries and plain objects, joins the one class, after the styles.
     // No style attribute is ever rendered.
-    const extra = [...flattenStyle(props.style), props.className as string | undefined]
+    // A handle of a sheet is resolved with the theme of the component, which writes to `cache`; what is
+    // left of a style passed from a server component is warned about in development.
+    const extra = [
+      ...flattenStyle(props.style, undefined, cache ?? engine.cache),
+      props.className as string | undefined,
+    ]
     const isHeld = extra.some(isPlainStyle)
     const held = canHold && isHeld ? own.getHeldClass(props, extra, theme) : undefined
     let className = held ? held.className : own.getClassName(props, extra, theme)

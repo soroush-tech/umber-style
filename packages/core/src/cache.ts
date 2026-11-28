@@ -34,6 +34,7 @@ import {
   type StyleObject,
 } from './serialize'
 import { createThemeRule, ROOT_SELECTOR, toDeclarationText } from './theme'
+import { createThemedEntryError, isThemedEntry } from './themedEntry'
 import { scanVariables } from './variables'
 import type { WebStyleObject } from './webStyle'
 
@@ -560,6 +561,10 @@ export function createMemorySheet(): Sheet {
   }
 }
 
+// `Node.DOCUMENT_POSITION_FOLLOWING`, the bit of `compareDocumentPosition` for a node that comes after:
+// the value, as the core reads no DOM global when it loads.
+const DOCUMENT_POSITION_FOLLOWING = 4
+
 /** Deletes `rule` from the style sheet that holds it, found by its place now; a rule that is held by none any more is left. */
 function deleteCssRule(rule: CSSRule): void {
   const parent = rule.parentStyleSheet
@@ -936,6 +941,9 @@ function addClassValues(
       continue
     }
     if (typeof value === 'object' && !isSheetEntry(value)) {
+      if (isThemedEntry(value)) {
+        throw createThemedEntryError('A class (apply, css(), the styles of styled)')
+      }
       sorted.styles.push(value as StyleObject)
       continue
     }
@@ -1956,6 +1964,45 @@ export function createCache(options: CacheOptions = {}): Cache {
     markUsed(found.variables)
   }
 
+  /** The rules this cache wrote itself for the classes of `found` that it keeps for good: none of a held class, which it may remove, nor of a class it took from the page. */
+  const readOwnRules = (found: StyleFindings): Set<string> => {
+    const own = new Set<string>()
+    for (const name of found.classes) {
+      if (!held.has(name)) for (const rule of insertedRules.get(name) ?? []) own.add(rule)
+    }
+    return own
+  }
+
+  /** Whether every style element of this cache's own sheet in `page` comes after `element`: none when its sheet is not in that page. */
+  const isWrittenAfter = (element: Element, page: Document): boolean => {
+    if (sheet.document !== page) return false
+    const own = [...page.querySelectorAll(`style[data-style="${prefix}"]`)].filter((found) =>
+      elementModes.has(found)
+    )
+    return (
+      own.length > 0 &&
+      own.every((found) => element.compareDocumentPosition(found) & DOCUMENT_POSITION_FOLLOWING)
+    )
+  }
+
+  /**
+   * Deletes from the sheet of `element`, which arrived on the page, each top-level rule (`objects`, in the
+   * order of `found`) that is the text of a rule this cache wrote itself for a class it keeps: the copy a
+   * server sends of a class that a client component wrote first, in a client-side navigation. Only when
+   * the cache's own elements come after `element`, so the copy that applied stays.
+   */
+  const deleteOwnCopies = (
+    page: Document,
+    element: Element,
+    found: StyleFindings,
+    objects: CSSRuleList
+  ): void => {
+    const own = readOwnRules(found)
+    const copies = found.classRules.filter(([, text]) => own.has(text))
+    if (copies.length === 0 || !isWrittenAfter(element, page)) return
+    for (const rule of copies.map(([index]) => objects[index])) deleteCssRule(rule)
+  }
+
   if (page) {
     // The page is read once here, and again for every style element that arrives later.
     const selector = createStyleSelector(prefix)
@@ -1983,6 +2030,7 @@ export function createCache(options: CacheOptions = {}): Cache {
       const rootRules = found.roots.map((index) => objects?.[index])
       if (root === undefined) pageRoots.push(...rootRules)
       else for (const rule of rootRules) if (rule) deleteCssRule(rule)
+      if (objects) deleteOwnCopies(page, element, found, objects)
     }
     for (const element of page.querySelectorAll(selector)) scan(element)
     // Rules reach the page without a call to the engine: streamed content, a route that a framework

@@ -59,6 +59,20 @@ export type NativeMotionStyle = {
   transitionBehavior?: string
 }
 
+declare const sheetMark: unique symbol
+
+/**
+ * The mark that the compiler gives a style the binding registered (an entry of `StyleSheet.create` or of
+ * `useStyle`), so that `SheetStyleProp` can tell it from a plain object. It exists for the compiler only:
+ * at run time an entry is the platform's registered style, with no mark.
+ */
+export interface NativeSheetMark {
+  readonly [sheetMark]: true
+}
+
+/** An entry of a sheet of the binding: a native style that the binding registered, with its mark. */
+export type NativeSheetEntry = NativeStyleObject & NativeSheetMark
+
 /** A set of named native styles. */
 export type NativeSheetStyles = Record<string, NativeStyleObject>
 

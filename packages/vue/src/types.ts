@@ -24,6 +24,8 @@ import type {
   StylerOptions,
   TemplateValue,
   Theme as CoreTheme,
+  ThemedEntries,
+  ThemedEntry,
   ThemeInput,
   WebStyleObject,
 } from '@umber-style/core'
@@ -53,6 +55,8 @@ export type {
   StateName,
   StyleObject,
   StyleTypeOptions,
+  ThemedEntries,
+  ThemedEntry,
   ThemeInput,
   ThemeKey,
   WebNested,
@@ -126,6 +130,35 @@ export interface StyledStatics {
   /** The component as a selector: `.` and a class that every element of it has. Throws when it has none. */
   toString(): string
 }
+
+/**
+ * What the `style` attribute of a styled component takes: sheet entries, handles of a sheet made from a
+ * function of the theme (`sheet.card`) and plain style objects, in arrays, with falsy values dropped.
+ * Nothing is rendered as a style attribute: all of it is merged, in order, into the one class of the
+ * element, after its own styles and before `class`. A string is an error.
+ */
+export type StyleProp =
+  | SheetEntry
+  | ThemedEntry
+  | WebStyleObject
+  | false
+  | null
+  | undefined
+  | readonly StyleProp[]
+
+/**
+ * What a `style` attribute that takes sheet entries only takes: an entry (of `StyleSheet.create`, or a
+ * `css()` value), a handle of a sheet made from a function of the theme (`sheet.card`), `false`, `null`,
+ * `undefined`, and lists of them, nested. A plain style object and a string are type errors. It is a
+ * part of `StyleProp`.
+ */
+export type SheetStyleProp =
+  | SheetEntry
+  | ThemedEntry
+  | false
+  | null
+  | undefined
+  | readonly SheetStyleProp[]
 
 /** A component that `styled` made: it takes any attribute, and keeps its styles for a component that wraps it. */
 export type StyledComponent = FunctionalComponent<Record<string, unknown>> & StyledStatics
@@ -230,16 +263,22 @@ export interface Style<T> {
   StyleSheet: {
     /** A sheet given as an object is its entries, usable at once, with no hook and no theme. */
     create<K extends string>(styles: ObjectSheet<K>): { readonly [P in K]: SheetEntry }
-    /** A sheet given as a function of the theme is for `useStyle`, which resolves it against the theme. */
+    /**
+     * A sheet given as a function of the theme: `useStyle` resolves it against the theme, and each name
+     * is a handle (`sheet.card`) that the `style` of a styled component resolves with its own theme.
+     */
     create<K extends string>(
       styles: (theme: T) => Record<K, WebStyleObject>
-    ): Sheet<Record<K, WebStyleObject>>
+    ): Sheet<Record<K, WebStyleObject>> & ThemedEntries<K>
   }
   /** The entries of a sheet; an object sheet is its own entries and is returned as it is. */
   useStyle<K extends string>(sheet: { readonly [P in K]: SheetEntry }): {
     readonly [P in K]: SheetEntry
   }
   /** The entries of a sheet made from a function of the theme, resolved against the nearest provider. Call it in `setup`. */
+  useStyle<K extends string>(
+    sheet: Sheet<Record<K, WebStyleObject>> & ThemedEntries<K>
+  ): { [P in K]: SheetEntry }
   useStyle<S extends SheetStyles>(sheet: Sheet<S>): { [K in keyof S]: SheetEntry }
   /** The attributes that apply entries of a sheet: a class. */
   apply(...entries: (SheetEntry | string | null | undefined | false)[]): { class?: string }

@@ -151,6 +151,12 @@ jobs:
           ok || { echo "::error::npm $(npm --version) is older than 11.5.1, which Trusted Publishing needs"; exit 1; }
           echo "npm $(npm --version), node $(node --version)"
 
+      # The family carries one version, CORE_VERSION names it and siblings are workspace:^: checked on the
+      # tree as committed, before the step below rewrites the versions, so a release cannot start from a
+      # tree whose versions differ.
+      - name: Check versions
+        run: pnpm run check:versions
+
       # Turn the package.json targets into this channel's versions (in this checkout only) and
       # order the run dependencies-first. With `all`, a target already on npm is skipped; a
       # named one fails. The release notes were checked for the target version above.

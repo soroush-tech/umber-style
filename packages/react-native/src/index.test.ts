@@ -26,6 +26,8 @@ describe('the entry of @umber-style/react-native', () => {
       'useTheme',
       'StyleSheet',
       'useStyle',
+      'withTheme',
+      'withStyle',
       'apply',
       'css',
       'themeClass',

@@ -5,7 +5,8 @@
 Types only: the public types of the Vue binding. The main one is `Style<T>`, what `createStyle` and
 `bindEngine` return. It also holds `Theme` (the default style's theme, augmentable), the options
 (`StyleOptions`, `StyledOptions`, `FilteringStyledOptions`), the `styled` types (`Styled`, `StyledFactory`,
-`StyledTags`, `StyledComponent`, `StyledStatics`, `CreateStyled`), `CssFunction`, `Sheet`, and the props of
+`StyledTags`, `StyledComponent`, `StyledStatics`, `CreateStyled`), the style props (`StyleProp`,
+`SheetStyleProp`), `CssFunction`, `Sheet`, and the props of
 `ThemeProvider` and `Global`. It re-exports many style types of the core, `StateName` and `StateKey` of the state keys among them.
 
 ## Why it exists
@@ -35,7 +36,13 @@ flowchart TD
   (styles last, so a mistake in a style object is reported against a style).
 - `PropsOf<C>` is the props of an intrinsic element, of a component with `$props`, or of a functional
   component.
-- `Style<T>.useStyle` has two overloads: an object sheet returns itself, a `Sheet<S>` is resolved.
+- `Style<T>.useStyle` has three overloads: an object sheet returns itself, a sheet made from a function
+  (`Sheet & ThemedEntries<K>`) is resolved, and the general `Sheet<S>`.
+- `StyleProp` is what the style attribute of a styled component takes: entries, handles, plain style
+  objects, falsy values and nested lists. `SheetStyleProp` takes entries only (#89): an entry, a handle,
+  `false`, `null`, `undefined` and nested lists; a plain object and a string are type errors. Both are
+  new in 0.9.0.
+- `StyleSheet.create` given a function returns `Sheet & ThemedEntries<K>`: a handle for each name.
 - `Style<T>.useStyleValue` returns a `StyleValueRef`: the core's `LiveValue` with a `value` of a ref's shape.
 
 ## What it guarantees
@@ -54,3 +61,6 @@ flowchart TD
 ## Limits
 
 - `Theme` must be augmented by the app; the file does not know the app's tokens.
+- The style attribute of a styled component is still untyped (`Record<string, unknown>`): typing it as
+  `StyleProp` makes three existing tests fail to compile (they pass a value typed `unknown` or `object`, and
+  a string to check the error), so that change waits for a decision.

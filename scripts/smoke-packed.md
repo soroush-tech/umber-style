@@ -49,7 +49,10 @@ flowchart TD
 Step 1 checks each tarball: not private; `exports`, `main`, `module` and `types` all start with `./dist/`
 and exist (a package with no `.` entry, `is-prop-valid`, has no main, module or types to check); no
 `/src/` in the manifest; `LICENSE` and `README.md` present; no `workspace:` left; each sibling published
-as `^<its version>`; nothing but `dist`, `LICENSE`, `README.md`, `package.json`. Step 3 loads every key of
+as `^<its version>`; nothing but `dist`, `LICENSE`, `README.md`, `package.json`; and no `.mjs` file under
+`dist` that no export, `main` or `module` points at (a chunk the entries share, or a module of an
+unbundled build) exporting a name renamed to a minified one (`findMinifiedExports` of
+`shared-exports.mjs`, #84). Step 3 loads every key of
 `ENTRIES` and also checks that each entry of `NAMED_DEFAULTS` exports its default by name, the same
 function, that the bindings and the umbrella hand out the very functions of one core,
 that each prop filter answers for its platform, that `@umber-style/is-prop-valid` has no root entry, that

@@ -5,7 +5,8 @@
 Types only: the public shapes of the React Native binding. The main one is `NativeStyle<T>`, what
 `createStyle` and the default style return. The rest are the options (`StyleOptions`, `StyledOptions`), the
 props of the components (`ThemeProviderProps`, `CacheProviderProps`, `ThemeScopeProps`, `GlobalProps`), the
-`styled` and `css` types, and `NativeStyleSheet`. It also holds the contract between the binding and its
+`styled` and `css` types, `NativeStyleSheet`, and the wrappers of `withTheme` and `withStyle`
+(`WrappedComponent`, `StyleWrapper`, `PropsTaking`, the same types as in the React binding). It also holds the contract between the binding and its
 animated entry: `AnimatedDriver` (the value `animated`), `MotionContext` and `Motion`. There is no run-time
 code.
 
@@ -24,7 +25,7 @@ flowchart TD
   t["theme shape T"] --> ns["NativeStyle of T"]
   ns --> rd["what reads the theme gets NativeTheme of T"]
   ns --> tk["what takes a theme takes T"]
-  rd --> r1["useTheme, ThemeContext, style functions, sheet functions"]
+  rd --> r1["useTheme, withTheme, ThemeContext, style functions, sheet functions"]
   tk --> r2["ThemeProvider, when"]
   ns --> same["web members kept so one source runs on both"]
   same --> r3["Global, ThemeScope, themeClass, keyframes, globalStyles"]
@@ -35,6 +36,9 @@ flowchart TD
 
 ## The data
 
+- `withTheme` takes a component whose `theme` takes `NativeTheme<T>`, and `withStyle` has the three
+  overloads of `useStyle`, each returning a `StyleWrapper` of `NativeSheetEntry` entries; the wrapper is
+  `WrappedComponent<C, Name>`, the props of `C` with its `ref`, minus `Name`, and its statics but React's.
 - `StyleOptions<T>` extends the core's `BindingOptions<T>` with `remBase` (default 16) and `animated`.
   Only `remBase`, `lengthKeys` and `animated` are used; any other option is ignored with a development
   warning.
@@ -46,9 +50,17 @@ flowchart TD
 - `StyledComponent<C, P>` takes the props of the tag, `P`, the state props, `as` and `style`.
 - `StateProps` is `{ pressed?, hovered?, focused? }`, booleans: what tells a styled component a state its
   `state()` keys name, for a component that does not report it itself (`styled.ts` reads them).
-- The `style` prop takes style objects, falsy values and nested arrays (`StyleProp`).
+- The `style` prop takes style objects, handles of a sheet made from a function of the theme
+  (`ThemedEntry`), falsy values and nested arrays (`StyleProp`).
+- `SheetStyleProp<S = ViewStyle>` takes entries only (#89): an entry of the binding (`NativeSheetMark` with
+  the keys of `S` as `NativeStyleObject` types them), a handle, `false`, `null`, `undefined` and nested
+  lists. A plain object and a style of the platform's own `StyleSheet.create` are type errors: they have no
+  mark. `S` picks the keys only: the binding's entries are typed with every key, so they fit every kind,
+  an image's included, whose `overflow` takes fewer values than the union does.
 - `NativeStyleSheet<T>` is the platform `StyleSheet` with `create` replaced by two overloads: an object sheet
-  gives its styles at once, a function of the theme gives a `SheetDefinition` for `useStyle`.
+  gives its styles at once, typed `NativeSheetEntry`, a function of the theme gives a `SheetDefinition`
+  for `useStyle` and a handle for each name (`ThemedEntries<K, 'resolve' | 'prepare'>`). `useStyle` has
+  an overload for that form, which returns `NativeSheetEntry` for each name.
 
 ## What it guarantees
 

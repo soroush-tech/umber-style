@@ -191,6 +191,8 @@ What it reads is unchanged: the same values, and the same object for the same pa
 | React Native | the theme                                        |
 | Vue          | a computed ref of the theme (`useTheme().value`) |
 
+A class component cannot call `useTheme()`. `withTheme(Component)` wraps it: the wrapper calls `useTheme()` in its render and gives the result to the component as its `theme` prop, so it is the same value in the same place (the nearest provider in a client component, the base theme in a server component, the lengths as numbers on React Native). The wrapper takes the props of the component without `theme`, typed as `useTheme()` returns it, forwards `ref`, keeps the statics and is named `withTheme(Card)`. It is in both React builds, React Native and `umber-style/react`; Vue keeps its composables. See [React](react.md#class-components-withtheme-and-withstyle).
+
 In a client component of React the theme is the same object from render to render while the theme given to each provider above is (`toBe`, so it can be a dependency of a memo or an effect). A branch that a provider's theme does not change is the object of the theme above, not a copy, and an outermost provider with no given base theme gives the very object it was given.
 
 With no provider above, `useTheme()` returns the base theme that was given on purpose (below), or an empty object when none was. A theme that a provider gave the engine does not count: once that provider unmounts, a tree with no provider has the empty theme again, in every binding. Styles still render: a style function then gets an empty theme, and one that reads a token (`theme.palette.primary`) throws a `TypeError` of the language, because `theme.palette` is `undefined`.

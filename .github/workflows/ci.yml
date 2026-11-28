@@ -237,6 +237,10 @@ jobs:
       - name: Check release notes
         run: ${{ needs.prepare.outputs.runner }} run check:release-notes
 
+      # The publishable packages carry one version, CORE_VERSION names it, and siblings are workspace:^.
+      - name: Check versions
+        run: ${{ needs.prepare.outputs.runner }} run check:versions
+
       # No sidecar graph uses a reserved node id, and no link in docs/ points at a missing page or heading.
       - name: Check docs
         run: ${{ needs.prepare.outputs.runner }} run check:docs

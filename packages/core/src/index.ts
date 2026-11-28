@@ -70,6 +70,7 @@ export {
 export { findEntryCache, isSheetEntry, type SheetEntry } from './sheetEntry'
 export * from './state'
 export * from './styleTypes'
+export type { ThemedEntries, ThemedEntry } from './themedEntry'
 export type { ThemeInput } from './themeInput'
 export * from './tokens'
 export * from './types'

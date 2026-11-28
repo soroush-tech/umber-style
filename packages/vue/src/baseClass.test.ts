@@ -1,7 +1,7 @@
 import { createApp, h, type Component } from 'vue'
 import { createCache, createMemorySheet, type Theme } from '@umber-style/core'
 import { createStyle } from './createStyle'
-import type { SheetEntry } from './types'
+import type { SheetEntry, ThemedEntry } from './types'
 import { createDefaultStyle } from './defaultStyle'
 
 const baseTheme = { palette: { primary: '#0000ff' }, space: [0, 4, 8] }
@@ -93,8 +93,8 @@ describe('the types of a sheet in Vue', () => {
     expectTypeOf(apply(object.box)).toEqualTypeOf<{ class?: string }>()
     expectTypeOf(useStyle(object)).toEqualTypeOf<{ readonly box: SheetEntry }>()
     expectTypeOf(useStyle(themed)).toEqualTypeOf<{ box: SheetEntry }>()
-    // @ts-expect-error a sheet that is not resolved has no entries
-    expect(themed.box).toBeUndefined()
+    // Each name is a handle, which the style of a styled component resolves with its theme.
+    expectTypeOf(themed.box).toEqualTypeOf<ThemedEntry>()
     // @ts-expect-error it is not an entry, so it is not given to apply
     expect(apply(themed)).toBeDefined()
     // @ts-expect-error an entry alone is not a sheet

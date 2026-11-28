@@ -33,7 +33,11 @@ describe('the development check of a page, shared by the caches of a prefix', ()
     first.css({ color: 'red' })
     second.css({ color: 'blue' })
     vi.advanceTimersByTime(1000)
-    expect(warn.mock.calls).toEqual([['[u] p[] has the class u-missing, which no rule names']])
+    expect(warn.mock.calls).toEqual([
+      [
+        '[u] p[] has the class u-missing, which no rule names: if it is the class of a sheet entry passed as text (String(entry), entry.className), use the entry itself where the style is used, importing its sheet there: a class name carries no rule',
+      ],
+    ])
   })
 
   it('checks the page for each prefix on its own', () => {
@@ -44,8 +48,8 @@ describe('the development check of a page, shared by the caches of a prefix', ()
     createPageCache('v', page)
     vi.advanceTimersByTime(1000)
     expect(warn.mock.calls.flat().sort()).toEqual([
-      '[u] p[] has the class u-missing, which no rule names',
-      '[v] p[] has the class v-missing, which no rule names',
+      '[u] p[] has the class u-missing, which no rule names: if it is the class of a sheet entry passed as text (String(entry), entry.className), use the entry itself where the style is used, importing its sheet there: a class name carries no rule',
+      '[v] p[] has the class v-missing, which no rule names: if it is the class of a sheet entry passed as text (String(entry), entry.className), use the entry itself where the style is used, importing its sheet there: a class name carries no rule',
     ])
   })
 
@@ -60,8 +64,12 @@ describe('the development check of a page, shared by the caches of a prefix', ()
     createPageCache('u', page).css({ color: 'blue' })
     vi.advanceTimersByTime(1000)
     expect(warn.mock.calls).toEqual([
-      ['[u] p[] has the class u-first, which no rule names'],
-      ['[u] p[] has the class u-second, which no rule names'],
+      [
+        '[u] p[] has the class u-first, which no rule names: if it is the class of a sheet entry passed as text (String(entry), entry.className), use the entry itself where the style is used, importing its sheet there: a class name carries no rule',
+      ],
+      [
+        '[u] p[] has the class u-second, which no rule names: if it is the class of a sheet entry passed as text (String(entry), entry.className), use the entry itself where the style is used, importing its sheet there: a class name carries no rule',
+      ],
     ])
   })
 

@@ -6,8 +6,8 @@
 and has no comments, in one pass, and adds what it holds to a `StyleFindings`: the layer order statement,
 the classes that rules name, each theme class with the variables it declares, the `@property` rules,
 the `@keyframes` names, the variables the rules use, the number of top-level rules, the top-level rules
-that may be global, and the places of the rules of a root theme. `createEmptyFindings()` makes the empty
-record.
+that may be global, the places of the rules of a root theme, and the top-level rules that name a class of
+the prefix with their text. `createEmptyFindings()` makes the empty record.
 
 ## Why it exists
 
@@ -37,7 +37,7 @@ flowchart TD
   what -->|"a single theme class"| theme["themes: class -> declared variables"]
   what -->|"classes with the prefix"| cls["classes, minus markers; variables used"]
   close --> top{"back at the top level?"}
-  top -->|yes| place["ruleCount++; root rule -> roots; may be global -> globals"]
+  top -->|yes| place["ruleCount++; root rule -> roots; may be global -> globals; names .prefix- -> classRules"]
   stmt --> layer["@layer statement sets hasLayerOrder; any statement counts as a rule"]
 ```
 
@@ -48,7 +48,11 @@ its innermost level. Strings are skipped so that braces or semicolons inside the
 
 `StyleFindings`: `hasLayerOrder`, `classes: Set`, `themes: Map<class, Set<variable>>`,
 `properties: Map<variable, rule text>`, `keyframes: Set`, `variables: Set`, `ruleCount`,
-`globals: [index, text][]` and `roots: number[]` (indexes among the top-level rules). A theme class is a
+`globals: [index, text][]`, `roots: number[]` and `classRules: [index, text][]` (indexes among the
+top-level rules). `classRules` holds every top-level rule that is not a root rule and whose text has
+`.<prefix>-`: a layer block of a class, a class in no layer, an at-rule that holds one. The cache compares
+those texts with the rules it wrote, to delete a copy of one that arrives later (`cache.md`, #91); a global
+rule that names a class is among them too, and the comparison leaves it. A theme class is a
 prelude that is exactly one class starting with `<prefix>-theme-`; its variables are the custom properties
 the body declares. The markers `<prefix>-boundary`, `<prefix>-scheme-light` and `<prefix>-scheme-dark`, and
 theme classes, are not put in `classes`.

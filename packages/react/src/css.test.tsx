@@ -4,6 +4,11 @@ import { createStyle } from './createStyle'
 
 const theme = { palette: { primary: '#0000ff' }, space: [0, 4, 8] }
 
+/** What `css` throws for a function, as an argument or as an interpolation: the message of every binding. */
+const FUNCTION_ERROR = new TypeError(
+  "css(): a function is not a style here, as an argument or as an interpolation: css() makes a class with no component, so it has no props or theme to call it with. For a value of the props, use a styled component's style function; for a value of the theme, give an entry of StyleSheet.create((theme) => ...) to the style prop."
+)
+
 function setup() {
   const sheet = createMemorySheet()
   const style = createStyle(theme, { prefix: 'c', cache: createCache({ prefix: 'c', sheet }) })
@@ -122,14 +127,15 @@ describe('css', () => {
     expect(card.className).toBe(css({ padding: 8, '&:hover': { opacity: 0.5 } }).className)
   })
 
-  it('throws a TypeError for a function, alone or in a template: there are no props', () => {
+  it('throws a TypeError that says what to use for a function, alone, in a list or in a template', () => {
     const { css } = setup()
-    expect(() => css((() => ({ color: 'red' })) as never)).toThrow(TypeError)
+    expect(() => css((() => ({ color: 'red' })) as never)).toThrow(FUNCTION_ERROR)
+    expect(() => css({ margin: 0 }, [(() => ({ color: 'red' })) as never])).toThrow(FUNCTION_ERROR)
     expect(
       () => css`
         color: ${(() => 'red') as never};
       `
-    ).toThrow(TypeError)
+    ).toThrow(FUNCTION_ERROR)
   })
 })
 

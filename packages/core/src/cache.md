@@ -33,7 +33,7 @@ flowchart TD
   names -->|yes| memo{"a merge of these names remembered, each name with the same style, its class written?"}
   memo -->|yes| again["registered.set(name, the merged style of then); return what it returned"]
   memo -->|no| sort
-  names -->|no| sort["sortClassValues: styles, raw class names, entries"]
+  names -->|no| sort["sortClassValues: styles, raw class names, entries; a handle is a TypeError"]
   sort --> sole{"one entry only, and no 'after'?"}
   sole -->|yes| use["entry.use(layer): its class, written if new"]
   sole -->|no| prep["prepareClass: merge styles, compile to rules for '&', name = prefix-label-hash"]
@@ -116,7 +116,15 @@ The rest of the closure, in the order of the file:
   first declaration are deleted as it is scanned: they come later in the document than the rule of the
   cache, so they would win with the server's values. A theme switched while the page streams (a second
   declaration) would then be undone by a chunk that arrives after the switch, until the next declaration
-  (`cache.root.test.ts`, `are removed on arrival after a switch of the theme`). Before it reads the page,
+  (`cache.root.test.ts`, `are removed on arrival after a switch of the theme`). A rule the cache wrote
+  itself is the other exception (#91). In a client-side navigation a client component writes its class in
+  its render, and the copy that the server components build sends for the same class arrives in the
+  commit: the element React hoists for a `<style href precedence>`, or the head element of `NonceStyles`.
+  `deleteOwnCopies` deletes, from the sheet of an element that arrives, each top-level rule
+  (`classRules` of `scanStyleText`) whose text is a rule that `insertedRules` holds for one of its
+  classes, when that class is not held. It does so only when the element comes before every element of
+  the cache's own sheet in the page (`isWrittenAfter`), so that the copy kept is the later one, the copy
+  that applied (`cache.copies.test.ts`). Before it reads the page,
   `createCache` compares the options stamp of the server with its own and throws on a difference.
 - Themes. `insertTheme` registers a theme class. With pruning a class declares only used variables, and
   `markUsed` adds more as rules refer to them, following values that refer to other variables. `insertRoot`
@@ -206,7 +214,16 @@ The rest of the closure, in the order of the file:
 - Without a document nothing browser-specific runs: the sheet is in memory and nothing is watched. Nothing
   touches a browser global at module top level (`document` appears only as a default read when called).
 - A cache over a sheet in a style element is recorded in `cacheRegistry` for its prefix.
+- A rule this cache wrote is not applied twice: the copy of it in an element that arrives before the
+  cache's own elements is deleted from that element's sheet. Only a rule with the very text the cache
+  wrote, of a class the cache wrote itself and does not hold, is touched; the layer order statement, the
+  other rules of the element (other classes, global rules, themes, `@keyframes`, `@property`) and the text
+  of the element stay. An element left with no rule (or with only its layer order statement) stays in the
+  document: React and `NonceStyles` keep it as the element of its `href`, so they do not write it again.
 - A prefix that does not match `^[a-z][a-z0-9-]*$` throws.
+- A handle of a sheet made from a function of the theme among the values of a class (`apply`, `css()`, the
+  styles of `styled`, what a style function returns) is a `TypeError` (`A class (apply, css(), the styles of
+  styled): ...`): no theme is known there (`themedEntry.md`).
 
 ## Decisions
 
@@ -275,6 +292,16 @@ The rest of the closure, in the order of the file:
 - `elementModes` and `writtenText` keep their shared keys (`@1`): a copy of the core of an earlier release
   reads them, and skips the text nodes of `writtenText` when it scans an element written by text. This
   copy never scans such an element, so it only adds to `writtenText`.
+- A copy of a rule the cache wrote is deleted from the element that arrives, never from the cache's own
+  sheet: the cache keeps no place for a permanent class it wrote, and its copy is the later one where the
+  cache's elements come last in the head (where React and `NonceStyles` put theirs before them), so the
+  cascade is what it was with both copies. Where the arriving element comes after them both copies stay.
+  The copy of a held class stays: the cache removes the class when nothing holds it, and the server's
+  element would then have no rule. Rejected: deleting, at start-up, from a later element of the page a
+  rule that an earlier one holds (the two copies of the first HTML of a request with no nonce, React's
+  element and the registry's): it needs a record of the text of every rule of the page for as long as the
+  page lives, and it keeps the earlier copy, which moves the rule before the rules between them (a props
+  class of the server, after its base class), so it changes what applies.
 - A held class is removed after one macrotask, so a class let go and held again in the same task stays.
 - The sheet decides removal: without `remove` every class is permanent and global rules stay.
 - Keyframes live outside every layer (an at-rule that is not a layer's to hold).
@@ -290,6 +317,13 @@ The rest of the closure, in the order of the file:
 ## Limits
 
 - A sheet without `remove` cannot release held classes or global rules; they stay and count as written.
+- Copies between two elements of the page are not deleted: the first HTML of a request with no nonce
+  under `StyleRegistry` holds the rule of a class that a server component and a client component both
+  render twice, and the page keeps both after hydration. A copy is deleted only when the watch reads the
+  element, after the commit: for that moment both apply. A copy of a held class, of a `@keyframes` rule,
+  of a theme class or of a global rule stays, and so does every copy when the browser kept another number
+  of rules than the text holds, when the cache's sheet is not in the page, or when the arriving element
+  comes after the cache's elements.
 - A nonce is set only on a style element the sheet creates. Written with `insertRule`, the sheet uses the
   element of a server when there is one, which carries the server's nonce or none; the cache does not check.
   `options.nonce` is not read when a `sheet` is given, nor the nonce of the page.

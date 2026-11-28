@@ -99,7 +99,11 @@ export function createStyled<T>(engine: Engine<T>, useThemeView: (cache?: Cache)
               : (name: string) => local.cache.findEntry(name) ?? engine.cache.findEntry(name)
           // Everything in the style attribute, entries and plain objects, joins the one class, after
           // the styles. No style attribute is ever rendered; a string is an error.
-          const extra = [...flattenStyle(attrs.style, findEntry), normalizeClass(attrs.class)]
+          // A handle of a sheet is resolved with the theme of the component (`useStyle` in this render).
+          const extra = [
+            ...flattenStyle(attrs.style, findEntry, local.cache),
+            normalizeClass(attrs.class),
+          ]
           const theme = own.isDynamic ? useThemeView(cache) : undefined
           // Only the browser lets a class go; a server render keeps every class.
           const held =

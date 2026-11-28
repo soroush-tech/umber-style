@@ -1,6 +1,6 @@
-import { createElement, type ElementType } from 'react'
+import { createElement, type ElementType, type ReactNode } from 'react'
 import { type StateName } from '@umber-style/core'
-import { callCheckedStyle } from '@umber-style/core/internal'
+import { callCheckedStyle, rejectThemedEntries } from '@umber-style/core/internal'
 import { guardTheme, readStyleOwner } from './devGuard'
 import type { InteractionState, NativeCondition } from './conditions'
 import {
@@ -22,6 +22,7 @@ import {
   type NativeSettings,
   type StyleKeys,
 } from './toNativeStyle'
+import { createThemedStyle, hasThemedEntry } from './themedStyle'
 import type { Motion, Styled, StyledOptions } from './types'
 import { warnAboutLateMotion, warnAboutUnheldState } from './warnStyle'
 import { readReducedMotion, readWindowState, useMediaKey } from './windowState'
@@ -95,6 +96,8 @@ export function createStyled<T>(
   remBase: number,
   motion?: Motion
 ): Styled<T> {
+  // What a component given a handle of a sheet in `style` renders through.
+  const ThemedStyle = createThemedStyle(useTheme, useCondition, remBase)
   const styled = (tag: ElementType, options: StyledOptions = {}) => {
     if (typeof tag === 'string') {
       throw new TypeError(`styled needs a component on React Native, not the tag "${tag}".`)
@@ -116,6 +119,8 @@ export function createStyled<T>(
     }
 
     return (...styles: NativeStyleInput[]) => {
+      // A handle of a sheet made from a function of the theme has no theme among the styles of a component.
+      rejectThemedEntries(styles, 'styled()')
       const keys = styles.map((style) =>
         typeof style === 'function' || !style ? NO_KEYS : (collectKeys(style) ?? NO_KEYS)
       )
@@ -273,7 +278,12 @@ export function createStyled<T>(
         state?: WindowState,
         found?: StyleKeys,
         held?: HeldStates
-      ) => {
+      ): ReactNode => {
+        // A handle in `style` is resolved by a component that reads the providers and the window for it,
+        // and renders this one again with its entry; after the hooks of this one, which stay the same.
+        if (hasThemedEntry(props.style)) {
+          return createElement(ThemedStyle, { props, component: Component })
+        }
         // The states of the function styles are known once they ran; they come after the others.
         const used = found === undefined ? states : joinItems([states, found.states])
         const hasStates = used.length > 0
@@ -346,15 +356,16 @@ export function createStyled<T>(
       const ConditionalStyled = (props: Record<string, unknown>) => useConditionalElement(props)
       const DynamicStyled = (props: Record<string, unknown>) => useDynamicElement(props)
       const hasFunction = kinds.includes('function')
-      if (heldNames.length > 0) {
-        // Hover and focus are kept as state: one hook more, in every render of this component.
-        const useElement = hasFunction ? useDynamicElement : useConditionalElement
-        const HeldStyled = (props: Record<string, unknown>) => useElement(props, useHeldStates())
-        return HeldStyled
-      }
-      if (hasFunction) return DynamicStyled
-      if (kinds.includes('conditional')) return ConditionalStyled
-      return queries.length > 0 || isAnimated ? WindowStyled : StaticStyled
+      // Hover and focus are kept as state: one hook more, in every render of this component.
+      const useElement = hasFunction ? useDynamicElement : useConditionalElement
+      const HeldStyled = (props: Record<string, unknown>) => useElement(props, useHeldStates())
+      // The component that reads only what the styles need.
+      let Component: (props: Record<string, unknown>) => ReactNode =
+        queries.length > 0 || isAnimated ? WindowStyled : StaticStyled
+      if (kinds.includes('conditional')) Component = ConditionalStyled
+      if (hasFunction) Component = DynamicStyled
+      if (heldNames.length > 0) Component = HeldStyled
+      return Component
     }
   }
   return styled as unknown as Styled<T>

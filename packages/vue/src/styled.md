@@ -22,8 +22,9 @@ flowchart TD
   cache --> loc{"CacheProvider above?"}
   loc -->|"no"| s1["the engine's styler"]
   loc -->|"yes"| s2["styler of the engine over that cache, made once for each engine"]
-  s1 --> extra["extra: the style attribute (entries and objects) and the class attribute"]
+  s1 --> extra["extra: flattenStyle(style, findEntry, cache of the component) and the class attribute"]
   s2 --> extra
+  extra --> handle["a handle, alone or merged by its key: useStyle(sheet)[key] of this render"]
   extra --> dyn{"styler is dynamic?"}
   dyn -->|"yes"| view["theme view from useThemeView"]
   dyn -->|"no"| nov["no theme read"]
@@ -50,6 +51,10 @@ component's tag and styles are used, not nested.
 - Everything in the `style` attribute (entries and plain objects) joins the one class, after the styles; no
   `style` attribute is ever rendered. A string in `style` is an error (the comment in the code says so; the
   check is in the core's `flattenStyle`, which this file does not show).
+- `flattenStyle` is given the cache the component writes to: a handle of a sheet made from a function of
+  the theme is resolved with the theme of the render, alone or merged by Vue into one object, where it is
+  found again by its key (`findEntry` is given, so nothing is taken for what a server component passed:
+  `sheetEntry.md`).
 - `as`, `theme`, `class` and `style` are never forwarded to a tag; other attributes go through
   `shouldForwardProp` when the element is a string. For a component that is not made by `styled`,
   `as` is forwarded and every attribute is.

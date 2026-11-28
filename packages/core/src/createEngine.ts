@@ -3,6 +3,7 @@ import { hashString } from './hash'
 import { createLazyRecord } from './lazyRecord'
 import { createCache, type Cache, type ClassValue, type GlobalRules, type HeldClass } from './cache'
 import { isSheetEntry } from './sheetEntry'
+import { rejectThemedEntries } from './themedEntry'
 import { readGlobalInput, type GlobalInput } from './globalStyles'
 import {
   createSchemeKey,
@@ -682,6 +683,8 @@ function createFamilyEngine<T extends object>(
     styles: readonly StyleInput[],
     inherited: readonly StyleInput[] = []
   ): Styler => {
+    // A handle of a sheet made from a function of the theme has no theme among the styles of a component.
+    rejectThemedEntries(styles, 'styled()')
     const label = createLabel(stylerOptions)
     const ownLabel = label ? [{ label }] : []
     for (const style of ownLabel) labelStyles.add(style)

@@ -20,7 +20,7 @@ Every package has a stable release on the `latest` tag of npm, which the lines a
 
 The bindings declare these peer dependencies: `react` `^19.0.0`, `vue` `^3.5.0`, and `react-native` `>=0.76.0` (optional, because only the React Native binding uses it). The tests run on each React 19 minor, 19.0 to 19.3. A strict nonce policy on a page rendered on a server needs React 19.2 or later (see [Content security policy](server-rendering.md#content-security-policy)). An app on the Next.js App Router runs the React that Next.js bundles, not the one it installs.
 
-On the Next.js App Router, add the registry of `@umber-style/react/next` once, around the page, in the root layout: `import { StyleRegistry } from '@umber-style/react/next'`, then `<body><StyleRegistry>{children}</StyleRegistry></body>`. It writes the styles of each request into the stream, server components and client components, with the request's nonce under a content security policy. `next` is an optional peer dependency of `@umber-style/react` (`^16.3.0`), read by that entry only; the umbrella gives the same entry as `umber-style/react/next`. See [A registry for the Next.js App Router](cache-and-server.md#a-registry-for-the-nextjs-app-router).
+On the Next.js App Router, add the registry of `@umber-style/react/next` once, around the page, in the root layout: `import { StyleRegistry } from '@umber-style/react/next'`, then `<body><StyleRegistry>{children}</StyleRegistry></body>`. It writes the styles of each request into the stream, server components and client components, with the request's nonce under a content security policy. `next` is an optional peer dependency of `@umber-style/react` (`^16.3.0`), read by that entry only; the umbrella gives the same entry as `umber-style/react/next`. The whole set-up, file by file, is in [Next.js App Router](nextjs.md); how the registry works is in [A registry for the Next.js App Router](cache-and-server.md#a-registry-for-the-nextjs-app-router).
 
 ## React
 
@@ -154,5 +154,5 @@ const night = engine.themeClass(dark, 'dark')
 ## Limits
 
 - The install lines install the release on `latest`; the examples here are checked against the code of this repository, which can be ahead of that release (see the release notes of each package).
-- The React Native example was compiled against the real `react-native` types and run against a stand-in for the platform in a test. The binding has never been run in a real app.
+- The React Native example was compiled against the real `react-native` types and run against a stand-in for the platform in a test. The binding has run in a real app: an Expo example on an iPhone in Expo Go (themes, a nested theme, state keys and the animated entry); Android has not been observed.
 - The Vue template form is compiled and rendered on a server in a test; it is not run in a browser in this repository.

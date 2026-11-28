@@ -12,13 +12,19 @@ import {
   type SheetStyles,
   type WebStyleObject,
 } from '@umber-style/core'
-import { createCssEntry, EMPTY_THEME } from '@umber-style/core/internal'
+import {
+  createCssEntry,
+  createThemedSheet,
+  EMPTY_THEME,
+  rejectThemedEntries,
+} from '@umber-style/core/internal'
+import { createWrappers } from './createWrappers'
 import { createGlobal } from './Global.server'
 import { createStyleSender } from './inlineStyles.server'
 import { createNonceReader, createRequestSlot, type CacheFunction } from './serverContext'
 import { createStyled } from './styled.server'
 import { createThemeProvider } from './ThemeProvider.server'
-import type { ServerStyle, SheetDefinition, StyleOptions } from './types'
+import type { ServerStyle, SheetDefinition, StyleOptions, ThemedEntries } from './types'
 import { createServerStyleValue } from './useStyleValue.server'
 
 export type { StyleOptions } from './types'
@@ -76,12 +82,25 @@ export function bindEngine<T extends object>(
   function create<K extends string>(styles: ObjectSheet<K>): SheetEntries<K>
   function create<K extends string>(
     styles: (theme: T) => Record<K, WebStyleObject>
-  ): ServerSheet<Record<K, WebStyleObject>>
+  ): ServerSheet<Record<K, WebStyleObject>> & ThemedEntries<K>
   function create(
     styles: ObjectSheet<string> | ((theme: T) => Record<string, WebStyleObject>)
   ): unknown {
-    return engine.createSheet(styles as never)
+    if (typeof styles !== 'function') return engine.createSheet(styles)
+    // `sheet.card` is a handle that a styled component resolves with the theme of a server component.
+    const sheet = engine.createSheet(styles)
+    // A plain function in this build, named as the hook of the client build is.
+    const useEntry = (key: string) => (useStyle(sheet as never) as Record<string, SheetEntry>)[key]
+    return createThemedSheet(sheet, {
+      readEntry: useEntry,
+      // React serializes the props of a client component, and reads every key of a prop for its messages
+      // of development: the key of a handle of this build must not throw there.
+      isMerged: true,
+    })
   }
+
+  // The plain functions of this build, called in the render of the wrapper as the hooks are in the client build.
+  const { withTheme, withStyle } = createWrappers(useTheme, useStyle)
 
   return {
     engine,
@@ -89,8 +108,12 @@ export function bindEngine<T extends object>(
     styled: createStyled(engine, readViewTheme, readNonce, sendStyles),
     StyleSheet: { create },
     useStyle,
+    withStyle: withStyle as ServerStyle<T>['withStyle'],
     useStyleValue: createServerStyleValue(engine.cache),
-    apply: (...entries) => ({ className: engine.css(...entries) || undefined }),
+    apply: (...entries) => {
+      rejectThemedEntries(entries, 'apply()')
+      return { className: engine.css(...entries) || undefined }
+    },
     css: ((...args: unknown[]) => createCssEntry(engine.cache, args)) as ServerStyle<T>['css'],
     // The provider and `Global` return a Promise only while the nonce a registered source gives is not
     // known yet, which a render of server components awaits: they keep the types of the client build.
@@ -102,6 +125,7 @@ export function bindEngine<T extends object>(
     }) as ServerStyle<T>['ThemeProvider'],
     useTheme,
     readTheme: useTheme,
+    withTheme: withTheme as ServerStyle<T>['withTheme'],
     themeClass,
     when: engine.when,
     whenScheme: engine.whenScheme,

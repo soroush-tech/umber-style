@@ -7,4 +7,7 @@ export default defineConfig({
   // The default export of each entry stays `exports.default` in CommonJS, as its declarations say.
   cjsDefault: false,
   clean: true,
+  // Shared code keeps its own export names, as in the core: a renamed re-export makes Turbopack add a
+  // module per imported name (#84).
+  outputOptions: { minifyInternalExports: false },
 })

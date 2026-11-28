@@ -10,6 +10,7 @@ import {
 } from './serialize'
 import { isSheetEntry, readEntryStyle, type SheetEntry } from './sheetEntry'
 import { DEFAULT_SCOPING } from './scope'
+import { createThemedEntryError, isThemedEntry } from './themedEntry'
 import { createStandIn, readStandIn } from './standIn'
 import type { TemplateValue } from './styleTypes'
 import { isTemplateStrings, parseStyleTemplate } from './templateStyle'
@@ -199,6 +200,8 @@ function addGlobalInput<T>(
     addGlobalInput((input as GlobalStyles<T>).resolve(readTheme), readTheme, warn, found)
   } else if (typeof input === 'function') {
     addGlobalInput(input(readTheme()), readTheme, warn, found)
+  } else if (isThemedEntry(input)) {
+    throw createThemedEntryError('Global')
   } else if (isSheetEntry(input)) {
     found.push(readEntryGlobal(input, warn))
   } else if (input !== null && input !== undefined && input !== false) {

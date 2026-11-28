@@ -85,7 +85,9 @@ flowchart TD
   view -->|no| make["made as before: createView, the same recent view, or the new one"]
 ```
 
-`createStyler` builds, for one component: its label (`name-slot`, or the given `label`), the style list
+`createStyler` first rejects a handle of a sheet made from a function of the theme among the styles of
+the component (`rejectThemedEntries`, a `TypeError` that starts with `styled()`): the styles of a component
+have no theme to resolve it with. It builds, for one component: its label (`name-slot`, or the given `label`), the style list
 (inherited, own label, styles), and the labels of the whole chain. The functions of an element in a render
 get one argument, the props with the guarded theme view (`createStyleArgument`), made by `resolveAll` when it
 meets the first function and never kept; the render that plans the base for a view makes one more, behind
@@ -130,6 +132,8 @@ binding under `ThemeProvider`. With the checks a write at any level throws, nami
   engine calls, throws a `TypeError` that names the component (or `Global`, `keyframes <name>`,
   `StyleSheet`, `ThemeProvider`) and, for the theme, the path.
 - `withCache(cache)` gives the same engine for the same cache (`family.engines`).
+- A handle (`sheet.card` of a sheet made from a function of the theme) among the styles given to
+  `createStyler` throws a `TypeError` when the styler is made, at the `styled()` call.
 
 ## Decisions
 

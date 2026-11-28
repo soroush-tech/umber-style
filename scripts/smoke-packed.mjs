@@ -42,6 +42,7 @@ import {
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { findMinifiedExports } from './shared-exports.mjs'
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..')
 const shouldKeep = process.argv.includes('--keep')
@@ -123,6 +124,7 @@ const CORE_INTERNAL_EXPORTS = [
   'createThemeId',
   'createThemeKey',
   'createThemeRule',
+  'createThemedSheet',
   'declareLiveValue',
   'findCache',
   'flattenStyle',
@@ -141,7 +143,9 @@ const CORE_INTERNAL_EXPORTS = [
   'readSharedState',
   'readStaticTemplate',
   'readStyleArguments',
+  'readThemedSource',
   'rejectFunctions',
+  'rejectThemedEntries',
   'resolveThemeInput',
   'toDeclarationText',
   'toRgba',
@@ -175,6 +179,8 @@ const ENTRIES = {
     'styled',
     'ThemeProvider',
     'useTheme',
+    'withTheme',
+    'withStyle',
     'StyleSheet',
     'at',
     'state',
@@ -189,6 +195,8 @@ const ENTRIES = {
     'styled',
     'ThemeProvider',
     'useTheme',
+    'withTheme',
+    'withStyle',
     'StyleSheet',
     'Global',
     'keyframes',
@@ -211,6 +219,8 @@ const ENTRIES = {
     'styled',
     'ThemeProvider',
     'StyleSheet',
+    'withTheme',
+    'withStyle',
     'Global',
     'keyframes',
     'css',
@@ -220,6 +230,8 @@ const ENTRIES = {
     'styled',
     'ThemeProvider',
     'useTheme',
+    'withTheme',
+    'withStyle',
     'Global',
     'css',
   ],
@@ -372,6 +384,19 @@ try {
     check(
       other.length === 0,
       `${name}: the tarball holds only dist, LICENSE, README.md, package.json`
+    )
+    // An ES module no export points at is code the entries share: it keeps its own export names, as
+    // a renamed re-export makes Turbopack add a module per imported name (#84).
+    const entryFiles = new Set(paths.map(({ path }) => join(root, path)))
+    const minified = readdirSync(join(root, 'dist'), { recursive: true })
+      .filter((file) => file.endsWith('.mjs'))
+      .map((file) => join(root, 'dist', file))
+      .filter((file) => !entryFiles.has(file))
+      .flatMap((file) => findMinifiedExports(readFileSync(file, 'utf8')))
+    const found = minified.length > 0 ? ` (${minified.join(', ')})` : ''
+    check(
+      minified.length === 0,
+      `${name}: no shared chunk exports a name renamed to a minified one${found}`
     )
   }
 

@@ -29,8 +29,12 @@ flowchart TD
   resolve --> own{"cache given?"}
   own -->|yes| other["styler of engine.withCache(cache), made once"]
   own -->|no| main["the styler"]
-  other --> cls["class from props and style prop entries"]
-  main --> cls
+  other --> flatten
+  main --> flatten["flattenStyle(style, undefined, cache or engine.cache)"]
+  flatten --> handle["a handle: useStyle(sheet)[key] of this render"]
+  flatten --> leftover["what a server component passed: a development warning, no CSS"]
+  handle --> cls["class from props and style prop entries"]
+  leftover --> cls
   cls --> plain["isHeld: a plain object among the values of style"]
   plain --> hold{"canHold and isHeld?"}
   hold -->|yes| held["getHeldClass: className + hold"]
@@ -56,6 +60,12 @@ flowchart TD
   (a tag with a hyphen forwards every prop); none for a component.
 - Everything in `style` (entries, plain objects) and `className` joins the one class, after the styles. No
   `style` attribute is ever rendered.
+- `flattenStyle` is given the cache the component writes to (the provider's, else the engine's): a handle of
+  a sheet made from a function of the theme is resolved there with the theme of this render. With that
+  cache and no `findEntry`, what an entry or a handle becomes when a server component passes it to a
+  client component (an object of one `--umber-entry-` or `--umber-themed-` key, with no CSS) is warned
+  about in development, with the prefix of the cache (`sheetEntry.md`). A component given neither does no
+  more than before: one check of each value.
 - `target` classes of wrapped components and of this one are joined and added after the engine's classes.
 - `forwarded.className` is `undefined` when empty.
 - `isHeld` depends on the props only, so a server and the browser agree on it: `styled.ts` renders a place

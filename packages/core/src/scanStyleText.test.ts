@@ -131,6 +131,19 @@ describe('scanStyleText', () => {
     expect(found.variables).toEqual(new Set(['--u-c']))
   })
 
+  it('lists the top-level rules that name a class of the prefix with their places, in a layer or in none, and no root rule', () => {
+    const text =
+      '@layer u-theme,u-components;@layer u-theme{:where(:root){--u-a:1;}}' +
+      '@layer u-components{.u-a{color:red;}}.u-b:hover{color:red;}@media (width >= 1px){.u-c{margin:0;}}' +
+      'body{margin:0;}.x-a{color:red;}'
+    const found = scanStyleText('u', text)
+    expect(found.classRules).toEqual([
+      [2, '@layer u-components{.u-a{color:red;}}'],
+      [3, '.u-b:hover{color:red;}'],
+      [4, '@media (width >= 1px){.u-c{margin:0;}}'],
+    ])
+  })
+
   it('reads a large text in one pass', () => {
     const text = Array.from(
       { length: 20000 },

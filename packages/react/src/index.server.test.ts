@@ -9,6 +9,8 @@ describe('the server entry of @umber-style/react', () => {
       'readTheme',
       'StyleSheet',
       'useStyle',
+      'withTheme',
+      'withStyle',
       'apply',
       'css',
       'themeClass',

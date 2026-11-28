@@ -23,7 +23,7 @@ flowchart TD
   ctx -->|yes| real["completeTheme(that theme, holder, prefix)"]
   ctx -->|no| own["holder.givenTheme or empty theme"]
   view["useThemeView(cache)"] --> local{"cache given?"}
-  local -->|no| viewctx{"ViewContext set?"}
+  local -->|no| viewctx{"use(ViewContext) set?"}
   viewctx -->|yes| given["return the view of the provider"]
   viewctx -->|no| build["createThemeView(completeTheme(use(ThemeContext), holder, prefix) or own)"]
   local -->|yes| build2["holder.withCache(cache).createThemeView(...)"]
@@ -56,6 +56,11 @@ engine's own.
 ## Decisions
 
 - A provider of the server build sets `ViewContext` to `undefined`; the view is then made from the real theme.
+- `ViewContext` is read with `use`, not `useContext` (#88). A styled component with no function style reads
+  the view only when its `style` holds a handle of a sheet, through `useStyle`: in one render and not in
+  another. React lets `use` be called conditionally, and counts `useContext` among the hooks of a render in
+  development, where a change of their order is an error. Both subscribe the component to the context the
+  same way.
 - Under a `CacheProvider` the view is made by the engine over that cache, so references name that cache's
   variables.
 - The contexts are shared by prefix (see `ProviderScope.tsx`), not made here.

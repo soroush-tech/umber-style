@@ -33,9 +33,11 @@ flowchart TD
   oneObj -->|no| tpl{"a tagged template?"}
   tpl -->|yes| parse["parseStyleTemplate, interpolations resolved by class"]
   parse --> fn{"an interpolation is a function?"}
-  fn -->|yes| throwFn["throw TypeError"]
+  fn -->|yes| throwFn["throw the TypeError of rejectFunctions"]
   fn -->|no| direct
-  tpl -->|no| flat["flatten, drop false/null/undefined/''/true"]
+  tpl -->|no| argFn{"an argument, or an item of a list, is a function?"}
+  argFn -->|yes| throwFn
+  argFn -->|no| flat["flatten, drop false/null/undefined/''/true"]
   flat --> text{"a string with : or { that is not a registered class?"}
   text -->|yes| asStyle["read it as CSS text"]
   text -->|no| keep["keep it"]
@@ -82,7 +84,11 @@ each followed by a space.
 
 - `hasLayers` defaults to `false`, so a class of this package is an ordinary class next to the app's own
   CSS, which is not layered.
-- A function interpolated in a template throws: there are no props or theme here to call it with.
+- A function, interpolated in a template or given as an argument (or in a list), throws: there are no
+  props or theme here to call it with. The error is the one of every binding's `css`, made by
+  `rejectFunctions` of `@umber-style/core/internal`, which names `css` and says what takes a function
+  instead (#87). Up to 0.8.0 a function given as an argument was dropped with no error, and the template
+  threw a message of this package's own.
 - A string is CSS text only if it holds `:` or `{`; a registered class name is checked first, because
   such a name can itself hold `:` (test "resolves a class of this cache back to its style even when its
   name holds ':'").

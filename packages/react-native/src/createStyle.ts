@@ -1,13 +1,16 @@
 import { createElement, Fragment, type Context, type ReactElement } from 'react'
 import { createNativeThemeKey, type NativeCondition } from './conditions'
-import { globalStyles, isThemedSheet, keyframes } from '@umber-style/core'
+import { globalStyles, isThemedSheet, keyframes, type ThemedEntries } from '@umber-style/core'
 import {
   createLazyRecord,
   createSchemeKey,
+  createThemedSheet,
   EMPTY_THEME,
   readStaticTemplate,
   rejectFunctions,
+  rejectThemedEntries,
 } from '@umber-style/core/internal'
+import { createWrappers } from './createWrappers'
 import { guardTheme } from './devGuard'
 import { createThemeValue, type ThemeHolder } from './ThemeValue'
 import type {
@@ -18,7 +21,12 @@ import type {
   ThemeProviderProps,
   ThemeScopeProps,
 } from './types'
-import type { NativeObjectSheet, NativeSheetStyles, NativeStyleObject } from './nativeStyle'
+import type {
+  NativeObjectSheet,
+  NativeSheetEntry,
+  NativeSheetStyles,
+  NativeStyleObject,
+} from './nativeStyle'
 import { DEFAULT_LENGTH_KEYS, toNativeTheme, type NativeTheme } from './nativeTheme'
 import { createStyled } from './styled'
 import { platformStyleSheet } from './platform'
@@ -30,10 +38,7 @@ import { warnAboutIgnoredOptions } from './warnStyle'
 export type { StyleOptions } from './types'
 
 /** A sheet made from a function on React Native: its styles are registered with the platform once for each theme. */
-interface NativeSheet<S extends NativeSheetStyles, T> extends SheetDefinition<
-  S,
-  NativeStyleObject
-> {
+interface NativeSheet<S extends NativeSheetStyles, T> extends SheetDefinition<S, NativeSheetEntry> {
   /** The sheet of `theme`, registered once for each theme object. */
   prepare(theme: T): RegisteredSheet<S>
   /** The entries for `theme`, the providers of `condition` and the window now. */
@@ -149,6 +154,7 @@ function resolveEntries<S extends NativeSheetStyles>(
  * the last key winning. Throws a `TypeError` for a function and for anything else that is not a style.
  */
 function mergeNativeStyles(args: readonly unknown[], base: SheetSettings): NativeStyleObject {
+  rejectThemedEntries(args, 'css()')
   const template = readStaticTemplate(args, 'css')
   if (!template) rejectFunctions(args, 'css')
   const styles = template ? [template] : args.flat(Infinity).filter(Boolean)
@@ -206,10 +212,11 @@ export function bindHolder<T extends object>(
 
   function create<K extends string>(
     styles: NativeObjectSheet<K>
-  ): { readonly [P in K]: NativeStyleObject }
+  ): { readonly [P in K]: NativeSheetEntry }
   function create<K extends string>(
     styles: (theme: NativeTheme<T>) => Record<K, NativeStyleObject>
-  ): NativeSheet<Record<K, NativeStyleObject>, NativeTheme<T>>
+  ): NativeSheet<Record<K, NativeStyleObject>, NativeTheme<T>> &
+    ThemedEntries<K, 'resolve' | 'prepare'>
   function create(
     styles:
       | NativeObjectSheet<string>
@@ -232,13 +239,18 @@ export function bindHolder<T extends object>(
       }
       return sheet
     }
-    return {
-      prepare,
-      resolve(current: NativeTheme<T>, condition?: NativeCondition) {
-        const sheet = prepare(current)
-        return resolveEntries(sheet, condition, readMediaKey(sheet.queries, false, remBase), base)
+    // `sheet.card` is a handle that a styled component resolves with `prepare` and `resolve`, as
+    // `useStyle` does; on a plain View it is a `TypeError`.
+    return createThemedSheet(
+      {
+        prepare,
+        resolve(current: NativeTheme<T>, condition?: NativeCondition) {
+          const sheet = prepare(current)
+          return resolveEntries(sheet, condition, readMediaKey(sheet.queries, false, remBase), base)
+        },
       },
-    }
+      {}
+    )
   }
 
   // The contexts and the window are read first, for every sheet, so that the hooks of a component never
@@ -254,16 +266,23 @@ export function bindHolder<T extends object>(
     return prepared === undefined ? sheet : resolveEntries(prepared, condition, key, base)
   }) as NativeStyle<T>['useStyle']
 
+  const { withTheme, withStyle } = createWrappers(useTheme, useStyle)
+
   return {
     styled: createStyled(useTheme, useCondition, remBase, motion),
     StyleSheet: { ...platformStyleSheet, create },
     useStyle,
-    apply: (...entries) => ({ style: entries.filter((entry) => !!entry) as NativeStyleObject[] }),
+    withStyle: withStyle as NativeStyle<T>['withStyle'],
+    apply: (...entries) => {
+      rejectThemedEntries(entries, 'apply()')
+      return { style: entries.filter((entry) => !!entry) as NativeStyleObject[] }
+    },
     css: ((...args: unknown[]) => mergeNativeStyles(args, base)) as NativeStyle<T>['css'],
     ThemeProvider,
     ThemeScope,
     ThemeContext,
     useTheme,
+    withTheme: withTheme as NativeStyle<T>['withTheme'],
     useThemeClass,
     themeClass: () => '',
     when: createNativeThemeKey,

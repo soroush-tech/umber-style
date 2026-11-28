@@ -184,49 +184,7 @@ In headless Chromium the framed text has the class `frame-text-root-<hash>` and 
 
 ## A registry for the Next.js App Router
 
-In the App Router the styles of a request are written into the stream with `useServerInsertedHTML`, which the framework calls each time it sends a piece of the page. `@umber-style/react/next` has a registry that does it: add `StyleRegistry` once, around the page, in the root layout. This is the root layout of the server components routes of the App Router fixture, `fixtures/next-app/app/(csp-server)/layout.tsx`, as the end-to-end suite runs it (Next.js 16.3.8 and 16.4.6, production build and development server):
-
-```tsx
-import './nonce'
-import { Hydrated } from '@umber-fixtures/shared/interactive'
-import { StyleRegistry } from '@umber-style/react/next'
-import type { ReactNode } from 'react'
-import { Global, ThemeProvider } from './style'
-
-export const metadata = {
-  title: 'UmberStyle server components with a nonce',
-  icons: { icon: 'data:,' },
-}
-
-// A root layout of its own for the routes under /csp-server, which proxy.ts sends with a strict policy
-// and a new nonce for each request. Everything styled here is a server component but one badge; the nonce
-// of each request comes from the source that `./nonce` registers, not from a prop of this layout, so the
-// request of a client-side navigation, which does not render this layout, gets it too. `StyleRegistry`
-// writes the styles of the request in the head and before each later piece of the stream.
-export default function CspServerLayout({ children }: { children: ReactNode }) {
-  return (
-    <html lang="en">
-      <body>
-        <StyleRegistry>
-          <ThemeProvider theme={{ palette: { surface: '#efe9e3' } }}>
-            <Global
-              styles={(theme) => ({
-                body: {
-                  margin: 0,
-                  backgroundColor: theme.palette.background,
-                  fontFamily: 'sans-serif',
-                },
-              })}
-            />
-            {children}
-          </ThemeProvider>
-        </StyleRegistry>
-        <Hydrated />
-      </body>
-    </html>
-  )
-}
-```
+In the App Router the styles of a request are written into the stream with `useServerInsertedHTML`, which the framework calls each time it sends a piece of the page. `@umber-style/react/next` has a registry that does it: add `StyleRegistry` once, around the page, in the root layout. The root layout of the server components routes of the App Router fixture, `fixtures/next-app/app/(csp-server)/layout.tsx`, is copied in [The root layout](nextjs.md#the-root-layout) of the Next.js page, with the style module, the server and client components and the nonce source it goes with; the end-to-end suite runs it on Next.js 16.3.8 and 16.4.6, production build and development server.
 
 `StyleRegistry` is a client component; a server layout renders it as any other. It makes a registry for each request, and in the server render of the first HTML it collects:
 
@@ -379,67 +337,7 @@ The root layout is a server component that renders `<html lang="en"><body><Provi
 
 The routes under `/csp` of the same fixture run `StyleRegistry` with a cache of the request (the providers file above) under `Content-Security-Policy: style-src 'nonce-<n>'; script-src 'self' 'nonce-<n>' 'strict-dynamic'`, with a new nonce for each request and no `'unsafe-inline'` for styles (`e2e/tests/next-app.csp.spec.ts` on the production build, the same scenarios in `e2e/dev-tests/csp.spec.ts` on the development server). Three files do it.
 
-The policy is made in `proxy.ts`, the file the framework runs before a route (the `middleware` file convention, which it renamed `proxy`), as its guide sets one up (`node_modules/next/dist/docs/01-app/02-guides/content-security-policy.md`). The nonce goes into the policy of the response, and into two headers of the request: `Content-Security-Policy`, from which the framework takes the nonce of its own scripts (it gives React's render that nonce as a string, which React takes as the script nonce only, so a `<style data-precedence>` element of React has none), and `x-nonce`, which the layouts read. The routes under `/csp-server` and `/csp-fixed` are sent the same way: they are server components, whose nonce comes from a source the app registers (or is fixed on the cache), under the same `StyleRegistry` in their root layouts (above); `/csp-inplace` renders the parts of `/csp-server` with no registry, and its styles are sent in place in the first HTML and written into the head with the document's nonce in the browser, so that this policy lets them in (see [Server components: a nonce for each request](server-rendering.md#server-components-a-nonce-for-each-request)). The `control` switches are the fixture's, for its tests:
-
-```ts
-import { NextResponse, type NextRequest } from 'next/server'
-import { FIXED_NONCE } from './app/(csp-fixed)/nonce'
-
-// The routes under /csp are sent with a strict content security policy, as the framework's guide sets
-// one (node_modules/next/dist/docs/01-app/02-guides/content-security-policy.md): a new nonce for each
-// request, in the policy of the response and in the request headers that the render reads. The
-// framework takes the nonce of its own scripts from the `Content-Security-Policy` header of the request
-// (it gives React's render that nonce as a string, which React takes as the script nonce only); the
-// layouts read `x-nonce`. Styles have no 'unsafe-inline'. The development server needs 'unsafe-eval'
-// for React's debugging.
-//
-// Three switches of the query, for the tests: `?control=no-policy` sends the same page with no policy and
-// no nonce (what the styles are compared with), `?control=no-cache-nonce` keeps the policy and leaves the
-// nonce off the cache (the negative control of /csp), and `?control=no-source` keeps the policy and makes
-// the nonce source of /csp-server give nothing (its negative control). A `csp-control` cookie of the same
-// value does the same for every request of the page. /csp-server is sent the same way. /csp-fixed is sent
-// with the same nonce in every response (the fixed nonce that its engine's cache has) and no `x-nonce`
-// request header, so the nonce source of /csp-server answers nothing there. /csp-inplace is sent as
-// /csp-server is: the same parts with no registry.
-export function proxy(request: NextRequest) {
-  // The cookie keeps a switch for the requests of the client-side navigations of a page too.
-  const control =
-    request.nextUrl.searchParams.get('control') ?? request.cookies.get('csp-control')?.value
-  const requestHeaders = new Headers(request.headers)
-  requestHeaders.delete('x-nonce')
-  requestHeaders.delete('x-csp-control')
-  if (control === 'no-policy') {
-    requestHeaders.delete('content-security-policy')
-    return NextResponse.next({ request: { headers: requestHeaders } })
-  }
-  const isFixed = request.nextUrl.pathname.startsWith('/csp-fixed')
-  const nonce = isFixed ? FIXED_NONCE : Buffer.from(crypto.randomUUID()).toString('base64')
-  const isDevelopment = process.env.NODE_ENV === 'development'
-  const evaluation = isDevelopment ? " 'unsafe-eval'" : ''
-  const policy = `style-src 'nonce-${nonce}'; script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${evaluation}`
-  if (!isFixed) requestHeaders.set('x-nonce', nonce)
-  requestHeaders.set('content-security-policy', policy)
-  if (control === 'no-cache-nonce' || control === 'no-source') {
-    requestHeaders.set('x-csp-control', control)
-  }
-  const response = NextResponse.next({ request: { headers: requestHeaders } })
-  response.headers.set('content-security-policy', policy)
-  return response
-}
-
-export const config = {
-  matcher: [
-    '/csp',
-    '/csp/:path*',
-    '/csp-server',
-    '/csp-server/:path*',
-    '/csp-inplace',
-    '/csp-inplace/:path*',
-    '/csp-fixed',
-    '/csp-fixed/:path*',
-  ],
-}
-```
+The policy is made in `proxy.ts`, the file the framework runs before a route (the `middleware` file convention, which it renamed `proxy`), as its guide sets one up (`node_modules/next/dist/docs/01-app/02-guides/content-security-policy.md`). The nonce goes into the policy of the response, and into two headers of the request: `Content-Security-Policy`, from which the framework takes the nonce of its own scripts (it gives React's render that nonce as a string, which React takes as the script nonce only, so a `<style data-precedence>` element of React has none), and `x-nonce`, which the layouts read. The routes under `/csp-server` and `/csp-fixed` are sent the same way: they are server components, whose nonce comes from a source the app registers (or is fixed on the cache), under the same `StyleRegistry` in their root layouts (above); `/csp-inplace` renders the parts of `/csp-server` with no registry, and its styles are sent in place in the first HTML and written into the head with the document's nonce in the browser, so that this policy lets them in (see [Server components: a nonce for each request](server-rendering.md#server-components-a-nonce-for-each-request)). The file is copied in [The proxy](nextjs.md#the-proxy) of the Next.js page. The fixture's file also has `control` switches for its tests, described in its comment: `?control=no-policy` sends the same page with no policy and no nonce (what the styles are compared with), `?control=no-cache-nonce` keeps the policy and leaves the nonce off the cache (the negative control of `/csp`), `?control=no-source` keeps the policy and makes the nonce source of `/csp-server` give nothing, and a `csp-control` cookie of the same value does the same for every request of the page.
 
 The root layout of those routes is a server component. It reads the nonce from the request and gives it to the providers file as a prop, the one way a value of the request reaches a client component; reading the headers also makes every page under it render for each request, which a nonce needs:
 
@@ -634,7 +532,7 @@ The second element is the cache's own (`data-style="soroush"`). Rendering the sa
 - `CacheProvider` was checked in jsdom with React and Vue, in headless Chromium for the iframe, and in two fixture apps: the registry above in the App Router fixture (Next.js 16.3.8 and 16.4.6 with Turbopack, production build and development server), and `createInstance` on the prerendered page `/chunks` of the Vike fixture. Vue was not run with either package in a fixture.
 - The root rules of a style element are removed by their place in the element's sheet, which the cache knows only when the browser kept every rule of the text. Where it dropped one (a rule it does not know), the root rules of that element stay, whether the element was there at the start or arrived later (`cache.root.test.ts`).
 - The root theme is written anew each time a rule uses a variable it had not declared, and a registry that sends every new group sends each of those rules whole: the first flush of the fixture's stream page holds six `:where(:root)` rules, each one the last with more variables. Only the last one is needed.
-- A page that renders a styled component from a server component as well as from a client component, under a registry written by hand or under `StyleRegistry` in a request with no nonce, was not run: the same class would then come both from the registry and from a `<style href precedence>` element. Under `StyleRegistry` in a request with a nonce both go to the registry, which writes the text of an `href` once.
+- A page that renders a styled component from a server component as well as from a client component, under `StyleRegistry` in a request with no nonce, has the rule of the class twice in its first HTML, and keeps both after hydration: once in the `<style href precedence>` element React hoists for the server components build, once in the registry for the client component. Under `StyleRegistry` in a request with a nonce both go to the registry, which writes the text of an `href` once (scenarios (y1) and (y2) of the App Router fixture). Under a registry written by hand it was not run. After a client-side navigation the rule is in the page once either way: the engine's cache in the browser deletes, from an element that arrives before its own, a rule it wrote itself for a class it does not hold (y3, y4).
 - `StyleRegistry` runs on Next.js 16.3.8 and 16.4.6 (Turbopack, production build and development server), in Chromium only, and on 16.4.6 also on the edge runtime and under partial prerendering (see the Limits of [Server rendering](server-rendering.md#limits)). It needs `useServerInsertedHTML`: elsewhere nothing writes what it collects.
 - The elements of `StyleRegistry` for the later pieces of a stream stay at the top of the body after hydration; they are not moved into the head.
 - A cache key other than the style's prefix was run at the unit tier only (`cacheKey.test.tsx`); the fixture's key is the prefix of its style.
