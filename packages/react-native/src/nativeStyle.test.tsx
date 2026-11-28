@@ -4,7 +4,7 @@ import { createElement } from 'react'
 import { expectTypeOf } from 'vitest'
 import { add, divide, multiply, negate, subtract } from './calc'
 import { createStyle } from './createStyle'
-import type { NativeStyleObject } from './nativeStyle'
+import type { NativeSheetEntry, NativeStyleObject } from './nativeStyle'
 
 const theme = { palette: { primary: '#0000ff' }, space: [0, 4, 8] }
 
@@ -125,7 +125,7 @@ describe('what a native style accepts', () => {
     const Box = styled(View)()
     const Panel = () => {
       const styles = useStyle(sheet)
-      expectTypeOf(styles.box).toEqualTypeOf<NativeStyleObject>()
+      expectTypeOf(styles.box).toEqualTypeOf<NativeSheetEntry>()
       expectTypeOf(apply(styles.active).style).toEqualTypeOf<NativeStyleObject[]>()
       return <Box style={[styles.box, false, { opacity: 0.9 }]} />
     }

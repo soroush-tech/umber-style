@@ -8,14 +8,20 @@ import {
   isThemedSheet,
   type ObjectSheet,
   type SheetEntries,
+  type SheetEntry,
   type WebStyleObject,
 } from '@umber-style/core'
-import { createCssEntry, EMPTY_THEME } from '@umber-style/core/internal'
+import {
+  createCssEntry,
+  createThemedSheet,
+  EMPTY_THEME,
+  rejectThemedEntries,
+} from '@umber-style/core/internal'
 import { injectCache } from './CacheProvider'
 import { createGlobal } from './Global'
 import { createStyled } from './styled'
 import { createThemeKeys, createThemeProvider, createThemeScope } from './ThemeProvider'
-import type { Sheet, Style, StyleOptions } from './types'
+import type { Sheet, Style, StyleOptions, ThemedEntries } from './types'
 import { createUseStyleValue } from './useStyleValue'
 
 export type { StyleOptions } from './types'
@@ -39,14 +45,31 @@ export function bindEngine<T extends object>(engine: Engine<T>): Style<T> {
     return local.createThemeView(inject(keys.theme, null)?.value ?? readOwnTheme())
   }
 
+  // An object sheet is its own entries: it reads no theme. Under a cache provider the entries are those
+  // of the engine over its cache, for the same styles, so that what uses them writes there.
+  const useStyle = ((sheet: object) => {
+    const cache = injectCache()
+    const entries = (
+      isThemedSheet(sheet) ? sheet.resolve(useThemeView(cache)) : sheet
+    ) as SheetEntries<string>
+    return cache === undefined ? entries : engine.withCache(cache).adoptSheet(entries)
+  }) as Style<T>['useStyle']
+
   function create<K extends string>(styles: ObjectSheet<K>): SheetEntries<K>
   function create<K extends string>(
     styles: (theme: T) => Record<K, WebStyleObject>
-  ): Sheet<Record<K, WebStyleObject>>
+  ): Sheet<Record<K, WebStyleObject>> & ThemedEntries<K>
   function create(
     styles: ObjectSheet<string> | ((theme: T) => Record<string, WebStyleObject>)
   ): unknown {
-    return engine.createSheet(styles as never)
+    if (typeof styles !== 'function') return engine.createSheet(styles)
+    // `sheet.card` is a handle that a styled component resolves with `useStyle` in its render. Vue merges
+    // the objects of a list into one, so the key of a handle is kept, and found again by its id.
+    const sheet = engine.createSheet(styles)
+    return createThemedSheet(sheet, {
+      readEntry: (key) => (useStyle(sheet as never) as Record<string, SheetEntry>)[key],
+      isMerged: true,
+    })
   }
 
   return {
@@ -54,20 +77,13 @@ export function bindEngine<T extends object>(engine: Engine<T>): Style<T> {
     cache: engine.cache,
     styled: createStyled(engine, useThemeView),
     StyleSheet: { create },
-    // An object sheet is its own entries: it reads no theme. Under a cache provider the entries are those
-    // of the engine over its cache, for the same styles, so that what uses them writes there.
-    useStyle: ((sheet: object) => {
-      const cache = injectCache()
-      const entries = (
-        isThemedSheet(sheet) ? sheet.resolve(useThemeView(cache)) : sheet
-      ) as SheetEntries<string>
-      return cache === undefined ? entries : engine.withCache(cache).adoptSheet(entries)
-    }) as Style<T>['useStyle'],
+    useStyle,
     useStyleValue: createUseStyleValue(() => engine.cache),
     // The class is made in the cache of the entries: under a cache provider, those of `useStyle`.
-    apply: (...entries) => ({
-      class: (findEntryCache(entries) ?? engine.cache).css(...entries) || undefined,
-    }),
+    apply: (...entries) => {
+      rejectThemedEntries(entries, 'apply()')
+      return { class: (findEntryCache(entries) ?? engine.cache).css(...entries) || undefined }
+    },
     css: ((...args: unknown[]) => createCssEntry(engine.cache, args)) as Style<T>['css'],
     ThemeProvider: createThemeProvider(engine, keys),
     ThemeScope,

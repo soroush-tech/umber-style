@@ -39,7 +39,7 @@ describe('findMissingStyles', () => {
     addStyle('.u-a{color:red;}')
     document.body.innerHTML = '<div class="u-theme-0 u-boundary u-scope"><p class="u-a"></p></div>'
     expect(findMissingStyles().map(({ message }) => message)).toEqual([
-      'div[] has the class u-scope, which no rule names',
+      'div[] has the class u-scope, which no rule names: if it is the class of a sheet entry passed as text (String(entry), entry.className), use the entry itself where the style is used, importing its sheet there: a class name carries no rule',
     ])
   })
 
@@ -68,8 +68,8 @@ describe('findMissingStyles', () => {
       '<p data-testid="one" class="u-a u-b"></p><i id="two" class="u-c"></i>'
     const problems = findMissingStyles()
     expect(problems.map((problem) => problem.message)).toEqual([
-      'p[one] has the class u-b, which no rule names',
-      'i[two] has the class u-c, which no rule names',
+      'p[one] has the class u-b, which no rule names: if it is the class of a sheet entry passed as text (String(entry), entry.className), use the entry itself where the style is used, importing its sheet there: a class name carries no rule',
+      'i[two] has the class u-c, which no rule names: if it is the class of a sheet entry passed as text (String(entry), entry.className), use the entry itself where the style is used, importing its sheet there: a class name carries no rule',
     ])
     expect(problems[0]).toMatchObject({
       kind: 'class-without-rule',

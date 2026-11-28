@@ -192,6 +192,10 @@ function collectRules(page: Document, prefix: string) {
 
 type EngineRule = ReturnType<typeof collectRules>[number]
 
+/** What the warning of a class that no rule names adds: a class name passed as text, from a server component to a client one, carries no rule. */
+const CLASS_NAME_FIX =
+  ': if it is the class of a sheet entry passed as text (String(entry), entry.className), use the entry itself where the style is used, importing its sheet there: a class name carries no rule'
+
 /** The classes of the engine on the element called `label` that no rule names. */
 function findClassProblems(
   label: string,
@@ -201,7 +205,7 @@ function findClassProblems(
 ): void {
   for (const name of classes) {
     if (named.has(name)) continue
-    const message = `${label} has the class ${name}, which no rule names`
+    const message = `${label} has the class ${name}, which no rule names${CLASS_NAME_FIX}`
     problems.push({
       kind: 'class-without-rule',
       name,

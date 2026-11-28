@@ -37,6 +37,8 @@ flowchart TD
   useBase --> parts["createStyled, createGlobal, useStyle"]
   useFirst --> parts
   empty --> parts
+  create["StyleSheet.create(function)"] --> handles["createThemedSheet, isMerged: readEntry = useStyle(sheet)[key]"]
+  handles --> parts
   slot --> provider["createThemeProvider(engine, readFirstSlot, readBaseTheme, readNonce, sendStyles)"]
   engine --> nonce["createNonceReader: the nonce of the cache, or of the source, once a request"]
   nonce --> parts
@@ -57,7 +59,18 @@ The request slot is `{ current: DeepPartial<T> | undefined, isSet }`, made by `R
 - `useTheme()` returns the base theme, the same in every render; it never reads a provider.
 - With no base theme it returns an empty object, and warns once in development.
 - An object sheet works with no theme; a themed sheet resolves against `engine.createThemeView(readViewTheme())`.
-- `apply` and `css` use the engine's own cache; there is no `CacheProvider` in this build.
+- `apply` and `css` use the engine's own cache; there is no `CacheProvider` in this build. `apply` given a
+  handle throws the `TypeError` of `apply()`.
+- A handle of a function sheet (`sheet.card`) given to a styled server component is the entry of this
+  build's `useStyle`: the class a server component gets from `useStyle(sheet).card`. A handle, an entry
+  or a class name passed to a client component as a prop crosses with no CSS and is unstyled there: a
+  client component imports the sheet and is given a plain value that chooses the style
+  (`sheetEntry.md`, which warns about what crossed).
+- The handles of this build are made with `isMerged`: their key holds `null`. React reads every key of a
+  prop for its messages of development, and a key that throws made the page fail on the development
+  server. A plain element in a server component given a
+  handle in `style` therefore writes nothing and raises no error; the types reject it, and `String(handle)`
+  still throws.
 - No hook is called; `serverGuard.test.ts` checks it for the files of this build.
 
 ## Decisions

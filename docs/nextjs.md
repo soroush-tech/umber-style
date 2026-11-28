@@ -304,6 +304,58 @@ export function Providers({ children }: { children: ReactNode }) {
 
 The rules of the merge, and what a list or a token does in it, are in [Hidden members](server-rendering.md#hidden-members-helpers-on-breakpoints).
 
+### Styles stay on their side
+
+A style does not cross from a server component to a client component. React turns the props of a client component into data, and an entry of `useStyle(sheet)`, an entry of an object sheet, a handle (`sheet.card`), a `css()` value or a class name (`String(entry)`) arrives without its CSS: the client component's element is unstyled. A styled server component given a handle or an entry is styled, and so is a client component that imports the sheet itself. To let a server component choose the style of a client component, pass a plain value:
+
+The sheet, imported by both sides (`fixtures/next-app/app/(csp-server)/sheets.ts`, shortened):
+
+```ts
+export const sheet = StyleSheet.create((theme) => ({
+  card: {
+    paddingLeft: 31,
+    borderLeftWidth: 3,
+    borderLeftStyle: 'solid',
+    borderLeftColor: theme.palette.accent,
+  },
+  label: { paddingLeft: 43, color: theme.palette.accent },
+}))
+```
+
+The client component chooses the style from a plain value (`sheets-client.tsx`):
+
+```tsx
+'use client'
+
+import { sheet } from './sheets'
+import { styled } from './style'
+
+const Card = styled('section', { name: 'CspServerSheetCard' })({ display: 'block', marginTop: 2 })
+
+/** A card whose style the server component chooses with a plain value: the way to do it. */
+export function ClientPicked({ tone }: { tone: 'card' | 'label' }) {
+  return (
+    <Card data-testid="sheets-client-picked" style={sheet[tone]}>
+      picked
+    </Card>
+  )
+}
+```
+
+And the server component passes the value, not the style (`csp-server/sheets/page.tsx`):
+
+```tsx
+<ClientPicked tone="card" />
+```
+
+In development, a styled client component given what a style became when it crossed warns once for each key, in its server render and in the browser (here for the entry of `StyleSheet.create({ card: { color: 'red' } }).card` under the prefix `umber`):
+
+```text
+[umber] A style was passed from a server component to a client component (--umber-entry-umber-bkhmwp), and its CSS cannot cross: import the sheet in the client component, and pass a plain value such as a string to choose the style.
+```
+
+React also prints its own development message for an entry or a handle given to a client component (an object with members of its own, "Only plain objects can be passed to Client Components from Server Components"). The slot pattern, an object of entries for the parts of a component, works within one side: a server component passing it to styled server components, or a client component to styled client components.
+
 ## A strict content security policy
 
 A policy whose `style-src` has a nonce and no `'unsafe-inline'` lets in a `<style>` element only when it carries the nonce. On the App Router three things make the engine's elements carry it: a proxy that makes a nonce for each request and sends the policy, a nonce source that tells the server components build where to read it, and `StyleRegistry` in the root layout. The routes under `/csp-server` run this under `style-src 'nonce-<n>'; script-src 'self' 'nonce-<n>' 'strict-dynamic'`, with a new nonce for each request (scenario (j)).
@@ -478,3 +530,5 @@ A root layout with `export const runtime = 'edge'` renders every page below it o
 - With JavaScript off, a page that streams shows the fallback of each `Suspense` boundary and never its late content, under a policy or not: that takes React's script.
 - A page that renders one styled component from a server component and from a client component, under `StyleRegistry` in a request with no nonce, was not run ([Limits of The cache and server packages](cache-and-server.md#limits)).
 - Other frameworks with server components were not run.
+- A plain element in a server component given a handle in `style` writes nothing and raises no error (the client build throws): the handles of the server components build hold `null` in their key, because React reads every key of a prop for its development messages, and a key that throws made the page fail on the development server. The types reject it.
+- A style passed from a server component to a client component is unstyled; the warning that says so is given in development only, for an object of one key.

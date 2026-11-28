@@ -17,6 +17,8 @@ import type {
   StateKey,
   StateName,
   StaticTemplateValue,
+  ThemedEntries,
+  ThemedEntry,
   ThemeKey,
   WebNested,
   WebProperties,
@@ -29,7 +31,12 @@ import type {
   Theme,
   ThemeProviderProps,
 } from '@umber-style/react'
-import type { AnimatedDriver, NativeStyleObject, StateProps } from '@umber-style/react-native'
+import type {
+  AnimatedDriver,
+  NativeSheetEntry,
+  NativeStyleObject,
+  StateProps,
+} from '@umber-style/react-native'
 
 /** The keys that the web style and the native style both have. */
 type SharedKeys = keyof WebProperties & keyof NativeStyleObject
@@ -73,17 +80,32 @@ export type SharedSheetInput<K extends string, T> =
 /** A shared sheet given as an object: one style for each name, with a function left out (the compiler tries the object form first). */
 export type SharedObjectSheet<K extends string> = Record<K, SharedStyleObject> & { call?: never }
 
-/** An entry of a sheet: a class name on the web, a style object on React Native. Pass it on; do not read it. */
-export type SharedEntry = SheetEntry | NativeStyleObject
+/** An entry of a sheet: a class name on the web, a registered style object on React Native. Pass it on; do not read it. */
+export type SharedEntry = SheetEntry | NativeSheetEntry
 
 /** What the `style` prop of a shared styled component takes. */
 export type SharedStyleProp =
   | SharedEntry
+  | ThemedEntry
   | SharedStyleObject
   | false
   | null
   | undefined
   | readonly SharedStyleProp[]
+
+/**
+ * What a `style` prop that takes sheet entries only takes, in shared code: an entry (of
+ * `StyleSheet.create`, `useStyle` or `css()`), a handle of a sheet made from a function of the theme
+ * (`sheet.card`), `false`, `null`, `undefined`, and lists of them, nested. A plain style object and a
+ * string are type errors. It is a part of the `style` of a shared styled component.
+ */
+export type SheetStyleProp =
+  | SharedEntry
+  | ThemedEntry
+  | false
+  | null
+  | undefined
+  | readonly SheetStyleProp[]
 
 /** A component that `styled` made in shared code: the props of its tag and its own, the state props, with `as` and a shared `style`. */
 export type SharedStyledComponent<C extends ElementType, P extends object> = FunctionComponent<
@@ -108,10 +130,13 @@ export interface SharedSheetDefinition<S extends SharedSheetStyles> {
 export interface SharedStyleSheet<T> {
   /** A sheet given as an object is its entries, usable at once, with no hook and no theme. */
   create<K extends string>(styles: SharedObjectSheet<K>): { readonly [P in K]: SharedEntry }
-  /** A sheet given as a function of the theme is for `useStyle`, which resolves it against the theme. */
+  /**
+   * A sheet given as a function of the theme: `useStyle` resolves it against the theme, and each name is
+   * a handle (`sheet.card`) that the `style` of a styled component resolves with its own theme.
+   */
   create<K extends string>(
     styles: (theme: T) => Record<K, SharedStyleObject>
-  ): SharedSheetDefinition<Record<K, SharedStyleObject>>
+  ): SharedSheetDefinition<Record<K, SharedStyleObject>> & ThemedEntries<K, 'resolve' | 'prepare'>
 }
 
 /** The props that apply entries to a styled component: a class name on the web, a style array on React Native. */
@@ -163,6 +188,10 @@ export interface SharedStyleBase<T> {
     readonly [P in K]: SharedEntry
   }
   /** The entries of a sheet made from a function of the theme, resolved against the nearest provider. */
+  useStyle<K extends string>(
+    sheet: SharedSheetDefinition<Record<K, SharedStyleObject>> &
+      ThemedEntries<K, 'resolve' | 'prepare'>
+  ): { [P in K]: SharedEntry }
   useStyle<S extends SharedSheetStyles>(
     sheet: SharedSheetDefinition<S>
   ): { [K in keyof S]: SharedEntry }
@@ -198,7 +227,7 @@ export interface MotionOptions {
 
 export type { DefaultStyleOptions, GlobalProps, StyledOptions, ThemeProviderProps }
 export type { StyleOptions } from '@umber-style/react'
-export type { SheetEntry, Theme }
+export type { SheetEntry, Theme, ThemedEntry }
 export type {
   AlphaColor,
   GlobalInput,

@@ -100,6 +100,12 @@ Each unit is tested with comparisons of its code, never with a regular expressio
   that declares nothing, have no rule by design and are left out.
 - A root problem is one for each rule, with all its missing variables, because the cause is one rule.
 - `options.prefix` wins over the prefix read from the page.
+- The message of a class that no rule names ends with the fix of its most likely cause in an app of
+  server components: `...which no rule names: if it is the class of a sheet entry passed as text
+  (String(entry), entry.className), use the entry itself where the style is used, importing its sheet
+  there: a class name carries no rule` (#88). A class name passed as text, from a server component to a client component
+  among others, carries no rule; a style passed from a server component to a client component does not
+  carry its CSS either, which `flattenStyle` warns about in development (`sheetEntry.md`).
 
 ## Limits
 

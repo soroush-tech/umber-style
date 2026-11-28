@@ -29,6 +29,8 @@ flowchart TD
   fn -->|"no: object sheet"| lazy["lazy record: registered with the platform on first read"]
   fn -->|"yes"| themed["themed sheet: prepare and resolve"]
   themed --> prep["prepare(theme): register once for each theme object"]
+  themed --> handles["createThemedSheet, no reader and no base entry: sheet.card is a handle"]
+  apply["apply, css()"] --> reject["a handle: TypeError of apply() or css()"]
   use["useStyle(sheet)"] --> ctx["read theme and condition first, always"]
   ctx --> isT{"themed sheet?"}
   isT -->|"no"| same["return the sheet itself"]
@@ -62,7 +64,14 @@ conversion), `keys` (a `StyleKeys` for each entry), `isConditional`, `queries`, 
 - `Global`, `ThemeScope`, `useThemeClass`, `themeClass` do nothing (`Global` renders `null`, `ThemeScope` its
   children, `themeClass` returns `''`, `useThemeClass` `undefined`); `keyframes` and `globalStyles` come from
   the core so one source runs on both.
-- `apply(...entries)` returns `{ style: [...] }` with falsy entries removed.
+- `apply(...entries)` returns `{ style: [...] }` with falsy entries removed. A handle is a `TypeError`
+  there and in `css()`: no theme is known.
+- A sheet made from a function is wrapped by `createThemedSheet` (`themedEntry.md` of the core): each name
+  is a handle that a styled component resolves through `ThemedStyle` (`themedStyle.md`), with this sheet's
+  `prepare` and `resolve`, which pass through the wrapper. It gives no `readEntry` (nothing calls it here),
+  and reading the key of a handle (a plain `View` flattens its `style`, `JSON.stringify` reads it) is the
+  `TypeError` of a plain element.
+- The entries of `StyleSheet.create` and `useStyle` are typed `NativeSheetEntry` (`nativeStyle.md`).
 - With `animated`, a sheet entry and `css()` keep their animation and transition keys, translated: the
   entry can be given to a component that the library animates. Steps that are a function of the theme are
   resolved against the base theme as it was given (the empty theme when there is none).

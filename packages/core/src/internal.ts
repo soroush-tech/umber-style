@@ -38,6 +38,13 @@ export {
   type EntrySource,
 } from './sheetEntry'
 export { callCheckedStyle } from './styleBase'
+export {
+  createThemedSheet,
+  readThemedSource,
+  rejectThemedEntries,
+  type ThemedSheetOptions,
+  type ThemedSource,
+} from './themedEntry'
 export { withTagShorthands } from './tagShorthands'
 export { isTemplateStrings, parseKeyframesTemplate, parseStyleTemplate } from './templateStyle'
 export {

@@ -67,7 +67,9 @@ describe('the development checker', () => {
     expect(warn).not.toHaveBeenCalled()
     vi.advanceTimersByTime(1)
     expect(warn).toHaveBeenCalledTimes(1)
-    expect(warn).toHaveBeenCalledWith('[u] p[p] has the class u-missing, which no rule names')
+    expect(warn).toHaveBeenCalledWith(
+      '[u] p[p] has the class u-missing, which no rule names: if it is the class of a sheet entry passed as text (String(entry), entry.className), use the entry itself where the style is used, importing its sheet there: a class name carries no rule'
+    )
     check()
     vi.advanceTimersByTime(100)
     expect(warn).toHaveBeenCalledTimes(1)

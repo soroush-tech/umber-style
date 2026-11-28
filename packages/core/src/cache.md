@@ -33,7 +33,7 @@ flowchart TD
   names -->|yes| memo{"a merge of these names remembered, each name with the same style, its class written?"}
   memo -->|yes| again["registered.set(name, the merged style of then); return what it returned"]
   memo -->|no| sort
-  names -->|no| sort["sortClassValues: styles, raw class names, entries"]
+  names -->|no| sort["sortClassValues: styles, raw class names, entries; a handle is a TypeError"]
   sort --> sole{"one entry only, and no 'after'?"}
   sole -->|yes| use["entry.use(layer): its class, written if new"]
   sole -->|no| prep["prepareClass: merge styles, compile to rules for '&', name = prefix-label-hash"]
@@ -207,6 +207,9 @@ The rest of the closure, in the order of the file:
   touches a browser global at module top level (`document` appears only as a default read when called).
 - A cache over a sheet in a style element is recorded in `cacheRegistry` for its prefix.
 - A prefix that does not match `^[a-z][a-z0-9-]*$` throws.
+- A handle of a sheet made from a function of the theme among the values of a class (`apply`, `css()`, the
+  styles of `styled`, what a style function returns) is a `TypeError` (`A class (apply, css(), the styles of
+  styled): ...`): no theme is known there (`themedEntry.md`).
 
 ## Decisions
 

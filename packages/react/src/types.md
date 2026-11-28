@@ -6,7 +6,8 @@ Build: both (types only; it has no runtime code).
 
 It holds the public types of the binding: the options (`StyleOptions`, `DefaultStyleOptions`,
 `ServerStyleOptions`, `StyledOptions`), the theme (`Theme`), the styled component types (`Styled`,
-`StyledComponent`, `CreateStyledComponent`, `StyledStatics`, `StyleProp`, `PropsOf`), the props of the
+`StyledComponent`, `CreateStyledComponent`, `StyledStatics`, `StyleProp`, `SheetStyleProp`, `PropsOf`),
+the props of the
 components (`ThemeProviderProps`, `WebThemeProviderProps`, `ThemeScopeProps`, `CacheProviderProps`,
 `GlobalProps`), the setter of `useStyleValue` (`StyleValueSetter`), and the shape of a whole style (`Style`, `WebStyle`, `ServerStyle`). It re-exports the style
 types of the core that an app annotates with, `StateName` and `StateKey` of the state keys among them.
@@ -34,8 +35,14 @@ flowchart TD
 
 - `Theme` extends the core's `Theme`; an app augments it with `declare module '@umber-style/react'` or, for
   every binding, `'@umber-style/core'`.
-- `StyleProp` takes sheet entries, style objects, React's `CSSProperties` (not with `isStrict`), arrays, and
-  falsy values.
+- `StyleProp` takes sheet entries, handles (`ThemedEntry`), style objects, React's `CSSProperties` (not with
+  `isStrict`), arrays, and falsy values.
+- `SheetStyleProp` takes sheet entries only (#89): an entry, a handle, `false`, `null`, `undefined` and
+  nested lists of them. A plain object and a string are type errors. It is assignable to `StyleProp`, so a
+  design system passes it on to a part as it is.
+- `Style.StyleSheet.create` given a function returns `SheetDefinition & ThemedEntries<K>`: one handle for
+  each name, the names that pass through excepted (`themedEntry.md`), so a misspelt name is a type error.
+  `useStyle` has an overload for that intersection, before the general one, which returns the entries.
 - `StyledComponent` removes from the tag's props the keys that the component's own props name, in a form
   chosen to cost the compiler less (the comment in the file explains the order of the tests).
 

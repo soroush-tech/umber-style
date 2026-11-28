@@ -24,7 +24,7 @@ by apps by accident (issue #79).
 flowchart LR
   whole["export * from at, calc, createEngine, findMissingStyles, mergeDeep, state, styleTypes, tokens, types, webStyle"]
   named["named exports: alpha, cache, devChecks, extractStyles, globalStyles, keyframes, liveValue, nonceSource, scope, serialize, sheetEntry"]
-  types["type-only: RegisteredSyntax, ThemeInput, umberCache types"]
+  types["type-only: RegisteredSyntax, ThemedEntries, ThemedEntry, ThemeInput, umberCache types"]
   whole --> entry["index.ts"]
   named --> entry
   types --> entry
@@ -42,7 +42,7 @@ flowchart LR
   the other entry and checks that the two share no name.
 - Files that are API as a whole are exported with `export *`; a file that also holds helpers of the
   bindings (`alpha`, `cache`, `extractStyles`, `liveValue`, `nonceSource`, `scope`, `sheetEntry`,
-  `themeInput`) is exported by name, so its helpers stay in `internal.ts`.
+  `themedEntry`, `themeInput`) is exported by name, so its helpers stay in `internal.ts`.
 
 ## Decisions
 

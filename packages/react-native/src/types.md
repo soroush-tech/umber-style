@@ -46,9 +46,17 @@ flowchart TD
 - `StyledComponent<C, P>` takes the props of the tag, `P`, the state props, `as` and `style`.
 - `StateProps` is `{ pressed?, hovered?, focused? }`, booleans: what tells a styled component a state its
   `state()` keys name, for a component that does not report it itself (`styled.ts` reads them).
-- The `style` prop takes style objects, falsy values and nested arrays (`StyleProp`).
+- The `style` prop takes style objects, handles of a sheet made from a function of the theme
+  (`ThemedEntry`), falsy values and nested arrays (`StyleProp`).
+- `SheetStyleProp<S = ViewStyle>` takes entries only (#89): an entry of the binding (`NativeSheetMark` with
+  the keys of `S` as `NativeStyleObject` types them), a handle, `false`, `null`, `undefined` and nested
+  lists. A plain object and a style of the platform's own `StyleSheet.create` are type errors: they have no
+  mark. `S` picks the keys only: the binding's entries are typed with every key, so they fit every kind,
+  an image's included, whose `overflow` takes fewer values than the union does.
 - `NativeStyleSheet<T>` is the platform `StyleSheet` with `create` replaced by two overloads: an object sheet
-  gives its styles at once, a function of the theme gives a `SheetDefinition` for `useStyle`.
+  gives its styles at once, typed `NativeSheetEntry`, a function of the theme gives a `SheetDefinition`
+  for `useStyle` and a handle for each name (`ThemedEntries<K, 'resolve' | 'prepare'>`). `useStyle` has
+  an overload for that form, which returns `NativeSheetEntry` for each name.
 
 ## What it guarantees
 

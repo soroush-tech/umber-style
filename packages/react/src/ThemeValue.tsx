@@ -60,7 +60,9 @@ export function createThemeValue<T extends object>(
    * that reads a view given renders again only when the view changes.
    */
   function useThemeView(cache?: Cache): T {
-    const view = useContext(ViewContext)
+    // `use`, not `useContext`: a styled component with no function style reads it only when it is given
+    // a handle of a sheet, which a hook could not do in some renders and not in others.
+    const view = use(ViewContext)
     const local = cache === undefined ? holder : holder.withCache(cache)
     if (local === holder && view !== undefined) return view
     return local.createThemeView(

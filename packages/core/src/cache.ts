@@ -34,6 +34,7 @@ import {
   type StyleObject,
 } from './serialize'
 import { createThemeRule, ROOT_SELECTOR, toDeclarationText } from './theme'
+import { createThemedEntryError, isThemedEntry } from './themedEntry'
 import { scanVariables } from './variables'
 import type { WebStyleObject } from './webStyle'
 
@@ -936,6 +937,9 @@ function addClassValues(
       continue
     }
     if (typeof value === 'object' && !isSheetEntry(value)) {
+      if (isThemedEntry(value)) {
+        throw createThemedEntryError('A class (apply, css(), the styles of styled)')
+      }
       sorted.styles.push(value as StyleObject)
       continue
     }

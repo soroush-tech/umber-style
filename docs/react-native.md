@@ -503,6 +503,28 @@ Once for each distinct message, with the component's name, in development only:
 - a property in a step that the library does not animate: `Pulse: "boxSizing" in the step "100%" is not animated by the animation library on React Native; it is dropped from the step.`, and an animation key other than `animationTimingFunction` in a step;
 - a function style that starts an animation in a component whose object styles name none (see [Which components are wrapped](#which-components-are-wrapped)).
 
+## Handles of a sheet of the theme
+
+A styled component takes a handle of a sheet made from a function of the theme in `style`, as on the web ([Style sheets](style-sheets.md#a-sheet-of-the-theme-without-a-hook)). From `packages/react-native/src/themedStyle.test.tsx`:
+
+```tsx
+const wide: string = '@media (min-width: 600px)'
+
+const sheet = StyleSheet.create((theme) => ({
+  card: { padding: theme.space[1], [wide]: { padding: theme.space[2] } },
+}))
+
+const Card = styled(View)()
+
+const Screen = () => <Card style={sheet.card} />
+```
+
+The component renders through a small inner component when its `style` holds a handle: that component reads the theme and the providers once, as `useStyle` does, subscribes to the window and the system color scheme for the media and `whenScheme()` keys of the handles' sheets with the same path `useStyle` takes, and renders the styled component again with each handle replaced by the registered style object `useStyle(sheet)` gives. A static component given `style={sheet.card}` therefore follows a rotation: in the test, `padding` is `4` at 400 by 800, `8` after a resize to 800 by 400, and `4` again after the window turns back. A component given no handle is unchanged and pays one check of its `style`.
+
+A plain `View` cannot resolve a handle: it is a type error, and the `TypeError` of a plain element when the platform reads the keys of its `style`. `apply`, `css()` and the styles of `styled` throw for one too; read the entry with `useStyle(sheet)` there. `JSON.stringify(sheet.card)` throws the same error.
+
+For a component that types its `style` as entries only, `SheetStyleProp<S>` takes the entries of the binding and handles, and rejects a plain object and a style of the platform's own `StyleSheet.create` ([Typed styles](typed-styles.md#sheet-entries-only)). The entries of the binding carry a mark for the compiler, `NativeSheetEntry`, which does not exist at run time.
+
 ## Development warnings
 
 In development, once for each distinct message, the binding warns with `console.warn`. A message starts with `@umber-style/react-native:` and the name of the component when it is known: the `name` option of `styled`, else the display name or function name of the wrapped component; for a sheet, `sheet entry "card"`. Nothing is warned in production, or where there is no `process`.
@@ -529,6 +551,7 @@ The package exports `add`, `subtract`, `multiply`, `divide`, `negate` and `alpha
 - **The React Native binding was never run in a real app.** The tests alias the one import of the platform (`react-native`) to a stand-in whose `StyleSheet.create` returns its input and whose `Appearance` is a stub, and they use plain host components that record their props. The styles were compiled against the real `react-native` types.
 - Because of that, `StyleSheet.create` returning ids and the platform's own handling of an unknown key were not exercised. The events of `Dimensions`, `Appearance` and `AccessibilityInfo` were sent by stand-ins: a rotation and a window resize on a device were not observed.
 - The color scheme of the platform is read when a component renders. A change of the system setting renders again the components that read it through `prefers-color-scheme` or a `whenScheme()` key that no provider decides; a style function that reads `Appearance` itself is not rendered again.
+- A styled component whose `style` switches between holding a handle and not mounts its element again: the inner component that resolves handles comes and goes. A handle inside a function `style` (a `Pressable`) is not seen. That a handle follows a rotation was checked with the stand-in of `Dimensions`, not on a device.
 - Sheets made from a function are registered once for each theme object, kept in a `WeakMap`, so they are released with the theme object. A theme object that is re-created on every render registers a new sheet every time.
 - `alpha` cannot mix a colour it cannot read as a literal (a named colour, `hsl()`): it returns that colour unchanged.
 - That a modal's content shows the theme of the nested provider above it was checked with a stand-in modal that renders its children in place, as React Native's does; the platform's `Modal` was not run.

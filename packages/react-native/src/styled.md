@@ -23,7 +23,9 @@ importer.
 flowchart TD
   def["styled(Component)(...styles)"] --> tag{"tag is a string?"}
   tag -->|"yes"| throw["TypeError: needs a component"]
-  tag -->|"no"| kinds["classify each style"]
+  tag -->|"no"| handles{"a handle of a theme sheet among the styles?"}
+  handles -->|"yes"| styledErr["TypeError: styled()"]
+  handles -->|"no"| kinds["classify each style"]
   kinds --> k{"kind of style"}
   k -->|"function"| fn["computed on each render"]
   k -->|"object with when, whenScheme or state key"| cond["resolved once for each theme, scheme, window key and states, then reused"]
@@ -43,7 +45,9 @@ flowchart TD
   cnd --> render
   wnd --> render
   stat --> render
-  render --> used{"states named: object styles, then this render's function results"}
+  render --> handleQ{"style holds a handle?"}
+  handleQ -->|"yes"| themed["ThemedStyle (themedStyle.ts): resolves the handles, renders this component again"]
+  handleQ -->|"no"| used{"states named: object styles, then this render's function results"}
   used -->|"none"| arr["style: resolved styles, then the style prop, flat"]
   used -->|"some"| pressable{"component is the platform Pressable and names pressed, or its style prop is a function?"}
   pressable -->|"yes"| fnStyle["style: a function of the platform's pressed"]
@@ -92,6 +96,11 @@ entry leaves with its theme object, and a component has at most 16 for each them
 ## What it guarantees
 
 - The fixed styles are registered once, when the component is made.
+- A handle of a sheet made from a function of the theme among the styles of `styled` throws a `TypeError`
+  (`styled()`) when the component is made. Given in `style`, alone or in lists, it is resolved by
+  `ThemedStyle` (`themedStyle.md`) into the entry `useStyle(sheet)` gives, which follows the window and the
+  providers. `render` checks for it after the hooks of the component, so the hooks stay in order when
+  `style` switches; a component given no handle pays that one check.
 - A function style runs on each render with the props and `theme`, and may return nothing or `false`. Its
   media keys and its states are known only after it ran, so they are appended to the key and to the states.
 - A component whose styles name no state (this render) gets `style` as one flat list: the resolved styles,
@@ -166,6 +175,10 @@ entry leaves with its theme object, and a component has at most 16 for each them
   when a later render does not animate (every such switch would mount the subtree again). A wrapped
   component whose styles stop animating keeps the wrapper, and the library detaches the animation, as the
   web removes an animation whose name goes away.
+
+- The component is chosen with `let Component` and a series of `if`s, in the order the returns had
+  (held, then dynamic, conditional, window, static), so that `render` can name the component it renders
+  through `ThemedStyle`.
 
 ## Limits
 

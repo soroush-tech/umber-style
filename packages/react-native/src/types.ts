@@ -12,11 +12,16 @@ import type {
   SchemeName,
   StaticTemplateValue,
   StylerOptions,
+  ThemedEntries,
+  ThemedEntry,
   ThemeInput,
   ThemeKey,
 } from '@umber-style/core'
+import type { ImageStyle, TextStyle, ViewStyle } from 'react-native'
 import type {
   NativeObjectSheet,
+  NativeSheetEntry,
+  NativeSheetMark,
   NativeSheetStyles,
   NativeStyleInput,
   NativeStyleObject,
@@ -85,10 +90,29 @@ export interface StyledOptions extends StylerOptions {
   shouldForwardProp?: (prop: string) => boolean
 }
 
-/** What the `style` prop of a styled component takes: style objects (sheet entries are such objects), in arrays, with falsy values dropped. */
-type StyleValue = NativeStyleObject | false | null | readonly StyleProp[]
+/**
+ * What the `style` prop of a styled component takes: style objects (sheet entries are such objects) and
+ * handles of a sheet made from a function of the theme (`sheet.card`), in arrays, with falsy values
+ * dropped.
+ */
+type StyleValue = NativeStyleObject | ThemedEntry | false | null | readonly StyleProp[]
 /** What the `style` prop of a styled component takes, or nothing. */
 export type StyleProp = StyleValue | undefined
+
+/**
+ * What a `style` prop that takes sheet entries only takes, for a component whose style is of the kind
+ * `S` (a `View` by default): an entry of the binding (of `StyleSheet.create` or `useStyle`, with the keys
+ * of `S`), a handle of a sheet made from a function of the theme (`sheet.card`), `false`, `null`,
+ * `undefined`, and lists of them, nested. A plain style object and a style of the platform's own
+ * `StyleSheet.create` are type errors (they have no mark of the binding); `StyleProp` takes them.
+ */
+export type SheetStyleProp<S extends ViewStyle | TextStyle | ImageStyle = ViewStyle> =
+  | (Pick<NativeStyleObject, keyof S & keyof NativeStyleObject> & NativeSheetMark)
+  | ThemedEntry
+  | false
+  | null
+  | undefined
+  | readonly SheetStyleProp<S>[]
 
 /**
  * The props that tell a styled component a state that its `state()` keys name, for a component that does
@@ -179,11 +203,15 @@ export interface NativeCssFunction {
 /** The platform StyleSheet, with a `create` that registers the styles, and resolves them with the theme when they are a function of it. */
 export type NativeStyleSheet<T> = Omit<typeof platformStyleSheet, 'create'> & {
   /** A sheet given as an object is registered with the platform on first read and is its registered styles, usable at once, with no hook and no theme. */
-  create<K extends string>(styles: NativeObjectSheet<K>): { readonly [P in K]: NativeStyleObject }
-  /** A sheet given as a function of the theme is for `useStyle`, which resolves it against the theme. */
+  create<K extends string>(styles: NativeObjectSheet<K>): { readonly [P in K]: NativeSheetEntry }
+  /**
+   * A sheet given as a function of the theme: `useStyle` resolves it against the theme, and each name is
+   * a handle (`sheet.card`) that the `style` of a styled component resolves with its own theme.
+   */
   create<K extends string>(
     styles: (theme: T) => Record<K, NativeStyleObject>
-  ): SheetDefinition<Record<K, NativeStyleObject>, NativeStyleObject>
+  ): SheetDefinition<Record<K, NativeStyleObject>, NativeSheetEntry> &
+    ThemedEntries<K, 'resolve' | 'prepare'>
 }
 
 /**
@@ -197,13 +225,17 @@ export interface NativeStyle<T> {
   /** The platform StyleSheet, whose `create` also takes a function of the theme. */
   StyleSheet: NativeStyleSheet<NativeTheme<T>>
   /** The styles of a sheet; an object sheet is its own registered styles and is returned as it is. */
-  useStyle<K extends string>(sheet: { readonly [P in K]: NativeStyleObject }): {
-    readonly [P in K]: NativeStyleObject
+  useStyle<K extends string>(sheet: { readonly [P in K]: NativeSheetEntry }): {
+    readonly [P in K]: NativeSheetEntry
   }
+  useStyle<K extends string>(
+    sheet: SheetDefinition<Record<K, NativeStyleObject>, NativeSheetEntry> &
+      ThemedEntries<K, 'resolve' | 'prepare'>
+  ): { [P in K]: NativeSheetEntry }
   useStyle<S extends NativeSheetStyles>(
-    sheet: SheetDefinition<S, NativeStyleObject>
+    sheet: SheetDefinition<S, NativeSheetEntry>
   ): {
-    [K in keyof S]: NativeStyleObject
+    [K in keyof S]: NativeSheetEntry
   }
   /** The props that apply entries of a sheet: a style array. */
   apply(...entries: (NativeStyleObject | null | undefined | false)[]): {

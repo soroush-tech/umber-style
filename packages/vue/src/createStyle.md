@@ -34,7 +34,11 @@ flowchart TD
   ent --> cp
   cp -->|"yes"| adopt["engine over that cache: adoptSheet(entries)"]
   cp -->|"no"| ret["entries as they are"]
-  app["apply(...entries)"] --> cache["cache of the entries, else the engine's"]
+  create["StyleSheet.create"] --> fnQ{"a function of the theme?"}
+  fnQ -->|"no"| objEntries["the entries of the object"]
+  fnQ -->|"yes"| handles["createThemedSheet, isMerged: readEntry = useStyle(sheet)[key]"]
+  app["apply(...entries)"] --> reject["a handle: TypeError of apply()"]
+  reject --> cache["cache of the entries, else the engine's"]
   cache --> cls["class string, or undefined when empty"]
 ```
 
@@ -53,6 +57,11 @@ theme.
 - Under a `CacheProvider`, entries are adopted into the engine over its cache, so what uses them writes there.
 - `apply` makes its class in the cache of the entries (`findEntryCache`), so a class made under a cache
   provider is made in that cache.
+- A sheet made from a function returns a handle for each name (`themedEntry.md`); the style attribute of a
+  styled component resolves it with this file's `useStyle(sheet)[key]` in its render, so it gives the class
+  and the rules of `useStyle(sheet).card` under the same provider. Its key holds `null` (`isMerged`), because
+  Vue merges the objects of a list into one: `flattenStyle` finds the handle again by its id.
+- `apply` given a handle throws the `TypeError` of `apply()`.
 - `css` makes a sheet entry from the engine's own cache; `themeClass`, `when`, `whenScheme`, `keyframes` are
   the engine's, and `globalStyles` the core's.
 
@@ -60,4 +69,6 @@ theme.
 
 - `createStyle` sets the theme on the engine only when the engine has none given, so an engine passed in
   with its own base theme is kept.
-- `create` is the engine's `createSheet`; the two overloads only type the object and function forms.
+- `create` is the engine's `createSheet`, a function sheet wrapped by `createThemedSheet`; the two overloads
+  type the object and function forms. `useStyle` is a constant of the closure, so that `create` can give
+  it to the handles.

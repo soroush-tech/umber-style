@@ -4,7 +4,8 @@ import { StyleSheet as platform } from 'react-native'
 import type { Theme } from '@umber-style/core'
 import { bindHolder, createStyle } from './createStyle'
 import { createDefaultStyle } from './defaultStyle'
-import type { NativeStyleObject } from './nativeStyle'
+import type { ThemedEntry } from '@umber-style/core'
+import type { NativeSheetEntry, NativeStyleObject } from './nativeStyle'
 
 const light = { palette: { primary: '#0000ff' }, space: { small: 4 } }
 
@@ -72,17 +73,17 @@ describe('the types of a sheet on React Native', () => {
     const { StyleSheet, apply, useStyle } = createStyle(light)
     const object = StyleSheet.create({ box: { margin: 1 } })
     const themed = StyleSheet.create((theme) => ({ box: { padding: theme.space.small } }))
-    expectTypeOf(object).toEqualTypeOf<{ readonly box: NativeStyleObject }>()
+    expectTypeOf(object).toEqualTypeOf<{ readonly box: NativeSheetEntry }>()
     expectTypeOf(apply(object.box)).toEqualTypeOf<{ style: NativeStyleObject[] }>()
     // Hooks: only their types are checked here, they are not called.
     const useReadObject = () => useStyle(object)
     const useReadThemed = () => useStyle(themed)
     expectTypeOf<ReturnType<typeof useReadObject>>().toEqualTypeOf<{
-      readonly box: NativeStyleObject
+      readonly box: NativeSheetEntry
     }>()
-    expectTypeOf<ReturnType<typeof useReadThemed>>().toEqualTypeOf<{ box: NativeStyleObject }>()
-    // @ts-expect-error a sheet that is not resolved has no styles
-    expect(themed.box).toBeUndefined()
+    expectTypeOf<ReturnType<typeof useReadThemed>>().toEqualTypeOf<{ box: NativeSheetEntry }>()
+    // Each name of a sheet made from a function of the theme is a handle, for the style of a styled component.
+    expectTypeOf(themed.box).toEqualTypeOf<ThemedEntry>()
     // @ts-expect-error it is not a style, so it is not given to apply
     expect(apply(themed)).toBeDefined()
     // @ts-expect-error a misspelt property in an object sheet

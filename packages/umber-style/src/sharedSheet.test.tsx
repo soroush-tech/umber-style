@@ -9,6 +9,7 @@ import {
   useStyle,
   type SharedEntry,
   type SharedStyleObject,
+  type ThemedEntry,
 } from 'umber-style/react'
 
 const Host = (props: { id?: string }) => <i id={props.id} />
@@ -30,8 +31,8 @@ describe('the sheets of a style written for web and mobile', () => {
 
   it('gives a sheet for useStyle for a function of the theme, which is not an entry and has none', () => {
     const themed = StyleSheet.create(() => ({ box: { padding: 8 } }))
-    // @ts-expect-error a sheet that is not resolved has no entries
-    expect(themed.box).toBeUndefined()
+    // Each name is a handle, which the style prop of a styled component resolves with its theme.
+    expectTypeOf(themed.box).toEqualTypeOf<ThemedEntry>()
     // @ts-expect-error it is not an entry, so it is not given to apply
     expect(apply(themed)).toBeDefined()
     const Box = styled(Host)({ opacity: 1 })

@@ -14,7 +14,7 @@ import {
   type SheetStyles,
   type WebStyleObject,
 } from '@umber-style/core'
-import { createCssEntry } from '@umber-style/core/internal'
+import { createCssEntry, createThemedSheet, rejectThemedEntries } from '@umber-style/core/internal'
 import type { ReactElement } from 'react'
 import { useProvidedCache } from './CacheProvider'
 import { createGlobal } from './Global'
@@ -31,7 +31,13 @@ import { registerTexts, type StyleRegistryStore } from './styleRegistry'
 import { createStyled } from './styled'
 import { createThemeProvider } from './ThemeProvider'
 import { createThemeValue, type ThemeContexts } from './ThemeValue'
-import type { ServerStyleOptions, SheetDefinition, StyleOptions, WebStyle } from './types'
+import type {
+  ServerStyleOptions,
+  SheetDefinition,
+  StyleOptions,
+  ThemedEntries,
+  WebStyle,
+} from './types'
 import { createUseStyleValue } from './useStyleValue'
 
 export type { StyleOptions } from './types'
@@ -112,11 +118,18 @@ export function bindEngine<T extends object>(
   function create<K extends string>(styles: ObjectSheet<K>): SheetEntries<K>
   function create<K extends string>(
     styles: (theme: T) => Record<K, WebStyleObject>
-  ): WebSheet<Record<K, WebStyleObject>>
+  ): WebSheet<Record<K, WebStyleObject>> & ThemedEntries<K>
   function create(
     styles: ObjectSheet<string> | ((theme: T) => Record<string, WebStyleObject>)
   ): unknown {
-    return engine.createSheet(styles as never)
+    if (typeof styles !== 'function') return engine.createSheet(styles)
+    // `sheet.card` is a handle that a styled component resolves with `useStyle`, under its provider.
+    const sheet = engine.createSheet(styles)
+    // Called in the render of a styled component: a hook.
+    const useEntry = (key: string) => (useStyle(sheet as never) as Record<string, SheetEntry>)[key]
+    return createThemedSheet(sheet, {
+      readEntry: useEntry,
+    })
   }
 
   return {
@@ -128,9 +141,10 @@ export function bindEngine<T extends object>(
     useStyleValue: createUseStyleValue(() => engine.cache),
     // The class is made in the cache of the entries: under a cache provider, the entries of `useStyle`
     // are that cache's.
-    apply: (...entries) => ({
-      className: (findEntryCache(entries) ?? engine.cache).css(...entries) || undefined,
-    }),
+    apply: (...entries) => {
+      rejectThemedEntries(entries, 'apply()')
+      return { className: (findEntryCache(entries) ?? engine.cache).css(...entries) || undefined }
+    },
     css: ((...args: unknown[]) => createCssEntry(engine.cache, args)) as WebStyle<T>['css'],
     ThemeProvider: createThemeProvider({
       engine,

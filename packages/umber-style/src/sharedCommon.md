@@ -25,7 +25,8 @@ flowchart TD
   props --> obj["SharedStyleObject: props + web part + native part"]
   obj --> fn["SharedStyleFunction: props and theme -> result"]
   obj --> sheet["SharedSheetInput, SharedObjectSheet"]
-  obj --> entry["SharedEntry: sheet entry or native style"]
+  obj --> entry["SharedEntry: sheet entry or marked native entry"]
+  entry --> sheetProp["SheetStyleProp: entries, handles, falsy values, nested lists"]
   fn --> styled["SharedStyled"]
   sheet --> ss["SharedStyleSheet: object form usable at once, function form for useStyle"]
   entry --> base["SharedStyleBase<T>"]
@@ -41,7 +42,14 @@ flowchart TD
 - `SharedStyleObject`: the keys valid on both platforms (a number, a percentage and `auto` are; `grid` and
   `10px` are not), plus `web` (merged over the rest on the web, dropped on native) and `native` (the
   other way round).
-- `SharedEntry`: a class name on the web, a style object on React Native; pass it on, do not read it.
+- `SharedEntry`: a class name on the web, a registered style object on React Native (`NativeSheetEntry`,
+  with the mark of that binding); pass it on, do not read it.
+- `SheetStyleProp`: what a `style` prop that takes sheet entries only takes in shared code (#89): a
+  `SharedEntry`, a handle (`ThemedEntry`), `false`, `null`, `undefined` and nested lists; a plain object
+  and a string are type errors. `SharedStyleProp` takes handles too.
+- `SharedStyleSheet.create` given a function returns the definition and a handle for each name
+  (`ThemedEntries<K, 'resolve' | 'prepare'>`, the own members of both platforms' sheets left out), and
+  `useStyle` has an overload for it. `ThemedEntry` is exported with `SheetEntry`.
 - `MotionOptions`: `{ animated? }`, the option of `createStyle` and `configure` that React Native reads
   (the `animated` of `umber-style/react-native/animated`) and the web accepts and ignores. The animation and
   transition keys are in both platform types (`NativeMotionStyle` of the React Native binding), so a shared
