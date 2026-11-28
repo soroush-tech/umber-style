@@ -5,7 +5,7 @@ Build: client. The server counterpart is `createStyle.server.ts`.
 ## What it does
 
 `bindEngine(engine, options, contexts)` assembles the whole React styling of the client build over one
-engine: `styled`, `StyleSheet`, `useStyle`, `useStyleValue` (`useStyleValue.ts`, over the engine's cache or the provided one), `apply`, `css`, `ThemeProvider`, `ThemeScope`, `useTheme`,
+engine: `styled`, `StyleSheet`, `useStyle`, `withStyle`, `useStyleValue` (`useStyleValue.ts`, over the engine's cache or the provided one), `apply`, `css`, `ThemeProvider`, `ThemeScope`, `useTheme`, `withTheme`,
 `useThemeClass`, `themeClass`, `when`, `whenScheme`, `keyframes`, `globalStyles`, `Global`, plus the
 `engine` and its `cache`. `createStyle(theme, options)` makes an engine (or takes the one in `options`),
 gives it the theme as base theme, and binds it.

@@ -78,6 +78,7 @@ The components receive these `style` props:
 | `themeClass(...)`                | Always `''`                                                                                                                                                                                                                                                                                                                                                                                        |
 | `when`, `whenScheme`             | Matched at render against the nearest provider: see [Theme conditions](theme-conditions.md)                                                                                                                                                                                                                                                                                                        |
 | `state`                          | Matched at render against what the component is doing: see [Interaction states](#interaction-states)                                                                                                                                                                                                                                                                                               |
+| `withTheme`, `withStyle`         | As on the web: `useTheme()` and `useStyle(sheet)` as props, for a class component; `withStyle` follows the window and the color scheme as `useStyle` does. See [Class components](#class-components-withtheme-and-withstyle)                                                                                                                                                                       |
 | `useTheme()`                     | The real theme values, merged over the providers above, with the lengths as numbers. With no provider, the base theme, or an empty object when there is none: a style function then gets an empty theme                                                                                                                                                                                            |
 | `createStyle` options            | Accepted so that one call runs on both platforms. `remBase` and `lengthKeys` are used (see [Values with CSS units](#values-with-css-units)), and `animated` (see [Animations](#animations)); the others are not, and in development one warning names each of them that was given                                                                                                                  |
 | `configure`                      | `theme`, `remBase`, `lengthKeys` and `animated` are used. Throws after first use, as on the web                                                                                                                                                                                                                                                                                                    |
@@ -525,6 +526,51 @@ A plain `View` cannot resolve a handle: it is a type error, and the `TypeError` 
 
 For a component that types its `style` as entries only, `SheetStyleProp<S>` takes the entries of the binding and handles, and rejects a plain object and a style of the platform's own `StyleSheet.create` ([Typed styles](typed-styles.md#sheet-entries-only)). The entries of the binding carry a mark for the compiler, `NativeSheetEntry`, which does not exist at run time.
 
+## Class components: `withTheme` and `withStyle`
+
+`withTheme(Component)` renders `Component` with `theme` set to `useTheme()`, and `withStyle(sheet)(Component)` with `styles` set to `useStyle(sheet)`, as on the web ([React](react.md#class-components-withtheme-and-withstyle)): the wrapper is a function component that calls the hook, so a class component gets what a hook gives. From `packages/react-native/src/wrappers.types.test.tsx`, which compiles it and renders it:
+
+```tsx
+import { Component } from 'react'
+import { Text, View } from 'react-native'
+import { createStyle, type NativeSheetEntry, type NativeTheme } from '@umber-style/react-native'
+
+const lightTheme = { palette: { primary: '#1b5fd1', surface: '#ffffff' }, space: [0, 4, 8, 16] }
+
+const { StyleSheet, withStyle, withTheme } = createStyle(lightTheme)
+
+const sheet = StyleSheet.create((theme) => ({
+  card: { padding: theme.space[3], backgroundColor: theme.palette.surface },
+  title: { color: theme.palette.primary },
+}))
+
+interface CardProps {
+  title: string
+  theme: NativeTheme<typeof lightTheme>
+  styles: { card: NativeSheetEntry; title: NativeSheetEntry }
+}
+
+class Card extends Component<CardProps> {
+  static variant = 'outlined'
+
+  render() {
+    const { title, theme, styles } = this.props
+    return (
+      <View style={styles.card}>
+        <Text style={[styles.title, { borderColor: theme.palette.primary }]}>{title}</Text>
+      </View>
+    )
+  }
+}
+
+// The props of Card without theme and styles, its ref, and its statics.
+export const ThemedCard = withTheme(withStyle(sheet)(Card))
+```
+
+- `theme` is the real theme of the nearest provider, with the lengths as numbers (`NativeTheme<T>`), as `useTheme()` gives it.
+- `styles` holds the registered style objects that `useStyle(sheet)` gives, the same objects. Since the wrapper calls `useStyle`, it follows what the hook follows: the providers for a `when()` key, the window for a media key and the system color scheme for a `whenScheme()` key. In `packages/react-native/src/createWrappers.test.tsx` a class component given `withStyle` of a sheet with a media key, a `when()` key and a `whenScheme()` key gets `{ padding: 2 }` under the dark provider at 400 by 800, `{ padding: 4 }` after a resize to 800 by 400, and the margin of its `whenScheme('dark')` key once the system turns dark.
+- The wrapper takes the props of the component without `theme` (or `styles`), forwards `ref` (React 19: a prop), keeps the statics that are not React's own, and is named `withTheme(Card)` or `withStyle(Card)`. The types are those of the web: a `theme` or `styles` prop on the wrapper, a component whose `theme` is of another type, and a `styles` that names an entry the sheet does not have are type errors.
+
 ## Development warnings
 
 In development, once for each distinct message, the binding warns with `console.warn`. A message starts with `@umber-style/react-native:` and the name of the component when it is known: the `name` option of `styled`, else the display name or function name of the wrapped component; for a sheet, `sheet entry "card"`. Nothing is warned in production, or where there is no `process`.
@@ -551,6 +597,7 @@ The package exports `add`, `subtract`, `multiply`, `divide`, `negate` and `alpha
 - **The React Native binding has run in a real app on iOS only:** an Expo example on an iPhone in Expo Go (a theme switch and a nested theme changing what is drawn, `pressed` and `disabled`, the animated entry with reduced motion); Android has not been observed. The tests alias the one import of the platform (`react-native`) to a stand-in whose `StyleSheet.create` returns its input and whose `Appearance` is a stub, and they use plain host components that record their props. The styles were compiled against the real `react-native` types.
 - Because of that, `StyleSheet.create` returning ids and the platform's own handling of an unknown key were not exercised. The events of `Dimensions`, `Appearance` and `AccessibilityInfo` were sent by stand-ins: a rotation and a window resize on a device were not observed.
 - The color scheme of the platform is read when a component renders. A change of the system setting renders again the components that read it through `prefers-color-scheme` or a `whenScheme()` key that no provider decides; a style function that reads `Appearance` itself is not rendered again.
+- That `withStyle` follows a rotation and the color scheme was checked with the stand-ins of `Dimensions` and `Appearance`, not on a device.
 - A styled component whose `style` switches between holding a handle and not mounts its element again: the inner component that resolves handles comes and goes. A handle inside a function `style` (a `Pressable`) is not seen. That a handle follows a rotation was checked with the stand-in of `Dimensions`, not on a device.
 - Sheets made from a function are registered once for each theme object, kept in a `WeakMap`, so they are released with the theme object. A theme object that is re-created on every render registers a new sheet every time.
 - `alpha` cannot mix a colour it cannot read as a literal (a named colour, `hsl()`): it returns that colour unchanged.

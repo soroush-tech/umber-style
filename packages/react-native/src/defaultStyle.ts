@@ -3,6 +3,7 @@ import { globalStyles, keyframes, type Theme } from '@umber-style/core'
 import { createDeferredObject, createDeferredRecord } from '@umber-style/core/internal'
 import type { NativeStyleObject } from './nativeStyle'
 import { bindHolder } from './createStyle'
+import { createWrappers } from './createWrappers'
 import type { ThemeHolder } from './ThemeValue'
 import type { NativeTheme } from './nativeTheme'
 import { platformStyleSheet } from './platform'
@@ -62,6 +63,10 @@ export function createDefaultStyle() {
     return getStyle().useTheme()
   }
 
+  // Over the hooks above, which bind the style in the wrapper's render: wrapping a component leaves
+  // `configure` open.
+  const { withTheme, withStyle } = createWrappers(useTheme, useStyle)
+
   function ThemeProvider(props: ThemeProviderProps<Theme>) {
     return getStyle().ThemeProvider(props)
   }
@@ -88,7 +93,9 @@ export function createDefaultStyle() {
     styled,
     StyleSheet,
     useStyle,
+    withStyle: withStyle as NativeStyle<Theme>['withStyle'],
     useTheme,
+    withTheme: withTheme as NativeStyle<Theme>['withTheme'],
     ThemeProvider,
     ThemeScope,
     useThemeClass,

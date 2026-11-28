@@ -31,6 +31,7 @@ import { registerTexts, type StyleRegistryStore } from './styleRegistry'
 import { createStyled } from './styled'
 import { createThemeProvider } from './ThemeProvider'
 import { createThemeValue, type ThemeContexts } from './ThemeValue'
+import { createWrappers } from './createWrappers'
 import type {
   ServerStyleOptions,
   SheetDefinition,
@@ -132,12 +133,15 @@ export function bindEngine<T extends object>(
     })
   }
 
+  const { withTheme, withStyle } = createWrappers(useTheme, useStyle)
+
   return {
     engine,
     cache: engine.cache,
     styled: createStyled(engine, useThemeView, renderStyleElements),
     StyleSheet: { create },
     useStyle,
+    withStyle: withStyle as WebStyle<T>['withStyle'],
     useStyleValue: createUseStyleValue(() => engine.cache),
     // The class is made in the cache of the entries: under a cache provider, the entries of `useStyle`
     // are that cache's.
@@ -161,6 +165,7 @@ export function bindEngine<T extends object>(
     ThemeScope,
     ThemeContext: contexts.ThemeContext,
     useTheme,
+    withTheme: withTheme as WebStyle<T>['withTheme'],
     useThemeClass,
     themeClass,
     when: engine.when,

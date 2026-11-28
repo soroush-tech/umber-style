@@ -91,15 +91,16 @@ The bundler compiles an import for the CommonJS build as Node's interop does, wh
 | `css`                                                      | One style made once and passed around: see [Style sheets](style-sheets.md)             |
 | `keyframes`, `globalStyles`, `Global`                      | [Animations and global styles](animations-and-global-styles.md)                        |
 | `ThemeProvider`, `useTheme`, `themeClass`                  | The theme                                                                              |
+| `withTheme`, `withStyle`                                   | `useTheme()` and `useStyle(sheet)` as props, for a class component                     |
 | `ThemeScope`, `useThemeClass`                              | The wrapper of the nearest nested provider, again, for portal content                  |
 | `ThemeContext`                                             | The React context of the real theme, for `useContext` or a consumer                    |
 | `CacheProvider`                                            | Gives a subtree its cache: see [The cache and server packages](cache-and-server.md)    |
 | `when`, `whenScheme`                                       | Keys for [theme conditions](theme-conditions.md)                                       |
 | `add`, `alpha`, `divide`, `multiply`, `negate`, `subtract` | The helpers of [Tokens](tokens.md)                                                     |
 
-Types: `StyleOptions`, `DefaultStyleOptions`, `StyledOptions`, `FilteringStyledOptions`, `StyledStatics`, `StyleProp`, `StyledComponent`, `Styled`, `CreateStyled`, `StyledCall`, `StyledFactory`, `StyledTags`, `PropsOf`, `CssFunction`, `SheetDefinition`, `ThemeProviderProps`, `WebThemeProviderProps`, `ThemeScopeProps`, `CacheProviderProps`, `Style`, `WebStyle`, `ServerStyle`, `Theme` (the theme of the default style), `Interpolation`, and `ThemeInput` (the type of `theme`). The style types of the core are re-exported too: `CSSObject`, `SerializedStyles`, `Keyframes`, `UmberCache` and the others listed in [Typed styles](typed-styles.md).
+Types: `StyleOptions`, `DefaultStyleOptions`, `WrappedComponent`, `StyleWrapper`, `PropsTaking`, `StyledOptions`, `FilteringStyledOptions`, `StyledStatics`, `StyleProp`, `StyledComponent`, `Styled`, `CreateStyled`, `StyledCall`, `StyledFactory`, `StyledTags`, `PropsOf`, `CssFunction`, `SheetDefinition`, `ThemeProviderProps`, `WebThemeProviderProps`, `ThemeScopeProps`, `CacheProviderProps`, `Style`, `WebStyle`, `ServerStyle`, `Theme` (the theme of the default style), `Interpolation`, and `ThemeInput` (the type of `theme`). The style types of the core are re-exported too: `CSSObject`, `SerializedStyles`, `Keyframes`, `UmberCache` and the others listed in [Typed styles](typed-styles.md).
 
-`createStyle` returns a `WebStyle`: `styled`, `StyleSheet`, `useStyle`, `useStyleValue` (see [Writing styles](writing-styles.md#a-value-that-changes-without-a-render)), `apply`, `css`, `keyframes`, `globalStyles`, `Global`, `ThemeProvider`, `ThemeScope`, `ThemeContext`, `useTheme`, `useThemeClass`, `themeClass`, `when`, `whenScheme`, and `engine` and `cache`, the engine and its cache. The default style creates its `ThemeContext` before its engine, so the direct import exists before `configure`. The direct imports have no `engine` or `cache`: use `getEngine()` and `getEngine().cache`. `WebStyleObject` and the other style types (`WebProperties`, `WebNested`, `NestedKey`, `StyleObject`, `AlphaColor`, `SheetEntry`) are re-exported from this package as types, in both builds, and `at` and `alpha` and the arithmetic helpers are exported as values. See [Typed styles](typed-styles.md).
+`createStyle` returns a `WebStyle`: `styled`, `StyleSheet`, `useStyle`, `withStyle`, `useStyleValue` (see [Writing styles](writing-styles.md#a-value-that-changes-without-a-render)), `apply`, `css`, `keyframes`, `globalStyles`, `Global`, `ThemeProvider`, `ThemeScope`, `ThemeContext`, `useTheme`, `withTheme`, `useThemeClass`, `themeClass`, `when`, `whenScheme`, and `engine` and `cache`, the engine and its cache. The default style creates its `ThemeContext` before its engine, so the direct import exists before `configure`. The direct imports have no `engine` or `cache`: use `getEngine()` and `getEngine().cache`. `WebStyleObject` and the other style types (`WebProperties`, `WebNested`, `NestedKey`, `StyleObject`, `AlphaColor`, `SheetEntry`) are re-exported from this package as types, in both builds, and `at` and `alpha` and the arithmetic helpers are exported as values. See [Typed styles](typed-styles.md).
 
 ## `ThemeProvider`
 
@@ -122,6 +123,58 @@ The outermost provider (no provider of its engine above it in the page, of eithe
 - `styled.div(...)` and the other HTML and SVG tags are shorthands for `styled('div')(...)`, typed as the tag, in both builds. `target` adds a class of your own to the element.
 - `style` is typed `StyleProp`: sheet entries and web style objects in arrays, with falsy values dropped, and by default React's `CSSProperties` too, so props spread from `HTMLAttributes` fit (not with the strict switch of [Typed styles](typed-styles.md#the-default-types-and-the-strict-switch)). It never renders an attribute: see [No inline styles](no-inline-styles.md). In the browser, an element given a plain object counts the class that the object made, from the commit that shows it to the one that drops it (an insertion effect in a child that renders nothing, only for such an element), and the class is removed when no element uses it. A server renders an empty place where the browser renders this child, so that the server and the browser render the same tree: React's `useId` makes an id from the place of a component in the tree, and an id below the element is the one the server wrote (see [Server rendering](server-rendering.md#the-server-render-of-a-client-component)). A component that is never given a plain object has no such child and no extra hook.
 - A component that has only object styles reads no context. One with a function style reads the view of the nearest provider's theme through a hook. The view stays the same object while only the values of tokens change, so such a component renders again only when a value that is not a token changes (a breakpoint, an `inline` token, a function in the theme).
+
+## Class components: `withTheme` and `withStyle`
+
+A class component cannot call a hook. `withTheme(Component)` renders `Component` with `theme` set to `useTheme()`, and `withStyle(sheet)(Component)` renders it with `styles` set to `useStyle(sheet)`: the wrapper is a function component that calls the hook in its own render. From `packages/react/src/wrappers.types.test.tsx`, which compiles it and renders it:
+
+```tsx
+import { Component } from 'react'
+import { createStyle, type SheetEntry } from '@umber-style/react'
+
+const lightTheme = { palette: { primary: '#1b5fd1', surface: '#ffffff' }, space: [0, 4, 8, 16] }
+
+const { StyleSheet, apply, withStyle, withTheme } = createStyle(lightTheme, { prefix: 'doc' })
+
+const sheet = StyleSheet.create((theme) => ({
+  card: { padding: theme.space[3], background: theme.palette.surface },
+}))
+
+interface CardProps {
+  title: string
+  theme: typeof lightTheme
+  styles: { card: SheetEntry }
+}
+
+class Card extends Component<CardProps> {
+  static variant = 'outlined'
+
+  render() {
+    const { title, theme, styles } = this.props
+    return (
+      <section {...apply(styles.card)} data-accent={theme.palette.primary}>
+        {title}
+      </section>
+    )
+  }
+}
+
+// The props of Card without theme and styles, its ref, and its statics.
+export const ThemedCard = withTheme(withStyle(sheet)(Card))
+```
+
+`<ThemedCard title="Plan" ref={ref} />` renders the section with the class of `styles.card` and `data-accent="#1b5fd1"`, and `ref.current` is the instance of `Card`.
+
+- **The values are the hooks' own.** `theme` is what `useTheme()` returns in the same place: the nearest provider in a client component and in its server render, the base theme in a server component. `styles` is what `useStyle(sheet)` returns there: an object sheet itself, or the entries of a sheet made from a function of the theme, resolved against the nearest provider (under a `CacheProvider`, written in its cache). Give an entry to a styled component (`style={styles.card}`) or to a plain element (`apply(styles.card)`).
+- **The sheet is made once, at module level**, as for `useStyle`.
+- **The props.** The wrapper takes the props of the component without `theme` (or `styles`): passing one is a type error, and at run time the wrapper's value wins. `theme` is typed as `useTheme()` returns it (the registered `Theme` with the direct imports, the type of the theme with `createStyle`), and a component whose `theme` is of another type is a type error. `styles` is typed as `useStyle(sheet)` returns it: a component whose `styles` names an entry the sheet does not have is a type error.
+- **`ref` is forwarded.** In React 19 `ref` is a prop: the wrapper passes it on with the others, so it reaches the instance of a class component, or the element a function component gives its own `ref` prop to.
+- **Statics are kept.** The wrapper has the statics of the component (`Card.variant` above, static methods, symbols), but not those React reads (`defaultProps`, `propTypes`, `contextType`, `displayName`, `getDerivedStateFromProps` and the like), which the component keeps and reads itself when it renders.
+- **The display name** is `withTheme(Card)` or `withStyle(Card)`, after the component's `displayName`, else its name, else `Component`; the example above is `withTheme(withStyle(Card))`.
+- **The default style.** The direct imports `withTheme` and `withStyle` read the style when the wrapper renders: wrapping a component at module level leaves `configure` open.
+- **Both builds.** In the server components build the wrappers call the plain `useTheme` and `useStyle` of that build, and use no hook and no context.
+
+`withStyle` pairs with `useStyle`: a component library that offers a `withStyles` of its own, with another signature (one entry), builds it on this one.
 
 ## Sharing one engine with another binding
 
@@ -163,7 +216,7 @@ Until the first `CacheProvider` renders, no component reads it. From then on eac
 
 ## Server components
 
-The package has a second build for server components, picked by the `react-server` condition. It has `useTheme` too, a plain function there that returns the base theme, and `readTheme`, another name of it; it has no `ThemeContext`, `ThemeScope` or `useThemeClass`. In a client component `useTheme()` gives the theme of the nearest provider, also of one that a server component rendered; in a server component it gives the base theme, the same in every render. A component that needs the nearest theme's values in a server tree is marked `'use client'`, its code unchanged. See [Server rendering](server-rendering.md#usetheme-one-name-one-rule).
+The package has a second build for server components, picked by the `react-server` condition. It has `useTheme` too, a plain function there that returns the base theme, and `readTheme`, another name of it, and `withTheme` and `withStyle` over those plain functions; it has no `ThemeContext`, `ThemeScope` or `useThemeClass`. In a client component `useTheme()` gives the theme of the nearest provider, also of one that a server component rendered; in a server component it gives the base theme, the same in every render. A component that needs the nearest theme's values in a server tree is marked `'use client'`, its code unchanged. See [Server rendering](server-rendering.md#usetheme-one-name-one-rule).
 
 ## Limits
 
@@ -176,4 +229,5 @@ The package has a second build for server components, picked by the `react-serve
 - An element that is given a plain object in `style` renders a second child next to it in the browser, which renders nothing (a server renders an empty place there): the element's own state is kept when the object comes and goes (checked in jsdom), but the component's root is then a list.
 - Outside a `CacheProvider`, with `hasServerStyleElements` on (the default), each `ThemeProvider`, and each styled element with a component below it (or whose tag is a component), has a place in front of it for the style elements that a server render sends, which the browser renders empty: the root of each is a list (for a styled element, with an empty fragment in front, one more fiber), in an app that is never rendered on a server too. A styled element of a tag with only text, tags and styled elements of tags below it is alone in the browser, because no id below it can move. Turn the option off, or render under a `CacheProvider`, and every element is alone again. The element keeps its state when its place comes and goes (checked in jsdom).
 - The CommonJS build of a library is checked with the interop of Node written out in `scripts/smoke-packed.mjs` (the default is the whole `module.exports`, the names are read from it), on the packed tarballs; no bundler's own output was run.
+- `withTheme` and `withStyle` were tested with class and function components in jsdom, in a server render of the client build, and in the server components build with function components rendered by a test helper that calls them, not by React's server renderer. The type of a hoisted static is the component's own; a static that a library adds to a component at run time is kept, but not typed.
 - `apply`, `themeClass`, `when` and `whenScheme` are not hooks and do not see a `CacheProvider`: read a sheet with `useStyle` under the provider, so that `apply` writes its entries there. The server components build has no `CacheProvider`. The other limits of the provider are in [The cache and server packages](cache-and-server.md).

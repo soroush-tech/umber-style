@@ -18,6 +18,7 @@ import {
   EMPTY_THEME,
   rejectThemedEntries,
 } from '@umber-style/core/internal'
+import { createWrappers } from './createWrappers'
 import { createGlobal } from './Global.server'
 import { createStyleSender } from './inlineStyles.server'
 import { createNonceReader, createRequestSlot, type CacheFunction } from './serverContext'
@@ -98,12 +99,16 @@ export function bindEngine<T extends object>(
     })
   }
 
+  // The plain functions of this build, called in the render of the wrapper as the hooks are in the client build.
+  const { withTheme, withStyle } = createWrappers(useTheme, useStyle)
+
   return {
     engine,
     cache: engine.cache,
     styled: createStyled(engine, readViewTheme, readNonce, sendStyles),
     StyleSheet: { create },
     useStyle,
+    withStyle: withStyle as ServerStyle<T>['withStyle'],
     useStyleValue: createServerStyleValue(engine.cache),
     apply: (...entries) => {
       rejectThemedEntries(entries, 'apply()')
@@ -120,6 +125,7 @@ export function bindEngine<T extends object>(
     }) as ServerStyle<T>['ThemeProvider'],
     useTheme,
     readTheme: useTheme,
+    withTheme: withTheme as ServerStyle<T>['withTheme'],
     themeClass,
     when: engine.when,
     whenScheme: engine.whenScheme,

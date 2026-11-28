@@ -3,7 +3,7 @@
 ## What it does
 
 The entry of `@umber-style/react-native`. It makes the default style once, exports its members by name
-(`configure`, `styled`, `StyleSheet`, `useStyle`, `ThemeProvider`, `useTheme`, `css`, `when`, `whenScheme`, and
+(`configure`, `styled`, `StyleSheet`, `useStyle`, `withStyle`, `ThemeProvider`, `useTheme`, `withTheme`, `css`, `when`, `whenScheme`, and
 the rest), and re-exports `at` and `state` (with the types `StateName` and `StateKey`) from the core, `CacheProvider`, `createStyle`, the calc helpers, `alpha`, and
 the types.
 

@@ -30,6 +30,8 @@ import type { NativeTheme } from './nativeTheme'
 import type { platformStyleSheet } from './platform'
 import type {
   ComponentProps,
+  ComponentPropsWithRef,
+  ComponentType,
   Context,
   ElementType,
   FunctionComponent,
@@ -215,6 +217,47 @@ export type NativeStyleSheet<T> = Omit<typeof platformStyleSheet, 'create'> & {
 }
 
 /**
+ * The props `P` of a component, with the prop `Name` replaced by `Value` where it does not take `Value`:
+ * a component is one that `withTheme` or `withStyle` takes when its props are these, so a component whose
+ * `theme` (or `styles`) is of another type is a type error.
+ */
+export type PropsTaking<P, Name extends string, Value> = {
+  [K in keyof P]: K extends Name ? (Value extends P[K] ? P[K] : Value) : P[K]
+}
+
+/** The statics that a wrapper of `withTheme` or `withStyle` does not take from the component it wraps. */
+type OwnStatics =
+  | 'childContextTypes'
+  | 'contextType'
+  | 'contextTypes'
+  | 'defaultProps'
+  | 'displayName'
+  | 'getDerivedStateFromError'
+  | 'getDerivedStateFromProps'
+  | 'propTypes'
+  | 'prototype'
+
+/**
+ * A component that `withTheme` or `withStyle` made from the component `C`: it takes the props of `C` and
+ * its `ref` (the instance of a class component), without `Name` (`theme` or `styles`), which it gives
+ * itself, and it has the statics of `C` that are not React's.
+ */
+export type WrappedComponent<C extends ElementType, Name extends string> = FunctionComponent<
+  Omit<ComponentPropsWithRef<C>, Name>
+> &
+  Omit<C, OwnStatics>
+
+/**
+ * What `withStyle(sheet)` returns: it wraps a component whose `styles` prop takes `Styles`, the entries
+ * that `useStyle(sheet)` returns.
+ */
+export type StyleWrapper<Styles> = <
+  C extends ComponentType<PropsTaking<ComponentProps<C>, 'styles', Styles>>,
+>(
+  component: C
+) => WrappedComponent<C, 'styles'>
+
+/**
  * The styling of the theme shape `T` on React Native. What reads the theme (`useTheme`, a style function,
  * a sheet made from a function, `ThemeContext`) gets it as React Native holds it, `NativeTheme<T>`:
  * lengths are numbers. What takes a theme (`ThemeProvider`, `when`) takes `T`.
@@ -237,6 +280,22 @@ export interface NativeStyle<T> {
   ): {
     [K in keyof S]: NativeSheetEntry
   }
+  /**
+   * Wraps a component, a class component too, so that it renders with `styles` set to `useStyle(sheet)`,
+   * read in the wrapper's render: it follows the providers, the window and the color scheme as the hook
+   * does. The sheet is made once, at module level. The wrapper takes the props of the component without
+   * `styles`, forwards `ref`, keeps the statics and is named `withStyle(Card)`.
+   */
+  withStyle<K extends string>(sheet: {
+    readonly [P in K]: NativeSheetEntry
+  }): StyleWrapper<{ readonly [P in K]: NativeSheetEntry }>
+  withStyle<K extends string>(
+    sheet: SheetDefinition<Record<K, NativeStyleObject>, NativeSheetEntry> &
+      ThemedEntries<K, 'resolve' | 'prepare'>
+  ): StyleWrapper<{ [P in K]: NativeSheetEntry }>
+  withStyle<S extends NativeSheetStyles>(
+    sheet: SheetDefinition<S, NativeSheetEntry>
+  ): StyleWrapper<{ [K in keyof S]: NativeSheetEntry }>
   /** The props that apply entries of a sheet: a style array. */
   apply(...entries: (NativeStyleObject | null | undefined | false)[]): {
     style: NativeStyleObject[]
@@ -258,6 +317,14 @@ export interface NativeStyle<T> {
   ThemeContext: Context<NativeTheme<T> | undefined>
   /** The real theme values, for JavaScript that needs a number or a name: of the nearest provider, else the base theme, else an empty object. Lengths are numbers. */
   useTheme(): NativeTheme<T>
+  /**
+   * Wraps a component, a class component too, so that it renders with `theme` set to `useTheme()`, read
+   * in the wrapper's render. The wrapper takes the props of the component without `theme`, forwards
+   * `ref`, keeps the statics and is named `withTheme(Card)`.
+   */
+  withTheme<C extends ComponentType<PropsTaking<ComponentProps<C>, 'theme', NativeTheme<T>>>>(
+    component: C
+  ): WrappedComponent<C, 'theme'>
   /** Always '': there are no classes on React Native. */
   themeClass(theme: DeepPartial<T>, colorScheme?: ColorScheme): string
   /** A style key for "the nearest provider has this theme object" (compared by identity; `colorScheme` is not used here). */

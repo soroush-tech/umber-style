@@ -5,7 +5,7 @@ Build: server (components build: no hook, no context). The client counterpart is
 ## What it does
 
 `bindEngine(engine, cache?)` assembles the styling for server components over one engine: `styled`,
-`StyleSheet`, `useStyle`, `useStyleValue` (`useStyleValue.server.ts`: the first number, a setter that warns), `apply`, `css`, `ThemeProvider`, `useTheme` (also exported as `readTheme`),
+`StyleSheet`, `useStyle`, `withStyle`, `useStyleValue` (`useStyleValue.server.ts`: the first number, a setter that warns), `apply`, `css`, `ThemeProvider`, `useTheme` (also exported as `readTheme`), `withTheme`,
 `themeClass`, `when`, `whenScheme`, `keyframes`, `globalStyles` and `Global`. `createStyle(theme, options)`
 makes the engine, gives it the theme as base theme, and binds it. There is no `ThemeScope`,
 `useThemeClass` or `ThemeContext` in this build.

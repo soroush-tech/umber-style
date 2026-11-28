@@ -10,6 +10,7 @@ import {
   rejectFunctions,
   rejectThemedEntries,
 } from '@umber-style/core/internal'
+import { createWrappers } from './createWrappers'
 import { guardTheme } from './devGuard'
 import { createThemeValue, type ThemeHolder } from './ThemeValue'
 import type {
@@ -265,10 +266,13 @@ export function bindHolder<T extends object>(
     return prepared === undefined ? sheet : resolveEntries(prepared, condition, key, base)
   }) as NativeStyle<T>['useStyle']
 
+  const { withTheme, withStyle } = createWrappers(useTheme, useStyle)
+
   return {
     styled: createStyled(useTheme, useCondition, remBase, motion),
     StyleSheet: { ...platformStyleSheet, create },
     useStyle,
+    withStyle: withStyle as NativeStyle<T>['withStyle'],
     apply: (...entries) => {
       rejectThemedEntries(entries, 'apply()')
       return { style: entries.filter((entry) => !!entry) as NativeStyleObject[] }
@@ -278,6 +282,7 @@ export function bindHolder<T extends object>(
     ThemeScope,
     ThemeContext,
     useTheme,
+    withTheme: withTheme as NativeStyle<T>['withTheme'],
     useThemeClass,
     themeClass: () => '',
     when: createNativeThemeKey,

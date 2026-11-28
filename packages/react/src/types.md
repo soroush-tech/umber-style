@@ -9,7 +9,8 @@ It holds the public types of the binding: the options (`StyleOptions`, `DefaultS
 `StyledComponent`, `CreateStyledComponent`, `StyledStatics`, `StyleProp`, `SheetStyleProp`, `PropsOf`),
 the props of the
 components (`ThemeProviderProps`, `WebThemeProviderProps`, `ThemeScopeProps`, `CacheProviderProps`,
-`GlobalProps`), the setter of `useStyleValue` (`StyleValueSetter`), and the shape of a whole style (`Style`, `WebStyle`, `ServerStyle`). It re-exports the style
+`GlobalProps`), the setter of `useStyleValue` (`StyleValueSetter`), the wrappers of `withTheme` and
+`withStyle` (`WrappedComponent`, `StyleWrapper`, `PropsTaking`), and the shape of a whole style (`Style`, `WebStyle`, `ServerStyle`). It re-exports the style
 types of the core that an app annotates with, `StateName` and `StateKey` of the state keys among them.
 
 ## Why it exists
@@ -24,7 +25,8 @@ app augments one `Theme`.
 flowchart TD
   core["types of @umber-style/core"] --> theme["Theme extends core Theme"]
   core --> reexp["re-exported style types"]
-  theme --> styleNode["Style T,E: what every platform has"]
+  theme --> styleNode["Style T,E: what every platform has, withTheme and withStyle among it"]
+  styleNode --> wrapped["WrappedComponent C,Name: props of C with ref, minus Name; statics of C"]
   styleNode --> web["WebStyle: client build, adds apply, css, useStyleValue, ThemeProvider, ThemeScope, useThemeClass, ThemeContext, engine, cache"]
   web --> server["ServerStyle: WebStyle minus ThemeContext, ThemeScope, useThemeClass; useTheme + readTheme"]
   opts["StyledOptions, StyleOptions"] --> styledT["CreateStyledComponent: function, template, styles"]
@@ -43,6 +45,11 @@ flowchart TD
 - `Style.StyleSheet.create` given a function returns `SheetDefinition & ThemedEntries<K>`: one handle for
   each name, the names that pass through excepted (`themedEntry.md`), so a misspelt name is a type error.
   `useStyle` has an overload for that intersection, before the general one, which returns the entries.
+- `withTheme` and `withStyle(sheet)` take a component `C` whose props take the value at `theme` (or
+  `styles`): `PropsTaking` puts the value there where the prop does not take it, so a component whose prop
+  is of another type fails the constraint. `withStyle` has the three overloads of `useStyle`, and each
+  returns a `StyleWrapper` of what that overload returns. The wrapper is `WrappedComponent<C, Name>`:
+  `ComponentPropsWithRef<C>` without `Name`, and `C` without the statics React reads (`OwnStatics`).
 - `StyledComponent` removes from the tag's props the keys that the component's own props name, in a form
   chosen to cost the compiler less (the comment in the file explains the order of the tests).
 

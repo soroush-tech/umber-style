@@ -12,6 +12,7 @@ import {
   withTagShorthands,
 } from '@umber-style/core/internal'
 import { bindEngine } from './createStyle'
+import { createWrappers } from './createWrappers'
 import { claimPrefixStyle } from './ProviderScope'
 import { createThemeContexts } from './ThemeValue'
 import { watchProvidedCaches } from './watchProvidedCaches'
@@ -119,6 +120,10 @@ export function createDefaultStyle() {
     return getStyle().useTheme()
   }
 
+  // Over the hooks above, which bind the style in the wrapper's render: wrapping a component leaves
+  // `configure` open.
+  const { withTheme, withStyle } = createWrappers(useTheme, useStyle)
+
   function ThemeProvider(props: WebThemeProviderProps<Theme>) {
     return getStyle().ThemeProvider(props)
   }
@@ -141,8 +146,10 @@ export function createDefaultStyle() {
     styled,
     StyleSheet,
     useStyle,
+    withStyle: withStyle as WebStyle<Theme>['withStyle'],
     useStyleValue,
     useTheme,
+    withTheme: withTheme as WebStyle<Theme>['withTheme'],
     ThemeProvider,
     ThemeScope,
     useThemeClass,

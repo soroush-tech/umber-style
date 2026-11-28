@@ -53,6 +53,7 @@ describe('the server build', () => {
       'Global.server.ts',
       'ThemeProvider.server.ts',
       'createStyle.server.ts',
+      'createWrappers.ts',
       'defaultStyle.server.ts',
       'index.server.ts',
       'inlineStyles.server.ts',

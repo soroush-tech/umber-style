@@ -5,7 +5,8 @@
 Types only: the public shapes of the React Native binding. The main one is `NativeStyle<T>`, what
 `createStyle` and the default style return. The rest are the options (`StyleOptions`, `StyledOptions`), the
 props of the components (`ThemeProviderProps`, `CacheProviderProps`, `ThemeScopeProps`, `GlobalProps`), the
-`styled` and `css` types, and `NativeStyleSheet`. It also holds the contract between the binding and its
+`styled` and `css` types, `NativeStyleSheet`, and the wrappers of `withTheme` and `withStyle`
+(`WrappedComponent`, `StyleWrapper`, `PropsTaking`, the same types as in the React binding). It also holds the contract between the binding and its
 animated entry: `AnimatedDriver` (the value `animated`), `MotionContext` and `Motion`. There is no run-time
 code.
 
@@ -24,7 +25,7 @@ flowchart TD
   t["theme shape T"] --> ns["NativeStyle of T"]
   ns --> rd["what reads the theme gets NativeTheme of T"]
   ns --> tk["what takes a theme takes T"]
-  rd --> r1["useTheme, ThemeContext, style functions, sheet functions"]
+  rd --> r1["useTheme, withTheme, ThemeContext, style functions, sheet functions"]
   tk --> r2["ThemeProvider, when"]
   ns --> same["web members kept so one source runs on both"]
   same --> r3["Global, ThemeScope, themeClass, keyframes, globalStyles"]
@@ -35,6 +36,9 @@ flowchart TD
 
 ## The data
 
+- `withTheme` takes a component whose `theme` takes `NativeTheme<T>`, and `withStyle` has the three
+  overloads of `useStyle`, each returning a `StyleWrapper` of `NativeSheetEntry` entries; the wrapper is
+  `WrappedComponent<C, Name>`, the props of `C` with its `ref`, minus `Name`, and its statics but React's.
 - `StyleOptions<T>` extends the core's `BindingOptions<T>` with `remBase` (default 16) and `animated`.
   Only `remBase`, `lengthKeys` and `animated` are used; any other option is ignored with a development
   warning.

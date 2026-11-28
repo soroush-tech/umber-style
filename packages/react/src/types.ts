@@ -1,5 +1,7 @@
 import type {
   ComponentProps,
+  ComponentPropsWithRef,
+  ComponentType,
   Context,
   CSSProperties,
   ElementType,
@@ -450,6 +452,47 @@ export interface WebThemeProviderProps<T> extends ThemeProviderProps<T> {
 }
 
 /**
+ * The props `P` of a component, with the prop `Name` replaced by `Value` where it does not take `Value`:
+ * a component is one that `withTheme` or `withStyle` takes when its props are these, so a component whose
+ * `theme` (or `styles`) is of another type is a type error.
+ */
+export type PropsTaking<P, Name extends string, Value> = {
+  [K in keyof P]: K extends Name ? (Value extends P[K] ? P[K] : Value) : P[K]
+}
+
+/** The statics that a wrapper of `withTheme` or `withStyle` does not take from the component it wraps. */
+type OwnStatics =
+  | 'childContextTypes'
+  | 'contextType'
+  | 'contextTypes'
+  | 'defaultProps'
+  | 'displayName'
+  | 'getDerivedStateFromError'
+  | 'getDerivedStateFromProps'
+  | 'propTypes'
+  | 'prototype'
+
+/**
+ * A component that `withTheme` or `withStyle` made from the component `C`: it takes the props of `C` and
+ * its `ref` (the instance of a class component), without `Name` (`theme` or `styles`), which it gives
+ * itself, and it has the statics of `C` that are not React's.
+ */
+export type WrappedComponent<C extends ElementType, Name extends string> = FunctionComponent<
+  Omit<ComponentPropsWithRef<C>, Name>
+> &
+  Omit<C, OwnStatics>
+
+/**
+ * What `withStyle(sheet)` returns: it wraps a component whose `styles` prop takes `Styles`, the entries
+ * that `useStyle(sheet)` returns.
+ */
+export type StyleWrapper<Styles> = <
+  C extends ComponentType<PropsTaking<ComponentProps<C>, 'styles', Styles>>,
+>(
+  component: C
+) => WrappedComponent<C, 'styles'>
+
+/**
  * What every platform's styling has, with `E` the entry of a sheet (a class name on the web, a style
  * object on React Native): the exports of the binding of the same names.
  */
@@ -474,6 +517,21 @@ export interface Style<T, E> {
     sheet: SheetDefinition<Record<K, WebStyleObject>, E> & ThemedEntries<K>
   ): { [P in K]: E }
   useStyle<S extends SheetStyles>(sheet: SheetDefinition<S, E>): { [K in keyof S]: E }
+  /**
+   * Wraps a component, a class component too, so that it renders with `styles` set to `useStyle(sheet)`,
+   * read in the wrapper's render: `withStyle(sheet)(Card)`. The sheet is made once, at module level. The
+   * wrapper takes the props of the component without `styles`, forwards `ref`, keeps the statics and is
+   * named `withStyle(Card)`.
+   */
+  withStyle<K extends string>(sheet: { readonly [P in K]: E }): StyleWrapper<{
+    readonly [P in K]: E
+  }>
+  withStyle<K extends string>(
+    sheet: SheetDefinition<Record<K, WebStyleObject>, E> & ThemedEntries<K>
+  ): StyleWrapper<{ [P in K]: E }>
+  withStyle<S extends SheetStyles>(
+    sheet: SheetDefinition<S, E>
+  ): StyleWrapper<{ [K in keyof S]: E }>
   /** Gives the subtree below it its theme, merged over the theme above. */
   ThemeProvider(props: ThemeProviderProps<T>): ReactElement
   /**
@@ -482,6 +540,15 @@ export interface Style<T, E> {
    * components build): the base theme, the same in every render, else an empty object.
    */
   useTheme(): T
+  /**
+   * Wraps a component, a class component too, so that it renders with `theme` set to `useTheme()`, read
+   * in the wrapper's render: the nearest provider in a client component, the base theme in a server
+   * component. The wrapper takes the props of the component without `theme`, forwards `ref`, keeps the
+   * statics and is named `withTheme(Card)`.
+   */
+  withTheme<C extends ComponentType<PropsTaking<ComponentProps<C>, 'theme', T>>>(
+    component: C
+  ): WrappedComponent<C, 'theme'>
   /** The class that declares the variables of `theme`; '' on React Native. */
   themeClass(theme: DeepPartial<T>, colorScheme?: ColorScheme): string
   /** A style key for "the nearest theme is this theme": `{ [when(dark)]: { border: ... } }`. On the web it needs `@scope`; on React Native it matches the theme object of the nearest provider. */

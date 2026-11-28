@@ -3,7 +3,7 @@
 ## What it does
 
 `bindHolder(holder, context?, options?)` builds the whole React Native styling of one theme shape: `styled`,
-`StyleSheet`, `useStyle`, `apply`, `css`, `ThemeProvider`, `useTheme`, `when`, `whenScheme` and the web
+`StyleSheet`, `useStyle`, `withStyle`, `apply`, `css`, `ThemeProvider`, `useTheme`, `withTheme`, `when`, `whenScheme` and the web
 members that do nothing here. `createStyle(theme, options)` is `bindHolder` over a holder of that theme. With
 the `animated` option, `bindHolder` binds it once (`animated.bind`) to its `remBase` and its base theme, and
 gives the `Motion` it makes to `styled`, to the sheets and to `css()`.

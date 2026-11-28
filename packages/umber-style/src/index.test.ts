@@ -57,6 +57,9 @@ describe('the entries of umber-style', () => {
     for (const binding of [react, reactNative, vue]) {
       for (const name of names) expect(binding).toHaveProperty(name)
     }
+    for (const binding of [react, reactNative, reactServer]) {
+      for (const name of ['withTheme', 'withStyle']) expect(binding).toHaveProperty(name)
+    }
     for (const binding of [react, vue]) expect(binding).toHaveProperty('getEngine')
     for (const binding of [react, reactNative, vue]) {
       for (const name of ['ThemeScope', 'useThemeClass']) expect(binding).toHaveProperty(name)

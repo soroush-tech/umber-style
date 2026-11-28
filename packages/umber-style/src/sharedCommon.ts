@@ -2,7 +2,13 @@
 // web and on React Native, `useTheme` with it, and in server components (`shared.server.ts` adds
 // `readTheme`, `shared.ts` the context and the portal helpers). This file holds types and declarations
 // only: it is never loaded.
-import type { ComponentProps, ElementType, FunctionComponent, ReactElement } from 'react'
+import type {
+  ComponentProps,
+  ComponentType,
+  ElementType,
+  FunctionComponent,
+  ReactElement,
+} from 'react'
 import type {
   ColorScheme,
   DeepPartial,
@@ -27,9 +33,12 @@ import type {
 import type {
   DefaultStyleOptions,
   GlobalProps,
+  PropsTaking,
   StyledOptions,
+  StyleWrapper,
   Theme,
   ThemeProviderProps,
+  WrappedComponent,
 } from '@umber-style/react'
 import type {
   AnimatedDriver,
@@ -195,6 +204,29 @@ export interface SharedStyleBase<T> {
   useStyle<S extends SharedSheetStyles>(
     sheet: SharedSheetDefinition<S>
   ): { [K in keyof S]: SharedEntry }
+  /**
+   * Wraps a component, a class component too, so that it renders with `styles` set to `useStyle(sheet)`,
+   * read in the wrapper's render. The wrapper takes the props of the component without `styles`,
+   * forwards `ref`, keeps the statics and is named `withStyle(Card)`.
+   */
+  withStyle<K extends string>(sheet: {
+    readonly [P in K]: SharedEntry
+  }): StyleWrapper<{ readonly [P in K]: SharedEntry }>
+  withStyle<K extends string>(
+    sheet: SharedSheetDefinition<Record<K, SharedStyleObject>> &
+      ThemedEntries<K, 'resolve' | 'prepare'>
+  ): StyleWrapper<{ [P in K]: SharedEntry }>
+  withStyle<S extends SharedSheetStyles>(
+    sheet: SharedSheetDefinition<S>
+  ): StyleWrapper<{ [K in keyof S]: SharedEntry }>
+  /**
+   * Wraps a component, a class component too, so that it renders with `theme` set to `useTheme()`, read
+   * in the wrapper's render. The wrapper takes the props of the component without `theme`, forwards
+   * `ref`, keeps the statics and is named `withTheme(Card)`.
+   */
+  withTheme<C extends ComponentType<PropsTaking<ComponentProps<C>, 'theme', T>>>(
+    component: C
+  ): WrappedComponent<C, 'theme'>
   /** The props that put sheet entries on a styled component: a class name on the web, a style array on React Native. */
   apply: SharedApply
   /** One style made once and passed around: a sheet entry on the web, the merged native style on React Native. Pass it on; do not read it. */
@@ -226,6 +258,7 @@ export interface MotionOptions {
 }
 
 export type { DefaultStyleOptions, GlobalProps, StyledOptions, ThemeProviderProps }
+export type { PropsTaking, StyleWrapper, WrappedComponent }
 export type { StyleOptions } from '@umber-style/react'
 export type { SheetEntry, Theme, ThemedEntry }
 export type {
@@ -255,6 +288,8 @@ export declare const styled: SharedStyled<Theme>
 export declare const StyleSheet: SharedStyleSheet<Theme>
 export declare const useStyle: SharedStyleBase<Theme>['useStyle']
 export declare const useTheme: SharedStyleBase<Theme>['useTheme']
+export declare const withStyle: SharedStyleBase<Theme>['withStyle']
+export declare const withTheme: SharedStyleBase<Theme>['withTheme']
 export declare const ThemeProvider: SharedStyleBase<Theme>['ThemeProvider']
 export declare const apply: SharedApply
 export declare const css: SharedCss

@@ -44,6 +44,26 @@ On the web an entry is a frozen object that holds a class name. It prints as tha
 
 `useStyle` is a hook on React (call it in a component) and must run in `setup` on Vue. `StyleSheet.create` is not a hook.
 
+### `withStyle`: the entries as a prop
+
+A class component cannot call `useStyle`. `withStyle(sheet)(Component)` wraps it: the wrapper calls `useStyle(sheet)` in its render and gives the result to the component as its `styles` prop, the same entries, typed as the hook's result. It is in the React binding (both builds), the React Native binding and `umber-style/react`; Vue keeps its composables. From `packages/react/src/wrappers.types.test.tsx`:
+
+```tsx
+const sheet = StyleSheet.create((theme) => ({
+  card: { padding: theme.space[3], background: theme.palette.surface },
+}))
+
+class Panel extends Component<{ title: string; styles: { card: SheetEntry } }> {
+  render() {
+    return <section {...apply(this.props.styles.card)}>{this.props.title}</section>
+  }
+}
+
+export const StyledPanel = withStyle(sheet)(Panel)
+```
+
+Where it fits: a class component, or a component that should receive its entries from outside rather than call a hook. The entries go where the hook's go: in the `style` of a styled component (`style={styles.card}`), and on a plain element through `apply` (`{...apply(styles.card)}`). Make the sheet at module level, as for `useStyle`. The wrapper forwards `ref`, keeps the statics and is named `withStyle(Panel)`; a component whose `styles` names an entry the sheet does not have is a type error. See [React](react.md#class-components-withtheme-and-withstyle) and [React Native](react-native.md#class-components-withtheme-and-withstyle); `withTheme` gives `useTheme()` the same way ([Themes](themes.md#reading-values-in-javascript-usetheme)).
+
 ## A sheet without a hook
 
 Given an object, `StyleSheet.create` returns the entries, and they are usable where the sheet is made: in a `style` prop, in `apply`, in another module. `useStyle` is not needed, and given an object sheet it returns the same object, so existing code that calls it keeps working.
